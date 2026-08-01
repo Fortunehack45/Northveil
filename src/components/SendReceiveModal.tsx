@@ -1,0 +1,156 @@
+import React, { useState } from 'react';
+import { useWallet } from '../context/WalletContext';
+import { CustomSelect } from './CustomSelect';
+import { Send, QrCode, Copy, Check, ShieldCheck, HardDrive, AlertTriangle } from 'lucide-react';
+
+interface SendReceiveModalProps {
+  mode: 'send' | 'receive';
+  initialAssetId?: string;
+  onClose: () => void;
+}
+
+export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
+  mode,
+  initialAssetId,
+  onClose,
+}) => {
+  const { assets, sendCrypto, triggerBiometricAuth, hardwareWallet } = useWallet();
+
+  const [selectedAssetId, setSelectedAssetId] = useState<string>(
+    initialAssetId || assets[0]?.id || 'eth-main'
+  );
+  const [recipientAddress, setRecipientAddress] = useState<string>('');
+  const [amount, setAmount] = useState<string>('0.5');
+  const [copied, setCopied] = useState<boolean>(false);
+  const [isSending, setIsSending] = useState<boolean>(false);
+
+  const asset = assets.find((a) => a.id === selectedAssetId) || assets[0];
+  const numAmount = parseFloat(amount) || 0;
+
+  const handleCopyAddress = () => {
+    const addr = hardwareWallet.address || '0x71C87291a89041235B91238491209C8491209C8';
+    navigator.clipboard.writeText(addr);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleConfirmSend = () => {
+    if (!recipientAddress || numAmount <= 0) return;
+    if (numAmount > asset.balance) {
+      alert('Insufficient token balance.');
+      return;
+    }
+
+    triggerBiometricAuth(`Authorize Send of ${numAmount} ${asset.symbol}`, async () => {
+      setIsSending(true);
+      setTimeout(async () => {
+        await sendCrypto({
+          assetId: asset.id,
+          amount: numAmount,
+          recipientAddress,
+          gasFeeUsd: 2.50,
+        });
+        setIsSending(false);
+        onClose();
+      }, 1200);
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-4">
+      <div className="bg-[#141419] border-4 border-white p-5 sm:p-8 max-w-md w-full shadow-[10px_10px_0px_0px_#ccff00] relative space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
+        <div className="flex items-center justify-between border-b-2 border-white pb-3">
+          <h3 className="text-xl font-black text-white font-mono uppercase flex items-center gap-2 tracking-tight">
+            {mode === 'send' ? <Send className="w-5 h-5 text-[#ccff00] stroke-[3]" /> : <QrCode className="w-5 h-5 text-[#ccff00] stroke-[3]" />}
+            <span>{mode === 'send' ? `SEND ${asset.symbol}` : `RECEIVE ${asset.symbol}`}</span>
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 px-3 border-2 border-black bg-[#ff007f] text-white font-black hover:bg-[#ff3399]"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Asset Selector */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-mono font-black text-slate-300 uppercase">SELECT ASSET</label>
+          <CustomSelect
+            options={assets.map((a) => ({
+              value: a.id,
+              label: `${a.symbol} - ${a.name} (BAL: ${a.balance})`,
+            }))}
+            value={selectedAssetId}
+            onChange={(val) => setSelectedAssetId(val)}
+            variant="yellow"
+            className="w-full"
+          />
+        </div>
+
+        {mode === 'send' ? (
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-black text-slate-300 uppercase">RECIPIENT ADDRESS</label>
+              <input
+                type="text"
+                placeholder="PASTE 0X ADDRESS OR ENS..."
+                value={recipientAddress}
+                onChange={(e) => setRecipientAddress(e.target.value)}
+                className="w-full bg-[#0a0a0c] border-2 border-white p-3 text-xs text-white font-mono focus:outline-none"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs font-mono font-black">
+                <span className="text-slate-300 uppercase">AMOUNT</span>
+                <span className="text-slate-300 uppercase">
+                  AVAILABLE: <strong className="text-[#ccff00] font-black">{asset.balance} {asset.symbol}</strong>
+                </span>
+              </div>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full bg-[#0a0a0c] border-2 border-white p-3 text-lg font-mono font-black text-white focus:outline-none"
+              />
+            </div>
+
+            <button
+              disabled={isSending || !recipientAddress || numAmount <= 0}
+              onClick={handleConfirmSend}
+              className="w-full py-3.5 bg-[#ccff00] text-black font-mono font-black uppercase tracking-wider text-xs border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:bg-[#d8ff33] active:translate-x-1 active:translate-y-1 active:shadow-none cursor-pointer disabled:opacity-50 transition-all"
+            >
+              {isSending ? 'SIGNING TRANSACTION...' : `SEND ${numAmount} ${asset.symbol}`}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4 text-center">
+            {/* Generated QR Code placeholder */}
+            <div className="bg-white p-4 w-48 h-48 mx-auto flex items-center justify-center border-4 border-black shadow-[4px_4px_0px_0px_#000]">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${hardwareWallet.address || '0x71C87291a89041235B91238491209C8'}`}
+                alt="Deposit QR Code"
+                className="w-full h-full object-contain"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono text-slate-300 font-black uppercase tracking-wider">YOUR DEPOSIT ADDRESS ({asset.network})</span>
+              <div className="bg-[#0a0a0c] p-3 border-2 border-white text-xs font-mono text-[#00f0ff] font-bold break-all select-all shadow-[2px_2px_0px_0px_#000]">
+                {hardwareWallet.address || '0x71C87291a89041235B91238491209C8'}
+              </div>
+            </div>
+
+            <button
+              onClick={handleCopyAddress}
+              className="w-full py-3 bg-[#00f0ff] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[3px_3px_0px_0px_#000] flex items-center justify-center gap-2 cursor-pointer hover:bg-[#33f3ff]"
+            >
+              {copied ? <Check className="w-4 h-4 text-black stroke-[3]" /> : <Copy className="w-4 h-4 stroke-[3]" />}
+              <span>{copied ? 'COPIED ADDRESS!' : 'COPY DEPOSIT ADDRESS'}</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

@@ -1,0 +1,8 @@
+{
+  "name": "Northveil Wallet",
+  "description": "A feature-packed decentralized crypto wallet and DEX supporting multi-chain asset tracking, cross-chain swapping, gas fee estimation, hardware wallet integration, staking yield dashboards, seed backup & biometric security, and downloadable tax reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
