@@ -13,105 +13,31 @@ import {
   Check,
 } from 'lucide-react';
 
-interface NFTItem {
-  id: string;
-  name: string;
-  collection: string;
-  image: string;
-  tokenId: string;
-  contractAddress: string;
-  network: string;
-  floorPriceEth: number;
-  isSpam?: boolean;
-  isHidden?: boolean;
-  attributes: { trait: string; value: string }[];
-}
+import { useWallet } from '../context/WalletContext';
+import { NFTAsset } from '../types';
 
 export const NFTSectionView: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [activeTab, setActiveTab] = useState<'all' | 'hidden' | 'spam'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedNft, setSelectedNft] = useState<NFTItem | null>(null);
+  const [selectedNft, setSelectedNft] = useState<NFTAsset | null>(null);
   const [copiedAddress, setCopiedAddress] = useState(false);
 
-  const nfts: NFTItem[] = [
-    {
-      id: '1',
-      name: 'CyberPunk Neo #4290',
-      collection: 'Neo-Brutalist Punks',
-      image: 'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=500&auto=format&fit=crop&q=60',
-      tokenId: '#4290',
-      contractAddress: '0x356e...b981',
-      network: 'Ethereum',
-      floorPriceEth: 4.85,
-      attributes: [
-        { trait: 'Background', value: 'Neon Yellow' },
-        { trait: 'Eyes', value: 'VR Goggles' },
-        { trait: 'Mouth', value: 'Gold Grill' },
-      ],
-    },
-    {
-      id: '2',
-      name: 'Bored Ape Yacht Club #8812',
-      collection: 'BAYC',
-      image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60',
-      tokenId: '#8812',
-      contractAddress: '0xbc4e...f13d',
-      network: 'Ethereum',
-      floorPriceEth: 28.5,
-      attributes: [
-        { trait: 'Fur', value: 'Cheetah' },
-        { trait: 'Hat', value: 'Captain' },
-      ],
-    },
-    {
-      id: '3',
-      name: 'Solana Ape #104',
-      collection: 'Solana Monkey Business',
-      image: 'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=500&auto=format&fit=crop&q=60',
-      tokenId: '#104',
-      contractAddress: 'Sol111...420',
-      network: 'Solana',
-      floorPriceEth: 45.2,
-      attributes: [
-        { trait: 'Clothes', value: 'Tuxedo' },
-        { trait: 'Eyes', value: 'Laser' },
-      ],
-    },
-    {
-      id: '4',
-      name: 'CLAIM FREE AIRDROP NFT',
-      collection: 'Scam Drop 2026',
-      image: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=500&auto=format&fit=crop&q=60',
-      tokenId: '#0000',
-      contractAddress: '0xDEAD...BEEF',
-      network: 'Polygon',
-      floorPriceEth: 0,
-      isSpam: true,
-      attributes: [{ trait: 'Type', value: 'Phishing Token' }],
-    },
-    {
-      id: '5',
-      name: 'Hidden Ledger Pass #02',
-      collection: 'Vault Access Passes',
-      image: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=500&auto=format&fit=crop&q=60',
-      tokenId: '#02',
-      contractAddress: '0x8888...7777',
-      network: 'Arbitrum',
-      floorPriceEth: 1.2,
-      isHidden: true,
-      attributes: [{ trait: 'Tier', value: 'Founders Edition' }],
-    },
-  ];
+  const { ownedNFTs } = useWallet();
+  const nfts = ownedNFTs;
 
   const filteredNfts = nfts.filter((nft) => {
-    if (activeTab === 'spam') return nft.isSpam;
-    if (activeTab === 'hidden') return nft.isHidden;
-    if (nft.isSpam || nft.isHidden) return false;
+    const isSpam = false; // Add spam detection logic here if needed
+    const isHidden = false; // Add hidden logic here if needed
+    
+    if (activeTab === 'spam') return isSpam;
+    if (activeTab === 'hidden') return isHidden;
+    if (isSpam || isHidden) return false;
+    
     if (searchQuery) {
       return (
-        nft.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        nft.collection.toLowerCase().includes(searchQuery.toLowerCase())
+        (nft.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (nft.collection || '').toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
     return true;
@@ -170,7 +96,7 @@ export const NFTSectionView: React.FC = () => {
                 : 'bg-[#0a0a0c] text-slate-300 border-white/40'
             }`}
           >
-            COLLECTION ({nfts.filter((n) => !n.isSpam && !n.isHidden).length})
+            COLLECTION ({nfts.length})
           </button>
           <button
             onClick={() => setActiveTab('hidden')}
@@ -180,7 +106,7 @@ export const NFTSectionView: React.FC = () => {
                 : 'bg-[#0a0a0c] text-slate-300 border-white/40'
             }`}
           >
-            HIDDEN ({nfts.filter((n) => n.isHidden).length})
+            HIDDEN (0)
           </button>
           <button
             onClick={() => setActiveTab('spam')}
@@ -190,7 +116,7 @@ export const NFTSectionView: React.FC = () => {
                 : 'bg-[#0a0a0c] text-slate-300 border-white/40'
             }`}
           >
-            SPAM SHIELD ({nfts.filter((n) => n.isSpam).length})
+            SPAM SHIELD (0)
           </button>
         </div>
 
@@ -208,7 +134,13 @@ export const NFTSectionView: React.FC = () => {
       </div>
 
       {/* NFT Grid / List Display */}
-      {viewMode === 'grid' ? (
+      {filteredNfts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center border-2 border-dashed border-white/20 text-slate-500 font-mono text-xs uppercase min-h-[400px] bg-[#0a0a0c]">
+          <List className="w-12 h-12 mb-4 opacity-50 text-[#ccff00]" />
+          <span className="text-lg font-black text-white">NO NFTS IN VAULT</span>
+          <span className="mt-2 text-slate-400">CONNECT OMNICHAIN API KEY OR DEPOSIT AN NFT</span>
+        </div>
+      ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredNfts.map((nft) => (
             <div
@@ -221,11 +153,6 @@ export const NFTSectionView: React.FC = () => {
                 <span className="absolute top-2 left-2 bg-[#0a0a0c] text-[#ccff00] font-mono font-black text-[10px] px-2 py-0.5 border border-white uppercase shadow-[2px_2px_0px_0px_#000]">
                   {nft.network}
                 </span>
-                {nft.isSpam && (
-                  <span className="absolute top-2 right-2 bg-[#ff007f] text-white font-mono font-black text-[10px] px-2 py-0.5 border border-black uppercase shadow-[2px_2px_0px_0px_#000]">
-                    ⚠️ SPAM DETECTED
-                  </span>
-                )}
               </div>
 
               <div>
@@ -233,7 +160,7 @@ export const NFTSectionView: React.FC = () => {
                 <h3 className="text-lg font-black text-white font-mono uppercase tracking-tight truncate">{nft.name}</h3>
                 <div className="flex items-center justify-between mt-2 pt-2 border-t-2 border-white/20 font-mono text-xs">
                   <span className="text-slate-400">FLOOR PRICE:</span>
-                  <span className="text-[#ccff00] font-black">{nft.floorPriceEth} ETH</span>
+                  <span className="text-[#ccff00] font-black">{nft.floorPrice}</span>
                 </div>
               </div>
 
@@ -256,12 +183,12 @@ export const NFTSectionView: React.FC = () => {
                 <div>
                   <div className="text-[10px] font-mono font-black text-[#00f0ff] uppercase">{nft.collection}</div>
                   <h4 className="text-base font-black text-white font-mono uppercase">{nft.name}</h4>
-                  <div className="text-[10px] font-mono text-slate-400">{nft.tokenId} • {nft.contractAddress}</div>
+                  <div className="text-[10px] font-mono text-slate-400">{nft.tokenId} • {nft.contract}</div>
                 </div>
               </div>
               <div className="text-right font-mono">
                 <div className="text-xs text-slate-300">FLOOR</div>
-                <div className="text-sm font-black text-[#ccff00]">{nft.floorPriceEth} ETH</div>
+                <div className="text-sm font-black text-[#ccff00]">{nft.floorPrice}</div>
               </div>
             </div>
           ))}
@@ -297,7 +224,7 @@ export const NFTSectionView: React.FC = () => {
               </div>
               <div className="flex justify-between p-2.5 bg-[#0a0a0c] border-2 border-white">
                 <span className="text-slate-400">CONTRACT:</span>
-                <span className="text-[#ccff00] font-bold">{selectedNft.contractAddress}</span>
+                <span className="text-[#ccff00] font-bold">{selectedNft.contract}</span>
               </div>
 
               <div>

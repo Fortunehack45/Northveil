@@ -1,4 +1,4 @@
-export type NetworkId = 'ethereum' | 'solana' | 'bitcoin' | 'arbitrum' | 'polygon' | 'bsc' | 'avalanche';
+export type NetworkId = string; // 'ethereum' | 'solana' | 'bitcoin' | 'arbitrum' | 'polygon' | 'bsc' | 'avalanche' | 'base'
 
 export interface ChainInfo {
   id: NetworkId;
@@ -11,6 +11,9 @@ export interface ChainInfo {
   gasUnit: string;
   nativeTokenPrice: number;
   explorerUrl: string;
+  rpcUrl?: string; // added for custom networks
+  chainId?: number; // added for custom networks
+  isCustom?: boolean;
 }
 
 export interface TokenSocials {
@@ -39,9 +42,37 @@ export interface CryptoAsset {
   volume24hUsd?: number;
   avgBuyPriceUsd?: number;
   isFavorite?: boolean;
+  isCustom?: boolean;
   launchYear?: number;
   bio?: string;
   socials?: TokenSocials;
+}
+
+export interface NFTAttribute {
+  trait: string;
+  value: string;
+}
+
+export interface NFTAsset {
+  id: string;
+  name: string;
+  collection: string;
+  image: string;
+  tokenId: string;
+  network: string;
+  floorPrice: string;
+  estUsd: string;
+  contract: string;
+  attributes: NFTAttribute[];
+}
+
+export interface PortfolioHistoryPoint {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  isGreen: boolean;
 }
 
 export type TxType = 'swap' | 'bridge' | 'send' | 'receive' | 'stake' | 'unstake' | 'claim';
@@ -111,6 +142,8 @@ export interface SubWalletAccount {
   accountIndex: number;
   address: string;
   derivationPath: string;
+  solanaAddress?: string;
+  solanaDerivationPath?: string;
   colorTag: string;
   isDefault?: boolean;
   createdAt: string;
@@ -128,6 +161,7 @@ export interface UserSettings {
   slippageTolerance: number; // percentage, e.g. 0.5
   cloudBackupEnabled: boolean;
   lastBackupTimestamp?: string;
+  moralisApiKey?: string;
 }
 
 export interface MicroserviceStatus {

@@ -32,6 +32,7 @@ export const GasEstimatorView: React.FC = () => {
 
   // Simulated 24h gas price historical chart
   const gasHistoryData = useMemo(() => {
+    if (!activeGasData) return [];
     const list = [];
     const base = activeGasData.baseFee;
     for (let i = 24; i >= 0; i--) {
@@ -47,6 +48,7 @@ export const GasEstimatorView: React.FC = () => {
   }, [activeGasData]);
 
   const customEstimatedFeeUsd = useMemo(() => {
+    if (!activeGasData) return 0;
     const standardUsd = activeGasData.tiers.find((t) => t.speed === 'standard')?.feeUsd || 5.0;
     return Number((standardUsd * (1 + customPriorityGwei / 20)).toFixed(2));
   }, [activeGasData, customPriorityGwei]);
@@ -82,14 +84,30 @@ export const GasEstimatorView: React.FC = () => {
                   : 'bg-[#181820] border-white/30 text-slate-300 hover:border-white'
               }`}
             >
-              <span>{chain.icon}</span>
+              {chain.icon.startsWith('http') ? (
+                <img src={chain.icon} alt={chain.name} className="w-5 h-5 object-contain" />
+              ) : (
+                <span>{chain.icon}</span>
+              )}
               <span>{chain.symbol}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Network Speed Tiers Grid */}
+      {!activeGasData ? (
+        <div className="bg-[#141419] border-2 border-white p-12 shadow-[8px_8px_0px_0px_#000] flex flex-col items-center justify-center min-h-[300px]">
+          <Activity className="w-12 h-12 text-[#ccff00] mb-4 animate-spin-slow" />
+          <div className="text-[#ccff00] font-mono text-lg font-black animate-pulse uppercase tracking-widest text-center">
+            FETCHING LIVE ON-CHAIN GAS DATA...
+          </div>
+          <div className="text-slate-400 font-mono text-xs mt-2 uppercase">
+            CONNECTING TO {selectedChain.toUpperCase()} RPC NODES
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Network Speed Tiers Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {activeGasData.tiers.map((tier) => {
           const isInstant = tier.speed === 'instant';
@@ -267,6 +285,7 @@ export const GasEstimatorView: React.FC = () => {
           </div>
         </div>
       </div>
+      </>)}
     </div>
   );
 };

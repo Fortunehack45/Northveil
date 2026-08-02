@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useWallet } from '../context/WalletContext';
 import { CustomSelect } from './CustomSelect';
+import { ImportTokenModal } from './ImportTokenModal';
 import {
   Wallet,
   ArrowDownLeft,
   TrendingUp,
+  TrendingDown,
   BarChart2,
   ChevronDown,
   CandlestickChart,
@@ -21,6 +23,7 @@ import {
 
 import { TokenDetailsView } from './TokenDetailsView';
 import { CryptoAsset } from '../types';
+import { SUPPORTED_CHAINS } from '../data/initialData';
 
 interface PortfolioViewProps {
   onOpenSend: (assetId?: string) => void;
@@ -41,13 +44,17 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
 }) => {
   const {
     assets,
-    totalNetWorthUsd,
     subWallets,
     activeWalletId,
     activeSubWallet,
     setActiveWalletId,
     createSubWallet,
+    ownedNFTs,
+    historicalPerformance,
   } = useWallet();
+
+  const totalUsd = assets.reduce((sum, a) => sum + (a.balance * a.priceUsd), 0);
+  const totalDeposits = totalUsd > 0 ? totalUsd * 0.85 : 0;
   const [timeframe, setTimeframe] = useState<'1D' | '1W' | '1M' | '1Y' | 'ALL'>('1M');
   const [selectedAsset, setSelectedAsset] = useState<string>('ETH');
   const [selectedVaultNft, setSelectedVaultNft] = useState<any | null>(null);
@@ -55,24 +62,31 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
   const [selectedTokenDetails, setSelectedTokenDetails] = useState<CryptoAsset | null>(null);
   const [showAddWalletModal, setShowAddWalletModal] = useState<boolean>(false);
   const [quickWalletName, setQuickWalletName] = useState<string>('');
+  const [showImportTokenModal, setShowImportTokenModal] = useState<boolean>(false);
 
   useEffect(() => {
     const handleCustomTokenOpen = (e: Event) => {
       const customEvent = e as CustomEvent<CryptoAsset>;
       if (customEvent.detail) {
         setSelectedTokenDetails(customEvent.detail);
-        window.scrollTo(0, 0);
+        document.querySelector('main')?.scrollTo(0, 0);
       }
     };
-    window.addEventListener('open-token-details', handleCustomTokenOpen);
+    const handleResetPortfolio = () => {
+      setSelectedTokenDetails(null);
+    };
+
+    window.addEventListener('open-token-details', handleCustomTokenOpen as EventListener);
+    window.addEventListener('reset-portfolio', handleResetPortfolio);
     return () => {
-      window.removeEventListener('open-token-details', handleCustomTokenOpen);
+      window.removeEventListener('open-token-details', handleCustomTokenOpen as EventListener);
+      window.removeEventListener('reset-portfolio', handleResetPortfolio);
     };
   }, []);
 
   const handleOpenTokenDetails = (asset: CryptoAsset) => {
     setSelectedTokenDetails(asset);
-    window.scrollTo(0, 0);
+    document.querySelector('main')?.scrollTo(0, 0);
   };
 
   const handleCreateWalletFromDashboard = (e?: React.FormEvent) => {
@@ -99,92 +113,31 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
     );
   }
 
-  // Owned NFTs displayed directly in the dashboard's middle left section
-  const ownedNFTs = [
-    {
-      id: '1',
-      name: 'CyberPunk Neo #4290',
-      collection: 'Neo-Brutalist Punks',
-      image: 'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=500&auto=format&fit=crop&q=60',
-      tokenId: '#4290',
-      network: 'ETH',
-      floorPrice: '4.85 ETH',
-      estUsd: '$16,733',
-      contract: '0x356e...b981',
-      attributes: [
-        { trait: 'Background', value: 'Neon Yellow' },
-        { trait: 'Eyes', value: 'VR Goggles' },
-        { trait: 'Mouth', value: 'Gold Grill' },
-      ],
-    },
-    {
-      id: '2',
-      name: 'Bored Ape #8812',
-      collection: 'Bored Ape Yacht Club',
-      image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60',
-      tokenId: '#8812',
-      network: 'ETH',
-      floorPrice: '28.50 ETH',
-      estUsd: '$98,330',
-      contract: '0xbc4e...f13d',
-      attributes: [
-        { trait: 'Fur', value: 'Cheetah' },
-        { trait: 'Hat', value: 'Captain' },
-      ],
-    },
-    {
-      id: '3',
-      name: 'Solana Ape #104',
-      collection: 'Solana Monkey Business',
-      image: 'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=500&auto=format&fit=crop&q=60',
-      tokenId: '#104',
-      network: 'SOL',
-      floorPrice: '45.20 SOL',
-      estUsd: '$6,508',
-      contract: 'Sol111...420',
-      attributes: [
-        { trait: 'Clothes', value: 'Tuxedo' },
-        { trait: 'Eyes', value: 'Laser' },
-      ],
-    },
-    {
-      id: '4',
-      name: 'Vault Pass #02',
-      collection: 'Cryptfest Access Passes',
-      image: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=500&auto=format&fit=crop&q=60',
-      tokenId: '#02',
-      network: 'ARB',
-      floorPrice: '1.20 ETH',
-      estUsd: '$4,140',
-      contract: '0x8888...7777',
-      attributes: [
-        { trait: 'Tier', value: 'Genesis Founders' },
-        { trait: 'Perk', value: 'Zero Gas Trading' },
-      ],
-    },
-  ];
+  // Chain Allocation Items
+  const chainAllocations = assets
+    .filter(a => a.balance * a.priceUsd > 0)
+    .map((a, i) => {
+      const amountUsd = a.balance * a.priceUsd;
+      const pct = totalUsd > 0 ? (amountUsd / totalUsd) * 100 : 0;
+      const palette = ['#ccff00', '#00f0ff', '#ff007f', '#9d00ff', '#ff7b00'];
+      const color = palette[i % palette.length];
+      const isImageUrl = a.icon.length > 5 || a.icon.startsWith('http');
+      
+      return {
+        name: a.name,
+        icon: isImageUrl ? undefined : a.icon,
+        iconUrl: isImageUrl ? a.icon : undefined,
+        symbol: a.symbol,
+        amount: `$ ${amountUsd.toFixed(2)}`,
+        pct: `${pct.toFixed(2)}%`,
+        color: color
+      };
+    })
+    .sort((a, b) => parseFloat(b.pct) - parseFloat(a.pct))
+    .slice(0, 5);
+  const candlestickPoints = historicalPerformance;
 
-  // Chain Allocation Items matching screenshot styling
-  const chainAllocations = [
-    { name: 'Bitcoin', icon: '₿', symbol: 'BTC', amount: '$ 33,38', pct: '71.68%', color: 'bg-amber-500', iconBg: 'bg-amber-500/20 text-amber-400' },
-    { name: 'Ethereum', icon: 'Ξ', symbol: 'ETH', amount: '$ 23,08', pct: '71.68%', color: 'bg-emerald-400', iconBg: 'bg-emerald-500/20 text-emerald-400' },
-    { name: 'Shiba', icon: '🐕', symbol: 'SHIB', amount: '$ 33,38', pct: '71.68%', color: 'bg-rose-500', iconBg: 'bg-rose-500/20 text-rose-400' },
-    { name: 'Solana', icon: '◎', symbol: 'SOL', amount: '$ 23,08', pct: '71.68%', color: 'bg-cyan-400', iconBg: 'bg-cyan-500/20 text-cyan-400' },
-    { name: 'Tether', icon: '₮', symbol: 'USDT', amount: '$ 33,38', pct: '71.68%', color: 'bg-teal-400', iconBg: 'bg-teal-500/20 text-teal-400' },
-  ];
-
-  // Simulated Candlesticks Data for the chart matching screenshot colors
-  const candlestickPoints = [
-    { date: '1 Nov', open: 3400, high: 3600, low: 3300, close: 3550, isGreen: true },
-    { date: '5 Nov', open: 3550, high: 3580, low: 3200, close: 3250, isGreen: false },
-    { date: '10 Nov', open: 3250, high: 3650, low: 3200, close: 3600, isGreen: true },
-    { date: '15 Nov', open: 3600, high: 3750, low: 3500, close: 3520, isGreen: false },
-    { date: '20 Nov', open: 3520, high: 4100, low: 3480, close: 4050, isGreen: true },
-    { date: '25 Nov', open: 4050, high: 4150, low: 3900, close: 3950, isGreen: false },
-    { date: '30 Nov', open: 3950, high: 4300, low: 3920, close: 4280, isGreen: true },
-    { date: '05 Dec', open: 4280, high: 4350, low: 4080, close: 4120, isGreen: false },
-    { date: '10 Dec', open: 4120, high: 4420, low: 4100, close: 4390, isGreen: true },
-  ];
+  const sortedAssets = [...assets].sort((a, b) => (b.balance * b.priceUsd) - (a.balance * a.priceUsd));
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-5 sm:space-y-6 pb-12 w-full">
@@ -246,7 +199,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
               TOTAL ASSETS
             </span>
             <div className="text-xl sm:text-2xl font-black text-white font-mono mt-0.5 truncate">
-              $ 87,743
+              $ {totalUsd > 0 && totalUsd < 0.01 ? totalUsd.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : totalUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
         </div>
@@ -261,7 +214,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
               TOTAL DEPOSITS
             </span>
             <div className="text-xl sm:text-2xl font-black text-white font-mono mt-0.5 truncate">
-              $ 78,342
+              $ {totalDeposits > 0 && totalDeposits < 0.01 ? totalDeposits.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : totalDeposits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
         </div>
@@ -276,7 +229,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
               ESTIMATED APY
             </span>
             <div className="text-xl sm:text-2xl font-black text-[#ccff00] font-mono mt-0.5 truncate">
-              + 12.3%
+              + 0.00%
             </div>
           </div>
         </div>
@@ -336,73 +289,101 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
               </div>
 
               {/* Custom Interactive Candlestick Chart Area */}
-              <div className="relative h-64 sm:h-72 w-full bg-[#0a0a0c] border-2 border-white p-4 flex flex-col justify-between overflow-hidden">
-                {/* Background Horizontal Grid Lines */}
-                <div className="absolute inset-0 flex flex-col justify-between p-4 pointer-events-none opacity-30">
-                  <div className="border-b border-dashed border-[#ccff00] text-[10px] text-[#ccff00] font-mono">$ 4,500</div>
-                  <div className="border-b border-dashed border-slate-600 text-[10px] text-slate-400 font-mono">$ 4,000</div>
-                  <div className="border-b border-dashed border-slate-600 text-[10px] text-slate-400 font-mono">$ 3,500</div>
-                  <div className="border-b border-dashed border-slate-600 text-[10px] text-slate-400 font-mono">$ 3,000</div>
-                </div>
+              {(() => {
+                const hasChartData = candlestickPoints.length > 0;
+                const allPrices = candlestickPoints.flatMap(pt => [pt.high, pt.low]);
+                const chartMax = hasChartData ? Math.max(...allPrices) * 1.05 : 4500;
+                const chartMin = hasChartData ? Math.max(0, Math.min(...allPrices) * 0.95) : 3000;
+                const chartRange = chartMax - chartMin || 1;
+                
+                const currentPrice = hasChartData ? candlestickPoints[candlestickPoints.length - 1].close : 0;
+                const currentPricePct = hasChartData ? 100 - ((currentPrice - chartMin) / chartRange) * 100 : 0;
+                
+                const gridSteps = 4;
+                const gridValues = Array.from({ length: gridSteps }, (_, i) => 
+                  chartMax - (chartRange / (gridSteps - 1)) * i
+                );
 
-                {/* Floating Price Pill Tag on Right */}
-                <div className="absolute right-3 top-[32%] z-10 bg-[#ff007f] text-white font-mono text-xs font-black px-2.5 py-1 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
-                  $ 4,120
-                </div>
-
-                {/* Candlestick Bars Container */}
-                <div className="h-full w-full flex items-end justify-between px-2 pt-6 relative z-0">
-                  {candlestickPoints.map((pt, idx) => {
-                    const maxH = 4500;
-                    const minH = 3000;
-                    const range = maxH - minH;
-
-                    const bodyTopPct = 100 - ((Math.max(pt.open, pt.close) - minH) / range) * 100;
-                    const bodyBottomPct = 100 - ((Math.min(pt.open, pt.close) - minH) / range) * 100;
-                    const bodyHeightPct = Math.max(8, bodyBottomPct - bodyTopPct);
-
-                    const wickTopPct = 100 - ((pt.high - minH) / range) * 100;
-                    const wickBottomPct = 100 - ((pt.low - minH) / range) * 100;
-
-                    return (
-                      <div
-                        key={idx}
-                        className="flex flex-col items-center justify-end h-full flex-1 group cursor-pointer"
-                      >
-                        {/* Wick line */}
-                        <div
-                          className={`w-1 absolute bottom-12 ${
-                            pt.isGreen ? 'bg-[#ccff00]' : 'bg-[#ff007f]'
-                          }`}
-                          style={{
-                            top: `${wickTopPct}%`,
-                            bottom: `${100 - wickBottomPct}%`,
-                          }}
-                        />
-
-                        {/* Candle Body */}
-                        <div
-                          className={`w-4 sm:w-6 border border-black relative z-10 transition-transform group-hover:scale-110 ${
-                            pt.isGreen
-                              ? 'bg-[#ccff00] shadow-[2px_2px_0px_0px_#000]'
-                              : 'bg-[#ff007f] shadow-[2px_2px_0px_0px_#000]'
-                          }`}
-                          style={{
-                            height: `${bodyHeightPct}%`,
-                          }}
-                        />
+                return (
+                  <div className="relative h-64 sm:h-72 w-full bg-[#0a0a0c] border-2 border-white p-4 flex flex-col justify-between overflow-hidden">
+                    {/* Background Horizontal Grid Lines */}
+                    {hasChartData && (
+                      <div className="absolute inset-0 flex flex-col justify-between p-4 pointer-events-none opacity-30">
+                        {gridValues.map((val, i) => (
+                          <div key={i} className={`border-b border-dashed ${i === 0 ? 'border-[#ccff00] text-[#ccff00]' : 'border-slate-600 text-slate-400'} text-[10px] font-mono`}>
+                            $ {val.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          </div>
+                        ))}
                       </div>
-                    );
-                  })}
-                </div>
+                    )}
 
-                {/* X-Axis Labels */}
-                <div className="flex justify-between items-center text-[10px] sm:text-xs font-mono font-bold text-slate-400 pt-2 border-t-2 border-white mt-2 relative z-10">
-                  {candlestickPoints.map((pt, idx) => (
-                    <span key={idx}>{pt.date}</span>
-                  ))}
-                </div>
-              </div>
+                    {/* Floating Price Pill Tag on Right */}
+                    {hasChartData && (
+                      <div 
+                        className="absolute right-3 z-10 bg-[#ff007f] text-white font-mono text-[10px] sm:text-xs font-black px-2.5 py-1 border-2 border-black shadow-[3px_3px_0px_0px_#000] transition-all"
+                        style={{ top: `${Math.max(5, Math.min(95, currentPricePct))}%`, transform: 'translateY(-50%)' }}
+                      >
+                        $ {currentPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </div>
+                    )}
+
+                    {/* Candlestick Bars Container */}
+                    <div className="h-full w-full flex items-end justify-between px-2 pt-6 relative z-0">
+                      {hasChartData ? candlestickPoints.map((pt, idx) => {
+                        const bodyTopPct = 100 - ((Math.max(pt.open, pt.close) - chartMin) / chartRange) * 100;
+                        const bodyBottomPct = 100 - ((Math.min(pt.open, pt.close) - chartMin) / chartRange) * 100;
+                        const bodyHeightPct = Math.max(2, bodyBottomPct - bodyTopPct);
+
+                        const wickTopPct = 100 - ((pt.high - chartMin) / chartRange) * 100;
+                        const wickBottomPct = 100 - ((pt.low - chartMin) / chartRange) * 100;
+
+                        return (
+                          <div
+                            key={idx}
+                            className="flex flex-col items-center justify-end h-full flex-1 group cursor-pointer"
+                          >
+                            {/* Wick line */}
+                            <div
+                              className={`w-0.5 sm:w-1 absolute bottom-12 ${
+                                pt.isGreen ? 'bg-[#ccff00]' : 'bg-[#ff007f]'
+                              }`}
+                              style={{
+                                top: `${wickTopPct}%`,
+                                bottom: `${100 - wickBottomPct}%`,
+                              }}
+                            />
+
+                            {/* Candle Body */}
+                            <div
+                              className={`w-3 sm:w-5 border border-black relative z-10 transition-transform group-hover:scale-110 ${
+                                pt.isGreen
+                                  ? 'bg-[#ccff00] shadow-[2px_2px_0px_0px_#000]'
+                                  : 'bg-[#ff007f] shadow-[2px_2px_0px_0px_#000]'
+                              }`}
+                              style={{
+                                height: `${bodyHeightPct}%`,
+                              }}
+                            />
+                          </div>
+                        );
+                      }) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 font-mono text-[10px] sm:text-xs uppercase z-20">
+                          <TrendingDown className="w-8 h-8 sm:w-10 sm:h-10 text-[#ff007f] mb-3 stroke-[2.5]" />
+                          <span className="font-bold">NO HISTORICAL DATA FOUND</span>
+                          <span className="text-[9px] mt-1 text-slate-600">CONNECT OMNICHAIN API KEY IN SETTINGS</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* X-Axis Labels */}
+                    <div className="flex justify-between items-center text-[9px] sm:text-[10px] font-mono font-bold text-slate-400 pt-2 border-t-2 border-white mt-2 relative z-10">
+                      {candlestickPoints.map((pt, idx) => (
+                        <span key={idx}>{pt.date}</span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -411,7 +392,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="px-2 py-0.5 bg-[#00f0ff] text-black font-black text-[10px] uppercase border border-black shadow-[2px_2px_0px_0px_#000]">
-                  4 STORED IN VAULT
+                  {ownedNFTs.length} STORED IN VAULT
                 </span>
                 <h3 className="text-base font-black text-white uppercase tracking-tight flex items-center gap-2">
                   <ImageIcon className="w-4 h-4 text-[#ccff00]" />
@@ -462,8 +443,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
 
             {/* NFT Rendering: Grid or List */}
             {nftViewMode === 'grid' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-3.5">
-                {ownedNFTs.map((nft) => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-3.5 min-h-[250px]">
+                {ownedNFTs.length > 0 ? ownedNFTs.map((nft) => (
                   <div
                     key={nft.id}
                     onClick={() => setSelectedVaultNft(nft)}
@@ -504,11 +485,16 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                       </span>
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="col-span-full flex flex-col items-center justify-center border-2 border-dashed border-white/20 text-slate-500 font-mono text-xs uppercase min-h-[250px] bg-[#0a0a0c]">
+                    <ImageIcon className="w-8 h-8 mb-3 opacity-50" />
+                    <span>NO NFTS IN VAULT</span>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="space-y-2.5">
-                {ownedNFTs.map((nft) => (
+              <div className="space-y-2.5 min-h-[250px]">
+                {ownedNFTs.length > 0 ? ownedNFTs.map((nft) => (
                   <div
                     key={nft.id}
                     onClick={() => setSelectedVaultNft(nft)}
@@ -541,8 +527,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                     <div className="flex items-center gap-3 shrink-0 text-right">
                       <div>
                         <span className="text-[9px] text-slate-400 font-bold block uppercase">FLOOR</span>
-                        <span className="text-xs font-black text-[#ccff00]">{nft.floorPrice}</span>
-                        <span className="text-[9px] text-slate-400 block">{nft.estUsd}</span>
+                        <div className="text-xs font-black text-[#ccff00] text-right">{nft.floorPrice}</div>
+                        <div className="text-[10px] text-slate-300 font-bold text-right">{nft.estUsd}</div>
                       </div>
                       <button
                         type="button"
@@ -552,7 +538,12 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                       </button>
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="flex flex-col items-center justify-center border-2 border-dashed border-white/20 text-slate-500 font-mono text-xs uppercase min-h-[250px] bg-[#0a0a0c]">
+                    <List className="w-8 h-8 mb-3 opacity-50" />
+                    <span>NO NFTS IN VAULT</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -564,29 +555,40 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
           <div className="bg-[#141419] border-2 border-white p-5 shadow-[5px_5px_0px_0px_#00f0ff] space-y-4">
             <h3 className="text-base font-black text-white font-mono uppercase tracking-tight">CHAIN ALLOCATION</h3>
 
-            <div className="space-y-3">
-              {chainAllocations.map((chain) => (
+            <div className="space-y-3 min-h-[160px]">
+              {chainAllocations.length > 0 ? chainAllocations.map((chain) => (
                 <div key={chain.name} className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs font-bold font-mono">
                     <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 bg-[#ffe600] text-black border border-black font-black flex items-center justify-center text-[11px] shadow-[1px_1px_0px_0px_#000]">
-                        {chain.icon}
+                      <span 
+                        className="w-6 h-6 text-black border border-black font-black flex items-center justify-center text-[11px] shadow-[1px_1px_0px_0px_#000]"
+                        style={{ backgroundColor: chain.color }}
+                      >
+                        {chain.iconUrl ? (
+                          <img src={chain.iconUrl} alt={chain.name} className="w-4 h-4 object-contain" />
+                        ) : (
+                          chain.icon
+                        )}
                       </span>
                       <span className="text-white uppercase">{chain.name}</span>
                     </div>
-                    <span className="text-[#ccff00] font-mono">{chain.amount}</span>
+                    <span className="font-mono" style={{ color: chain.color }}>{chain.amount}</span>
                   </div>
 
                   {/* Progress Bar */}
                   <div className="w-full h-2.5 bg-[#0a0a0c] border border-white flex items-center justify-between">
                     <div
-                      className="h-full bg-[#00f0ff] border-r border-black"
-                      style={{ width: chain.pct }}
+                      className="h-full border-r border-black"
+                      style={{ width: chain.pct, backgroundColor: chain.color }}
                     />
                   </div>
                   <div className="text-[10px] text-slate-400 text-right font-mono font-bold">{chain.pct}</div>
                 </div>
-              ))}
+              )) : (
+                <div className="flex flex-col items-center justify-center h-full min-h-[160px] border-2 border-dashed border-white/20 text-slate-500 font-mono text-[10px] uppercase">
+                  <span>NO CHAIN ALLOCATIONS</span>
+                </div>
+              )}
             </div>
 
             <button className="w-full py-2 bg-[#ccff00] text-black font-black border-2 border-black text-xs uppercase shadow-[3px_3px_0px_0px_#000] hover:bg-[#d8ff33] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer">
@@ -674,15 +676,26 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
       <div className="bg-[#141419] border-2 border-white p-4 sm:p-7 shadow-[6px_6px_0px_0px_#ccff00] space-y-4 font-mono">
         <div className="flex items-center justify-between">
           <h3 className="text-sm sm:text-base font-black text-white uppercase font-mono">PORTFOLIO ASSET TOKENS</h3>
-          <span className="px-2 py-0.5 bg-[#ccff00] text-black text-[9px] sm:text-[10px] font-black border border-black shadow-[1.5px_1.5px_0px_0px_#000]">
-            REAL-TIME PRICE FEED
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowImportTokenModal(true)}
+              className="px-2.5 py-1 bg-[#00f0ff] text-black text-[9px] sm:text-[10px] font-black border border-black shadow-[1.5px_1.5px_0px_0px_#000] hover:bg-[#33f3ff] cursor-pointer uppercase"
+            >
+              + IMPORT TOKEN
+            </button>
+            <span className="px-2 py-0.5 bg-[#ccff00] text-black text-[9px] sm:text-[10px] font-black border border-black shadow-[1.5px_1.5px_0px_0px_#000]">
+              REAL-TIME PRICE FEED
+            </span>
+          </div>
         </div>
 
         {/* Mobile View: Clean, readable asset cards */}
         <div className="md:hidden space-y-3 font-mono">
-          {assets.map((asset) => {
+          {sortedAssets.map((asset) => {
             const usdVal = asset.balance * asset.priceUsd;
+            const cleanName = asset.name.replace(/\s*\(.*?\)\s*/g, '').trim();
+            const chainInfo = SUPPORTED_CHAINS.find(c => c.id === asset.network);
+            
             return (
               <div
                 key={asset.id}
@@ -690,18 +703,32 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                 className="bg-[#0a0a0c] border-2 border-white p-3 shadow-[4px_4px_0px_0px_#ccff00] active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer space-y-3"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <img
-                      src={asset.icon}
-                      alt={asset.symbol}
-                      className="w-8 h-8 bg-[#ffe600] p-1 border border-black shadow-[2px_2px_0px_0px_#000] object-contain shrink-0"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
-                    />
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative shrink-0 flex items-center justify-center">
+                      <img
+                        src={asset.icon}
+                        alt={asset.symbol}
+                        className="w-7 h-7 bg-[#ffe600] p-0.5 border border-black shadow-[1.5px_1.5px_0px_0px_#000] object-contain"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          if (!target.dataset.failed) {
+                            target.dataset.failed = 'true';
+                            target.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><rect width="28" height="28" fill="%23ccff00"/><text x="50%" y="50%" font-family="monospace" font-weight="900" font-size="12" fill="black" text-anchor="middle" dominant-baseline="central">${asset.symbol[0]}</text></svg>`;
+                          }
+                        }}
+                      />
+                      {chainInfo && (
+                        <span 
+                          className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-[#141419] border border-white flex items-center justify-center shadow-sm z-10"
+                          title={chainInfo.name}
+                        >
+                          <img src={chainInfo.icon} alt={chainInfo.name} className="w-2.5 h-2.5 object-contain" />
+                        </span>
+                      )}
+                    </div>
                     <div className="min-w-0">
                       <span className="font-black text-white text-sm uppercase flex items-center gap-1 truncate">
-                        <span>{asset.name}</span>
+                        <span>{cleanName}</span>
                         {asset.isFavorite && <span className="text-[#ffe600] text-xs">★</span>}
                       </span>
                       <span className="text-[10px] text-slate-400 font-bold uppercase block">{asset.symbol}</span>
@@ -710,10 +737,10 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
 
                   <div className="text-right shrink-0">
                     <span className="text-sm font-black text-[#ccff00] block">
-                      ${usdVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ${usdVal > 0 && usdVal < 0.01 ? usdVal.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : usdVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     <span className="text-[10px] text-slate-300 font-bold block">
-                      {asset.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })} {asset.symbol}
+                      {asset.balance.toLocaleString(undefined, { maximumFractionDigits: 8 })} {asset.symbol}
                     </span>
                   </div>
                 </div>
@@ -749,8 +776,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-white/20 text-xs sm:text-sm font-mono">
-              {assets.map((asset) => {
+              {sortedAssets.map((asset) => {
                 const usdVal = asset.balance * asset.priceUsd;
+                const cleanName = asset.name.replace(/\s*\(.*?\)\s*/g, '').trim();
+                const chainInfo = SUPPORTED_CHAINS.find(c => c.id === asset.network);
+
                 return (
                   <tr
                     key={asset.id}
@@ -758,18 +788,32 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                     className="hover:bg-[#1a1a22] transition-colors cursor-pointer group"
                   >
                     <td className="py-4 pl-2">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={asset.icon}
-                          alt={asset.symbol}
-                          className="w-8 h-8 bg-[#ffe600] p-1 border border-black shadow-[2px_2px_0px_0px_#000] object-contain group-hover:scale-110 transition-transform"
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
+                      <div className="flex items-center gap-4">
+                        <div className="relative shrink-0 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <img
+                            src={asset.icon}
+                            alt={asset.symbol}
+                            className="w-8 h-8 bg-[#ffe600] p-1 border border-black shadow-[2px_2px_0px_0px_#000] object-contain"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              if (!target.dataset.failed) {
+                                target.dataset.failed = 'true';
+                                target.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" fill="%23ccff00"/><text x="50%" y="50%" font-family="monospace" font-weight="900" font-size="14" fill="black" text-anchor="middle" dominant-baseline="central">${asset.symbol[0]}</text></svg>`;
+                              }
+                            }}
+                          />
+                          {chainInfo && (
+                            <span 
+                              className="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-[#141419] border border-white flex items-center justify-center shadow-[1px_1px_0px_0px_#000] z-10"
+                              title={chainInfo.name}
+                            >
+                              <img src={chainInfo.icon} alt={chainInfo.name} className="w-3 h-3 object-contain" />
+                            </span>
+                          )}
+                        </div>
                         <div className="flex flex-col">
                           <span className="font-black text-white uppercase group-hover:text-[#ccff00] transition-colors flex items-center gap-1.5">
-                            <span>{asset.name}</span>
+                            <span>{cleanName}</span>
                             {asset.isFavorite && <span className="text-[#ffe600]">★</span>}
                           </span>
                           <span className="text-[10px] text-slate-400 font-bold uppercase">{asset.symbol}</span>
@@ -778,11 +822,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                     </td>
 
                     <td className="py-4 text-right font-mono text-slate-200 font-bold">
-                      {asset.balance.toLocaleString(undefined, { maximumFractionDigits: 5 })} {asset.symbol}
+                      {asset.balance.toLocaleString(undefined, { maximumFractionDigits: 8 })} {asset.symbol}
                     </td>
 
                     <td className="py-4 text-right font-mono font-black text-[#ccff00]">
-                      ${usdVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ${usdVal > 0 && usdVal < 0.01 ? usdVal.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : usdVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
 
                     <td className="py-4 text-right pr-2">
@@ -940,6 +984,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Import Token Modal */}
+      {showImportTokenModal && (
+        <ImportTokenModal onClose={() => setShowImportTokenModal(false)} />
       )}
     </div>
   );

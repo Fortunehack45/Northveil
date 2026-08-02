@@ -23,6 +23,8 @@ import {
 import { CryptoAsset } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { SUPPORTED_CHAINS } from '../data/initialData';
+import { TokenService } from '../services/TokenService';
+import { AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 interface TokenDetailsViewProps {
   asset: CryptoAsset;
@@ -45,7 +47,15 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
 
   // Always scroll to top when token details view is opened or asset changes
   useEffect(() => {
-    window.scrollTo(0, 0);
+    const mainEl = document.querySelector('main');
+    if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'instant' });
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    
+    // Sometimes a slight delay helps if rendering is deferred
+    setTimeout(() => {
+      if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'instant' });
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }, 10);
   }, [asset.id]);
 
   const launchYear =
@@ -68,8 +78,29 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
       ? 2021
       : 2021);
 
+
+  const selectedChain =
+    SUPPORTED_CHAINS.find((c) => c.id === asset.network || c.symbol.toLowerCase() === asset.network.toLowerCase()) ||
+    SUPPORTED_CHAINS.find((c) => c.id === activeChain) ||
+    SUPPORTED_CHAINS[0];
+
+  const [timeframe, setTimeframe] = useState<'1H' | '24H' | '7D' | '30D' | '90D' | '1Y' | 'ALL'>('24H');
+  const [isCopied, setIsCopied] = useState(false);
+  const [isFavorite, setIsFavorite] = useState<boolean>(!!asset.isFavorite);
+  const [activeActionModal, setActiveActionModal] = useState<'buy' | 'sell' | null>(null);
+
+  // Real market data state
+  const [marketData, setMarketData] = useState<any>(null);
+  const [isLoadingMarket, setIsLoadingMarket] = useState(true);
+
+  const [liveTickPrice, setLiveTickPrice] = useState<number | null>(null);
+  const [isBioExpanded, setIsBioExpanded] = useState(false);
+  
+  const livePrice = liveTickPrice || marketData?.currentPrice || asset.priceUsd;
+  let liveChange = marketData?.priceChange24h ?? asset.change24h;
+
   const tokenBio =
-    asset.bio ||
+    marketData?.description || asset.bio ||
     `${asset.name} (${asset.symbol}) is a cryptographic asset operating on the ${asset.network.toUpperCase()} blockchain network, serving decentralized transactions, smart contracts, and Web3 ecosystem utility.`;
 
   const socials = {
@@ -80,15 +111,59 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
     github: asset.socials?.github,
     whitepaper: asset.socials?.whitepaper,
   };
-  const selectedChain =
-    SUPPORTED_CHAINS.find((c) => c.id === asset.network || c.symbol.toLowerCase() === asset.network.toLowerCase()) ||
-    SUPPORTED_CHAINS.find((c) => c.id === activeChain) ||
-    SUPPORTED_CHAINS[0];
 
-  const [timeframe, setTimeframe] = useState<'1H' | '24H' | '7D' | '30D' | '90D' | '1Y' | 'ALL'>('7D');
-  const [isCopied, setIsCopied] = useState(false);
-  const [isFavorite, setIsFavorite] = useState<boolean>(!!asset.isFavorite);
-  const [activeActionModal, setActiveActionModal] = useState<'buy' | 'sell' | null>(null);
+  useEffect(() => {
+    let days = '7';
+    if (timeframe === '24H' || timeframe === '1H') days = '1';
+    if (timeframe === '30D') days = '30';
+    if (timeframe === '90D') days = '90';
+    if (timeframe === '1Y') days = '365';
+    if (timeframe === 'ALL') days = 'max'; // Handled via special Binance fallback in TokenService for full history
+    
+    setIsLoadingMarket(true);
+    TokenService.fetchTokenMarketData(asset.symbol, asset.contractAddress, asset.network, days)
+      .then(data => {
+        setMarketData(data);
+        setIsLoadingMarket(false);
+      })
+      .catch(() => setIsLoadingMarket(false));
+  }, [asset.id, timeframe]);
+
+  // Real-time ultra-fast live price updates via Binance WebSocket API (Push based, instant)
+  useEffect(() => {
+    // Only fetch for major assets that have a USDT pair
+    const supportedSymbols = ['ETH', 'SOL', 'BTC', 'BNB', 'AVAX', 'ARB', 'LINK', 'POL'];
+    if (!supportedSymbols.includes(asset.symbol.toUpperCase())) return;
+
+    const streamSymbol = `${asset.symbol.toLowerCase()}usdt`;
+    let ws: WebSocket;
+    
+    const connectWs = () => {
+      try {
+        // Using Binance US stream to avoid geo-blocks and API key requirements
+        ws = new WebSocket(`wss://stream.binance.us:9443/ws/${streamSymbol}@ticker`);
+        
+        ws.onmessage = (msg) => {
+          try {
+            const data = JSON.parse(msg.data);
+            if (data.c) { // 'c' is the current close price in Binance ticker payload
+              setLiveTickPrice(parseFloat(data.c));
+            }
+          } catch (e) {}
+        };
+      } catch (e) {
+        // Silently ignore WS errors
+      }
+    };
+
+    connectWs();
+
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, [asset.symbol]);
 
   // Buy / Sell state
   const [fiatAmount, setFiatAmount] = useState('500');
@@ -119,55 +194,51 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
   };
 
   // Holdings Calculations
-  const fiatValue = asset.balance * asset.priceUsd;
-  const avgCost = asset.avgBuyPriceUsd || asset.priceUsd * 0.85;
+  const fiatValue = asset.balance * livePrice;
+  const avgCost = asset.avgBuyPriceUsd || livePrice * 0.85;
   const totalCost = asset.balance * avgCost;
   const pnlAmount = fiatValue - totalCost;
   const pnlPercent = totalCost > 0 ? (pnlAmount / totalCost) * 100 : 0;
   const isPnlPositive = pnlAmount >= 0;
 
-  // Generate chart data based on selected timeframe
-  const generateChartData = () => {
-    const pointsCount = 30;
-    const basePrice = asset.priceUsd;
-    const volatility = timeframe === '1H' ? 0.005 : timeframe === '24H' ? 0.02 : timeframe === '7D' ? 0.06 : 0.15;
+  // Generate chart data based on real market data
+  const chartPoints = (marketData?.prices?.length > 0) 
+    ? marketData.prices.map((p: [number, number]) => {
+        const date = new Date(p[0]);
+        let label = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (timeframe !== '24H' && timeframe !== '1H') {
+          label = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        }
+        return { price: p[1], label };
+      })
+    : [{ price: asset.priceUsd, label: 'Now' }, { price: asset.priceUsd, label: 'Now' }]; // fallback if no data
 
-    const data = [];
-    let current = basePrice * (1 - (asset.change24h / 100) * 0.5);
+  // For 1H timeframe, take the last subset of 1 day data (since CoinGecko doesn't do 1H natively)
+  let displayPoints = chartPoints;
+  if (timeframe === '1H' && displayPoints.length > 12) {
+    displayPoints = displayPoints.slice(-12); // Last hour roughly assuming 5 min intervals for 1d
+  }
 
-    for (let i = 0; i < pointsCount; i++) {
-      const factor = 1 + (Math.sin(i / 2) * volatility + (Math.random() - 0.48) * volatility);
-      current = Math.max(0.0001, current * factor);
+  // Downsample to max 150 points for rendering performance, especially for 'ALL' timeframe
+  if (displayPoints.length > 150) {
+    const step = Math.ceil(displayPoints.length / 150);
+    displayPoints = displayPoints.filter((_: any, idx: number) => idx % step === 0 || idx === displayPoints.length - 1);
+  }
 
-      let timeLabel = `${i}:00`;
-      if (timeframe === '7D') timeLabel = `Day ${Math.floor(i / 4) + 1}`;
-      if (timeframe === '30D') timeLabel = `Day ${i + 1}`;
-      if (timeframe === '1Y') timeLabel = `Month ${Math.floor(i / 2.5) + 1}`;
+  if (displayPoints.length === 1) {
+    displayPoints = [displayPoints[0], displayPoints[0]]; // Duplicate to prevent division by 0
+  } else if (displayPoints.length === 0) {
+    displayPoints = [{ price: livePrice, label: 'Now' }, { price: livePrice, label: 'Now' }];
+  }
 
-      data.push({
-        price: i === pointsCount - 1 ? asset.priceUsd : current,
-        volume: Math.random() * 80 + 20,
-        label: timeLabel,
-      });
+  // Calculate dynamic timeframe price change percentage
+  if (displayPoints.length > 1 && timeframe !== '24H') {
+    const firstPrice = displayPoints[0].price;
+    if (firstPrice > 0) {
+      liveChange = ((livePrice - firstPrice) / firstPrice) * 100;
     }
-    return data;
-  };
+  }
 
-  const chartPoints = generateChartData();
-  const minPrice = Math.min(...chartPoints.map((p) => p.price));
-  const maxPrice = Math.max(...chartPoints.map((p) => p.price));
-  const priceRange = maxPrice - minPrice || 1;
-
-  // Map to SVG coordinates (width: 800, height: 240)
-  const svgWidth = 800;
-  const svgHeight = 240;
-  const pointsString = chartPoints
-    .map((p, idx) => {
-      const x = (idx / (chartPoints.length - 1)) * svgWidth;
-      const y = svgHeight - ((p.price - minPrice) / priceRange) * (svgHeight - 40) - 20;
-      return `${x},${y}`;
-    })
-    .join(' ');
 
   return (
     <div className="space-y-4 sm:space-y-6 font-mono select-none w-full animate-fadeIn pb-24 sm:pb-12 px-1 sm:px-0">
@@ -212,11 +283,15 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
         <div className="flex items-start gap-3 min-w-0">
           <div className="relative shrink-0">
             <img
-              src={asset.icon}
+              src={marketData?.icon || asset.icon}
               alt={asset.name}
               className="w-10 h-10 sm:w-16 sm:h-16 bg-[#ffe600] p-1 sm:p-2 border-2 border-black shadow-[2px_2px_0px_0px_#000] sm:shadow-[3px_3px_0px_0px_#000] object-contain"
               onError={(e) => {
-                (e.target as HTMLElement).style.display = 'none';
+                const target = e.target as HTMLImageElement;
+                if (!target.dataset.failed) {
+                  target.dataset.failed = 'true';
+                  target.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" fill="%23ffe600"/><text x="50%" y="50%" font-family="monospace" font-weight="900" font-size="28" fill="black" text-anchor="middle" dominant-baseline="central">${asset.symbol.substring(0, 2).toUpperCase()}</text></svg>`;
+                }
               }}
             />
             <span className="absolute -bottom-1 -right-1 px-1 py-0.2 sm:px-1.5 sm:py-0.5 bg-black text-[#ccff00] font-black text-[8px] sm:text-[10px] border border-white">
@@ -265,15 +340,15 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
         <div className="flex flex-row items-center justify-between w-full border-t pt-2.5 sm:pt-4 border-white/20 gap-2">
           <div>
             <span className="text-[9px] sm:text-xs text-slate-400 font-bold uppercase block">LIVE MARKET PRICE</span>
-            <span className="text-xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight">${asset.priceUsd.toLocaleString()}</span>
+            <span className="text-xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight">${livePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</span>
           </div>
           <span
             className={`px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-black uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] sm:shadow-[3px_3px_0px_0px_#000] flex items-center gap-1 shrink-0 ${
-              asset.change24h >= 0 ? 'bg-[#ccff00] text-black' : 'bg-[#ff007f] text-white'
+              liveChange >= 0 ? 'bg-[#ccff00] text-black' : 'bg-[#ff007f] text-white'
             }`}
           >
-            {asset.change24h >= 0 ? <ArrowUpRight className="w-3.5 h-3.5 stroke-[3]" /> : <ArrowDownRight className="w-3.5 h-3.5 stroke-[3]" />}
-            <span>{asset.change24h >= 0 ? '+' : ''}{asset.change24h.toFixed(2)}%</span>
+            {liveChange >= 0 ? <ArrowUpRight className="w-3.5 h-3.5 stroke-[3]" /> : <ArrowDownRight className="w-3.5 h-3.5 stroke-[3]" />}
+            <span>{liveChange >= 0 ? '+' : ''}{liveChange.toFixed(2)}%</span>
           </span>
         </div>
       </div>
@@ -282,20 +357,28 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <div className="bg-[#141419] border-2 border-white p-3 sm:p-4 shadow-[2px_2px_0px_0px_#000] sm:shadow-[4px_4px_0px_0px_#000] space-y-1">
           <span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase block truncate">MARKET CAP</span>
-          <span className="text-base sm:text-xl font-black text-white truncate block">{formatNumberUsd(asset.marketCapUsd)}</span>
+          <span className="text-base sm:text-xl font-black text-white truncate block">{isLoadingMarket ? 'LOADING...' : formatNumberUsd(marketData?.marketCap || asset.marketCapUsd)}</span>
           <span className="text-[9px] sm:text-[10px] text-slate-500 font-bold block truncate">GLOBAL CIRCULATING</span>
         </div>
 
         <div className="bg-[#141419] border-2 border-white p-3 sm:p-4 shadow-[2px_2px_0px_0px_#000] sm:shadow-[4px_4px_0px_0px_#000] space-y-1">
           <span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase block truncate">24H VOLUME</span>
-          <span className="text-base sm:text-xl font-black text-[#ccff00] truncate block">{formatNumberUsd(asset.volume24hUsd)}</span>
+          <span className="text-base sm:text-xl font-black text-[#ccff00] truncate block">{isLoadingMarket ? 'LOADING...' : formatNumberUsd(marketData?.volume24h || asset.volume24hUsd)}</span>
           <span className="text-[9px] sm:text-[10px] text-slate-500 font-bold block truncate">24H AGGREGATE</span>
         </div>
 
         <div className="bg-[#141419] border-2 border-white p-3 sm:p-4 shadow-[2px_2px_0px_0px_#000] sm:shadow-[4px_4px_0px_0px_#000] space-y-1">
-          <span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase block truncate">DEX LIQUIDITY</span>
-          <span className="text-base sm:text-xl font-black text-[#00f0ff] truncate block">{formatNumberUsd(asset.liquidityUsd)}</span>
-          <span className="text-[9px] sm:text-[10px] text-slate-500 font-bold block truncate">LOCKED IN POOLS</span>
+          <span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase block truncate">CIRCULATING SUPPLY</span>
+          <span className="text-base sm:text-xl font-black text-[#00f0ff] truncate block">
+            {isLoadingMarket ? 'LOADING...' : (
+              marketData?.circulatingSupply 
+                ? marketData.circulatingSupply.toLocaleString()
+                : asset.marketCapUsd && livePrice > 0 
+                  ? Math.floor(asset.marketCapUsd / livePrice).toLocaleString() 
+                  : 'N/A'
+            )}
+          </span>
+          <span className="text-[9px] sm:text-[10px] text-slate-500 font-bold block truncate">ACTIVE TOKENS</span>
         </div>
 
         <div className="bg-[#141419] border-2 border-white p-3 sm:p-4 shadow-[2px_2px_0px_0px_#000] sm:shadow-[4px_4px_0px_0px_#000] space-y-1">
@@ -336,65 +419,56 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
           </div>
         </div>
 
-        {/* SVG Chart Display */}
-        <div className="relative w-full h-52 sm:h-72 bg-[#141419] border-2 border-white/40 p-3 overflow-hidden">
-          <svg
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-            className="w-full h-full overflow-visible"
-            onMouseLeave={() => setHoverPoint(null)}
-          >
-            <defs>
-              <linearGradient id="fullTokenChartGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ccff00" stopOpacity="0.45" />
-                <stop offset="100%" stopColor="#ccff00" stopOpacity="0.0" />
-              </linearGradient>
-            </defs>
-
-            {/* Horizontal Grid lines */}
-            <line x1="0" y1="50" x2={svgWidth} y2="50" stroke="#ffffff" strokeOpacity="0.1" strokeDasharray="4 4" />
-            <line x1="0" y1="100" x2={svgWidth} y2="100" stroke="#ffffff" strokeOpacity="0.1" strokeDasharray="4 4" />
-            <line x1="0" y1="150" x2={svgWidth} y2="150" stroke="#ffffff" strokeOpacity="0.1" strokeDasharray="4 4" />
-            <line x1="0" y1="200" x2={svgWidth} y2="200" stroke="#ffffff" strokeOpacity="0.1" strokeDasharray="4 4" />
-
-            {/* Gradient Fill */}
-            <polygon
-              points={`0,${svgHeight} ${pointsString} ${svgWidth},${svgHeight}`}
-              fill="url(#fullTokenChartGradient)"
-            />
-
-            {/* Polyline */}
-            <polyline
-              fill="none"
-              stroke="#ccff00"
-              strokeWidth="3.5"
-              points={pointsString}
-            />
-
-            {/* Interactive Circles */}
-            {chartPoints.map((p, idx) => {
-              const x = (idx / (chartPoints.length - 1)) * svgWidth;
-              const y = svgHeight - ((p.price - minPrice) / priceRange) * (svgHeight - 40) - 20;
-              return (
-                <circle
-                  key={idx}
-                  cx={x}
-                  cy={y}
-                  r="4.5"
-                  className="fill-[#00f0ff] stroke-black stroke-2 hover:r-7 cursor-pointer transition-all"
-                  onMouseEnter={() => setHoverPoint({ price: p.price, label: p.label })}
-                />
-              );
-            })}
-          </svg>
-
-          {/* Interactive Hover Tooltip */}
-          {hoverPoint && (
-            <div className="absolute top-4 left-6 bg-black border-2 border-[#ccff00] p-3 text-xs text-white shadow-[4px_4px_0px_0px_#ccff00]">
-              <div className="text-[10px] text-slate-400 font-bold uppercase">{hoverPoint.label}</div>
-              <div className="text-base font-black text-[#ccff00]">
-                ${hoverPoint.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </div>
+        {/* Recharts Chart Display */}
+        <div className="relative w-full h-52 sm:h-72 bg-[#141419] border-2 border-white/40 p-3 pt-6 overflow-hidden font-mono text-[10px] sm:text-xs">
+          {isLoadingMarket ? (
+            <div className="w-full h-full flex items-center justify-center">
+              <Activity className="w-8 h-8 text-[#ccff00] animate-spin-slow" />
             </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={displayPoints}>
+                <defs>
+                  <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ccff00" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#ccff00" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis 
+                  dataKey="label" 
+                  stroke="#475569" 
+                  tick={{ fill: '#94a3b8', fontSize: 10 }} 
+                  tickMargin={10} 
+                  minTickGap={30} 
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis 
+                  domain={['auto', 'auto']} 
+                  stroke="#475569" 
+                  tick={{ fill: '#94a3b8', fontSize: 10 }} 
+                  tickFormatter={(value) => `$${value.toLocaleString()}`}
+                  width={80}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <RechartsTooltip 
+                  contentStyle={{ backgroundColor: '#000', border: '2px solid #ccff00', borderRadius: 0, boxShadow: '4px 4px 0px 0px #ccff00' }}
+                  itemStyle={{ color: '#ccff00', fontWeight: 900, fontSize: '16px' }}
+                  labelStyle={{ color: '#94a3b8', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }}
+                  formatter={(value: number) => [`$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`, 'Price']}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="price" 
+                  stroke="#ccff00" 
+                  strokeWidth={3} 
+                  fillOpacity={1} 
+                  fill="url(#colorPrice)" 
+                  activeDot={{ r: 6, fill: '#00f0ff', stroke: '#000', strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           )}
         </div>
       </div>
@@ -416,20 +490,20 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
           <div className="bg-[#141419] p-3 sm:p-4 border-2 border-white space-y-1">
             <span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase block">STORED TOKEN BALANCE</span>
             <span className="text-xl sm:text-2xl font-black text-white block">
-              {asset.balance.toLocaleString()} {asset.symbol}
+              {asset.balance.toLocaleString(undefined, { maximumFractionDigits: 8 })} {asset.symbol}
             </span>
             <span className="text-[10px] sm:text-[11px] text-slate-400 block">
-              AVG BUY PRICE: <span className="text-white font-bold">${avgCost.toFixed(2)}</span>
+              AVG BUY PRICE: <span className="text-white font-bold">${avgCost > 0 && avgCost < 0.01 ? avgCost.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 8 }) : avgCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </span>
           </div>
 
           <div className="bg-[#141419] p-3 sm:p-4 border-2 border-white space-y-1">
             <span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase block">CURRENT FIAT VALUATION</span>
             <span className="text-xl sm:text-2xl font-black text-[#00f0ff] block">
-              ${fiatValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              ${fiatValue > 0 && fiatValue < 0.01 ? fiatValue.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 }) : fiatValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
             <span className="text-[10px] sm:text-[11px] text-slate-400 block">
-              TOTAL COST BASIS: <span className="text-white font-bold">${totalCost.toFixed(2)}</span>
+              TOTAL COST BASIS: <span className="text-white font-bold">${totalCost > 0 && totalCost < 0.01 ? totalCost.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 }) : totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </span>
           </div>
 
@@ -437,7 +511,7 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
             <span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase block">UNREALIZED PROFIT / LOSS</span>
             <div className="flex flex-wrap items-center gap-2 mt-1">
               <span className={`text-xl sm:text-2xl font-black ${isPnlPositive ? 'text-[#ccff00]' : 'text-[#ff007f]'}`}>
-                {isPnlPositive ? '+' : ''}${pnlAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {isPnlPositive ? '+' : ''}${Math.abs(pnlAmount) > 0 && Math.abs(pnlAmount) < 0.01 ? pnlAmount.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 }) : pnlAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
               <span
                 className={`text-[10px] sm:text-xs font-black px-1.5 py-0.5 border border-black ${
@@ -526,9 +600,19 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
               ABOUT {asset.name.toUpperCase()} ({asset.symbol})
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-sans font-medium">
-            {tokenBio}
-          </p>
+          <div>
+            <p className={`text-xs sm:text-sm text-slate-200 leading-relaxed font-sans font-medium ${!isBioExpanded ? 'line-clamp-4' : ''}`}>
+              {tokenBio}
+            </p>
+            {tokenBio.length > 250 && (
+              <button 
+                onClick={() => setIsBioExpanded(!isBioExpanded)}
+                className="mt-2 text-[10px] sm:text-xs text-[#ccff00] font-black uppercase hover:underline cursor-pointer flex items-center gap-1"
+              >
+                {isBioExpanded ? 'SHOW LESS' : 'READ MORE'}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Key Token Metadata Grid */}

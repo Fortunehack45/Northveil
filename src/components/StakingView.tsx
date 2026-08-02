@@ -209,7 +209,7 @@ export const StakingView: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
           <div className="space-y-2">
-            <label className="text-xs font-mono font-bold text-slate-300 uppercase">SIMULATED DEPOSIT AMOUNT (USD)</label>
+            <label className="text-xs font-mono font-bold text-slate-300 uppercase">DEPOSIT AMOUNT (USD)</label>
             <input
               type="number"
               value={calcAmount}

@@ -6,6 +6,11 @@
     <title>Northveil - Multi-Chain Web3 Wallet & DEX</title>
   </head>
   <body>
+    <script>
+      if (typeof global === 'undefined') {
+        window.global = window;
+      }
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

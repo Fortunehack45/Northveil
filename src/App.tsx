@@ -20,15 +20,18 @@ import { OnboardingAuthModal } from './components/OnboardingAuthModal';
 import { BuySellView } from './components/BuySellView';
 import { CreateTicketView } from './components/CreateTicketView';
 import { ReportBugView } from './components/ReportBugView';
+import { NetworkManagerView } from './components/NetworkManagerView';
 
 const MainContent: React.FC = () => {
-  const { isLocked, unlockWalletWithBiometrics } = useWallet();
+  const { isLocked, unlockWalletWithBiometrics, unlockVault } = useWallet();
   const [activeTab, setActiveTab] = useState<TabType>('portfolio');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
   const [modalMode, setModalMode] = useState<'send' | 'receive' | null>(null);
   const [modalAssetId, setModalAssetId] = useState<string | undefined>(undefined);
   const [buySellMode, setBuySellMode] = useState<'buy' | 'sell'>('buy');
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
+  const [unlockPassword, setUnlockPassword] = useState('');
+  const [unlockError, setUnlockError] = useState(false);
 
   const mainRef = useRef<HTMLElement>(null);
 
@@ -48,21 +51,53 @@ const MainContent: React.FC = () => {
           </div>
           <div>
             <span className="px-2.5 py-1 bg-[#ff007f] text-white text-[10px] font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000]">
-              SYSTEM LOCKED
+              VAULT ENCRYPTED
             </span>
             <h2 className="text-2xl font-black text-white tracking-tight font-mono mt-2">
-              CRYPTFEST SECURITY
+              NORTHVEIL SECURITY
             </h2>
             <p className="text-xs text-slate-300 font-mono mt-2">
-              BIOMETRIC NODE AUTH ACTIVE. AUTHORIZE FINGERPRINT / FACE SCAN TO ACCESS VAULT.
+              ENTER YOUR VAULT PASSWORD TO DECRYPT YOUR SEED PHRASE AND ACCESS YOUR FUNDS.
             </p>
           </div>
-          <button
-            onClick={() => unlockWalletWithBiometrics()}
-            className="w-full py-4 bg-[#ccff00] text-black font-black border-2 border-black text-xs uppercase tracking-wider shadow-[4px_4px_0px_0px_#000] hover:bg-[#d8ff33] active:translate-x-1 active:translate-y-1 active:shadow-none cursor-pointer transition-all"
-          >
-            Unlock with Biometrics
-          </button>
+          <div className="space-y-3">
+            <input
+              type="password"
+              placeholder="Vault Password"
+              value={unlockPassword}
+              onChange={(e) => {
+                setUnlockPassword(e.target.value);
+                setUnlockError(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (!unlockVault(unlockPassword)) {
+                    setUnlockError(true);
+                  }
+                }
+              }}
+              className="w-full bg-[#0a0a0c] border-2 border-white p-3 font-mono text-white focus:outline-none focus:border-[#ccff00]"
+            />
+            {unlockError && <p className="text-xs font-mono text-[#ff007f]">INCORRECT PASSWORD</p>}
+            <button
+              onClick={() => {
+                if (!unlockVault(unlockPassword)) {
+                  setUnlockError(true);
+                }
+              }}
+              className="w-full py-4 bg-[#ccff00] text-black font-black border-2 border-black text-xs uppercase tracking-wider shadow-[4px_4px_0px_0px_#000] hover:bg-[#d8ff33] active:translate-x-1 active:translate-y-1 active:shadow-none cursor-pointer transition-all"
+            >
+              DECRYPT VAULT & UNLOCK
+            </button>
+            
+            {/* Fallback to biometrics if enabled */}
+            <button
+              onClick={() => unlockWalletWithBiometrics()}
+              className="w-full py-3 bg-transparent text-[#00f0ff] font-black border-2 border-white/20 text-xs uppercase tracking-wider hover:border-[#00f0ff] cursor-pointer transition-all mt-2"
+            >
+              Unlock with Biometrics
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -82,9 +117,11 @@ const MainContent: React.FC = () => {
           onOpenOnboarding={() => setIsOnboardingOpen(true)}
         />
 
-        {/* Right Content Frame (Header + View Area) */}
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-transparent">
-          <Header onToggleMobileNav={() => setIsMobileNavOpen(!isMobileNavOpen)} />
+          <Header 
+            onToggleMobileNav={() => setIsMobileNavOpen(!isMobileNavOpen)} 
+            onNavigateNetworkManager={() => setActiveTab('networkManager')}
+          />
 
           <main ref={mainRef} className="flex-1 overflow-y-auto no-scrollbar p-3 sm:p-8 pb-24 sm:pb-8 max-w-[1600px] mx-auto w-full">
             {activeTab === 'portfolio' && (
@@ -137,6 +174,7 @@ const MainContent: React.FC = () => {
             {activeTab === 'reportBug' && (
               <ReportBugView onBack={() => setActiveTab('helpSupport')} />
             )}
+            {activeTab === 'networkManager' && <NetworkManagerView />}
           </main>
         </div>
       </div>

@@ -17,6 +17,7 @@ import {
   CreditCard,
   Menu,
   HelpCircle,
+  Globe,
 } from 'lucide-react';
 
 export type TabType =
@@ -34,8 +35,8 @@ export type TabType =
   | 'securityBackup'
   | 'systemMetrics'
   | 'helpSupport'
-  | 'createTicket'
-  | 'reportBug';
+  | 'reportBug'
+  | 'networkManager';
 
 interface NavigationProps {
   activeTab: TabType;
@@ -71,6 +72,7 @@ export const Navigation: React.FC<NavigationProps> = ({
     { id: 'securityBackup', label: 'SETTINGS', icon: <Settings className="w-4 h-4 stroke-[2.5]" /> },
     { id: 'systemMetrics', label: 'PROFILE', icon: <User className="w-4 h-4 stroke-[2.5]" /> },
     { id: 'helpSupport', label: 'HELP & SUPPORT', icon: <HelpCircle className="w-4 h-4 stroke-[2.5]" /> },
+    { id: 'networkManager', label: 'NETWORK MGR', icon: <Globe className="w-4 h-4 stroke-[2.5]" /> },
   ];
 
   // Core 5 primary pages (featured on mobile bottom nav bar)
@@ -93,6 +95,7 @@ export const Navigation: React.FC<NavigationProps> = ({
     { id: 'securityBackup', label: 'SETTINGS', icon: <Settings className="w-4 h-4 stroke-[2.5]" /> },
     { id: 'systemMetrics', label: 'PROFILE', icon: <User className="w-4 h-4 stroke-[2.5]" /> },
     { id: 'helpSupport', label: 'HELP & SUPPORT', icon: <HelpCircle className="w-4 h-4 stroke-[2.5]" /> },
+    { id: 'networkManager', label: 'NETWORK MGR', icon: <Globe className="w-4 h-4 stroke-[2.5]" /> },
   ];
 
   return (
@@ -116,7 +119,14 @@ export const Navigation: React.FC<NavigationProps> = ({
         {/* Cryptfest Brand Header */}
         <div className="p-4 sm:p-5 border-b-2 border-white/20 shrink-0 bg-[#0d0d10]">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <button 
+              onClick={() => {
+                setActiveTab('portfolio');
+                window.dispatchEvent(new CustomEvent('reset-portfolio'));
+                if (isMobileOpen && onCloseMobile) onCloseMobile();
+              }}
+              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+            >
               <div className="w-9 h-9 bg-[#ccff00] border-2 border-black shadow-[3px_3px_0px_0px_#000] flex items-center justify-center text-black font-black shrink-0">
                 <div className="grid grid-cols-2 gap-1">
                   <div className="w-1.5 h-1.5 bg-black"></div>
@@ -128,7 +138,7 @@ export const Navigation: React.FC<NavigationProps> = ({
               <span className="text-xl font-black tracking-tighter text-white font-mono uppercase">
                 North<span className="text-[#ccff00]">veil</span>
               </span>
-            </div>
+            </button>
             {isMobileOpen && (
               <button
                 onClick={onCloseMobile}
@@ -153,6 +163,9 @@ export const Navigation: React.FC<NavigationProps> = ({
                 <button
                   key={item.id}
                   onClick={() => {
+                    if (item.id === 'portfolio' && activeTab === 'portfolio') {
+                      window.dispatchEvent(new CustomEvent('reset-portfolio'));
+                    }
                     setActiveTab(item.id);
                     if (onCloseMobile) onCloseMobile();
                   }}
@@ -228,6 +241,9 @@ export const Navigation: React.FC<NavigationProps> = ({
             <button
               key={item.id}
               onClick={() => {
+                if (item.id === 'portfolio' && activeTab === 'portfolio') {
+                  window.dispatchEvent(new CustomEvent('reset-portfolio'));
+                }
                 setActiveTab(item.id);
                 if (isMobileOpen && onCloseMobile) onCloseMobile();
               }}

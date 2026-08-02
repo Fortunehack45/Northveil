@@ -21,6 +21,7 @@ import {
   Edit2,
   ArrowRightLeft,
   Key,
+  Database,
 } from 'lucide-react';
 
 export const SecurityBackupView: React.FC = () => {
@@ -383,6 +384,49 @@ export const SecurityBackupView: React.FC = () => {
               />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Web3 Indexer API Configuration */}
+      <div className="bg-[#141419] border-2 border-white p-6 shadow-[8px_8px_0px_0px_#ccff00] space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-white pb-4">
+          <div className="flex items-center gap-3">
+            <Database className="w-6 h-6 text-[#ccff00] stroke-[3]" />
+            <div>
+              <h3 className="text-xl font-black text-white font-mono uppercase tracking-tight">
+                WEB3 OMNICHAIN INDEXER
+              </h3>
+              <p className="text-xs text-slate-300 font-mono mt-0.5">
+                CONNECT A MORALIS API KEY TO FETCH ALL CROSS-CHAIN TOKENS, NFTS, AND HISTORICAL DATA.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <label className="text-xs font-mono font-black text-white uppercase tracking-wider block">
+            MORALIS API KEY (REST API)
+          </label>
+          <div className="flex flex-col sm:flex-row items-stretch gap-3">
+            <input
+              type="password"
+              placeholder="Paste your Moralis API Key here..."
+              value={userSettings.moralisApiKey || ''}
+              onChange={(e) => updateUserSettings({ moralisApiKey: e.target.value })}
+              className="flex-1 bg-[#0a0a0c] text-white p-3 font-mono text-sm border-2 border-white/50 focus:border-[#ccff00] focus:outline-none placeholder:text-slate-600 transition-colors"
+            />
+            <button
+              onClick={() => {
+                alert('Indexer Key Saved! If a wallet is connected, it will now fetch all tokens and NFTs.');
+              }}
+              className="px-6 py-3 bg-[#ccff00] text-black font-mono font-black text-sm uppercase border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:bg-[#d8ff33] active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap"
+            >
+              SAVE KEY
+            </button>
+          </div>
+          <p className="text-[10px] font-mono text-slate-400 max-w-2xl">
+            Without an API key, Northveil uses standard RPC nodes which can only fetch balances for predefined tokens (ETH, USDC, SOL, etc.). A premium indexer allows scanning the entire blockchain for unknown assets and fetching NFT galleries instantly.
+          </p>
         </div>
       </div>
 

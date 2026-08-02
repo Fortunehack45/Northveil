@@ -16,6 +16,7 @@ import {
   HardDrive,
   GitCommit,
 } from 'lucide-react';
+import { SwapService, SwapQuoteResult } from '../services/SwapService';
 
 export const DexBridgeView: React.FC = () => {
   const {
@@ -41,31 +42,54 @@ export const DexBridgeView: React.FC = () => {
   const fromAsset = assets.find((a) => a.id === fromAssetId) || assets[0];
   const toAsset = assets.find((a) => a.id === toAssetId) || assets[1];
 
-  // Inverse rate calculation
-  const exchangeRate = useMemo(() => {
-    if (!fromAsset || !toAsset || toAsset.priceUsd === 0) return 1;
-    return fromAsset.priceUsd / toAsset.priceUsd;
-  }, [fromAsset, toAsset]);
+  const [isQuoting, setIsQuoting] = useState(false);
+  const [quoteData, setQuoteData] = useState<SwapQuoteResult | null>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
 
   const numFromAmount = parseFloat(fromAmount) || 0;
-  const estimatedToAmount = useMemo(() => {
-    return Number((numFromAmount * exchangeRate).toFixed(4));
-  }, [numFromAmount, exchangeRate]);
 
-  // Price impact calculation simulation
-  const priceImpact = useMemo(() => {
-    const usdVal = numFromAmount * (fromAsset?.priceUsd || 0);
-    if (usdVal > 50000) return 1.85;
-    if (usdVal > 10000) return 0.42;
-    return 0.08;
-  }, [numFromAmount, fromAsset]);
+  React.useEffect(() => {
+    if (numFromAmount <= 0 || !fromAsset || !toAsset) {
+      setQuoteData(null);
+      setQuoteError(null);
+      return;
+    }
+    
+    // Cross-chain bridge not supported by 1inch/Jupiter out of the box in this basic implementation
+    if (mode === 'bridge' || fromAsset.network !== toAsset.network) {
+      setQuoteError("Cross-chain routing requires Stargate/LayerZero (mocked for now).");
+      setQuoteData(null);
+      return;
+    }
 
-  // Gas Fee estimation
-  const currentGas = useMemo(() => {
-    const chainGas = gasEstimates.find((g) => g.network === fromAsset?.network);
-    const standardTier = chainGas?.tiers.find((t) => t.speed === 'standard');
-    return standardTier ? standardTier.feeUsd * (mode === 'bridge' ? 1.8 : 1.0) : 4.50;
-  }, [gasEstimates, fromAsset, mode]);
+    const fetchQuote = async () => {
+      setIsQuoting(true);
+      setQuoteError(null);
+      try {
+        const res = await SwapService.getQuote({
+          fromAsset,
+          toAsset,
+          amount: numFromAmount,
+          slippage: userSettings.slippageTolerance
+        });
+        setQuoteData(res);
+      } catch (err: any) {
+        setQuoteError(err.message || 'Failed to fetch quote');
+        setQuoteData(null);
+      } finally {
+        setIsQuoting(false);
+      }
+    };
+    
+    const timeout = setTimeout(fetchQuote, 500); // debounce
+    return () => clearTimeout(timeout);
+  }, [numFromAmount, fromAsset, toAsset, mode, userSettings.slippageTolerance]);
+
+  const estimatedToAmount = quoteData ? parseFloat(quoteData.estimatedToAmount) : 0;
+  const priceImpact = quoteData ? quoteData.priceImpact : 0;
+  const currentGas = quoteData ? quoteData.gasFeeEstimated : 0;
+
+  const exchangeRate = estimatedToAmount > 0 && numFromAmount > 0 ? estimatedToAmount / numFromAmount : 0;
 
   // Switch direction
   const handleSwitchTokens = () => {
@@ -86,10 +110,10 @@ export const DexBridgeView: React.FC = () => {
       return;
     }
 
-    const performTransaction = () => {
+    const performTransaction = async () => {
       setIsSwapping(true);
-      setTimeout(async () => {
-        await executeSwap({
+      try {
+        const txHash = await executeSwap({
           fromAssetId: fromAsset.id,
           toAssetId: toAsset.id,
           fromAmount: numFromAmount,
@@ -97,14 +121,19 @@ export const DexBridgeView: React.FC = () => {
           isBridge: mode === 'bridge',
           toNetwork: mode === 'bridge' ? bridgeTargetNetwork : fromAsset.network,
           gasFeeUsd: currentGas,
+          quoteData: mode === 'swap' ? quoteData?.routeParams : undefined
         });
 
-        const txHash =
-          '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-        setLatestTxHash(txHash);
+        if (txHash) {
+          setLatestTxHash(txHash);
+          setIsSwapping(false);
+          setShowSuccessModal(true);
+        } else {
+          setIsSwapping(false);
+        }
+      } catch (err) {
         setIsSwapping(false);
-        setShowSuccessModal(true);
-      }, 1500);
+      }
     };
 
     triggerBiometricAuth(`Authorize ${mode.toUpperCase()} of ${numFromAmount} ${fromAsset.symbol}`, performTransaction);

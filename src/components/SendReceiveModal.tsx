@@ -14,7 +14,7 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
   initialAssetId,
   onClose,
 }) => {
-  const { assets, sendCrypto, triggerBiometricAuth, hardwareWallet } = useWallet();
+  const { assets, sendCrypto, triggerBiometricAuth, hardwareWallet, activeSubWallet } = useWallet();
 
   const [selectedAssetId, setSelectedAssetId] = useState<string>(
     initialAssetId || assets[0]?.id || 'eth-main'
@@ -28,7 +28,7 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
   const numAmount = parseFloat(amount) || 0;
 
   const handleCopyAddress = () => {
-    const addr = hardwareWallet.address || '0x71C87291a89041235B91238491209C8491209C8';
+    const addr = activeSubWallet?.address || hardwareWallet.address || 'No address derived';
     navigator.clipboard.writeText(addr);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -128,7 +128,7 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
             {/* Generated QR Code placeholder */}
             <div className="bg-white p-4 w-48 h-48 mx-auto flex items-center justify-center border-4 border-black shadow-[4px_4px_0px_0px_#000]">
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${hardwareWallet.address || '0x71C87291a89041235B91238491209C8'}`}
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${activeSubWallet?.address || 'no-address'}`}
                 alt="Deposit QR Code"
                 className="w-full h-full object-contain"
               />
@@ -137,7 +137,7 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
             <div className="space-y-1">
               <span className="text-[10px] font-mono text-slate-300 font-black uppercase tracking-wider">YOUR DEPOSIT ADDRESS ({asset.network})</span>
               <div className="bg-[#0a0a0c] p-3 border-2 border-white text-xs font-mono text-[#00f0ff] font-bold break-all select-all shadow-[2px_2px_0px_0px_#000]">
-                {hardwareWallet.address || '0x71C87291a89041235B91238491209C8'}
+                {activeSubWallet?.address || 'No address derived'}
               </div>
             </div>
 

@@ -6,6 +6,7 @@ import { CustomSelect } from './CustomSelect';
 
 interface HeaderProps {
   onToggleMobileNav?: () => void;
+  onNavigateNetworkManager?: () => void;
 }
 
 interface NotificationItem {
@@ -17,7 +18,7 @@ interface NotificationItem {
   read: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
+export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNetworkManager }) => {
   const {
     assets,
     activeChain,
@@ -27,14 +28,19 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
     activeSubWallet,
     setActiveWalletId,
     createSubWallet,
+    customNetworks,
+    addCustomNetwork
   } = useWallet();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isCreatingWallet, setIsCreatingWallet] = useState(false);
+  const [isAddingNetwork, setIsAddingNetwork] = useState(false);
   const [newWalletName, setNewWalletName] = useState('');
   const [copiedAddr, setCopiedAddr] = useState<string | null>(null);
+
+  const [customNetData, setCustomNetData] = useState({ name: '', rpcUrl: '', chainId: '', symbol: '' });
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([
     {
@@ -96,7 +102,30 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
       })
     : [];
 
-  const activeChainData = SUPPORTED_CHAINS.find((c) => c.id === activeChain) || SUPPORTED_CHAINS[0];
+  const activeChainData = [...SUPPORTED_CHAINS, ...customNetworks].find((c) => c.id === activeChain) || SUPPORTED_CHAINS[0];
+
+  const handleAddCustomNetwork = () => {
+    if (!customNetData.name || !customNetData.rpcUrl || !customNetData.chainId) return;
+    const newChain = {
+      id: `custom-${Date.now()}`,
+      name: customNetData.name,
+      symbol: customNetData.symbol || 'ETH',
+      icon: 'https://cryptologos.cc/logos/ethereum-eth-logo.png',
+      color: '#00f0ff',
+      rpcLatency: 50,
+      blockTime: 12,
+      gasUnit: 'Gwei',
+      nativeTokenPrice: 0,
+      explorerUrl: '',
+      rpcUrl: customNetData.rpcUrl,
+      chainId: parseInt(customNetData.chainId),
+      isCustom: true
+    };
+    addCustomNetwork(newChain);
+    setActiveChain(newChain.id);
+    setIsAddingNetwork(false);
+    setCustomNetData({ name: '', rpcUrl: '', chainId: '', symbol: '' });
+  };
 
   const handleCreateNewSubWallet = (overrideName?: string) => {
     const finalName = (overrideName || newWalletName).trim() || `Sub-Account #${subWallets.length + 1}`;
@@ -373,13 +402,30 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
         {/* Active Chain Selector */}
         <div>
           <CustomSelect
-            options={SUPPORTED_CHAINS.map((chain) => ({
-              value: chain.id,
-              label: chain.name,
-              icon: chain.icon,
-            }))}
+            options={[
+              ...SUPPORTED_CHAINS.map((chain) => ({
+                value: chain.id,
+                label: chain.name,
+                icon: <img src={chain.icon} alt={chain.name} className="w-4 h-4 object-contain bg-white/10 p-0.5 border border-white/20" />,
+              })),
+              ...customNetworks.map((chain) => ({
+                value: chain.id,
+                label: chain.name,
+                icon: <Zap className="w-4 h-4 text-[#00f0ff]" />,
+                badge: 'CUSTOM'
+              })),
+              { value: 'add_custom', label: '+ ADD CUSTOM NETWORK', badge: 'NEW' }
+            ]}
             value={activeChain}
-            onChange={(val) => setActiveChain(val as any)}
+            onChange={(val) => {
+              if (val === 'add_custom') {
+                if (onNavigateNetworkManager) {
+                  onNavigateNetworkManager();
+                }
+              } else {
+                setActiveChain(val as any);
+              }
+            }}
             variant="yellow"
             align="right"
           />
@@ -473,6 +519,48 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
           </div>
         </div>
       </div>
+      {/* Add Custom Network Modal */}
+      {isAddingNetwork && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn font-mono">
+          <div className="bg-[#0a0a0c] border-2 border-white shadow-[8px_8px_0px_0px_#00f0ff] w-full max-w-md p-6 space-y-4">
+            <div className="flex justify-between items-center border-b-2 border-white pb-3">
+              <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                <Plus className="w-5 h-5 text-[#00f0ff]" /> ADD CUSTOM NETWORK
+              </h3>
+              <button onClick={() => setIsAddingNetwork(false)} className="text-slate-400 hover:text-white cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-black text-[#00f0ff] mb-1">NETWORK NAME</label>
+                <input type="text" value={customNetData.name} onChange={e => setCustomNetData(prev => ({...prev, name: e.target.value}))} placeholder="e.g. Polygon Mumbai" className="w-full bg-[#181820] border-2 border-white p-2.5 text-xs text-white focus:outline-none focus:border-[#00f0ff]" />
+              </div>
+              <div>
+                <label className="block text-xs font-black text-[#00f0ff] mb-1">RPC URL (Required)</label>
+                <input type="text" value={customNetData.rpcUrl} onChange={e => setCustomNetData(prev => ({...prev, rpcUrl: e.target.value}))} placeholder="https://..." className="w-full bg-[#181820] border-2 border-white p-2.5 text-xs text-white focus:outline-none focus:border-[#00f0ff]" />
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-black text-[#00f0ff] mb-1">CHAIN ID</label>
+                  <input type="number" value={customNetData.chainId} onChange={e => setCustomNetData(prev => ({...prev, chainId: e.target.value}))} placeholder="e.g. 137" className="w-full bg-[#181820] border-2 border-white p-2.5 text-xs text-white focus:outline-none focus:border-[#00f0ff]" />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-black text-[#00f0ff] mb-1">SYMBOL</label>
+                  <input type="text" value={customNetData.symbol} onChange={e => setCustomNetData(prev => ({...prev, symbol: e.target.value}))} placeholder="e.g. MATIC" className="w-full bg-[#181820] border-2 border-white p-2.5 text-xs text-white focus:outline-none focus:border-[#00f0ff]" />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button onClick={handleAddCustomNetwork} className="w-full py-3 bg-[#00f0ff] text-black font-black text-sm uppercase border-2 border-black shadow-[4px_4px_0px_0px_#000] cursor-pointer hover:bg-[#33f3ff]">
+                SAVE NETWORK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 };
