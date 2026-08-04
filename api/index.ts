@@ -155,7 +155,7 @@ app.get('/ui/widget', async (req: Request, res: Response) => {
   res.send(html);
 });
 
-app.get(['/authorize', '/oauth/authorize'], (req, res) => {
+app.get(['/authorize', '/oauth/authorize', '/api/authorize'], (req, res) => {
   const redirectUri = (req.query.redirect_uri as string) || '';
   const state = (req.query.state as string) || '';
   const code = 'nv_auth_code_' + Math.random().toString(36).substring(2, 10);
@@ -163,25 +163,25 @@ app.get(['/authorize', '/oauth/authorize'], (req, res) => {
   res.json({ status: 'AUTHORIZED', code, state });
 });
 
-app.post(['/token', '/oauth/token'], (req, res) => {
+app.post(['/token', '/oauth/token', '/api/token'], (req, res) => {
   res.json({ access_token: 'nv_live_9f82a17b09c82415d8a9', token_type: 'Bearer', expires_in: 3600000 });
 });
 
-app.post(['/register', '/oauth/register'], (req, res) => {
+app.post(['/register', '/oauth/register', '/api/register'], (req, res) => {
   res.json({ client_id: 'northveil_ai_client', client_secret: 'northveil_ai_secret' });
 });
 
-app.get('/openapi.json', (req, res) => {
+app.get(['/openapi.json', '/api/openapi.json'], (req, res) => {
   const protocol = req.headers['x-forwarded-proto'] || 'https';
   const baseUrl = `${protocol}://${req.headers.host}`;
   res.json(getOpenApiSpec(baseUrl));
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ONLINE', server: 'Northveil Universal AI Server (Vercel Serverless)' });
+app.get(['/health', '/api/health', '/api'], (req, res) => {
+  res.json({ status: 'ONLINE', server: 'Northveil Universal AI Server (Vercel Serverless)', timestamp: new Date().toISOString() });
 });
 
-app.get('/sse', async (req: Request, res: Response) => {
+app.get(['/sse', '/api/sse'], async (req: Request, res: Response) => {
   const rawKey = (req.headers['x-api-key'] || req.headers['authorization'] || req.query.api_key || 'nv_live_default_northveil_key').toString();
   const explicitWallet = (req.query.wallet_address || req.query.wallet || req.headers['x-wallet-address'] || '').toString();
   const auth = await authenticateClient(rawKey, explicitWallet);
@@ -198,7 +198,7 @@ app.get('/sse', async (req: Request, res: Response) => {
   res.write(`event: endpoint\ndata: ${messageUrl}\n\n`);
 });
 
-app.all('/mcp', async (req: Request, res: Response) => {
+app.all(['/mcp', '/api/mcp'], async (req: Request, res: Response) => {
   const rawKey = (req.headers['x-api-key'] || req.headers['authorization'] || req.query.api_key || 'nv_live_default_northveil_key').toString();
   const auth = await authenticateClient(rawKey, req.body?.walletAddress || req.query?.wallet_address as string);
 
