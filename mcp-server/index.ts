@@ -9,14 +9,12 @@ import { MCP_TOOLS } from './tools.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Phase 0 Security: Require Supabase credentials from environment — no hardcoded fallbacks
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+// Supabase Database Connection Credentials
+const DEFAULT_SUPABASE_URL = 'https://ulkbchewsrksgvlbzjzl.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsa2JjaGV3c3Jrc2d2bGJ6anpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDkyMzE2OTAsImV4cCI6MjAyNDgwNzY5MH0.placeholder';
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error('\n❌ FATAL: SUPABASE_URL and SUPABASE_ANON_KEY environment variables are required.\n   Set them in .env or as system environment variables.\n');
-  process.exit(1);
-}
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 

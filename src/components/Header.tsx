@@ -519,13 +519,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
 
         {/* User Profile Avatar Pill */}
         <div className="flex items-center gap-2 pl-1 sm:pl-2 border-l-2 border-white/20">
-          <div className="w-7 h-7 sm:w-9 sm:h-9 border-2 border-black bg-[#ff007f] shadow-[2px_2px_0px_0px_#000] sm:shadow-[3px_3px_0px_0px_#000] flex items-center justify-center cursor-pointer overflow-hidden shrink-0">
-            <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
-              alt="Avatar"
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <BlockiesAvatar address={activeSubWallet?.address || '0x0000000000000000000000000000000000000000'} size={36} />
         </div>
       </div>
       {/* Add Custom Network Modal */}
