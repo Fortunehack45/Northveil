@@ -56,7 +56,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   onToggleMobile,
   onOpenOnboarding,
 }) => {
-  const { lockWallet } = useWallet();
+  const { lockWallet, activeSubWallet } = useWallet();
 
   const navItems: { id: TabType; label: string; icon: React.ReactNode }[] = [
     { id: 'portfolio', label: 'DASHBOARD', icon: <LayoutGrid className="w-4 h-4 stroke-[2.5]" /> },
