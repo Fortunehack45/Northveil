@@ -82,7 +82,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
         {/* Action Button & Mobile Menu Toggle */}
         <div className="flex items-center gap-3">
           <a
-            href="http://localhost:3000"
+            href="https://wallet.northveil.xyz/"
             target="_blank"
             rel="noreferrer"
             className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 bg-[#00f0ff] text-black font-mono font-black text-xs uppercase border-3 border-black shadow-[4px_4px_0px_0px_#ccff00] hover:bg-[#ccff00] hover:shadow-[4px_4px_0px_0px_#00f0ff] transition-all cursor-pointer"
