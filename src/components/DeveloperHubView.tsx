@@ -21,6 +21,8 @@ import {
   Layers,
 } from 'lucide-react';
 import { getMcpServerUrl, getMcpSseUrl } from '../config/endpointConfig';
+import { useWallet } from '../context/WalletContext';
+import { SUPPORTED_CHAINS } from '../data/initialData';
 
 interface ChatMessage {
   id: string;

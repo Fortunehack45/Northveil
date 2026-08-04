@@ -37,25 +37,31 @@ export class TokenService {
   }
 
   static async fetchLiveBalancesAndPrices(assets: CryptoAsset[], walletAddress: string, solanaAddress: string, bitcoinAddress?: string): Promise<CryptoAsset[]> {
-    const updatedAssets: CryptoAsset[] = [];
-    
-    // Live API Price Fetcher (Coinpaprika REST API)
-    const livePrices = await this.fetchLivePricesMap();
+    // Fetch live API prices map
+    const livePrices = await this.fetchLivePricesMap().catch(() => ({}));
 
-    // Fetch balances & apply live API prices
-    for (const asset of assets) {
-      let liveBalance = asset.balance; 
-      
+    // Helper timeout wrapper (4 seconds max per balance query)
+    const withTimeout = <T>(promise: Promise<T>, ms: number = 4000): Promise<T> => {
+      return Promise.race([
+        promise,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+      ]);
+    };
+
+    const updatedAssets = await Promise.all(assets.map(async (asset) => {
+      let liveBalance = asset.balance;
+
       try {
-        if (asset.network === 'solana') {
+        if (asset.network === 'solana' || asset.network === 'solana_devnet') {
           if (solanaAddress) {
-            const conn = ProviderService.getSolanaConnection();
-            const lamports = await conn.getBalance(new PublicKey(solanaAddress));
+            const isDev = asset.network === 'solana_devnet';
+            const conn = ProviderService.getSolanaConnection(isDev ? 'devnet' : 'mainnet');
+            const lamports = await withTimeout(conn.getBalance(new PublicKey(solanaAddress)));
             liveBalance = lamports / 1e9;
           }
         } else if (asset.network === 'bitcoin') {
           if (bitcoinAddress) {
-            liveBalance = await BitcoinService.fetchBalance(bitcoinAddress);
+            liveBalance = await withTimeout(BitcoinService.fetchBalance(bitcoinAddress));
           }
         } else {
           // EVM Chain
@@ -66,19 +72,20 @@ export class TokenService {
                              asset.contractAddress === '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c';
                              
             if (isNative) {
-              const bal = await provider.getBalance(walletAddress);
+              const bal = await withTimeout(provider.getBalance(walletAddress));
               liveBalance = Number(ethers.formatEther(bal));
             } else {
               // ERC20
               const contract = new ethers.Contract(asset.contractAddress, ERC20_ABI, provider);
-              const bal = await contract.balanceOf(walletAddress);
+              const bal = await withTimeout(contract.balanceOf(walletAddress));
               const decimals = await contract.decimals().catch(() => 18);
               liveBalance = Number(ethers.formatUnits(bal, decimals));
             }
           }
         }
       } catch (e) {
-        console.error(`Failed to fetch live balance for ${asset.symbol} on ${asset.network}`, e);
+        // Fallback to existing balance on network/timeout error
+        liveBalance = asset.balance;
       }
 
       const sym = (asset.symbol || '').toUpperCase();
@@ -86,13 +93,13 @@ export class TokenService {
       const priceUsd = (liveData && liveData.usd > 0) ? liveData.usd : asset.priceUsd;
       const change24h = (liveData && liveData.change24h !== undefined) ? liveData.change24h : asset.change24h;
 
-      updatedAssets.push({
+      return {
         ...asset,
         balance: liveBalance,
         priceUsd: priceUsd,
         change24h: change24h
-      });
-    }
+      };
+    }));
 
     return updatedAssets;
   }
