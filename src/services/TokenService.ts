@@ -13,22 +13,36 @@ const ERC20_ABI = [
 ];
 
 export class TokenService {
+  static async fetchLivePricesMap(): Promise<Record<string, { usd: number; change24h: number }>> {
+    let livePrices: Record<string, { usd: number; change24h: number }> = {};
+    try {
+      const response = await fetch('https://api.coinpaprika.com/v1/tickers?limit=250');
+      if (response.ok) {
+        const paprikaData = await response.json();
+        if (Array.isArray(paprikaData)) {
+          paprikaData.forEach((item: any) => {
+            if (item.symbol && item.quotes?.USD) {
+              livePrices[item.symbol.toUpperCase()] = {
+                usd: Number(item.quotes.USD.price || 0),
+                change24h: Number(item.quotes.USD.percent_change_24h || 0),
+              };
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Live price ticker fetch failed:', e);
+    }
+    return livePrices;
+  }
+
   static async fetchLiveBalancesAndPrices(assets: CryptoAsset[], walletAddress: string, solanaAddress: string, bitcoinAddress?: string): Promise<CryptoAsset[]> {
     const updatedAssets: CryptoAsset[] = [];
     
-    // Fetch prices from CoinGecko
-    const cgIds = assets.map(a => this.getCoinGeckoId(a.symbol)).filter(id => id !== '').join(',');
-    let prices: Record<string, { usd: number, usd_24h_change: number }> = {};
-    try {
-      if (cgIds) {
-        const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cgIds}&vs_currencies=usd&include_24hr_change=true`);
-        prices = await response.json();
-      }
-    } catch (e) {
-      console.error('Failed to fetch prices', e);
-    }
+    // Live API Price Fetcher (Coinpaprika REST API)
+    const livePrices = await this.fetchLivePricesMap();
 
-    // Fetch balances
+    // Fetch balances & apply live API prices
     for (const asset of assets) {
       let liveBalance = asset.balance; 
       
@@ -42,8 +56,6 @@ export class TokenService {
         } else if (asset.network === 'bitcoin') {
           if (bitcoinAddress) {
             liveBalance = await BitcoinService.fetchBalance(bitcoinAddress);
-          } else {
-            liveBalance = 0; 
           }
         } else {
           // EVM Chain
@@ -60,34 +72,19 @@ export class TokenService {
               // ERC20
               const contract = new ethers.Contract(asset.contractAddress, ERC20_ABI, provider);
               const bal = await contract.balanceOf(walletAddress);
-              const decimals = await contract.decimals();
+              const decimals = await contract.decimals().catch(() => 18);
               liveBalance = Number(ethers.formatUnits(bal, decimals));
             }
           }
         }
       } catch (e) {
-        console.error(`Failed to fetch balance for ${asset.symbol} on ${asset.network}`, e);
-        // keep old balance on fail
+        console.error(`Failed to fetch live balance for ${asset.symbol} on ${asset.network}`, e);
       }
 
-      const cgId = this.getCoinGeckoId(asset.symbol);
-      let priceUsd = prices[cgId]?.usd || asset.priceUsd;
-      
-      // Fallback to static known prices if CoinGecko fails and it's 0
-      if (priceUsd === 0) {
-        if (asset.symbol === 'ETH' || asset.symbol === 'WETH') priceUsd = 3450.20;
-        else if (asset.symbol === 'BTC' || asset.symbol === 'WBTC') priceUsd = 65000.00;
-        else if (asset.symbol === 'SOL') priceUsd = 182.40;
-        else if (asset.symbol === 'BNB') priceUsd = 590.50;
-        else if (asset.symbol === 'USDC' || asset.symbol === 'USDT' || asset.symbol === 'DAI') priceUsd = 1.00;
-        else if (asset.symbol === 'ARB') priceUsd = 1.15;
-        else if (asset.symbol === 'POL' || asset.symbol === 'MATIC') priceUsd = 0.75;
-        else if (asset.symbol === 'AVAX') priceUsd = 35.20;
-        else if (asset.symbol === 'LINK') priceUsd = 14.50;
-        else if (asset.symbol === 'UNI') priceUsd = 7.80;
-      }
-      
-      const change24h = prices[cgId]?.usd_24h_change || asset.change24h;
+      const sym = (asset.symbol || '').toUpperCase();
+      const liveData = livePrices[sym];
+      const priceUsd = (liveData && liveData.usd > 0) ? liveData.usd : asset.priceUsd;
+      const change24h = (liveData && liveData.change24h !== undefined) ? liveData.change24h : asset.change24h;
 
       updatedAssets.push({
         ...asset,

@@ -17,10 +17,11 @@ import {
   ChevronDown,
   ArrowLeftRight,
   RefreshCw,
-  Coins
+  Coins,
+  Search
 } from 'lucide-react';
 import { useWallet } from '../context/WalletContext';
-import { CustomSelect } from './CustomSelect';
+import { TokenSearchModal } from './TokenSearchModal';
 
 interface BuySellViewProps {
   initialTokenId?: string;
@@ -35,6 +36,7 @@ export const BuySellView: React.FC<BuySellViewProps> = ({
 }) => {
   const { assets, executeSwap, unlockWalletWithBiometrics } = useWallet();
   const [mode, setMode] = useState<'buy' | 'sell'>(initialMode);
+  const [isTokenSearchOpen, setIsTokenSearchOpen] = useState(false);
 
   // Stablecoin (USDC) is the base currency
   const stablecoin = assets.find(a => a.symbol === 'USDC') || assets[0];
@@ -122,16 +124,26 @@ export const BuySellView: React.FC<BuySellViewProps> = ({
   };
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-6 pb-24 sm:pb-12 w-full font-mono select-none animate-fadeIn">
-      {/* Top Banner Navigation */}
-      <div className="bg-[#141419] border-2 border-white p-4 sm:p-6 shadow-[4px_4px_0px_0px_#ccff00] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <span className="px-2 py-0.5 bg-[#00f0ff] text-black text-[9px] sm:text-[10px] font-black uppercase border border-black shadow-[1.5px_1.5px_0px_0px_#000] inline-block">
-            STABLECOIN OTC DESK
-          </span>
-          <h1 className="text-lg sm:text-2xl font-black text-white uppercase tracking-tight mt-1 flex items-center gap-2">
-            <Coins className="w-6 h-6 text-[#ccff00]" />
-            NATIVE BUY & SELL
+    <div className="max-w-4xl mx-auto space-y-8 font-mono pb-12">
+      {/* Token Search Modal */}
+      <TokenSearchModal 
+        isOpen={isTokenSearchOpen} 
+        onClose={() => setIsTokenSearchOpen(false)}
+        onSelect={(token) => {
+            setSelectedAssetId(token.id);
+            setIsTokenSearchOpen(false);
+        }}
+      />
+
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#141419] border-2 border-white p-6 shadow-[6px_6px_0px_0px_#00f0ff]">
+        <div>
+          <div className="flex items-center gap-2">
+            <Coins className="w-5 h-5 text-[#ccff00]" />
+            <span className="text-[10px] font-black text-[#ccff00] uppercase tracking-widest">FIAT & STABLECOIN OTC GATEWAY</span>
+          </div>
+          <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
+            {mode === 'buy' ? 'INSTANT BUY CRYPTO' : 'INSTANT SELL CRYPTO'}
           </h1>
         </div>
 
@@ -146,7 +158,7 @@ export const BuySellView: React.FC<BuySellViewProps> = ({
             }`}
           >
             <ArrowDownToLine className="w-4 h-4 stroke-[2.5]" />
-            <span>BUY CRYPTO</span>
+            <span>BUY</span>
           </button>
 
           <button
@@ -158,14 +170,14 @@ export const BuySellView: React.FC<BuySellViewProps> = ({
             }`}
           >
             <ArrowUpFromLine className="w-4 h-4 stroke-[2.5]" />
-            <span>SELL CRYPTO</span>
+            <span>SELL</span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
         {/* Left Form Panel */}
-        <div className="lg:col-span-2 bg-[#0a0a0c] border-2 border-white p-6 shadow-[8px_8px_0px_0px_#00f0ff] min-h-[500px] flex flex-col relative">
+        <div className="bg-[#0a0a0c] border-2 border-white p-6 shadow-[8px_8px_0px_0px_#00f0ff] min-h-[500px] flex flex-col relative">
           
           {orderStatus === 'success' ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 animate-slideIn">
@@ -226,7 +238,7 @@ export const BuySellView: React.FC<BuySellViewProps> = ({
                 {/* YOU PAY */}
                 <div className="bg-[#141419] border-2 border-white/30 p-4 relative group hover:border-white transition-colors">
                   <label className="text-[10px] text-slate-400 font-bold uppercase block mb-2">You Pay</label>
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center gap-3">
                     <input
                       type="number"
                       value={inputAmount}
@@ -237,18 +249,20 @@ export const BuySellView: React.FC<BuySellViewProps> = ({
                     
                     {mode === 'buy' ? (
                       // Pay with USDC
-                      <div className="flex items-center gap-2 bg-[#0a0a0c] px-3 py-1.5 border border-white/20 min-w-32 justify-center">
+                      <div className="flex items-center gap-2 bg-[#0a0a0c] px-3 py-2 border-2 border-white shrink-0">
                         <img src={stablecoin.icon} alt="USDC" className="w-5 h-5 object-cover" />
-                        <span className="font-black text-white text-sm">USDC</span>
+                        <span className="font-black text-white text-xs">USDC</span>
                       </div>
                     ) : (
-                      // Pay with Crypto
-                      <CustomSelect
-                        options={targetAssets.map(a => ({ value: a.id, label: a.symbol, icon: <img src={a.icon} alt={a.symbol} className="w-4 h-4"/> }))}
-                        value={selectedAssetId}
-                        onChange={setSelectedAssetId}
-                        className="w-40"
-                      />
+                      // Pay with Searchable Token Button
+                      <button
+                        onClick={() => setIsTokenSearchOpen(true)}
+                        className="flex items-center gap-2 bg-[#0a0a0c] px-3.5 py-2 border-2 border-white hover:border-[#ccff00] transition-colors cursor-pointer shrink-0 shadow-[2px_2px_0px_0px_#000]"
+                      >
+                        <img src={selectedAsset.icon} alt={selectedAsset.symbol} className="w-5 h-5 object-contain" />
+                        <span className="font-black text-white text-xs uppercase">{selectedAsset.symbol}</span>
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-400 stroke-[3]" />
+                      </button>
                     )}
                   </div>
                   <div className="text-[10px] text-slate-400 font-bold text-right mt-2">
@@ -267,7 +281,7 @@ export const BuySellView: React.FC<BuySellViewProps> = ({
                   <label className="text-[10px] text-slate-400 font-bold uppercase block mb-2">
                     You Receive (Estimated)
                   </label>
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center gap-3">
                     <input
                       type="text"
                       readOnly
@@ -277,18 +291,20 @@ export const BuySellView: React.FC<BuySellViewProps> = ({
                     />
                     
                     {mode === 'buy' ? (
-                      // Receive Crypto
-                      <CustomSelect
-                        options={targetAssets.map(a => ({ value: a.id, label: a.symbol, icon: <img src={a.icon} alt={a.symbol} className="w-4 h-4"/> }))}
-                        value={selectedAssetId}
-                        onChange={setSelectedAssetId}
-                        className="w-40"
-                      />
+                      // Receive Searchable Token Button
+                      <button
+                        onClick={() => setIsTokenSearchOpen(true)}
+                        className="flex items-center gap-2 bg-[#0a0a0c] px-3.5 py-2 border-2 border-white hover:border-[#00f0ff] transition-colors cursor-pointer shrink-0 shadow-[2px_2px_0px_0px_#000]"
+                      >
+                        <img src={selectedAsset.icon} alt={selectedAsset.symbol} className="w-5 h-5 object-contain" />
+                        <span className="font-black text-white text-xs uppercase">{selectedAsset.symbol}</span>
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-400 stroke-[3]" />
+                      </button>
                     ) : (
                       // Receive USDC
-                      <div className="flex items-center gap-2 bg-[#0a0a0c] px-3 py-1.5 border border-white/20 min-w-32 justify-center">
+                      <div className="flex items-center gap-2 bg-[#0a0a0c] px-3 py-2 border-2 border-white shrink-0">
                         <img src={stablecoin.icon} alt="USDC" className="w-5 h-5 object-cover" />
-                        <span className="font-black text-white text-sm">USDC</span>
+                        <span className="font-black text-white text-xs">USDC</span>
                       </div>
                     )}
                   </div>

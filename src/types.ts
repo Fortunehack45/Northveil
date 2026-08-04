@@ -14,6 +14,7 @@ export interface ChainInfo {
   rpcUrl?: string; // added for custom networks
   chainId?: number; // added for custom networks
   isCustom?: boolean;
+  isTestnet?: boolean;
 }
 
 export interface TokenSocials {
@@ -147,7 +148,7 @@ export interface SubWalletAccount {
   colorTag: string;
   isDefault?: boolean;
   createdAt: string;
-  balanceMultiplier: number;
+  balanceMultiplier?: number;
 }
 
 export interface UserSettings {

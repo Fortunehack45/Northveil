@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useWallet } from '../context/WalletContext';
 import { CustomSelect } from './CustomSelect';
-import { Send, QrCode, Copy, Check, ShieldCheck, HardDrive, AlertTriangle } from 'lucide-react';
+import { TokenSearchModal } from './TokenSearchModal';
+import { Send, QrCode, Copy, Check, ShieldCheck, HardDrive, AlertTriangle, ChevronDown, Search } from 'lucide-react';
 
 interface SendReceiveModalProps {
   mode: 'send' | 'receive';
@@ -14,7 +15,7 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
   initialAssetId,
   onClose,
 }) => {
-  const { assets, sendCrypto, triggerBiometricAuth, hardwareWallet, activeSubWallet } = useWallet();
+  const { assets, sendCrypto, receiveCrypto, triggerBiometricAuth, hardwareWallet, activeSubWallet } = useWallet();
 
   const [selectedAssetId, setSelectedAssetId] = useState<string>(
     initialAssetId || assets[0]?.id || 'eth-main'
@@ -23,6 +24,7 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
   const [amount, setAmount] = useState<string>('0.5');
   const [copied, setCopied] = useState<boolean>(false);
   const [isSending, setIsSending] = useState<boolean>(false);
+  const [isTokenSearchOpen, setIsTokenSearchOpen] = useState<boolean>(false);
 
   const asset = assets.find((a) => a.id === selectedAssetId) || assets[0];
   const numAmount = parseFloat(amount) || 0;
@@ -36,29 +38,40 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
 
   const handleConfirmSend = () => {
     if (!recipientAddress || numAmount <= 0) return;
-    if (numAmount > asset.balance) {
-      alert('Insufficient token balance.');
-      return;
-    }
 
     triggerBiometricAuth(`Authorize Send of ${numAmount} ${asset.symbol}`, async () => {
       setIsSending(true);
-      setTimeout(async () => {
+      try {
         await sendCrypto({
           assetId: asset.id,
           amount: numAmount,
           recipientAddress,
           gasFeeUsd: 2.50,
         });
+      } catch (e: any) {
+        console.error('Send crypto error:', e);
+      } finally {
         setIsSending(false);
         onClose();
-      }, 1200);
+      }
     });
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-4">
-      <div className="bg-[#141419] border-4 border-white p-5 sm:p-8 max-w-md w-full shadow-[10px_10px_0px_0px_#ccff00] relative space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
+      {/* Token Search Modal */}
+      <TokenSearchModal
+        isOpen={isTokenSearchOpen}
+        onClose={() => setIsTokenSearchOpen(false)}
+        selectedAssetId={selectedAssetId}
+        onSelectToken={(t) => {
+          setSelectedAssetId(t.id);
+          setIsTokenSearchOpen(false);
+        }}
+        title="SELECT ASSET FOR TRANSACTION"
+      />
+
+      <div className="bg-[#141419] border-4 border-white p-5 sm:p-8 max-w-md w-full shadow-[10px_10px_0px_0px_#ccff00] relative space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar font-mono">
         <div className="flex items-center justify-between border-b-2 border-white pb-3">
           <h3 className="text-xl font-black text-white font-mono uppercase flex items-center gap-2 tracking-tight">
             {mode === 'send' ? <Send className="w-5 h-5 text-[#ccff00] stroke-[3]" /> : <QrCode className="w-5 h-5 text-[#ccff00] stroke-[3]" />}
@@ -72,19 +85,22 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
           </button>
         </div>
 
-        {/* Asset Selector */}
+        {/* Asset Selector Button */}
         <div className="space-y-1.5">
           <label className="text-xs font-mono font-black text-slate-300 uppercase">SELECT ASSET</label>
-          <CustomSelect
-            options={assets.map((a) => ({
-              value: a.id,
-              label: `${a.symbol} - ${a.name} (BAL: ${a.balance})`,
-            }))}
-            value={selectedAssetId}
-            onChange={(val) => setSelectedAssetId(val)}
-            variant="yellow"
-            className="w-full"
-          />
+          <button
+            onClick={() => setIsTokenSearchOpen(true)}
+            className="w-full flex items-center justify-between bg-[#0a0a0c] border-2 border-white p-3 hover:border-[#00f0ff] cursor-pointer transition-all shadow-[3px_3px_0px_0px_#000]"
+          >
+            <div className="flex items-center gap-2.5">
+              <img src={asset.icon} alt={asset.symbol} className="w-6 h-6 object-contain" />
+              <div className="text-left">
+                <div className="text-xs font-black text-white uppercase">{asset.symbol} - {asset.name}</div>
+                <div className="text-[10px] text-slate-400 font-bold">BALANCE: {asset.balance} {asset.symbol}</div>
+              </div>
+            </div>
+            <ChevronDown className="w-4 h-4 text-slate-400 stroke-[3]" />
+          </button>
         </div>
 
         {mode === 'send' ? (
@@ -143,7 +159,7 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
 
             <button
               onClick={handleCopyAddress}
-              className="w-full py-3 bg-[#00f0ff] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[3px_3px_0px_0px_#000] flex items-center justify-center gap-2 cursor-pointer hover:bg-[#33f3ff]"
+              className="w-full py-3.5 bg-[#00f0ff] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[4px_4px_0px_0px_#000] flex items-center justify-center gap-2 cursor-pointer hover:bg-[#33f3ff] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
             >
               {copied ? <Check className="w-4 h-4 text-black stroke-[3]" /> : <Copy className="w-4 h-4 stroke-[3]" />}
               <span>{copied ? 'COPIED ADDRESS!' : 'COPY DEPOSIT ADDRESS'}</span>

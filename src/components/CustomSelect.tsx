@@ -42,14 +42,27 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Normalize options to object format
-  const normalizedOptions: SelectOption[] = options.map((opt) =>
-    typeof opt === 'string' ? { value: opt, label: opt } : opt
-  );
+  // Normalize options to object format with 100% defensive safety
+  const safeOptions = Array.isArray(options) ? options : [];
+  const normalizedOptions: SelectOption[] = safeOptions
+    .filter(Boolean)
+    .map((opt) => {
+      if (typeof opt === 'string') {
+        return { value: opt, label: opt };
+      }
+      return {
+        value: opt.value || '',
+        label: opt.label || opt.value || 'Option',
+        icon: opt.icon,
+        badge: opt.badge,
+        description: opt.description,
+        color: opt.color,
+      };
+    });
 
-  const selectedOption: SelectOption = normalizedOptions.find((opt) => opt.value === value) || {
-    value,
-    label: value || placeholder,
+  const selectedOption: SelectOption = normalizedOptions.find((opt) => opt && opt.value === value) || {
+    value: value || '',
+    label: value || placeholder || 'Select...',
   };
 
   // Close when clicking outside
@@ -94,7 +107,10 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && setIsOpen((prev) => !prev)}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!disabled) setIsOpen((prev) => !prev);
+        }}
         className={`w-full flex items-center justify-between gap-2 font-black uppercase text-left transition-all cursor-pointer ${
           compact ? 'px-2 py-1 text-[10px]' : 'px-3 py-1.5 text-xs'
         } ${currentVariantStyle} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${buttonClassName}`}
@@ -122,13 +138,15 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
             align === 'right' ? 'right-0' : 'left-0'
           } ${menuWidth || 'min-w-[180px] w-full'} ${menuClassName}`}
         >
-          {normalizedOptions.map((opt) => {
+          {normalizedOptions.map((opt, index) => {
+            if (!opt) return null;
             const isSelected = opt.value === value;
             return (
               <button
-                key={opt.value}
+                key={opt.value || `opt-${index}`}
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   onChange(opt.value);
                   setIsOpen(false);
                 }}

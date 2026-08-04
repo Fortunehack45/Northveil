@@ -619,10 +619,14 @@ export const SecurityBackupView: React.FC = () => {
             <div>
               <label className="text-[10px] text-slate-400 font-bold block mb-1">FROM SUB-WALLET:</label>
               <CustomSelect
-                options={subWallets.map((w) => ({
-                  value: w.id,
-                  label: `${w.name} (${w.address.substring(0, 6)}...)`,
-                }))}
+                options={(subWallets || []).map((w) => {
+                  const addr = w?.address || '';
+                  const short = addr.length > 8 ? `${addr.slice(0, 6)}...` : addr;
+                  return {
+                    value: w?.id || '',
+                    label: `${w?.name || 'Wallet'} (${short})`,
+                  };
+                })}
                 value={transferFromId}
                 onChange={(val) => setTransferFromId(val)}
                 variant="dark"
@@ -633,10 +637,14 @@ export const SecurityBackupView: React.FC = () => {
             <div>
               <label className="text-[10px] text-slate-400 font-bold block mb-1">TO SUB-WALLET:</label>
               <CustomSelect
-                options={subWallets.map((w) => ({
-                  value: w.id,
-                  label: `${w.name} (${w.address.substring(0, 6)}...)`,
-                }))}
+                options={(subWallets || []).map((w) => {
+                  const addr = w?.address || '';
+                  const short = addr.length > 8 ? `${addr.slice(0, 6)}...` : addr;
+                  return {
+                    value: w?.id || '',
+                    label: `${w?.name || 'Wallet'} (${short})`,
+                  };
+                })}
                 value={transferToId}
                 onChange={(val) => setTransferToId(val)}
                 variant="dark"

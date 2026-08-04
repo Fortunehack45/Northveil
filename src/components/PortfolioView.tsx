@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useWallet } from '../context/WalletContext';
 import { CustomSelect } from './CustomSelect';
 import { ImportTokenModal } from './ImportTokenModal';
@@ -135,9 +135,41 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
     })
     .sort((a, b) => parseFloat(b.pct) - parseFloat(a.pct))
     .slice(0, 5);
+  const [showZeroBalances, setShowZeroBalances] = useState<boolean>(false);
+
   const candlestickPoints = historicalPerformance;
 
-  const sortedAssets = [...assets].sort((a, b) => (b.balance * b.priceUsd) - (a.balance * a.priceUsd));
+  const MAIN_NATIVE_SYMBOLS = useMemo(() => new Set(['ETH', 'SOL', 'BTC', 'BNB', 'POL', 'MATIC', 'AVAX', 'ARB']), []);
+
+  const filteredAssetsList = useMemo(() => {
+    if (showZeroBalances) return assets;
+
+    return assets.filter(asset => {
+      const usdVal = asset.balance * asset.priceUsd;
+      const symUpper = asset.symbol?.toUpperCase() || '';
+      const isMainNative = MAIN_NATIVE_SYMBOLS.has(symUpper) || 
+                           asset.id?.startsWith('native-') || 
+                           asset.id?.endsWith('-native') || 
+                           asset.id?.endsWith('-main');
+
+      // Rule 1: Always include main coins from the 7 primary blockchains even if balance is 0
+      if (isMainNative) return true;
+
+      // Rule 2: Include other tokens ONLY if they have real balance and real non-zero USD value (> $0.0001)
+      // Filters out spam dust tokens like MEZO 0.00000017 with $0.00 value
+      return asset.balance > 0.000001 && usdVal >= 0.0001;
+    });
+  }, [assets, showZeroBalances, MAIN_NATIVE_SYMBOLS]);
+
+  const sortedAssets = useMemo(() => {
+    return [...filteredAssetsList].sort((a, b) => {
+      const valA = a.balance * a.priceUsd;
+      const valB = b.balance * b.priceUsd;
+      if (valB !== valA) return valB - valA;
+      if (b.balance !== a.balance) return b.balance - a.balance;
+      return a.symbol.localeCompare(b.symbol);
+    });
+  }, [filteredAssetsList]);
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-5 sm:space-y-6 pb-12 w-full">
@@ -152,12 +184,14 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
               <span className="text-[8px] sm:text-[9px] bg-[#00f0ff] text-black px-1 py-0.2 font-black uppercase border border-black shrink-0">
                 ACTIVE WALLET
               </span>
-              <h3 className="text-xs sm:text-base font-black text-white truncate max-w-[140px] xs:max-w-[200px] sm:max-w-xs">{activeSubWallet.name}</h3>
+              <h3 className="text-xs sm:text-base font-black text-white truncate max-w-[140px] xs:max-w-[200px] sm:max-w-xs">{activeSubWallet?.name || 'Account 1'}</h3>
             </div>
             <p className="text-[10px] text-slate-400 truncate mt-0.5">
-              <span className="hidden xs:inline">{activeSubWallet.derivationPath} • </span>
+              <span className="hidden xs:inline">{activeSubWallet?.derivationPath || "m/44'/60'/0'/0/0"} • </span>
               <span className="text-[#ccff00] font-bold">
-                {activeSubWallet.address.substring(0, 8)}...{activeSubWallet.address.substring(36)}
+                {activeSubWallet?.address ? (
+                  activeSubWallet.address.length > 10 ? `${activeSubWallet.address.slice(0, 8)}...${activeSubWallet.address.slice(-6)}` : activeSubWallet.address
+                ) : '0x...'}
               </span>
             </p>
           </div>
@@ -166,10 +200,14 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
         {/* Quick Sub-Wallet Switcher & Add Button */}
         <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
           <CustomSelect
-            options={subWallets.map((w) => ({
-              value: w.id,
-              label: `${w.name} (${w.address.substring(0, 6)}...)`,
-            }))}
+            options={(subWallets || []).map((w) => {
+              const addr = w?.address || '';
+              const short = addr.length > 8 ? `${addr.slice(0, 6)}...` : addr;
+              return {
+                value: w?.id || '',
+                label: `${w?.name || 'Wallet'} (${short})`,
+              };
+            })}
             value={activeWalletId}
             onChange={(val) => setActiveWalletId(val)}
             variant="dark"
@@ -311,7 +349,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                       <div className="absolute inset-0 flex flex-col justify-between p-4 pointer-events-none opacity-30">
                         {gridValues.map((val, i) => (
                           <div key={i} className={`border-b border-dashed ${i === 0 ? 'border-[#ccff00] text-[#ccff00]' : 'border-slate-600 text-slate-400'} text-[10px] font-mono`}>
-                            $ {val.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            $ {val > 0 && val < 0.01 ? val.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 }) : val.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                           </div>
                         ))}
                       </div>
@@ -323,7 +361,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                         className="absolute right-3 z-10 bg-[#ff007f] text-white font-mono text-[10px] sm:text-xs font-black px-2.5 py-1 border-2 border-black shadow-[3px_3px_0px_0px_#000] transition-all"
                         style={{ top: `${Math.max(5, Math.min(95, currentPricePct))}%`, transform: 'translateY(-50%)' }}
                       >
-                        $ {currentPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        $ {currentPrice > 0 && currentPrice < 0.01 ? currentPrice.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 }) : currentPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                       </div>
                     )}
 
@@ -376,10 +414,18 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                     </div>
 
                     {/* X-Axis Labels */}
-                    <div className="flex justify-between items-center text-[9px] sm:text-[10px] font-mono font-bold text-slate-400 pt-2 border-t-2 border-white mt-2 relative z-10">
-                      {candlestickPoints.map((pt, idx) => (
-                        <span key={idx}>{pt.date}</span>
-                      ))}
+                    <div className="flex justify-between items-center text-[9px] sm:text-[10px] font-mono font-bold text-slate-400 pt-2 border-t-2 border-white mt-2 relative z-10 px-2">
+                      {candlestickPoints.length > 0 ? (
+                        [
+                          candlestickPoints[0],
+                          candlestickPoints[Math.floor(candlestickPoints.length * 0.25)],
+                          candlestickPoints[Math.floor(candlestickPoints.length * 0.5)],
+                          candlestickPoints[Math.floor(candlestickPoints.length * 0.75)],
+                          candlestickPoints[candlestickPoints.length - 1],
+                        ].map((pt, idx) => (
+                          <span key={idx}>{pt?.date || ''}</span>
+                        ))
+                      ) : null}
                     </div>
                   </div>
                 );
@@ -392,7 +438,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="px-2 py-0.5 bg-[#00f0ff] text-black font-black text-[10px] uppercase border border-black shadow-[2px_2px_0px_0px_#000]">
-                  {ownedNFTs.length} STORED IN VAULT
+                  {ownedNFTs.length > 4 ? `SHOWING 4 OF ${ownedNFTs.length} NFTS` : `${ownedNFTs.length} STORED IN VAULT`}
                 </span>
                 <h3 className="text-base font-black text-white uppercase tracking-tight flex items-center gap-2">
                   <ImageIcon className="w-4 h-4 text-[#ccff00]" />
@@ -441,51 +487,71 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
               </div>
             </div>
 
-            {/* NFT Rendering: Grid or List */}
+            {/* NFT Rendering: Grid or List (Max 4 items on Home Page) */}
             {nftViewMode === 'grid' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-3.5 min-h-[250px]">
-                {ownedNFTs.length > 0 ? ownedNFTs.map((nft) => (
-                  <div
-                    key={nft.id}
-                    onClick={() => setSelectedVaultNft(nft)}
-                    className="bg-[#0a0a0c] border-2 border-white p-3 shadow-[4px_4px_0px_0px_#00f0ff] hover:shadow-[6px_6px_0px_0px_#ccff00] hover:-translate-y-1 transition-all cursor-pointer group flex flex-col justify-between"
-                  >
-                    <div className="space-y-2.5">
-                      <div className="relative aspect-square w-full bg-[#141419] border-2 border-white overflow-hidden">
-                        <img
-                          src={nft.image}
-                          alt={nft.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                        <span className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-[#ff007f] text-white font-black text-[9px] uppercase border border-black shadow-[1.5px_1.5px_0px_0px_#000]">
-                          {nft.network}
-                        </span>
-                        <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/80 text-[#ccff00] font-black text-[9px] border border-white/50">
-                          {nft.tokenId}
-                        </span>
-                      </div>
+                {ownedNFTs.length > 0 ? (
+                  <>
+                    {ownedNFTs.slice(0, 4).map((nft) => (
+                      <div
+                        key={nft.id}
+                        onClick={() => setSelectedVaultNft(nft)}
+                        className="bg-[#0a0a0c] border-2 border-white p-3 shadow-[4px_4px_0px_0px_#00f0ff] hover:shadow-[6px_6px_0px_0px_#ccff00] hover:-translate-y-1 transition-all cursor-pointer group flex flex-col justify-between"
+                      >
+                        <div className="space-y-2.5">
+                          <div className="relative aspect-square w-full bg-[#141419] border-2 border-white overflow-hidden">
+                            <img
+                              src={nft.image}
+                              alt={nft.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                            <span className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-[#ff007f] text-white font-black text-[9px] uppercase border border-black shadow-[1.5px_1.5px_0px_0px_#000]">
+                              {nft.network}
+                            </span>
+                            <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/80 text-[#ccff00] font-black text-[9px] border border-white/50">
+                              {nft.tokenId}
+                            </span>
+                          </div>
 
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-bold block truncate uppercase">
-                          {nft.collection}
-                        </span>
-                        <h4 className="text-xs font-black text-white uppercase tracking-tight truncate">
-                          {nft.name}
-                        </h4>
-                      </div>
-                    </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold block truncate uppercase">
+                              {nft.collection}
+                            </span>
+                            <h4 className="text-xs font-black text-white uppercase tracking-tight truncate">
+                              {nft.name}
+                            </h4>
+                          </div>
+                        </div>
 
-                    <div className="pt-2 mt-3 border-t border-white/20 flex items-center justify-between">
-                      <div>
-                        <span className="text-[9px] text-slate-400 font-bold block uppercase">FLOOR</span>
-                        <span className="text-xs font-black text-[#ccff00]">{nft.floorPrice}</span>
+                        <div className="pt-2 mt-3 border-t border-white/20 flex items-center justify-between">
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-bold block uppercase">FLOOR</span>
+                            <span className="text-xs font-black text-[#ccff00]">{nft.floorPrice}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-300 font-bold px-1.5 py-0.5 bg-[#141419] border border-white/40">
+                            {nft.estUsd}
+                          </span>
+                        </div>
                       </div>
-                      <span className="text-[10px] text-slate-300 font-bold px-1.5 py-0.5 bg-[#141419] border border-white/40">
-                        {nft.estUsd}
-                      </span>
-                    </div>
-                  </div>
-                )) : (
+                    ))}
+                    {ownedNFTs.length > 4 && (
+                      <div
+                        onClick={onNavigateNFT}
+                        className="col-span-full sm:col-span-1 bg-[#181824] border-2 border-dashed border-[#ccff00] p-6 shadow-[4px_4px_0px_0px_#ff007f] hover:bg-[#202030] transition-all cursor-pointer flex flex-col items-center justify-center text-center space-y-2 group"
+                      >
+                        <span className="w-10 h-10 rounded-full bg-[#ccff00] text-black font-black text-sm flex items-center justify-center border border-black shadow-[2px_2px_0px_0px_#000] group-hover:scale-110 transition-transform">
+                          +{ownedNFTs.length - 4}
+                        </span>
+                        <span className="text-xs font-black text-white font-mono uppercase tracking-wider">
+                          MORE NFTS IN GALLERY
+                        </span>
+                        <span className="text-[10px] text-[#00f0ff] font-mono font-bold flex items-center gap-1">
+                          VIEW ALL {ownedNFTs.length} NFTS <ArrowUpRight className="w-3 h-3" />
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
                   <div className="col-span-full flex flex-col items-center justify-center border-2 border-dashed border-white/20 text-slate-500 font-mono text-xs uppercase min-h-[250px] bg-[#0a0a0c]">
                     <ImageIcon className="w-8 h-8 mb-3 opacity-50" />
                     <span>NO NFTS IN VAULT</span>
@@ -494,51 +560,64 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
               </div>
             ) : (
               <div className="space-y-2.5 min-h-[250px]">
-                {ownedNFTs.length > 0 ? ownedNFTs.map((nft) => (
-                  <div
-                    key={nft.id}
-                    onClick={() => setSelectedVaultNft(nft)}
-                    className="bg-[#0a0a0c] border-2 border-white p-3 shadow-[3px_3px_0px_0px_#00f0ff] hover:shadow-[4px_4px_0px_0px_#ccff00] transition-all cursor-pointer group flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="relative w-12 h-12 sm:w-14 sm:h-14 bg-[#141419] border-2 border-white overflow-hidden shrink-0">
-                        <img
-                          src={nft.image}
-                          alt={nft.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="px-1.5 py-0.2 bg-[#ff007f] text-white font-black text-[8px] sm:text-[9px] uppercase border border-black">
-                            {nft.network}
-                          </span>
-                          <span className="text-[9px] text-slate-400 font-bold">{nft.tokenId}</span>
-                        </div>
-                        <h4 className="text-xs sm:text-sm font-black text-white uppercase truncate mt-0.5 group-hover:text-[#ccff00] transition-colors">
-                          {nft.name}
-                        </h4>
-                        <span className="text-[10px] text-slate-400 font-bold block truncate uppercase">
-                          {nft.collection}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0 text-right">
-                      <div>
-                        <span className="text-[9px] text-slate-400 font-bold block uppercase">FLOOR</span>
-                        <div className="text-xs font-black text-[#ccff00] text-right">{nft.floorPrice}</div>
-                        <div className="text-[10px] text-slate-300 font-bold text-right">{nft.estUsd}</div>
-                      </div>
-                      <button
-                        type="button"
-                        className="hidden xs:inline-block px-3 py-1 bg-[#00f0ff] text-black font-black text-[10px] uppercase border-2 border-black shadow-[1.5px_1.5px_0px_0px_#000]"
+                {ownedNFTs.length > 0 ? (
+                  <>
+                    {ownedNFTs.slice(0, 4).map((nft) => (
+                      <div
+                        key={nft.id}
+                        onClick={() => setSelectedVaultNft(nft)}
+                        className="bg-[#0a0a0c] border-2 border-white p-3 shadow-[3px_3px_0px_0px_#00f0ff] hover:shadow-[4px_4px_0px_0px_#ccff00] transition-all cursor-pointer group flex items-center justify-between gap-3"
                       >
-                        INSPECT
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="relative w-12 h-12 sm:w-14 sm:h-14 bg-[#141419] border-2 border-white overflow-hidden shrink-0">
+                            <img
+                              src={nft.image}
+                              alt={nft.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="px-1.5 py-0.2 bg-[#ff007f] text-white font-black text-[8px] sm:text-[9px] uppercase border border-black">
+                                {nft.network}
+                              </span>
+                              <span className="text-[9px] text-slate-400 font-bold">{nft.tokenId}</span>
+                            </div>
+                            <h4 className="text-xs sm:text-sm font-black text-white uppercase truncate mt-0.5 group-hover:text-[#ccff00] transition-colors">
+                              {nft.name}
+                            </h4>
+                            <span className="text-[10px] text-slate-400 font-bold block truncate uppercase">
+                              {nft.collection}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0 text-right">
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-bold block uppercase">FLOOR</span>
+                            <div className="text-xs font-black text-[#ccff00] text-right">{nft.floorPrice}</div>
+                            <div className="text-[10px] text-slate-300 font-bold text-right">{nft.estUsd}</div>
+                          </div>
+                          <button
+                            type="button"
+                            className="hidden xs:inline-block px-3 py-1 bg-[#00f0ff] text-black font-black text-[10px] uppercase border-2 border-black shadow-[1.5px_1.5px_0px_0px_#000]"
+                          >
+                            INSPECT
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {ownedNFTs.length > 4 && (
+                      <button
+                        onClick={onNavigateNFT}
+                        className="w-full p-3 bg-[#181824] border-2 border-dashed border-[#ccff00] text-white font-mono font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#202030] transition-all cursor-pointer"
+                      >
+                        <span>+{ownedNFTs.length - 4} MORE NFTS IN GALLERY</span>
+                        <ArrowUpRight className="w-4 h-4 text-[#00f0ff]" />
                       </button>
-                    </div>
-                  </div>
-                )) : (
+                    )}
+                  </>
+                ) : (
                   <div className="flex flex-col items-center justify-center border-2 border-dashed border-white/20 text-slate-500 font-mono text-xs uppercase min-h-[250px] bg-[#0a0a0c]">
                     <List className="w-8 h-8 mb-3 opacity-50" />
                     <span>NO NFTS IN VAULT</span>
@@ -674,9 +753,17 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
 
       {/* 3. Bottom Table Section: Tokens */}
       <div className="bg-[#141419] border-2 border-white p-4 sm:p-7 shadow-[6px_6px_0px_0px_#ccff00] space-y-4 font-mono">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <h3 className="text-sm sm:text-base font-black text-white uppercase font-mono">PORTFOLIO ASSET TOKENS</h3>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowZeroBalances(prev => !prev)}
+              className={`px-2.5 py-1 text-[9px] sm:text-[10px] font-black border border-black shadow-[1.5px_1.5px_0px_0px_#000] cursor-pointer uppercase ${
+                showZeroBalances ? 'bg-[#ff007f] text-white' : 'bg-[#141419] text-slate-300 border-white/40 hover:text-white'
+              }`}
+            >
+              {showZeroBalances ? 'HIDE ZERO BALANCES' : 'SHOW ALL TOKENS'}
+            </button>
             <button
               onClick={() => setShowImportTokenModal(true)}
               className="px-2.5 py-1 bg-[#00f0ff] text-black text-[9px] sm:text-[10px] font-black border border-black shadow-[1.5px_1.5px_0px_0px_#000] hover:bg-[#33f3ff] cursor-pointer uppercase"

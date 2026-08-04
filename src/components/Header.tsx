@@ -167,7 +167,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
           <Menu className="w-4 h-4 stroke-[3]" />
         </button>
 
-        <div className="hidden xs:block shrink-0">
+        <div className="hidden xs:flex items-center gap-2 shrink-0">
+          <img src="/logo.png" alt="Northveil Logo" className="w-8 h-8 rounded-md border border-white/20 bg-[#000]" />
           <h2 className="text-xs sm:text-xl font-black text-white tracking-tight font-mono truncate">
             <span className="hidden md:inline">WELCOME, </span><span className="bg-[#ccff00] text-black px-1.5 py-0.5 border border-black shadow-[2px_2px_0px_0px_#000]">ARKHAN</span>
           </h2>
@@ -282,11 +283,11 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
           >
             <span
               className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full border border-black shrink-0"
-              style={{ backgroundColor: activeSubWallet.colorTag || '#00f0ff' }}
+              style={{ backgroundColor: activeSubWallet?.colorTag || '#00f0ff' }}
             />
-            <span className="hidden md:inline-block max-w-[110px] truncate">{activeSubWallet.name}</span>
+            <span className="hidden md:inline-block max-w-[110px] truncate">{activeSubWallet?.name || 'Account 1'}</span>
             <span className="text-[10px] text-slate-300 font-bold">
-              {activeSubWallet.address.substring(0, 6)}...
+              {activeSubWallet?.address ? `${activeSubWallet.address.slice(0, 6)}...` : '0x...'}
             </span>
             <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#00f0ff] stroke-[3] shrink-0" />
           </button>
@@ -296,7 +297,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
             <div className="absolute right-0 top-11 sm:top-12 w-[calc(100vw-24px)] max-w-xs sm:w-80 bg-[#141419] border-2 border-white shadow-[6px_6px_0px_0px_#00f0ff] p-3 z-50 space-y-3 font-mono animate-fadeIn">
               <div className="flex items-center justify-between border-b-2 border-white pb-2">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <Wallet className="w-3 h-3 text-[#00f0ff]" /> HD SUB-WALLETS ({subWallets.length})
+                  <Wallet className="w-3 h-3 text-[#00f0ff]" /> HD SUB-WALLETS ({(subWallets || []).length})
                 </span>
                 <span className="text-[9px] bg-[#ccff00] text-black px-1 font-black uppercase border border-black">
                   BIP-44
@@ -305,8 +306,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
 
               {/* Sub-Wallets List */}
               <div className="max-h-48 overflow-y-auto no-scrollbar space-y-1.5">
-                {subWallets.map((w) => {
+                {(subWallets || []).map((w) => {
+                  if (!w) return null;
                   const isActive = w.id === activeWalletId;
+                  const addrStr = w.address || '';
+                  const shortAddr = addrStr.length > 10 ? `${addrStr.slice(0, 6)}...${addrStr.slice(-4)}` : addrStr;
+
                   return (
                     <div
                       key={w.id}
@@ -323,12 +328,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
                       <div className="flex items-center gap-2 min-w-0">
                         <span
                           className="w-2.5 h-2.5 rounded-full border border-black shrink-0"
-                          style={{ backgroundColor: w.colorTag }}
+                          style={{ backgroundColor: w.colorTag || '#00f0ff' }}
                         />
                         <div className="truncate">
-                          <div className="truncate font-black text-[11px]">{w.name}</div>
+                          <div className="truncate font-black text-[11px]">{w.name || 'Sub Wallet'}</div>
                           <div className={`text-[9px] ${isActive ? 'text-black/70' : 'text-slate-400'}`}>
-                            {w.derivationPath} • {w.address.substring(0, 6)}...{w.address.substring(38)}
+                            {w.derivationPath || "m/44'/60'/0'/0/0"} • {shortAddr}
                           </div>
                         </div>
                       </div>
@@ -408,7 +413,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
                 label: chain.name,
                 icon: <img src={chain.icon} alt={chain.name} className="w-4 h-4 object-contain bg-white/10 p-0.5 border border-white/20" />,
               })),
-              ...customNetworks.map((chain) => ({
+              ...(customNetworks || []).map((chain) => ({
                 value: chain.id,
                 label: chain.name,
                 icon: <Zap className="w-4 h-4 text-[#00f0ff]" />,

@@ -196,11 +196,59 @@ const MainContent: React.FC = () => {
   );
 };
 
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("Uncaught Northveil App Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#0a0a0c] text-white flex flex-col items-center justify-center p-6 font-mono z-[99999]">
+          <div className="bg-[#141419] border-4 border-[#ff007f] p-8 max-w-lg w-full space-y-4 shadow-[8px_8px_0px_0px_#ff007f]">
+            <h2 className="text-xl font-black text-[#ff007f] uppercase">APPLICATION RUNTIME RECOVERED</h2>
+            <p className="text-xs text-slate-300">An unexpected component error occurred:</p>
+            <div className="bg-black p-3 border border-white/20 text-[10px] text-[#00f0ff] overflow-x-auto max-h-32 font-bold break-all">
+              {this.state.error?.toString() || 'Unknown Runtime Error'}
+            </div>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                window.location.reload();
+              }}
+              className="w-full py-3.5 bg-[#00f0ff] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[3px_3px_0px_0px_#000] cursor-pointer hover:bg-[#33f3ff]"
+            >
+              REFRESH APPLICATION
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
-    <WalletProvider>
-      <MainContent />
-    </WalletProvider>
+    <ErrorBoundary>
+      <WalletProvider>
+        <MainContent />
+      </WalletProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -61,7 +61,6 @@ export const Navigation: React.FC<NavigationProps> = ({
     { id: 'portfolio', label: 'DASHBOARD', icon: <LayoutGrid className="w-4 h-4 stroke-[2.5]" /> },
     { id: 'buySell', label: 'BUY & SELL', icon: <CreditCard className="w-4 h-4 stroke-[2.5]" /> },
     { id: 'dexBridge', label: 'TRADE & SWAP', icon: <ArrowLeftRight className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'dappBrowser', label: 'DAPP BROWSER', icon: <Compass className="w-4 h-4 stroke-[2.5]" /> },
     { id: 'gasEstimator', label: 'DEPOSITS', icon: <ArrowUpRight className="w-4 h-4 stroke-[2.5]" /> },
     { id: 'nftGallery', label: 'NFT GALLERY', icon: <ImageIcon className="w-4 h-4 stroke-[2.5]" /> },
     { id: 'smartContractStudio', label: 'CONTRACT STUDIO', icon: <Code2 className="w-4 h-4 stroke-[2.5]" /> },
@@ -127,14 +126,11 @@ export const Navigation: React.FC<NavigationProps> = ({
               }}
               className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
             >
-              <div className="w-9 h-9 bg-[#ccff00] border-2 border-black shadow-[3px_3px_0px_0px_#000] flex items-center justify-center text-black font-black shrink-0">
-                <div className="grid grid-cols-2 gap-1">
-                  <div className="w-1.5 h-1.5 bg-black"></div>
-                  <div className="w-1.5 h-1.5 bg-[#ff007f]"></div>
-                  <div className="w-1.5 h-1.5 bg-[#00f0ff]"></div>
-                  <div className="w-1.5 h-1.5 bg-black"></div>
-                </div>
-              </div>
+              <img 
+                src="/logo.png" 
+                alt="Northveil Logo" 
+                className="w-9 h-9 object-contain rounded-md border-2 border-black shadow-[3px_3px_0px_0px_#ccff00] shrink-0 bg-[#000]" 
+              />
               <span className="text-xl font-black tracking-tighter text-white font-mono uppercase">
                 North<span className="text-[#ccff00]">veil</span>
               </span>

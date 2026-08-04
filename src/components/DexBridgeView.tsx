@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useWallet } from '../context/WalletContext';
 import { CustomSelect } from './CustomSelect';
+import { TokenSearchModal } from './TokenSearchModal';
 import { SUPPORTED_CHAINS } from '../data/initialData';
 import { NetworkId, CryptoAsset } from '../types';
 import {
@@ -15,6 +16,8 @@ import {
   AlertTriangle,
   HardDrive,
   GitCommit,
+  ChevronDown,
+  Search,
 } from 'lucide-react';
 import { SwapService, SwapQuoteResult } from '../services/SwapService';
 
@@ -38,6 +41,7 @@ export const DexBridgeView: React.FC = () => {
   const [isSwapping, setIsSwapping] = useState<boolean>(false);
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [latestTxHash, setLatestTxHash] = useState<string>('');
+  const [selectingTokenFor, setSelectingTokenFor] = useState<'from' | 'to' | null>(null);
 
   const fromAsset = assets.find((a) => a.id === fromAssetId) || assets[0];
   const toAsset = assets.find((a) => a.id === toAssetId) || assets[1];
@@ -234,17 +238,16 @@ export const DexBridgeView: React.FC = () => {
                 className="w-full bg-transparent text-2xl sm:text-3xl font-black text-white font-mono focus:outline-none"
               />
 
-              {/* From Asset Selector */}
-              <CustomSelect
-                options={assets.map((a) => ({
-                  value: a.id,
-                  label: `${a.symbol} (${a.network.toUpperCase()})`,
-                }))}
-                value={fromAssetId}
-                onChange={(val) => setFromAssetId(val)}
-                variant="yellow"
-                align="right"
-              />
+              {/* From Asset Selector Button */}
+              <button
+                onClick={() => setSelectingTokenFor('from')}
+                className="flex items-center gap-2 px-3.5 py-2 bg-[#ccff00] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:bg-[#d8ff33] cursor-pointer shrink-0 transition-all active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+              >
+                <img src={fromAsset.icon} alt={fromAsset.symbol} className="w-5 h-5 object-contain" />
+                <span>{fromAsset.symbol}</span>
+                <span className="text-[9px] bg-black text-[#ccff00] px-1 py-0.2">{fromAsset.network.slice(0, 3)}</span>
+                <ChevronDown className="w-3.5 h-3.5 stroke-[3]" />
+              </button>
             </div>
 
             <div className="text-xs text-slate-400 font-mono">
@@ -280,17 +283,16 @@ export const DexBridgeView: React.FC = () => {
                 className="w-full bg-transparent text-2xl sm:text-3xl font-black text-[#ccff00] font-mono focus:outline-none"
               />
 
-              {/* To Asset Selector */}
-              <CustomSelect
-                options={assets.map((a) => ({
-                  value: a.id,
-                  label: `${a.symbol} (${a.network.toUpperCase()})`,
-                }))}
-                value={toAssetId}
-                onChange={(val) => setToAssetId(val)}
-                variant="cyan"
-                align="right"
-              />
+              {/* To Asset Selector Button */}
+              <button
+                onClick={() => setSelectingTokenFor('to')}
+                className="flex items-center gap-2 px-3.5 py-2 bg-[#00f0ff] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:bg-[#33f3ff] cursor-pointer shrink-0 transition-all active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+              >
+                <img src={toAsset.icon} alt={toAsset.symbol} className="w-5 h-5 object-contain" />
+                <span>{toAsset.symbol}</span>
+                <span className="text-[9px] bg-black text-[#00f0ff] px-1 py-0.2">{toAsset.network.slice(0, 3)}</span>
+                <ChevronDown className="w-3.5 h-3.5 stroke-[3]" />
+              </button>
             </div>
 
             <div className="text-xs text-slate-400 font-mono">
@@ -319,7 +321,7 @@ export const DexBridgeView: React.FC = () => {
                         : 'bg-[#181820] border-white/30 text-slate-300 hover:border-white'
                     }`}
                   >
-                    <span>{c.icon}</span>
+                    <img src={c.icon} alt={c.name} className="w-5 h-5 object-contain rounded-full border border-white/20 shrink-0" />
                     <span className="truncate">{c.name}</span>
                   </button>
                 ))}
@@ -510,6 +512,22 @@ export const DexBridgeView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Professional Searchable Token Selector Modal */}
+      <TokenSearchModal
+        isOpen={selectingTokenFor !== null}
+        onClose={() => setSelectingTokenFor(null)}
+        selectedAssetId={selectingTokenFor === 'from' ? fromAssetId : toAssetId}
+        onSelectToken={(asset) => {
+          if (selectingTokenFor === 'from') {
+            setFromAssetId(asset.id);
+          } else if (selectingTokenFor === 'to') {
+            setToAssetId(asset.id);
+          }
+          setSelectingTokenFor(null);
+        }}
+        title={selectingTokenFor === 'from' ? 'SELECT TOKEN TO PAY' : 'SELECT TOKEN TO RECEIVE'}
+      />
     </div>
   );
 };
