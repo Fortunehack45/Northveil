@@ -3,7 +3,214 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import { ethers } from 'ethers';
-import { MCP_TOOLS } from '../mcp-server/tools.js';
+export const MCP_TOOLS = [
+  {
+    name: 'deploy_smart_contract',
+    description: 'Deploys a compiled Solidity smart contract to a real EVM blockchain network (Sepolia, Ethereum, Polygon). Returns deployed contract address & Etherscan link.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        contractName: { type: 'string', description: 'Name of the smart contract to deploy (e.g. NorthveilToken)' },
+        bytecode: { type: 'string', description: 'Optional compiled EVM bytecode string (0x...)' },
+        abi: { type: 'string', description: 'Optional contract ABI JSON string' },
+        network: { type: 'string', description: 'Target EVM network (sepolia, ethereum, polygon, arbitrum)' },
+      },
+      required: ['contractName'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        contractName: { type: 'string', description: 'Name of the smart contract to deploy (e.g. NorthveilToken)' },
+        bytecode: { type: 'string', description: 'Optional compiled EVM bytecode string (0x...)' },
+        abi: { type: 'string', description: 'Optional contract ABI JSON string' },
+        network: { type: 'string', description: 'Target EVM network (sepolia, ethereum, polygon, arbitrum)' },
+      },
+      required: ['contractName'],
+    },
+  },
+  {
+    name: 'get_wallet_info',
+    description: 'Retrieves current wallet address, active chain, network status, and account metadata.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        chain: { type: 'string', description: 'Optional chain filter (ethereum, solana, bitcoin, polygon, arbitrum, bsc, avalanche, optimism)' },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        chain: { type: 'string', description: 'Optional chain filter (ethereum, solana, bitcoin, polygon, arbitrum, bsc, avalanche, optimism)' },
+      },
+    },
+  },
+  {
+    name: 'get_portfolio',
+    description: 'Fetches the complete asset portfolio including token balances, fiat USD valuations, 24h price changes, and net worth.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        hideZeroBalances: { type: 'boolean', description: 'Set to true to omit assets with 0 balance' },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        hideZeroBalances: { type: 'boolean', description: 'Set to true to omit assets with 0 balance' },
+      },
+    },
+  },
+  {
+    name: 'get_token_balance',
+    description: 'Queries the exact balance and USD market value for a specific cryptocurrency token symbol.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        symbol: { type: 'string', description: 'Token ticker symbol (e.g. ETH, USDT, SOL, BTC, UNI, LINK)' },
+      },
+      required: ['symbol'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        symbol: { type: 'string', description: 'Token ticker symbol (e.g. ETH, USDT, SOL, BTC, UNI, LINK)' },
+      },
+      required: ['symbol'],
+    },
+  },
+  {
+    name: 'send_transfer',
+    description: 'Executes an on-chain cryptocurrency transfer from the user wallet to a destination recipient address.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', description: 'Token symbol to transfer (e.g. ETH, USDT, SOL)' },
+        amount: { type: 'number', description: 'Amount of crypto units to transfer' },
+        recipientAddress: { type: 'string', description: 'Destination blockchain recipient public address' },
+        chain: { type: 'string', description: 'Target network id (default: active chain)' },
+      },
+      required: ['token', 'amount', 'recipientAddress'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', description: 'Token symbol to transfer (e.g. ETH, USDT, SOL)' },
+        amount: { type: 'number', description: 'Amount of crypto units to transfer' },
+        recipientAddress: { type: 'string', description: 'Destination blockchain recipient public address' },
+        chain: { type: 'string', description: 'Target network id (default: active chain)' },
+      },
+      required: ['token', 'amount', 'recipientAddress'],
+    },
+  },
+  {
+    name: 'create_smart_contract',
+    description: 'Generates complete production-ready Solidity smart contract code.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'Specification of contract features' },
+        contractType: { type: 'string', description: 'Template category (erc20, erc721, staking, dao, custom)' },
+      },
+      required: ['prompt'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'Specification of contract features' },
+        contractType: { type: 'string', description: 'Template category (erc20, erc721, staking, dao, custom)' },
+      },
+      required: ['prompt'],
+    },
+  },
+  {
+    name: 'execute_swap',
+    description: 'Executes a DEX token swap or cross-chain bridge trade.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fromToken: { type: 'string', description: 'Source token symbol (e.g. ETH)' },
+        toToken: { type: 'string', description: 'Destination token symbol (e.g. USDC)' },
+        amount: { type: 'number', description: 'Amount of source token to swap' },
+      },
+      required: ['fromToken', 'toToken', 'amount'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        fromToken: { type: 'string', description: 'Source token symbol (e.g. ETH)' },
+        toToken: { type: 'string', description: 'Destination token symbol (e.g. USDC)' },
+        amount: { type: 'number', description: 'Amount of source token to swap' },
+      },
+      required: ['fromToken', 'toToken', 'amount'],
+    },
+  },
+  {
+    name: 'get_transaction_history',
+    description: 'Retrieves past wallet transactions.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max records (default 10)' },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max records (default 10)' },
+      },
+    },
+  },
+  {
+    name: 'get_gas_estimate',
+    description: 'Fetches real-time EIP-1559 gas price estimates.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        chain: { type: 'string', description: 'Optional network ID filter' },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        chain: { type: 'string', description: 'Optional network ID filter' },
+      },
+    },
+  },
+  {
+    name: 'audit_smart_contract',
+    description: 'Performs static security analysis on smart contract code.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', description: 'Solidity source code' },
+      },
+      required: ['code'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', description: 'Solidity source code' },
+      },
+      required: ['code'],
+    },
+  },
+  {
+    name: 'get_nft_gallery',
+    description: 'Lists owned NFTs across supported chains.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        chain: { type: 'string', description: 'Optional chain filter' },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        chain: { type: 'string', description: 'Optional chain filter' },
+      },
+    },
+  },
+];
 
 const app = express();
 
