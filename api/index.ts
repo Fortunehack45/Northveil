@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
@@ -6,8 +7,14 @@ import { MCP_TOOLS } from '../mcp-server/tools.js';
 
 const app = express();
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ulkbchewsrksgvlbzjzl.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsa2JjaGV3c3Jrc2d2bGJ6anpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NzkzMDIsImV4cCI6MjEwMTI1NTMwMn0.L8d4ZI9f1mJda9mraZRb5O_Tjc9wzSur84pB_Y0vjTA';
+// Phase 0 Security: Require Supabase credentials from environment — no hardcoded fallbacks
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('\n❌ FATAL: SUPABASE_URL and SUPABASE_ANON_KEY environment variables are required.\n');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -57,14 +64,21 @@ export interface AuthResult {
   permissions: string[];
 }
 
-// Phase 0 Fix 1 & 3: Strict Key Authentication & Permission Scoping
+// Phase 0 Security: Strict API Key Authentication via Supabase DB only
+// NO hardcoded keys, NO fallback wallet addresses — all keys must be registered in DB
 async function authenticateClient(apiKey?: string, requestedAddress?: string): Promise<AuthResult> {
+  const INVALID: AuthResult = { valid: false, walletAddress: '', keyName: '', permissions: [] };
+
   if (!apiKey || typeof apiKey !== 'string' || apiKey.trim() === '') {
-    return { valid: false, walletAddress: '', keyName: '', permissions: [] };
+    return INVALID;
   }
 
   const cleanKey = apiKey.trim().replace(/^Bearer\s+/i, '');
-  const overrideAddress = (requestedAddress && requestedAddress.startsWith('0x') && requestedAddress.length === 42) ? requestedAddress.toLowerCase() : null;
+  if (!cleanKey) return INVALID;
+
+  const overrideAddress = (requestedAddress && requestedAddress.startsWith('0x') && requestedAddress.length === 42)
+    ? requestedAddress.toLowerCase()
+    : null;
 
   try {
     const { data, error } = await supabase
@@ -74,34 +88,30 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
       .eq('is_active', true)
       .maybeSingle();
 
-    if (!error && data) {
-      const permissions: string[] = Array.isArray(data.permissions) 
-        ? data.permissions 
-        : ['read_only', 'transfer_enabled', 'contract_deploy_enabled'];
-
-      return {
-        valid: true,
-        walletAddress: overrideAddress || data.wallet_address || '0x71c8891575b50d22e032d847847c234a413d4cc8',
-        keyName: data.key_name || 'AI Assistant Client',
-        permissions,
-      };
+    if (error || !data) {
+      return INVALID;
     }
-  } catch (e) {
-    console.error('Supabase key lookup error:', e);
-  }
 
-  // Active Developer Key check
-  if (cleanKey === 'nv_live_9f82a17b09c82415d8a9') {
+    const boundWallet = data.wallet_address;
+    if (!boundWallet || typeof boundWallet !== 'string' || !boundWallet.startsWith('0x')) {
+      console.error(`[Auth] API key '${data.key_name}' has no valid wallet_address bound in DB`);
+      return INVALID;
+    }
+
+    const permissions: string[] = Array.isArray(data.permissions) && data.permissions.length > 0
+      ? data.permissions
+      : ['read_only'];
+
     return {
       valid: true,
-      walletAddress: overrideAddress || '0x71c8891575b50d22e032d847847c234a413d4cc8',
-      keyName: 'Default Northveil Developer Key',
-      permissions: ['read_only', 'transfer_enabled', 'contract_deploy_enabled'],
+      walletAddress: overrideAddress || boundWallet.toLowerCase(),
+      keyName: data.key_name || 'API Client',
+      permissions,
     };
+  } catch (e) {
+    console.error('[Auth] Supabase key lookup error:', e);
+    return INVALID;
   }
-
-  // Phase 0 Fix 1: No default fallback wallet for invalid/unauthenticated requests!
-  return { valid: false, walletAddress: '', keyName: '', permissions: [] };
 }
 
 // Phase 0 Fix 3: Tool Permission Guard
@@ -158,7 +168,7 @@ function getOpenApiSpec(baseUrl: string) {
       title: 'Northveil AI Assistant Wallet API',
       description: 'Allows AI models (Claude, ChatGPT, Cursor) to manage crypto wallets, deploy smart contracts, and execute trades on real blockchains.',
       version: '1.0.0',
-      'x-logo': { url: 'https://iili.io/CU64M11.png' },
+      'x-logo': { url: 'https://iili.io/CgBPBHv.jpg' },
     },
     servers: [{ url: baseUrl, description: 'Northveil MCP Server' }],
     components: {
@@ -186,7 +196,7 @@ app.get('/ui/widget', async (req: Request, res: Response) => {
 <head>
   <meta charset="UTF-8">
   <title>Northveil Wallet UI Widget</title>
-  <link rel="icon" type="image/png" href="https://iili.io/CU64M11.png">
+  <link rel="icon" type="image/png" href="https://iili.io/CgBPBHv.jpg">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Courier New', monospace; }
     body { background: #0b0b0e; color: #ffffff; padding: 20px; border: 3px solid #00f0ff; border-radius: 8px; }
@@ -200,7 +210,7 @@ app.get('/ui/widget', async (req: Request, res: Response) => {
 </head>
 <body>
   <div class="header">
-    <div class="title"><img src="https://iili.io/CU64M11.png" style="height:24px; width:24px; vertical-align:middle; border-radius:4px;" /> NORTHVEIL LIVE WALLET UI</div>
+    <div class="title"><img src="https://iili.io/CgBPBHv.jpg" style="height:24px; width:24px; vertical-align:middle; border-radius:4px;" /> NORTHVEIL LIVE WALLET UI</div>
     <div class="badge">BLOCKCHAIN LIVE</div>
   </div>
   <div class="networth-card">

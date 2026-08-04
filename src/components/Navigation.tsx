@@ -115,7 +115,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             : 'hidden md:flex z-30'
         }`}
       >
-        {/* Cryptfest Brand Header */}
+        {/* Northveil Brand Header */}
         <div className="p-4 sm:p-5 border-b-2 border-white/20 shrink-0 bg-[#0d0d10]">
           <div className="flex items-center justify-between">
             <button 
@@ -127,9 +127,9 @@ export const Navigation: React.FC<NavigationProps> = ({
               className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
             >
               <img 
-                src="/logo.png" 
+                src="https://iili.io/CgBPBHv.jpg" 
                 alt="Northveil Logo" 
-                className="w-9 h-9 object-contain rounded-md border-2 border-black shadow-[3px_3px_0px_0px_#ccff00] shrink-0 bg-[#000]" 
+                className="w-9 h-9 object-cover rounded-md border border-white/20 bg-black shadow-[3px_3px_0px_0px_#ccff00] shrink-0 bg-[#000]" 
               />
               <span className="text-xl font-black tracking-tighter text-white font-mono uppercase">
                 North<span className="text-[#ccff00]">veil</span>

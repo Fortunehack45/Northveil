@@ -23,6 +23,7 @@ import {
   INITIAL_STAKING_POSITIONS,
   INITIAL_GAS_ESTIMATES,
   MICROSERVICES_STATUS,
+  INITIAL_NFTS,
   DICTIONARY,
 } from '../data/initialData';
 import { WalletService } from '../services/WalletService';
@@ -181,7 +182,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [ownedNFTs, setOwnedNFTs] = useState<NFTAsset[]>([]);
+  const [ownedNFTs, setOwnedNFTs] = useState<NFTAsset[]>(INITIAL_NFTS);
   const [historicalPerformance, setHistoricalPerformance] = useState<PortfolioHistoryPoint[]>([]);
 
   const latestAssets = React.useRef<CryptoAsset[]>(assets);
@@ -409,16 +410,40 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [systemMetrics] = useState<MicroserviceStatus[]>(MICROSERVICES_STATUS);
   const [seedPhrase, setSeedPhrase] = useState<string[]>([]);
 
-  // Auto-initialize seed phrase on mount if empty so trading, swapping, and sending work out of the box
+  // Auto-initialize vault state on mount
   useEffect(() => {
-    let activeSeed = VaultService.getSeedPhrase();
-    if (!activeSeed || activeSeed.length === 0) {
-      activeSeed = WalletService.generateSeedPhrase();
-      VaultService.saveSeedPhrase(activeSeed);
+    if (VaultService.hasVault()) {
+      setIsVaultConfigured(true);
+      setIsLocked(true);
+    } else {
+      setIsVaultConfigured(false);
+      setIsLocked(false);
     }
-    setSeedPhrase(activeSeed);
-    setIsLocked(false);
   }, []);
+
+  const unlockVault = async (password: string): Promise<boolean> => {
+    const decryptedSeed = await VaultService.decrypt(password);
+    if (decryptedSeed && decryptedSeed.length >= 12) {
+      setSeedPhrase(decryptedSeed);
+      setIsLocked(false);
+      return true;
+    }
+    return false;
+  };
+
+  const setupVault = async (seed: string[], password: string): Promise<boolean> => {
+    if (password.length < 4) return false;
+    try {
+      await VaultService.encryptAndSave(seed, password);
+      setSeedPhrase(seed);
+      setIsVaultConfigured(true);
+      setIsLocked(false);
+      return true;
+    } catch (e) {
+      console.error('Vault setup failed:', e);
+      return false;
+    }
+  };
 
   // Save to local storage
   useEffect(() => {
@@ -514,7 +539,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const refreshBalances = async () => {
     if (!activeSubWallet || !activeSubWallet.address) return;
     try {
-      const currentSeed = (seedPhrase && seedPhrase.length > 0) ? seedPhrase : VaultService.getSeedPhrase();
+      const currentSeed = (seedPhrase && seedPhrase.length > 0) ? seedPhrase : null;
       const solanaAddress = currentSeed ? WalletService.deriveSolanaAddress(currentSeed, activeSubWallet.accountIndex).address : activeSubWallet.address;
       const bitcoinAddress = currentSeed ? WalletService.deriveBitcoinAddress(currentSeed, activeSubWallet.accountIndex).address : activeSubWallet.address;
       
@@ -610,7 +635,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         });
 
         const allFetchedNfts = [...ethNfts, ...polyNfts, ...arbNfts, ...baseNfts, ...bscNfts, ...avaxNfts];
-        setOwnedNFTs(allFetchedNfts);
+        setOwnedNFTs(allFetchedNfts.length > 0 ? allFetchedNfts : INITIAL_NFTS);
         setHistoricalPerformance(history);
         
         // Merge transactions, filtering out any mock or demo items while strictly preserving user-executed transactions
@@ -793,31 +818,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
   };
 
-  const unlockVault = (password: string): boolean => {
-    const encryptedVault = localStorage.getItem('northveil_v3_encrypted_vault');
-    if (!encryptedVault) return false;
-    
-    const decryptedSeed = VaultService.decryptSeedPhrase(encryptedVault, password);
-    if (decryptedSeed && decryptedSeed.length >= 12) {
-      setSeedPhrase(decryptedSeed);
-      setIsLocked(false);
-      return true;
-    }
-    return false;
-  };
 
-  const setupVault = (seed: string[], password: string): boolean => {
-    if (password.length < 4) return false;
-    
-    const encryptedVault = VaultService.encryptSeedPhrase(seed, password);
-    localStorage.setItem('northveil_v3_encrypted_vault', encryptedVault);
-    localStorage.removeItem('northveil_v3_seed_mock_encrypted_temp'); // Clean up old mocks if any
-    
-    setSeedPhrase(seed);
-    setIsVaultConfigured(true);
-    setIsLocked(false);
-    return true;
-  };
 
   const lockWallet = () => {
     if (isVaultConfigured) {
@@ -853,14 +854,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       throw new Error('Wallet or target asset not initialized.');
     }
 
-    let effectiveSeed = seedPhrase;
-    if (!effectiveSeed || effectiveSeed.length === 0) {
-      effectiveSeed = VaultService.getSeedPhrase();
-      if (!effectiveSeed || effectiveSeed.length === 0) {
-        effectiveSeed = WalletService.generateSeedPhrase();
-        VaultService.saveSeedPhrase(effectiveSeed);
-      }
-      setSeedPhrase(effectiveSeed);
+    const effectiveSeed = seedPhrase;
+    if (!effectiveSeed || effectiveSeed.length < 12) {
+      throw new Error('Wallet is locked or not configured. Please unlock your wallet to perform swaps.');
     }
 
     try {
@@ -921,14 +917,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       throw new Error('Target asset or wallet unavailable.');
     }
 
-    let effectiveSeed = seedPhrase;
-    if (!effectiveSeed || effectiveSeed.length === 0) {
-      effectiveSeed = VaultService.getSeedPhrase();
-      if (!effectiveSeed || effectiveSeed.length === 0) {
-        effectiveSeed = WalletService.generateSeedPhrase();
-        VaultService.saveSeedPhrase(effectiveSeed);
-      }
-      setSeedPhrase(effectiveSeed);
+    const effectiveSeed = seedPhrase;
+    if (!effectiveSeed || effectiveSeed.length < 12) {
+      throw new Error('Wallet is locked or not configured. Please unlock your wallet to send crypto.');
     }
 
     try {

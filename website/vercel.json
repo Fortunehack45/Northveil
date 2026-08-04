@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "rewrites": [
+    { "source": "/((?!assets|logo.png|favicon.png|favicon.ico).*)", "destination": "/index.html" }
+  ]
+}

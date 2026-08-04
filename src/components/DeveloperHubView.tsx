@@ -20,8 +20,7 @@ import {
   Shield,
   Layers,
 } from 'lucide-react';
-import { useWallet } from '../context/WalletContext';
-import { SUPPORTED_CHAINS } from '../data/initialData';
+import { getMcpServerUrl, getMcpSseUrl } from '../config/endpointConfig';
 
 interface ChatMessage {
   id: string;
@@ -58,7 +57,7 @@ export const DeveloperHubView: React.FC = () => {
     {
       id: '1',
       sender: 'ai',
-      text: 'CRYPTFEST AI ASSISTANT READY. ASK ME TO ANALYZE YOUR PORTFOLIO, AUDIT CONTRACTS, ESTIMATE GAS, OR GENERATE TRADES.',
+      text: 'NORTHVEIL AI ASSISTANT READY. ASK ME TO ANALYZE YOUR PORTFOLIO, AUDIT CONTRACTS, ESTIMATE GAS, OR GENERATE TRADES.',
     },
   ]);
 
@@ -85,7 +84,7 @@ export const DeveloperHubView: React.FC = () => {
   const [webhooks, setWebhooks] = useState<WebhookSub[]>([
     {
       id: 'w1',
-      url: 'https://api.myweb3app.com/webhooks/cryptfest',
+      url: 'https://api.myweb3app.com/webhooks/northveil',
       events: ['tx.confirmed', 'security.alert'],
       status: 'ACTIVE',
     },
@@ -123,7 +122,7 @@ export const DeveloperHubView: React.FC = () => {
     if (!textToSend) setInputMessage('');
 
     setTimeout(() => {
-      let replyText = `[CRYPTFEST AI NODE]: Analyzed context on ${selectedChain.name}. Total assets scanned: ${assets.length}. Zero vulnerabilities detected.`;
+      let replyText = `[NORTHVEIL AI NODE]: Analyzed context on ${selectedChain.name}. Total assets scanned: ${assets.length}. Zero vulnerabilities detected.`;
       if (query.toLowerCase().includes('swap') || query.toLowerCase().includes('trade')) {
         replyText = `Prepared trade route on ${selectedChain.name}. Estimated gas: $0.45. Click below to execute swap automatically.`;
       } else if (query.toLowerCase().includes('scam') || query.toLowerCase().includes('audit')) {
@@ -164,7 +163,7 @@ export const DeveloperHubView: React.FC = () => {
   };
 
   const handleTestEndpoint = () => {
-    setDocsResult('Executing request to Cryptfest Node Gateway...');
+    setDocsResult('Executing request to Northveil Node Gateway...');
     setTimeout(() => {
       if (selectedEndpoint.includes('balances')) {
         setDocsResult(
@@ -361,7 +360,7 @@ export const DeveloperHubView: React.FC = () => {
                   >
                     {m.sender === 'ai' && (
                       <div className="flex items-center gap-1.5 text-[#ccff00] font-black text-[10px] mb-1">
-                        <Sparkles className="w-3 h-3" /> CRYPTFEST AI NODE
+                        <Sparkles className="w-3 h-3" /> NORTHVEIL AI NODE
                       </div>
                     )}
                     <p className="leading-relaxed">{m.text}</p>
@@ -637,11 +636,12 @@ export const DeveloperHubView: React.FC = () => {
               <button
                 onClick={async () => {
                   try {
-                    const res = await fetch(`http://${hostname}:3001/health`);
+                    const serverUrl = getMcpServerUrl();
+                    const res = await fetch(`${serverUrl}/health`);
                     const data = await res.json();
-                    alert(`✅ CONNECTION SUCCESSFUL!\nServer: ${data.server}\nProtocol: ${data.protocols?.join(', ')}\nBound Wallet: ${activeAddress}`);
+                    alert(`✅ CONNECTION SUCCESSFUL!\nServer: ${data.server}\nProtocols: ${data.protocols?.join(', ')}\nBound Wallet: ${activeAddress}`);
                   } catch (e: any) {
-                    alert('❌ Server offline or blocked: ' + e.message);
+                    alert('❌ Server connection error: ' + e.message);
                   }
                 }}
                 className="px-4 py-2 bg-[#ff007f] text-white font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#ff3399]"
@@ -684,28 +684,28 @@ export const DeveloperHubView: React.FC = () => {
             <div className="p-5 bg-[#0a0a0c] border-2 border-white space-y-2 shadow-[3px_3px_0px_0px_#000]">
               <div className="text-white font-black text-sm uppercase">TYPESCRIPT / JAVASCRIPT</div>
               <div className="p-3 bg-[#141419] border border-white/20 text-[#ccff00]">
-                npm install @cryptfest/web3-sdk
+                npm install @northveil/sdk
               </div>
             </div>
 
             <div className="p-5 bg-[#0a0a0c] border-2 border-white space-y-2 shadow-[3px_3px_0px_0px_#000]">
               <div className="text-white font-black text-sm uppercase">PYTHON</div>
               <div className="p-3 bg-[#141419] border border-white/20 text-[#00f0ff]">
-                pip install cryptfest-python
+                pip install northveil-python
               </div>
             </div>
 
             <div className="p-5 bg-[#0a0a0c] border-2 border-white space-y-2 shadow-[3px_3px_0px_0px_#000]">
-              <div className="text-white font-black text-sm uppercase">RUST</div>
-              <div className="p-3 bg-[#141419] border border-white/20 text-[#ff007f]">
-                cargo add cryptfest-rs
+              <div className="text-white font-black text-sm uppercase">RUST (CARGO)</div>
+              <div className="p-3 bg-[#141419] border border-white/20 text-[#ccff00]">
+                cargo add northveil-rs
               </div>
             </div>
 
             <div className="p-5 bg-[#0a0a0c] border-2 border-white space-y-2 shadow-[3px_3px_0px_0px_#000]">
               <div className="text-white font-black text-sm uppercase">GO (GOLANG)</div>
-              <div className="p-3 bg-[#141419] border border-white/20 text-[#ffe600]">
-                go get github.com/cryptfest/go-sdk
+              <div className="p-3 bg-[#141419] border border-white/20 text-[#ccff00]">
+                go get github.com/northveil/go-sdk
               </div>
             </div>
           </div>

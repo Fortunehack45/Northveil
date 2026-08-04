@@ -225,7 +225,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({ onClos
     await new Promise(r => setTimeout(r, 600));
     setProcessingProgress(20);
 
-    const success = setupVault(seedPhrase, vaultPassword);
+    const success = await setupVault(seedPhrase, vaultPassword);
     if (!success) { alert('Vault setup failed!'); goBack('createVault'); return; }
 
     setProcessingMsg('DERIVING MULTI-CHAIN ADDRESSES...');
@@ -261,8 +261,19 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({ onClos
       } else {
         alert('Must be at least 12 words.');
       }
+    } else if (importType === 'privateKey') {
+      const key = importText.trim();
+      const validation = WalletService.validatePrivateKey(key, selectedChain === 'solana' ? 'solana' : selectedChain === 'bitcoin' ? 'bitcoin' : 'ethereum');
+      if (!validation.valid) {
+        alert(validation.message || 'Invalid private key format for selected chain');
+        return;
+      }
+      // Deriving a single-address seed/account representation
+      alert('Private key validated! Note: Private key import controls only this single imported address.');
+      setSeedPhrase([]); // Single private key import mode
+      goForward('createVault');
     } else {
-      alert('Only Seed Phrase import is supported in v1.');
+      alert(`${importType.toUpperCase()} import will be available in next release.`);
     }
   };
 
@@ -368,7 +379,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({ onClos
                       animate={{ ...floatAnimation, ...pulseGlow }}
                       whileHover={{ scale: 1.1, rotate: 5 }}
                     >
-                      <img src="/logo.png" alt="Northveil Logo" className="w-full h-full object-contain" />
+                      <img src="https://iili.io/CgBPBHv.jpg" alt="Northveil Logo" className="w-full h-full object-cover" />
                     </motion.div>
                   </div>
 
@@ -821,7 +832,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({ onClos
                   <motion.div className="flex flex-wrap gap-2" variants={staggerContainer} initial="initial" animate="animate">
                     {[
                       { id: 'seed', label: 'SEED PHRASE' },
-                      { id: 'privateKey', label: 'PRIVATE KEY (SOON)' },
+                      { id: 'privateKey', label: 'PRIVATE KEY' },
                       { id: 'keystore', label: 'KEYSTORE (SOON)' },
                       { id: 'walletConnect', label: 'WALLETCONNECT (SOON)' },
                     ].map((t) => (
@@ -839,18 +850,32 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({ onClos
                     ))}
                   </motion.div>
 
+                  {importType === 'privateKey' && (
+                    <div className="p-3 bg-[#ff007f]/10 border-2 border-[#ff007f] text-xs text-[#ff007f] font-mono font-bold flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-black uppercase">⚠️ SINGLE-ADDRESS LIMITATION WARNING</div>
+                        <div className="text-[11px] text-slate-300 font-normal mt-0.5">
+                          Importing a raw private key binds ONLY a single public address. Multi-account HD derivation, sub-wallets, and recovery backup require a 12 or 24-word BIP-39 seed phrase.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
-                    <label className="text-xs text-slate-300 font-bold uppercase block">ENTER YOUR 12 OR 24-WORD SEED PHRASE:</label>
+                    <label className="text-xs text-slate-300 font-bold uppercase block">
+                      {importType === 'seed' ? 'ENTER YOUR 12 OR 24-WORD SEED PHRASE:' : 'ENTER YOUR PRIVATE KEY (HEX / WIF / BASE58):'}
+                    </label>
                     <textarea
-                      rows={4}
-                      placeholder="word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12"
+                      rows={importType === 'seed' ? 4 : 2}
+                      placeholder={importType === 'seed' ? 'word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12' : '0x... or Base58 string'}
                       value={importText}
                       onChange={(e) => setImportText(e.target.value)}
-                      className="w-full bg-[#0a0a0c] border-2 border-white p-3 text-xs text-white focus:outline-none focus:border-[#00f0ff] transition-colors resize-none"
+                      className="w-full bg-[#0a0a0c] border-2 border-white p-3 text-xs text-white focus:outline-none focus:border-[#00f0ff] transition-colors resize-none font-mono"
                     />
                     <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold">
-                      <span>WORDS: {importText.trim().split(/[\s,]+/).filter(w => w.length > 0).length} / 12</span>
-                      <span className="text-[#00f0ff]">BIP-39</span>
+                      <span>{importType === 'seed' ? `WORDS: ${importText.trim().split(/[\s,]+/).filter(w => w.length > 0).length} / 12` : `KEY LENGTH: ${importText.trim().length} chars`}</span>
+                      <span className="text-[#00f0ff]">{importType === 'seed' ? 'BIP-39' : selectedChain.toUpperCase()}</span>
                     </div>
                   </div>
 

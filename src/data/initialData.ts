@@ -42,7 +42,7 @@ export const SUPPORTED_CHAINS: ChainInfo[] = [
     id: 'base',
     name: 'Base Network',
     symbol: 'ETH',
-    icon: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png',
+    icon: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/base/info/logo.png',
     color: '#0052FF',
     rpcLatency: 10,
     blockTime: 2.0,
@@ -55,7 +55,7 @@ export const SUPPORTED_CHAINS: ChainInfo[] = [
     id: 'arbitrum',
     name: 'Arbitrum One',
     symbol: 'ARB',
-    icon: 'https://assets.coingecko.com/coins/images/16547/small/arbitrum.png',
+    icon: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/arbitrum/info/logo.png',
     color: '#28A0F0',
     rpcLatency: 8,
     blockTime: 0.25,
@@ -731,6 +731,97 @@ export const INITIAL_ASSETS: CryptoAsset[] = [
     marketCapUsd: 31000000000,
     isFavorite: false,
     bio: 'XRP is a digital asset built for cross-border global payments on the XRP Ledger.',
+  },
+  // NATIVE TESTNET ASSETS
+  {
+    id: 'native-sepolia',
+    symbol: 'ETH (Sepolia)',
+    name: 'Ethereum Sepolia Testnet',
+    network: 'sepolia',
+    balance: 0,
+    priceUsd: 0.00,
+    change24h: 0.00,
+    icon: 'https://iili.io/CgBPBHv.jpg',
+    contractAddress: '0x0000000000000000000000000000000000000000',
+    marketCapUsd: 0,
+    isFavorite: true,
+    bio: 'Ethereum Sepolia Testnet native testing token.',
+  },
+  {
+    id: 'native-bsc_testnet',
+    symbol: 'tBNB',
+    name: 'BNB BSC Testnet',
+    network: 'bsc_testnet',
+    balance: 0,
+    priceUsd: 0.00,
+    change24h: 0.00,
+    icon: 'https://iili.io/CgBPBHv.jpg',
+    contractAddress: '0x0000000000000000000000000000000000000000',
+    marketCapUsd: 0,
+    isFavorite: true,
+    bio: 'BNB Smart Chain Testnet native testing token.',
+  },
+  {
+    id: 'native-polygon_amoy',
+    symbol: 'POL (Amoy)',
+    name: 'Polygon Amoy Testnet',
+    network: 'polygon_amoy',
+    balance: 0,
+    priceUsd: 0.00,
+    change24h: 0.00,
+    icon: 'https://iili.io/CgBPBHv.jpg',
+    contractAddress: '0x0000000000000000000000000000000000000000',
+    marketCapUsd: 0,
+    isFavorite: true,
+    bio: 'Polygon Amoy Testnet native testing token.',
+  },
+  {
+    id: 'native-solana_devnet',
+    symbol: 'SOL (Devnet)',
+    name: 'Solana Devnet Testnet',
+    network: 'solana_devnet',
+    balance: 0,
+    priceUsd: 0.00,
+    change24h: 0.00,
+    icon: 'https://iili.io/CgBPBHv.jpg',
+    contractAddress: '11111111111111111111111111111111',
+    marketCapUsd: 0,
+    isFavorite: true,
+    bio: 'Solana Devnet testnet native testing token.',
+  }
+];
+
+export const INITIAL_NFTS: NFTAsset[] = [
+  {
+    id: 'nft-genesis-key',
+    name: 'Northveil Alpha Genesis Vault Pass',
+    collection: 'Northveil Core Protocol',
+    image: 'https://iili.io/CgBPBHv.jpg',
+    tokenId: '#0042',
+    network: 'ethereum',
+    floorPrice: '0.45 ETH',
+    estUsd: '$1,550.00',
+    contract: '0x3892a71d87192a71d87192a71d87192a71d87192',
+    attributes: [
+      { trait_type: 'Access Tier', value: 'Alpha Master' },
+      { trait_type: 'Security Level', value: 'AES-256-GCM' },
+      { trait_type: 'MCP Status', value: 'Unlimited Authority' }
+    ]
+  },
+  {
+    id: 'nft-[#0108]',
+    name: 'Northveil Quantum Node #0108',
+    collection: 'Northveil Cyber Network',
+    image: 'https://iili.io/CgBPBHv.jpg',
+    tokenId: '#0108',
+    network: 'base',
+    floorPrice: '0.18 ETH',
+    estUsd: '$620.00',
+    contract: '0x8891a71d87192a71d87192a71d87192a71d87198',
+    attributes: [
+      { trait_type: 'Network', value: 'Base L2' },
+      { trait_type: 'Multi-Tenant', value: 'Active' }
+    ]
   }
 ];
 

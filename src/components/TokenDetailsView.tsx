@@ -96,29 +96,30 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
   const [liveTickPrice, setLiveTickPrice] = useState<number | null>(null);
   const [isBioExpanded, setIsBioExpanded] = useState(false);
   
-  const livePrice = liveTickPrice || marketData?.currentPrice || asset.priceUsd;
-  let liveChange = marketData?.priceChange24h ?? asset.change24h;
+  const livePrice = liveTickPrice || marketData?.currentPrice || asset?.priceUsd || 0;
+  let liveChange = marketData?.priceChange24h ?? asset?.change24h ?? 0;
 
   const tokenBio =
-    marketData?.description || asset.bio ||
-    `${asset.name} (${asset.symbol}) is a cryptographic asset operating on the ${asset.network.toUpperCase()} blockchain network, serving decentralized transactions, smart contracts, and Web3 ecosystem utility.`;
+    marketData?.description || asset?.bio ||
+    `${asset?.name || 'Token'} (${asset?.symbol || 'SYM'}) is a cryptographic asset operating on the ${(asset?.network || 'ethereum').toUpperCase()} blockchain network, serving decentralized transactions, smart contracts, and Web3 ecosystem utility.`;
 
   const socials = {
-    website: asset.socials?.website || `https://coingecko.com/en/coins/${asset.name.toLowerCase().replace(/\s+/g, '-')}`,
-    twitter: asset.socials?.twitter || `https://x.com/search?q=%23${asset.symbol}`,
-    telegram: asset.socials?.telegram,
-    discord: asset.socials?.discord,
-    github: asset.socials?.github,
-    whitepaper: asset.socials?.whitepaper,
+    website: asset?.socials?.website || `https://coingecko.com/en/coins/${(asset?.name || '').toLowerCase().replace(/\s+/g, '-')}`,
+    twitter: asset?.socials?.twitter || `https://x.com/search?q=%23${asset?.symbol || ''}`,
+    telegram: asset?.socials?.telegram,
+    discord: asset?.socials?.discord,
+    github: asset?.socials?.github,
+    whitepaper: asset?.socials?.whitepaper,
   };
 
   useEffect(() => {
+    if (!asset?.symbol) return;
     let days = '7';
     if (timeframe === '24H' || timeframe === '1H') days = '1';
     if (timeframe === '30D') days = '30';
     if (timeframe === '90D') days = '90';
     if (timeframe === '1Y') days = '365';
-    if (timeframe === 'ALL') days = 'max'; // Handled via special Binance fallback in TokenService for full history
+    if (timeframe === 'ALL') days = 'max';
     
     setIsLoadingMarket(true);
     TokenService.fetchTokenMarketData(asset.symbol, asset.contractAddress, asset.network, days)
@@ -127,11 +128,11 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
         setIsLoadingMarket(false);
       })
       .catch(() => setIsLoadingMarket(false));
-  }, [asset.id, timeframe]);
+  }, [asset?.id, timeframe]);
 
-  // Real-time ultra-fast live price updates via Binance WebSocket API (Push based, instant)
+  // Real-time ultra-fast live price updates via Binance WebSocket API
   useEffect(() => {
-    // Only fetch for major assets that have a USDT pair
+    if (!asset?.symbol) return;
     const supportedSymbols = ['ETH', 'SOL', 'BTC', 'BNB', 'AVAX', 'ARB', 'LINK', 'POL'];
     if (!supportedSymbols.includes(asset.symbol.toUpperCase())) return;
 
@@ -140,20 +141,17 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
     
     const connectWs = () => {
       try {
-        // Using Binance US stream to avoid geo-blocks and API key requirements
         ws = new WebSocket(`wss://stream.binance.us:9443/ws/${streamSymbol}@ticker`);
         
         ws.onmessage = (msg) => {
           try {
             const data = JSON.parse(msg.data);
-            if (data.c) { // 'c' is the current close price in Binance ticker payload
+            if (data.c) {
               setLiveTickPrice(parseFloat(data.c));
             }
           } catch (e) {}
         };
-      } catch (e) {
-        // Silently ignore WS errors
-      }
+      } catch (e) {}
     };
 
     connectWs();
@@ -163,7 +161,7 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
         ws.close();
       }
     };
-  }, [asset.symbol]);
+  }, [asset?.symbol]);
 
   // Buy / Sell state
   const [fiatAmount, setFiatAmount] = useState('500');
@@ -173,7 +171,7 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
   const [hoverPoint, setHoverPoint] = useState<{ price: number; label: string } | null>(null);
 
   const formatNumberUsd = (val?: number) => {
-    if (val === undefined || val === null) return 'N/A';
+    if (val === undefined || val === null || isNaN(val)) return 'N/A';
     if (val >= 1e12) return `$${(val / 1e12).toFixed(2)} T`;
     if (val >= 1e9) return `$${(val / 1e9).toFixed(2)} B`;
     if (val >= 1e6) return `$${(val / 1e6).toFixed(2)} M`;
@@ -182,36 +180,38 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
   };
 
   const handleCopyContract = () => {
-    if (!asset.contractAddress) return;
+    if (!asset?.contractAddress) return;
     navigator.clipboard.writeText(asset.contractAddress);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 1500);
   };
 
   const handleToggleFav = () => {
+    if (!asset?.id) return;
     setIsFavorite(!isFavorite);
     toggleFavoriteAsset(asset.id);
   };
 
-  // Holdings Calculations
-  const fiatValue = asset.balance * livePrice;
-  const avgCost = asset.avgBuyPriceUsd || livePrice * 0.85;
-  const totalCost = asset.balance * avgCost;
+  // Holdings Calculations (with full NaN & undefined guards)
+  const balance = asset?.balance || 0;
+  const fiatValue = balance * (livePrice || 0);
+  const avgCost = asset?.avgBuyPriceUsd || ((livePrice || 0) > 0 ? (livePrice || 0) * 0.85 : 0);
+  const totalCost = balance * avgCost;
   const pnlAmount = fiatValue - totalCost;
   const pnlPercent = totalCost > 0 ? (pnlAmount / totalCost) * 100 : 0;
   const isPnlPositive = pnlAmount >= 0;
 
-  // Generate chart data based on real market data
-  const chartPoints = (marketData?.prices?.length > 0) 
+  // Generate chart data safely
+  const chartPoints = (marketData?.prices && Array.isArray(marketData.prices) && marketData.prices.length > 0) 
     ? marketData.prices.map((p: [number, number]) => {
         const date = new Date(p[0]);
         let label = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         if (timeframe !== '24H' && timeframe !== '1H') {
           label = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
         }
-        return { price: p[1], label };
+        return { price: Number(p[1]) || 0, label };
       })
-    : [{ price: asset.priceUsd, label: 'Now' }, { price: asset.priceUsd, label: 'Now' }]; // fallback if no data
+    : [{ price: livePrice || 0, label: 'Now' }, { price: livePrice || 0, label: 'Now' }]; // fallback if no data
 
   // For 1H timeframe, take the last subset of 1 day data (since CoinGecko doesn't do 1H natively)
   let displayPoints = chartPoints;

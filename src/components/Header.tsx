@@ -168,7 +168,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
         </button>
 
         <div className="hidden xs:flex items-center gap-2 shrink-0">
-          <img src="/logo.png" alt="Northveil Logo" className="w-8 h-8 rounded-md border border-white/20 bg-[#000]" />
+          <img src="https://iili.io/CgBPBHv.jpg" alt="Northveil Logo" className="w-8 h-8 rounded-md border border-white/20 bg-[#000] object-cover" />
           <h2 className="text-xs sm:text-xl font-black text-white tracking-tight font-mono truncate">
             <span className="hidden md:inline">WELCOME, </span><span className="bg-[#ccff00] text-black px-1.5 py-0.5 border border-black shadow-[2px_2px_0px_0px_#000]">ARKHAN</span>
           </h2>

@@ -76,7 +76,7 @@ export const ReportBugView: React.FC<ReportBugViewProps> = ({ onBack }) => {
 
       setBugsList([newBug, ...bugsList]);
       setReportStatus(
-        `✓ BUG REPORT ${newId} SUBMITTED SAFELY! THANK YOU FOR SECURING CRYPTFEST. DISCORD NOTIFICATION SENT.`
+        `✓ BUG REPORT ${newId} SUBMITTED SAFELY! THANK YOU FOR SECURING NORTHVEIL. DISCORD NOTIFICATION SENT.`
       );
       setBugTitle('');
       setSteps('');
@@ -133,7 +133,7 @@ export const ReportBugView: React.FC<ReportBugViewProps> = ({ onBack }) => {
               <span>SUBMIT VULNERABILITY / BUG REPORT</span>
             </h2>
             <p className="text-xs text-slate-300 mt-1">
-              HELP IMPROVE CRYPTFEST SECURITY AND EARN ON-CHAIN BOUNTY REWARDS FOR VERIFIED DISCOVERIES.
+              HELP IMPROVE NORTHVEIL SECURITY AND EARN ON-CHAIN BOUNTY REWARDS FOR VERIFIED DISCOVERIES.
             </p>
           </div>
 

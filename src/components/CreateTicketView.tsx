@@ -130,7 +130,7 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({ onBack }) =>
           <div className="border-b-2 border-white/20 pb-4">
             <h2 className="text-lg font-black text-white uppercase flex items-center gap-2">
               <Ticket className="w-5 h-5 text-[#ccff00]" />
-              <span>SUBMIT NEW TICKET TO CRYPTFEST ENGINEERS</span>
+              <span>SUBMIT NEW TICKET TO NORTHVEIL ENGINEERS</span>
             </h2>
             <p className="text-xs text-slate-300 mt-1">
               ALL TICKET DETAILS AND LOGS ARE ENCRYPTED CLIENT-SIDE BEFORE TRANSMISSION.

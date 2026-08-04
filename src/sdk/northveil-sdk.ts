@@ -44,7 +44,10 @@ export class NorthveilSDK {
       throw new Error('[Northveil SDK Error]: API key is required. (e.g. nv_live_...)');
     }
     this.apiKey = config.apiKey;
-    this.baseUrl = (config.baseUrl || 'https://northveil.vercel.app').replace(/\/$/, '');
+    const defaultBase = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+      ? `${window.location.protocol}//${window.location.hostname}:3001`
+      : 'https://northveil.vercel.app';
+    this.baseUrl = (config.baseUrl || defaultBase).replace(/\/$/, '');
     this.walletAddress = config.walletAddress;
   }
 

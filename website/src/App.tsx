@@ -13,26 +13,22 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('home');
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white flex flex-col font-mono selection:bg-[#ccff00] selection:text-black">
+    <div className="min-h-screen bg-[#0a0a0c] text-white flex flex-col font-sans selection:bg-[#ccff00] selection:text-black">
       <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <main className="flex-1">
         {activeTab === 'home' && (
-          <>
-            <Hero onExploreMcp={() => setActiveTab('mcpDocs')} />
-            <McpDocs />
-          </>
+          <Hero 
+            onExploreMcp={() => setActiveTab('mcpDocs')}
+            onExploreApi={() => setActiveTab('apiDocs')}
+          />
         )}
         {activeTab === 'mcpDocs' && <McpDocs />}
         {activeTab === 'apiDocs' && <ApiDocs />}
         {activeTab === 'sdkDocs' && <SdkDocs />}
         {activeTab === 'deployGuide' && <DeploymentGuide />}
-        {activeTab === 'terms' && (
-          <>
-            <TermsPage />
-            <PrivacyPage />
-          </>
-        )}
+        {activeTab === 'terms' && <TermsPage />}
+        {activeTab === 'privacy' && <PrivacyPage />}
       </main>
 
       <Footer setActiveTab={setActiveTab} />

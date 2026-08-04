@@ -3,7 +3,7 @@ import { Zap, Server, Shield, ExternalLink, CheckCircle } from 'lucide-react';
 
 export const DeploymentGuide: React.FC = () => {
   return (
-    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-8 space-y-12 font-mono">
+    <div className="max-w-[96%] mx-auto py-8 px-2 sm:px-4 space-y-10 font-mono text-left bg-[#0a0a0c]">
       <div className="border-b-4 border-white pb-6 space-y-3">
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#ccff00] text-black text-xs font-black uppercase border-2 border-black shadow-[3px_3px_0px_0px_#000]">
           <Zap className="w-4 h-4" /> PRODUCTION DEPLOYMENT GUIDE

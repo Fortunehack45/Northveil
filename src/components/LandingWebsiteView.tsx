@@ -50,7 +50,7 @@ export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({ onLaunch
           ═════════════════════════════════════════════════════════════ */}
       <header className="w-full bg-[#141419] border-b-4 border-white px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-50 shadow-[0_4px_0_0_#00f0ff]">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('home')}>
-          <img src="/logo.png" alt="Northveil Logo" className="w-10 h-10 object-contain rounded-md border-2 border-black bg-black shadow-[3px_3px_0px_0px_#ccff00]" />
+          <img src="https://iili.io/CgBPBHv.jpg" alt="Northveil Logo" className="w-10 h-10 object-contain rounded-md border-2 border-black bg-black shadow-[3px_3px_0px_0px_#ccff00]" />
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tighter">
               NORTH<span className="text-[#ccff00]">VEIL</span>
@@ -162,7 +162,7 @@ export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({ onLaunch
               <div className="bg-[#141419] border-4 border-white p-6 shadow-[10px_10px_0px_0px_#00f0ff] space-y-4 relative">
                 <div className="flex items-center justify-between border-b-2 border-white pb-3">
                   <div className="flex items-center gap-2">
-                    <img src="/logo.png" alt="Logo" className="w-7 h-7 rounded border border-white" />
+                    <img src="https://iili.io/CgBPBHv.jpg" alt="Logo" className="w-7 h-7 rounded border border-white" />
                     <span className="text-xs font-black text-white uppercase">NORTHVEIL CONTROL CENTER</span>
                   </div>
                   <span className="px-2 py-0.5 bg-[#ccff00] text-black text-[10px] font-black uppercase border border-black">ONLINE</span>
@@ -442,7 +442,7 @@ export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({ onLaunch
       <footer className="w-full bg-[#141419] border-t-4 border-white px-4 sm:px-8 py-8 mt-16 font-mono text-xs">
         <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Logo" className="w-8 h-8 rounded border border-white" />
+            <img src="https://iili.io/CgBPBHv.jpg" alt="Logo" className="w-8 h-8 rounded border border-white" />
             <div>
               <div className="font-black text-white uppercase">NORTHVEIL WEB3 & MCP AGENT PROTOCOL</div>
               <div className="text-[10px] text-slate-400">MILITARY-GRADE SELF-CUSTODIAL INFRASTRUCTURE</div>

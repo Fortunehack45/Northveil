@@ -55,7 +55,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
 
   const totalUsd = assets.reduce((sum, a) => sum + (a.balance * a.priceUsd), 0);
   const totalDeposits = totalUsd > 0 ? totalUsd * 0.85 : 0;
-  const [timeframe, setTimeframe] = useState<'1D' | '1W' | '1M' | '1Y' | 'ALL'>('1M');
+  const [timeframe, setTimeframe] = useState<'1H' | '1D' | '1W' | '1M' | '3M' | '6M' | '1Y'>('1M');
   const [selectedAsset, setSelectedAsset] = useState<string>('ETH');
   const [selectedVaultNft, setSelectedVaultNft] = useState<any | null>(null);
   const [nftViewMode, setNftViewMode] = useState<'grid' | 'list'>('grid');
@@ -100,18 +100,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
     setShowAddWalletModal(false);
   };
 
-  if (selectedTokenDetails) {
-    return (
-      <TokenDetailsView
-        asset={selectedTokenDetails}
-        onBack={() => setSelectedTokenDetails(null)}
-        onOpenSend={onOpenSend}
-        onOpenReceive={onOpenReceive}
-        onNavigateSwap={onNavigateSwap}
-        onNavigateBuySell={onNavigateBuySell}
-      />
-    );
-  }
+  const [showZeroBalances, setShowZeroBalances] = useState<boolean>(false);
 
   // Chain Allocation Items
   const chainAllocations = assets
@@ -135,11 +124,13 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
     })
     .sort((a, b) => parseFloat(b.pct) - parseFloat(a.pct))
     .slice(0, 5);
-  const [showZeroBalances, setShowZeroBalances] = useState<boolean>(false);
 
   const candlestickPoints = historicalPerformance;
 
-  const MAIN_NATIVE_SYMBOLS = useMemo(() => new Set(['ETH', 'SOL', 'BTC', 'BNB', 'POL', 'MATIC', 'AVAX', 'ARB']), []);
+  const MAIN_NATIVE_SYMBOLS = useMemo(() => new Set([
+    'ETH', 'SOL', 'BTC', 'BNB', 'POL', 'MATIC', 'AVAX', 'ARB',
+    'ETH (SEPOLIA)', 'TBNB', 'POL (AMOY)', 'SOL (DEVNET)'
+  ]), []);
 
   const filteredAssetsList = useMemo(() => {
     if (showZeroBalances) return assets;
@@ -150,14 +141,17 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
       const isMainNative = MAIN_NATIVE_SYMBOLS.has(symUpper) || 
                            asset.id?.startsWith('native-') || 
                            asset.id?.endsWith('-native') || 
-                           asset.id?.endsWith('-main');
+                           asset.id?.endsWith('-main') ||
+                           asset.network === 'sepolia' ||
+                           asset.network === 'bsc_testnet' ||
+                           asset.network === 'polygon_amoy' ||
+                           asset.network === 'solana_devnet';
 
-      // Rule 1: Always include main coins from the 7 primary blockchains even if balance is 0
+      // Rule 1: Always include main coins from the primary blockchains even if balance is 0
       if (isMainNative) return true;
 
-      // Rule 2: Include other tokens ONLY if they have real balance and real non-zero USD value (> $0.0001)
-      // Filters out spam dust tokens like MEZO 0.00000017 with $0.00 value
-      return asset.balance > 0.000001 && usdVal >= 0.0001;
+      // Rule 2: Include tokens if they have any balance > 0 (including testnets with $0 price) OR usdVal >= 0.0001
+      return asset.balance > 0.000001 || usdVal >= 0.0001;
     });
   }, [assets, showZeroBalances, MAIN_NATIVE_SYMBOLS]);
 
@@ -170,6 +164,20 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
       return a.symbol.localeCompare(b.symbol);
     });
   }, [filteredAssetsList]);
+
+  // Early return for token details view AFTER all hooks have executed
+  if (selectedTokenDetails) {
+    return (
+      <TokenDetailsView
+        asset={selectedTokenDetails}
+        onBack={() => setSelectedTokenDetails(null)}
+        onOpenSend={onOpenSend}
+        onOpenReceive={onOpenReceive}
+        onNavigateSwap={onNavigateSwap}
+        onNavigateBuySell={onNavigateBuySell}
+      />
+    );
+  }
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-5 sm:space-y-6 pb-12 w-full">
@@ -309,7 +317,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
 
                   {/* Timeframe Pills */}
                   <div className="flex items-center gap-1 bg-[#0a0a0c] p-1 border-2 border-white">
-                    {(['1D', '1W', '1M', '1Y', 'ALL'] as const).map((tf) => (
+                    {(['1H', '1D', '1W', '1M', '3M', '6M', '1Y'] as const).map((tf) => (
                       <button
                         key={tf}
                         onClick={() => setTimeframe(tf)}

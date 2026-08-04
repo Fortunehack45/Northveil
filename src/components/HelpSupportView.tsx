@@ -17,8 +17,8 @@ export const HelpSupportView: React.FC = () => {
 
   const faqs = [
     {
-      q: 'How does Cryptfest store my private keys and seed phrase?',
-      a: 'Cryptfest runs locally in your browser container. All private keys and 12-word seed phrases are encrypted using AES-GCM 256-bit cryptography and guarded by local biometric hardware protocols (Touch ID / Face ID).',
+      q: 'How does Northveil store my private keys and seed phrase?',
+      a: 'Northveil runs locally in your browser container. All private keys and 12-word seed phrases are encrypted using AES-GCM 256-bit cryptography and guarded by local biometric hardware protocols (Touch ID / Face ID).',
     },
     {
       q: 'What should I do if my Web3 transaction is stuck on pending?',
@@ -30,7 +30,7 @@ export const HelpSupportView: React.FC = () => {
     },
     {
       q: 'Is MEV sandwich attack protection enabled by default?',
-      a: 'Yes, Cryptfest routes all DEX trades through private RPC relays (Flashbots Protect & CowSwap) to shield your trades from front-running bots.',
+      a: 'Yes, Northveil routes all DEX trades through private RPC relays (Flashbots Protect & CowSwap) to shield your trades from front-running bots.',
     },
     {
       q: 'How do I export my historical crypto transactions for taxes?',
