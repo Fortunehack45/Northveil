@@ -231,20 +231,60 @@ app.get('/ui/widget', async (req: Request, res: Response) => {
   res.send(html);
 });
 
+// OAuth 2.0 Metadata Endpoint (RFC 8414)
+app.get(['/.well-known/oauth-authorization-server', '/.well-known/openid-configuration'], (req, res) => {
+  const protocol = req.headers['x-forwarded-proto'] || 'https';
+  const baseUrl = `${protocol}://${req.headers.host}`;
+  res.json({
+    issuer: baseUrl,
+    authorization_endpoint: `${baseUrl}/authorize`,
+    token_endpoint: `${baseUrl}/token`,
+    registration_endpoint: `${baseUrl}/register`,
+    response_types_supported: ['code'],
+    grant_types_supported: ['authorization_code', 'refresh_token', 'client_credentials'],
+    token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'none'],
+    scopes_supported: ['read', 'write', 'admin']
+  });
+});
+
+// OAuth 2.0 Authorization Endpoint
 app.get(['/authorize', '/oauth/authorize', '/api/authorize'], (req, res) => {
   const redirectUri = (req.query.redirect_uri as string) || '';
   const state = (req.query.state as string) || '';
-  const code = 'nv_auth_code_' + Math.random().toString(36).substring(2, 10);
-  if (redirectUri) return res.redirect(`${redirectUri}?code=${code}&state=${state}`);
+  const code = 'nv_code_' + Math.random().toString(36).substring(2, 12);
+
+  if (redirectUri) {
+    const separator = redirectUri.includes('?') ? '&' : '?';
+    return res.redirect(`${redirectUri}${separator}code=${code}&state=${encodeURIComponent(state)}`);
+  }
   res.json({ status: 'AUTHORIZED', code, state });
 });
 
+// OAuth 2.0 Token Endpoint
 app.post(['/token', '/oauth/token', '/api/token'], (req, res) => {
-  res.json({ access_token: 'nv_live_9f82a17b09c82415d8a9', token_type: 'Bearer', expires_in: 3600000 });
+  res.json({
+    access_token: 'nv_live_9f82a17b09c82415d8a9',
+    token_type: 'Bearer',
+    expires_in: 31536000,
+    refresh_token: 'nv_refresh_9f82a17b09c82415d8a9'
+  });
 });
 
+// OAuth 2.0 Dynamic Client Registration Endpoint (RFC 7591)
 app.post(['/register', '/oauth/register', '/api/register'], (req, res) => {
-  res.json({ client_id: 'northveil_ai_client', client_secret: 'northveil_ai_secret' });
+  const redirectUris = req.body?.redirect_uris || ['https://claude.ai/api/connectors/oauth/callback'];
+  const clientId = 'nv_client_' + Math.random().toString(36).substring(2, 12);
+  const clientSecret = 'nv_secret_' + Math.random().toString(36).substring(2, 16);
+  res.status(201).json({
+    client_id: clientId,
+    client_secret: clientSecret,
+    client_id_issued_at: Math.floor(Date.now() / 1000),
+    client_secret_expires_at: 0,
+    redirect_uris: redirectUris,
+    grant_types: ['authorization_code', 'refresh_token'],
+    response_types: ['code'],
+    token_endpoint_auth_method: 'client_secret_post'
+  });
 });
 
 app.get(['/openapi.json', '/api/openapi.json'], (req, res) => {
