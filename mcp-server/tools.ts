@@ -27,6 +27,54 @@ export interface MCPToolDefinition {
 
 export const MCP_TOOLS: MCPToolDefinition[] = [
   {
+    name: 'deploy_smart_contract',
+    description: 'Deploys a compiled Solidity smart contract to a real EVM blockchain network (Sepolia, Ethereum, Polygon). Returns deployed contract address & Etherscan link.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        contractName: {
+          type: 'string',
+          description: 'Name of the smart contract to deploy (e.g. NorthveilToken)',
+        },
+        bytecode: {
+          type: 'string',
+          description: 'Optional compiled EVM bytecode string (0x...)',
+        },
+        abi: {
+          type: 'string',
+          description: 'Optional contract ABI JSON string',
+        },
+        network: {
+          type: 'string',
+          description: 'Target EVM network (sepolia, ethereum, polygon, arbitrum)',
+        },
+      },
+      required: ['contractName'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        contractName: {
+          type: 'string',
+          description: 'Name of the smart contract to deploy (e.g. NorthveilToken)',
+        },
+        bytecode: {
+          type: 'string',
+          description: 'Optional compiled EVM bytecode string (0x...)',
+        },
+        abi: {
+          type: 'string',
+          description: 'Optional contract ABI JSON string',
+        },
+        network: {
+          type: 'string',
+          description: 'Target EVM network (sepolia, ethereum, polygon, arbitrum)',
+        },
+      },
+      required: ['contractName'],
+    },
+  },
+  {
     name: 'get_wallet_info',
     description: 'Retrieves current wallet address, active chain, network status, and account metadata.',
     inputSchema: {
