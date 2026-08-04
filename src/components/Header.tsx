@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useWallet } from '../context/WalletContext';
+import { BlockiesAvatar } from './BlockiesAvatar';
 import { SUPPORTED_CHAINS } from '../data/initialData';
 import { Search, Bell, Menu, ChevronDown, Wallet, Plus, Check, Copy, X, CheckCheck, ShieldAlert, ArrowLeftRight, Zap } from 'lucide-react';
 import { CustomSelect } from './CustomSelect';
@@ -168,9 +169,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
         </button>
 
         <div className="hidden xs:flex items-center gap-2 shrink-0">
-          <img src="https://iili.io/CgBPBHv.jpg" alt="Northveil Logo" className="w-8 h-8 rounded-md border border-white/20 bg-[#000] object-cover" />
-          <h2 className="text-xs sm:text-xl font-black text-white tracking-tight font-mono truncate">
-            <span className="hidden md:inline">WELCOME, </span><span className="bg-[#ccff00] text-black px-1.5 py-0.5 border border-black shadow-[2px_2px_0px_0px_#000]">ARKHAN</span>
+          <BlockiesAvatar address={activeSubWallet?.address || '0x0000000000000000000000000000000000000000'} size={32} />
+          <h2 className="text-xs sm:text-sm font-black text-white tracking-tight font-mono truncate flex items-center gap-1.5">
+            <span className="hidden md:inline text-slate-400">VAULT:</span>
+            <span className="bg-[#ccff00] text-black px-1.5 py-0.5 border border-black shadow-[2px_2px_0px_0px_#000]">
+              {activeSubWallet?.name || 'ACCOUNT 1'}
+            </span>
           </h2>
         </div>
 

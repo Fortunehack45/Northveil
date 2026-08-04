@@ -482,11 +482,12 @@ export const DeveloperHubView: React.FC = () => {
         const activeAddress = activeSubWallet?.address || '0x71c8891575b50d22e032d847847c234a413d4cc8';
 
         // Dynamically constructed server URLs with active user's wallet address
-        const localSseUrl = `http://${hostname}:3001/sse?wallet_address=${activeAddress}`;
-        const localMcpUrl = `http://${hostname}:3001/mcp?wallet_address=${activeAddress}`;
-        const openApiUrl = `https://8c919abc730c24b9-102-89-69-194.serveousercontent.com/openapi.json?wallet_address=${activeAddress}`;
-        const tunnelBaseUrl = `https://8c919abc730c24b9-102-89-69-194.serveousercontent.com`;
-        const uniqueSseUrl = `https://8c919abc730c24b9-102-89-69-194.serveousercontent.com/sse?wallet_address=${activeAddress}`;
+        const baseUrl = getMcpServerUrl();
+        const localSseUrl = `${baseUrl}/sse?wallet_address=${activeAddress}`;
+        const localMcpUrl = `${baseUrl}/mcp?wallet_address=${activeAddress}`;
+        const openApiUrl = `${baseUrl}/openapi.json?wallet_address=${activeAddress}`;
+        const tunnelBaseUrl = baseUrl;
+        const uniqueSseUrl = `${baseUrl}/sse?wallet_address=${activeAddress}`;
 
         return (
           <div className="bg-[#141419] border-2 border-white p-6 shadow-[6px_6px_0px_0px_#00f0ff] space-y-6 font-mono">

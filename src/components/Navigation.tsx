@@ -1,5 +1,6 @@
 import React from 'react';
 import { useWallet } from '../context/WalletContext';
+import { BlockiesAvatar } from './BlockiesAvatar';
 import {
   LayoutGrid,
   ArrowLeftRight,
@@ -208,17 +209,31 @@ export const Navigation: React.FC<NavigationProps> = ({
 
         {/* Footer Actions - Fixed at Bottom */}
         <div className="p-3 border-t-2 border-white/20 bg-[#0d0d10] shrink-0 space-y-2">
+          {/* Account Profile Badge */}
+          {activeSubWallet && (
+            <div className="p-2.5 bg-[#0a0a0c] border-2 border-white/40 shadow-[2px_2px_0px_0px_#000] flex items-center gap-2.5 mb-2 font-mono">
+              <BlockiesAvatar address={activeSubWallet.address} size={32} />
+              <div className="min-w-0 flex-1">
+                <span className="text-xs font-black text-white block truncate uppercase">{activeSubWallet.name}</span>
+                <span className="text-[10px] text-[#00f0ff] font-bold block truncate font-mono">
+                  {activeSubWallet.address.slice(0, 6)}...{activeSubWallet.address.slice(-4)}
+                </span>
+              </div>
+            </div>
+          )}
+
           {onOpenOnboarding && (
             <button
               onClick={() => {
                 onOpenOnboarding();
                 if (onCloseMobile) onCloseMobile();
               }}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#00f0ff] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000] font-mono font-black text-[11px] uppercase tracking-wider hover:bg-[#33f3ff] cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#00f0ff] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000] font-mono font-black text-[11px] uppercase tracking-wider hover:bg-[#33f3ff] cursor-pointer mb-2"
             >
-              <span>ONBOARDING & AUTH DEMO</span>
+              <span>VAULT & BACKUP</span>
             </button>
           )}
+
           <button
             onClick={lockWallet}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#ff007f] text-white border-2 border-black shadow-[3px_3px_0px_0px_#000] font-mono font-black text-xs uppercase tracking-wider hover:bg-[#ff3399] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
