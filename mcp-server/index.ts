@@ -703,21 +703,34 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
     console.error('Live market price fetch error:', e);
   }
 
-  // Fetch real live EVM balance from Ethers.js RPC Provider
-  let liveEthBalance = 2.45;
+  // 1. Fetch 100% Real Live EVM On-Chain Balances directly from Blockchain RPC Providers
+  let mainnetEth = 0;
+  let sepoliaEth = 0;
   try {
     if (cleanAddress.startsWith('0x') && cleanAddress.length === 42) {
-      const balWei = await ethProvider.getBalance(cleanAddress);
-      liveEthBalance = Number(ethers.formatEther(balWei));
-      if (liveEthBalance === 0) {
-        const sepoliaBal = await sepoliaProvider.getBalance(cleanAddress);
-        const sepEth = Number(ethers.formatEther(sepoliaBal));
-        if (sepEth > 0) liveEthBalance = sepEth;
-      }
+      const mainnetWei = await ethProvider.getBalance(cleanAddress).catch(() => 0n);
+      mainnetEth = Number(ethers.formatEther(mainnetWei));
+
+      const sepoliaWei = await sepoliaProvider.getBalance(cleanAddress).catch(() => 0n);
+      sepoliaEth = Number(ethers.formatEther(sepoliaWei));
     }
   } catch (e) {
-    console.error('Ethers.js RPC balance query error:', e);
+    console.error('Real RPC balance fetch error:', e);
   }
+
+  // 2. Fetch User-Specific Custom Token Assets from Supabase DB
+  let userDbAssets: any[] = [];
+  try {
+    const { data } = await supabase
+      .from('user_assets')
+      .select('*')
+      .eq('wallet_address', cleanAddress);
+    if (Array.isArray(data)) userDbAssets = data;
+  } catch (e) {
+    console.error('Supabase user_assets fetch error:', e);
+  }
+
+  const liveEthBalance = mainnetEth > 0 ? mainnetEth : sepoliaEth;
 
   switch (name) {
     case 'deploy_smart_contract': {
@@ -782,7 +795,6 @@ ${solCode}
     }
 
     case 'get_wallet_info': {
-      const { count } = await supabase.from('wallets').select('*', { count: 'exact', head: true });
       const activeChain = dbWallet?.chain || args?.chain || 'ethereum';
       
       const formattedMarkdown = `
@@ -794,9 +806,10 @@ ${solCode}
 | Parameter | Value | Status |
 | :--- | :--- | :--- |
 | **Account Label** | ${dbWallet?.label || 'Primary Vault'} | Active |
+| **Ethereum Mainnet Balance** | **${mainnetEth.toFixed(4)} ETH** | 🟢 Ethers.js Real RPC |
+| **Sepolia Testnet Balance** | **${sepoliaEth.toFixed(4)} Sepolia ETH** | 🟢 PublicNode Real RPC |
 | **Supabase DB Sync** | Connected (\`ulkbchewsrksgvlbzjzl\`) | 🟢 Live |
 | **Ethers.js RPC Provider** | \`${ETH_RPC_URL}\` | 🟢 Connected |
-| **On-Chain ETH Balance** | **${liveEthBalance.toFixed(4)} ETH** | Real RPC |
 `;
 
       return {
@@ -804,57 +817,80 @@ ${solCode}
         walletAddress,
         label: dbWallet?.label || 'Primary Northveil Wallet',
         activeChain,
+        mainnetEthBalance: mainnetEth,
+        sepoliaEthBalance: sepoliaEth,
         databaseStatus: 'CONNECTED (Supabase Cloud)',
-        totalRegisteredWallets: count || 1,
       };
     }
 
     case 'get_portfolio': {
-      const ethVal = liveEthBalance * ethPrice;
-      const btcVal = 0.25 * btcPrice;
-      const solVal = 15.0 * solPrice;
-      const usdtVal = 1250.0;
-      const totalNetWorth = ethVal + btcVal + solVal + usdtVal;
+      // Build real holdings list
+      const holdings: any[] = [];
+      let totalNetWorth = 0;
 
-      const ethPct = Math.round((ethVal / totalNetWorth) * 100);
-      const btcPct = Math.round((btcVal / totalNetWorth) * 100);
-      const solPct = Math.round((solVal / totalNetWorth) * 100);
-      const usdtPct = Math.round((usdtVal / totalNetWorth) * 100);
+      // Real Ethereum holding
+      const ethVal = mainnetEth * ethPrice;
+      totalNetWorth += ethVal;
+      holdings.push({
+        symbol: 'ETH',
+        name: 'Ethereum',
+        balance: mainnetEth,
+        priceUsd: ethPrice,
+        totalUsd: ethVal,
+        chain: 'Ethereum Mainnet',
+        isRealOnChain: true
+      });
+
+      // Real Sepolia holding if present
+      if (sepoliaEth > 0) {
+        holdings.push({
+          symbol: 'SepoliaETH',
+          name: 'Sepolia Testnet Ether',
+          balance: sepoliaEth,
+          priceUsd: 0,
+          totalUsd: 0,
+          chain: 'Sepolia Testnet',
+          isRealOnChain: true
+        });
+      }
+
+      // Add user custom assets from Supabase if present
+      for (const asset of userDbAssets) {
+        const price = asset.price_usd || 1.0;
+        const val = (asset.balance || 0) * price;
+        totalNetWorth += val;
+        holdings.push({
+          symbol: asset.symbol || 'CUSTOM',
+          name: asset.name || asset.symbol,
+          balance: asset.balance || 0,
+          priceUsd: price,
+          totalUsd: val,
+          chain: asset.chain || 'Ethereum',
+          isRealOnChain: false
+        });
+      }
 
       const formattedMarkdown = `
-### 📊 NORTHVEIL LIVE PORTFOLIO DASHBOARD
+### 📊 NORTHVEIL LIVE PORTFOLIO DASHBOARD (DIRECT BLOCKCHAIN RPC)
 
 > **Bound Wallet**: \`${walletAddress}\`  
-> **Total Net Worth**: **$${totalNetWorth.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD** 🟢 **+4.2% (24h)**
+> **Total Net Worth**: **$${totalNetWorth.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD** 🟢 **Live RPC Sync**
 
-#### 🎨 Asset Allocation Visual Bar:
-\`\`\`text
-[ETH ${ethPct}%] ${'█'.repeat(Math.max(1, Math.floor(ethPct / 5)))} [BTC ${btcPct}%] ${'█'.repeat(Math.max(1, Math.floor(btcPct / 5)))} [SOL ${solPct}%] [USDT ${usdtPct}%]
-\`\`\`
+#### 💰 Real On-Chain Token Holdings:
 
-#### 💰 Token Holdings & Real RPC Market Feeds:
-
-| Asset | Balance | Live Price (USD) | Total Value (USD) | Portfolio Share | Chain |
+| Asset | Balance | Live Price (USD) | Total Value (USD) | Chain | Source |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| 💎 **ETH** | **${liveEthBalance.toFixed(4)} ETH** | $${ethPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} | **$${ethVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}** | \`${ethPct}%\` | Ethereum Mainnet |
-| 🟠 **BTC** | **0.2500 BTC** | $${btcPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} | **$${btcVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}** | \`${btcPct}%\` | Bitcoin |
-| 🟣 **SOL** | **15.0000 SOL** | $${solPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} | **$${solVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}** | \`${solPct}%\` | Solana |
-| 💵 **USDT** | **1,250.00 USDT** | $1.00 | **$1,250.00** | \`${usdtPct}%\` | Ethereum |
+${holdings.map((h: any) => `| **${h.symbol}** | **${h.balance.toFixed(4)} ${h.symbol}** | $${h.priceUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })} | **$${h.totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}** | ${h.chain} | ${h.isRealOnChain ? '🟢 Direct RPC' : 'DB Sync'} |`).join('\n')}
 
-*Data Source: Live Ethers.js RPC Node + Coinpaprika Real-Time Price Engine + Supabase Cloud DB*
+*Data Source: Live Ethers.js Direct Blockchain RPC + Coinpaprika Tickers API*
 `;
 
       return {
         formattedMarkdown,
         walletAddress,
         netWorthUsd: Number(totalNetWorth.toFixed(2)),
-        totalAssetsCount: 4,
-        assets: [
-          { symbol: 'ETH', balance: Number(liveEthBalance.toFixed(4)), priceUsd: ethPrice, totalUsd: ethVal },
-          { symbol: 'BTC', balance: 0.25, priceUsd: btcPrice, totalUsd: btcVal },
-          { symbol: 'SOL', balance: 15.0, priceUsd: solPrice, totalUsd: solVal },
-          { symbol: 'USDT', balance: 1250.0, priceUsd: 1.0, totalUsd: 1250.0 },
-        ],
+        totalAssetsCount: holdings.length,
+        assets: holdings,
       };
     }
 
