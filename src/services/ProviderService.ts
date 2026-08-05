@@ -129,10 +129,13 @@ export class ProviderService {
     }
   }
 
-  static getSolanaConnection(): Connection {
-    if (!this.solanaConnection) {
-      // Setup failover connections or just a robust primary for Solana
-      this.solanaConnection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+  static getSolanaConnection(networkType?: string): Connection {
+    const url = networkType === 'devnet' 
+      ? 'https://api.devnet.solana.com' 
+      : (process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com');
+      
+    if (!this.solanaConnection || networkType === 'devnet') {
+      return new Connection(url, 'confirmed');
     }
     return this.solanaConnection;
   }

@@ -73,9 +73,8 @@ export class WalletService {
         return { valid: true };
       } catch (e) {
         try {
-          // Validate Bitcoin WIF format via bip32
-          const child = bip32.fromWIF(cleanKey, bitcoin.networks.bitcoin);
-          return { valid: !!child.publicKey };
+          // Validate Bitcoin WIF format length
+          return { valid: cleanKey.length >= 50 };
         } catch (err) {
           return { valid: cleanKey.length >= 50, message: 'Invalid Bitcoin WIF key format' };
         }
@@ -147,10 +146,11 @@ export class WalletService {
   static getEVMWallet(mnemonicWords: string[], accountIndex: number, provider: ethers.Provider, passphrase?: string): ethers.Wallet {
     const mnemonic = mnemonicWords.join(' ');
     const path = `m/44'/60'/0'/0/${accountIndex}`;
-    return ethers.HDNodeWallet.fromMnemonic(
+    const hdNode = ethers.HDNodeWallet.fromMnemonic(
       ethers.Mnemonic.fromPhrase(mnemonic, passphrase),
       path
-    ).connect(provider);
+    );
+    return new ethers.Wallet(hdNode.privateKey, provider);
   }
 
   /**

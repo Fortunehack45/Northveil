@@ -4,8 +4,9 @@
  */
 
 export const getMcpServerUrl = (): string => {
-  if (import.meta.env.VITE_MCP_SERVER_URL) {
-    return import.meta.env.VITE_MCP_SERVER_URL.replace(/\/$/, '');
+  const env = (import.meta as any).env || {};
+  if (env.VITE_MCP_SERVER_URL) {
+    return env.VITE_MCP_SERVER_URL.replace(/\/$/, '');
   }
 
   if (typeof window !== 'undefined') {

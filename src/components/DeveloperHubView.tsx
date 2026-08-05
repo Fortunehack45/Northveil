@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { SupabaseService } from '../services/SupabaseService';
 import {
   Bot,
   Terminal,

@@ -1,1 +1,1 @@
-export { NorthveilSDK, type NorthveilSDKConfig, type PortfolioResponse, type DeploymentResponse } from '../../src/sdk/northveil-sdk';
+export { NorthveilSDK, type NorthveilSDKConfig, type PortfolioResponse } from '../../../src/sdk/northveil-sdk';
