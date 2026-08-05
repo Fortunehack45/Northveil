@@ -35,14 +35,23 @@ export interface MCPToolDefinition {
 export const MCP_TOOLS: MCPToolDefinition[] = [
   {
     name: 'deploy_smart_contract',
-    description: 'Deploys a compiled Solidity smart contract to a real EVM blockchain network (Sepolia, Ethereum, Polygon). REQUIRES USER APPROVAL BEFORE BROADCASTING.',
+    description: 'Deploys an ERC-20 token, ERC-721 NFT collection, or custom smart contract to Mainnet or Testnet EVM blockchains (Ethereum, Sepolia, Polygon, Base, Arbitrum, BSC). REQUIRES USER APPROVAL BEFORE BROADCASTING.',
     annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
         contractName: {
           type: 'string',
-          description: 'Name of the smart contract to deploy (e.g. NorthveilToken)',
+          description: 'Name of the smart contract to deploy (e.g. NorthveilToken or GalacticNFT)',
+        },
+        contractType: {
+          type: 'string',
+          description: 'Template category: erc20 (Fungible Token), erc721 / nft (NFT Collection), erc1155, staking, dao, custom',
+          enum: ['erc20', 'erc721', 'nft', 'erc1155', 'staking', 'dao', 'custom'],
+        },
+        network: {
+          type: 'string',
+          description: 'Target EVM network: sepolia (testnet), ethereum (mainnet), polygon (mainnet), amoy (polygon testnet), base, base_sepolia, arbitrum, bsc',
         },
         bytecode: {
           type: 'string',
@@ -51,10 +60,6 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         abi: {
           type: 'string',
           description: 'Optional contract ABI JSON string',
-        },
-        network: {
-          type: 'string',
-          description: 'Target EVM network (sepolia, ethereum, polygon, arbitrum)',
         },
       },
       required: ['contractName'],
@@ -64,7 +69,16 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         contractName: {
           type: 'string',
-          description: 'Name of the smart contract to deploy (e.g. NorthveilToken)',
+          description: 'Name of the smart contract to deploy (e.g. NorthveilToken or GalacticNFT)',
+        },
+        contractType: {
+          type: 'string',
+          description: 'Template category: erc20 (Fungible Token), erc721 / nft (NFT Collection), erc1155, staking, dao, custom',
+          enum: ['erc20', 'erc721', 'nft', 'erc1155', 'staking', 'dao', 'custom'],
+        },
+        network: {
+          type: 'string',
+          description: 'Target EVM network: sepolia (testnet), ethereum (mainnet), polygon (mainnet), amoy (polygon testnet), base, base_sepolia, arbitrum, bsc',
         },
         bytecode: {
           type: 'string',
@@ -73,10 +87,6 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         abi: {
           type: 'string',
           description: 'Optional contract ABI JSON string',
-        },
-        network: {
-          type: 'string',
-          description: 'Target EVM network (sepolia, ethereum, polygon, arbitrum)',
         },
       },
       required: ['contractName'],
