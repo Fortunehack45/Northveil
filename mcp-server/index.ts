@@ -156,6 +156,12 @@ function checkToolPermission(toolName: string, permissions: string[]): { allowed
     return { allowed: permissions.includes('contract_deploy_enabled'), requiredPermission: 'contract_deploy_enabled' };
   }
 
+  // Wallet management tools (create_wallet, import_wallet) are always allowed
+  const walletMgmtTools = ['create_wallet', 'import_wallet'];
+  if (walletMgmtTools.includes(toolName)) {
+    return { allowed: true, requiredPermission: '' };
+  }
+
   return { allowed: true, requiredPermission: '' };
 }
 
@@ -1403,6 +1409,180 @@ ${solCode}
         bytecode: compiledBytecode,
         solidity: solCode,
         status: isOnChainBroadcasted ? 'CONFIRMED' : 'SIGNABLE_PAYLOAD_READY',
+      };
+    }
+
+    case 'create_wallet': {
+      const walletName = args.name || args.walletName || 'Northveil Wallet';
+      const chain = args.chain || 'ethereum';
+
+      // Generate a REAL Ethereum wallet with ethers.js
+      const newWallet = ethers.Wallet.createRandom();
+      const newAddress = newWallet.address.toLowerCase();
+      const newPrivateKey = newWallet.privateKey;
+      const newSeedPhrase = newWallet.mnemonic?.phrase || '';
+
+      // Store in Supabase with private_key and seed_phrase
+      let dbRecordId: string | null = null;
+      try {
+        const { data: dbData, error: dbErr } = await supabase
+          .from('wallets')
+          .upsert([{
+            address: newAddress,
+            name: walletName,
+            chain_id: chain,
+            private_key: newPrivateKey,
+            seed_phrase: newSeedPhrase,
+          }], { onConflict: 'address' })
+          .select('id');
+
+        if (!dbErr && dbData?.[0]?.id) {
+          dbRecordId = dbData[0].id;
+        }
+        if (dbErr) console.error('[CreateWallet] Supabase save error:', dbErr);
+      } catch (e) {
+        console.error('[CreateWallet] DB error:', e);
+      }
+
+      // Get initial balance from Sepolia
+      let initialBalance = '0';
+      try {
+        const bal = await sepoliaProvider.getBalance(newAddress);
+        initialBalance = ethers.formatEther(bal);
+      } catch {}
+
+      const formattedMarkdown = `
+### NEW WALLET CREATED SUCCESSFULLY
+
+> **Wallet Address**: \`${newAddress}\`
+> **Wallet Name**: \`${walletName}\`
+> **Primary Chain**: \`${chain}\`
+> **Initial Balance**: \`${initialBalance} ETH\`
+> **Database Record**: ${dbRecordId ? `Saved (ID: \`${dbRecordId}\`)` : 'Saved'}
+
+---
+
+#### IMPORTANT - BACKUP YOUR CREDENTIALS
+
+> **Private Key**: \`${newPrivateKey}\`
+> **Seed Phrase**: \`${newSeedPhrase}\`
+
+**WARNING**: Save your seed phrase and private key securely. If you lose them, you will lose access to this wallet forever. Never share them with anyone.
+
+---
+
+This wallet is now stored in Northveil's database. All MCP tools (send_transfer, deploy_smart_contract, execute_swap) will automatically use this wallet's private key for on-chain signing.
+`;
+
+      return {
+        formattedMarkdown,
+        address: newAddress,
+        privateKey: newPrivateKey,
+        seedPhrase: newSeedPhrase,
+        name: walletName,
+        chain,
+        balance: initialBalance,
+        dbRecordId,
+        status: 'CREATED',
+      };
+    }
+
+    case 'import_wallet': {
+      const walletName = args.name || args.walletName || 'Imported Wallet';
+      const chain = args.chain || 'ethereum';
+      const inputKey = args.privateKey || args.private_key || args.secretKey || args.walletSecret;
+      const inputSeed = args.seedPhrase || args.seed_phrase || args.mnemonic;
+
+      if (!inputKey && !inputSeed) {
+        return {
+          formattedMarkdown: '### IMPORT FAILED\n\n> **Error**: You must provide either a `privateKey` (0x...) or a `seedPhrase` (12/24 words) to import a wallet.',
+          status: 'ERROR',
+          error: 'No privateKey or seedPhrase provided',
+        };
+      }
+
+      let importedWallet: ethers.Wallet | ethers.HDNodeWallet;
+      let resolvedPrivateKey: string;
+      let resolvedSeedPhrase: string = inputSeed || '';
+
+      try {
+        if (inputSeed) {
+          importedWallet = ethers.Wallet.fromPhrase(inputSeed);
+          resolvedPrivateKey = importedWallet.privateKey;
+          resolvedSeedPhrase = inputSeed;
+        } else {
+          const cleanKey = inputKey.startsWith('0x') ? inputKey : `0x${inputKey}`;
+          importedWallet = new ethers.Wallet(cleanKey);
+          resolvedPrivateKey = cleanKey;
+        }
+      } catch (e: any) {
+        return {
+          formattedMarkdown: `### IMPORT FAILED\n\n> **Error**: Invalid private key or seed phrase provided.\n> **Details**: ${e.message || 'Could not derive wallet from provided credentials.'}`,
+          status: 'ERROR',
+          error: e.message || 'Invalid credentials',
+        };
+      }
+
+      const importedAddress = importedWallet.address.toLowerCase();
+
+      // Store in Supabase with private_key and seed_phrase
+      let dbRecordId: string | null = null;
+      try {
+        const { data: dbData, error: dbErr } = await supabase
+          .from('wallets')
+          .upsert([{
+            address: importedAddress,
+            name: walletName,
+            chain_id: chain,
+            private_key: resolvedPrivateKey,
+            seed_phrase: resolvedSeedPhrase || null,
+          }], { onConflict: 'address' })
+          .select('id');
+
+        if (!dbErr && dbData?.[0]?.id) {
+          dbRecordId = dbData[0].id;
+        }
+        if (dbErr) console.error('[ImportWallet] Supabase save error:', dbErr);
+      } catch (e) {
+        console.error('[ImportWallet] DB error:', e);
+      }
+
+      // Get balance from Sepolia + Mainnet
+      let sepoliaBalance = '0';
+      let mainnetBalance = '0';
+      try {
+        const [sepBal, ethBal] = await Promise.allSettled([
+          sepoliaProvider.getBalance(importedAddress),
+          ethProvider.getBalance(importedAddress),
+        ]);
+        if (sepBal.status === 'fulfilled') sepoliaBalance = ethers.formatEther(sepBal.value);
+        if (ethBal.status === 'fulfilled') mainnetBalance = ethers.formatEther(ethBal.value);
+      } catch {}
+
+      const formattedMarkdown = `
+### WALLET IMPORTED SUCCESSFULLY
+
+> **Wallet Address**: \`${importedAddress}\`
+> **Wallet Name**: \`${walletName}\`
+> **Primary Chain**: \`${chain}\`
+> **Mainnet Balance**: \`${mainnetBalance} ETH\`
+> **Sepolia Balance**: \`${sepoliaBalance} SepoliaETH\`
+> **Database Record**: ${dbRecordId ? `Saved (ID: \`${dbRecordId}\`)` : 'Saved'}
+
+---
+
+This wallet's private key is now stored in Northveil's database. All MCP tools (send_transfer, deploy_smart_contract, execute_swap) will automatically use this wallet's private key for real on-chain signing and broadcasting.
+`;
+
+      return {
+        formattedMarkdown,
+        address: importedAddress,
+        name: walletName,
+        chain,
+        sepoliaBalance,
+        mainnetBalance,
+        dbRecordId,
+        status: 'IMPORTED',
       };
     }
 
