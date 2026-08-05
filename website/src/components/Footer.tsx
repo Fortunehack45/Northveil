@@ -57,9 +57,6 @@ export const Footer: React.FC<FooterProps> = ({ setActiveTab }) => {
           <button onClick={() => handleNav('sdkDocs')} className="block text-slate-300 hover:text-[#00f0ff] uppercase transition-colors cursor-pointer">
             TypeScript & Python SDK
           </button>
-          <button onClick={() => handleNav('deployGuide')} className="block text-slate-300 hover:text-[#00f0ff] uppercase transition-colors cursor-pointer">
-            Vercel Deployment Guide
-          </button>
         </div>
 
         {/* Legal & GitHub */}

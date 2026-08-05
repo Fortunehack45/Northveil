@@ -4,7 +4,6 @@ import { Hero } from './components/Hero';
 import { McpDocs } from './components/McpDocs';
 import { ApiDocs } from './components/ApiDocs';
 import { SdkDocs } from './components/SdkDocs';
-import { DeploymentGuide } from './components/DeploymentGuide';
 import { TermsPage } from './components/TermsPage';
 import { PrivacyPage } from './components/PrivacyPage';
 import { Footer } from './components/Footer';
@@ -26,7 +25,6 @@ export const App: React.FC = () => {
         {activeTab === 'mcpDocs' && <McpDocs />}
         {activeTab === 'apiDocs' && <ApiDocs />}
         {activeTab === 'sdkDocs' && <SdkDocs />}
-        {activeTab === 'deployGuide' && <DeploymentGuide />}
         {activeTab === 'terms' && <TermsPage />}
         {activeTab === 'privacy' && <PrivacyPage />}
       </main>

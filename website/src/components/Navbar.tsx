@@ -14,7 +14,6 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
     { id: 'mcpDocs', label: 'MCP AI DOCS', icon: <Cpu className="w-4 h-4 text-black stroke-[3]" /> },
     { id: 'apiDocs', label: 'REST API', icon: <Code className="w-4 h-4 text-black stroke-[3]" /> },
     { id: 'sdkDocs', label: 'SDK REF', icon: <BookOpen className="w-4 h-4 text-black stroke-[3]" /> },
-    { id: 'deployGuide', label: 'DEPLOYMENT', icon: <Zap className="w-4 h-4 text-black stroke-[3]" /> },
     { id: 'terms', label: 'TERMS OF SERVICE', icon: <FileText className="w-4 h-4 text-black stroke-[3]" /> },
     { id: 'privacy', label: 'PRIVACY POLICY', icon: <Shield className="w-4 h-4 text-black stroke-[3]" /> },
   ];
