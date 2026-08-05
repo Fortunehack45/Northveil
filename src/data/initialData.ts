@@ -1,4 +1,4 @@
-import { ChainInfo, CryptoAsset, Transaction, StakingPosition, ChainGasEstimate, MicroserviceStatus, LanguageCode } from '../types';
+import { ChainInfo, CryptoAsset, Transaction, StakingPosition, ChainGasEstimate, MicroserviceStatus, LanguageCode, NFTAsset } from '../types';
 
 export const SUPPORTED_CHAINS: ChainInfo[] = [
   {
@@ -803,9 +803,9 @@ export const INITIAL_NFTS: NFTAsset[] = [
     estUsd: '$1,550.00',
     contract: '0x3892a71d87192a71d87192a71d87192a71d87192',
     attributes: [
-      { trait_type: 'Access Tier', value: 'Alpha Master' },
-      { trait_type: 'Security Level', value: 'AES-256-GCM' },
-      { trait_type: 'MCP Status', value: 'Unlimited Authority' }
+      { trait: 'Access Tier', value: 'Alpha Master' },
+      { trait: 'Security Level', value: 'AES-256-GCM' },
+      { trait: 'MCP Status', value: 'Unlimited Authority' }
     ]
   },
   {
@@ -819,8 +819,8 @@ export const INITIAL_NFTS: NFTAsset[] = [
     estUsd: '$620.00',
     contract: '0x8891a71d87192a71d87192a71d87192a71d87198',
     attributes: [
-      { trait_type: 'Network', value: 'Base L2' },
-      { trait_type: 'Multi-Tenant', value: 'Active' }
+      { trait: 'Network', value: 'Base L2' },
+      { trait: 'Multi-Tenant', value: 'Active' }
     ]
   }
 ];

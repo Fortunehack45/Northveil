@@ -42,24 +42,56 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         contractName: {
           type: 'string',
-          description: 'Name of the smart contract to deploy (e.g. NorthveilToken or GalacticNFT)',
+          description: 'Name of the smart contract (e.g. WorkBaseToken, GalacticNFT). Used as the Solidity contract name.',
+        },
+        symbol: {
+          type: 'string',
+          description: 'Token ticker symbol (e.g. WBT, ARG). Recommended: 3-5 uppercase characters.',
         },
         contractType: {
           type: 'string',
-          description: 'Template category: erc20 (Fungible Token), erc721 / nft (NFT Collection), erc1155, staking, dao, custom',
+          description: 'Template category: erc20 (Fungible Token with mint+burn), erc721 / nft (NFT Collection with URI storage), custom',
           enum: ['erc20', 'erc721', 'nft', 'erc1155', 'staking', 'dao', 'custom'],
+        },
+        totalSupply: {
+          type: 'number',
+          description: 'Total token supply (e.g. 1000000000) or total max NFT collection size (e.g. 10000).',
+        },
+        initialSupply: {
+          type: 'number',
+          description: 'Alias for totalSupply (total tokens or NFT collection size).',
+        },
+        ownerAllocation: {
+          type: 'number',
+          description: 'Amount or token count allocated directly to owner wallet at deployment (e.g. 800000000 for 80% owner allocation).',
+        },
+        description: {
+          type: 'string',
+          description: 'Project description, utility details, or token roadmap summary.',
+        },
+        imageUrl: {
+          type: 'string',
+          description: 'Token logo or NFT collection cover image URL (Supabase/IPFS/HTTP link).',
+        },
+        websiteUrl: {
+          type: 'string',
+          description: 'Official project website URL (e.g. https://northveil.xyz).',
+        },
+        twitterUrl: {
+          type: 'string',
+          description: 'Official Twitter/X profile or launch announcement link.',
+        },
+        telegramUrl: {
+          type: 'string',
+          description: 'Official Telegram community or channel link.',
+        },
+        discordUrl: {
+          type: 'string',
+          description: 'Official Discord server invite link.',
         },
         network: {
           type: 'string',
-          description: 'Target EVM network: sepolia (testnet), ethereum (mainnet), polygon (mainnet), amoy (polygon testnet), base, base_sepolia, arbitrum, bsc',
-        },
-        bytecode: {
-          type: 'string',
-          description: 'Optional compiled EVM bytecode string (0x...)',
-        },
-        abi: {
-          type: 'string',
-          description: 'Optional contract ABI JSON string',
+          description: 'Target EVM network: sepolia (testnet), ethereum (mainnet), polygon, amoy, base, base_sepolia, arbitrum, bsc',
         },
       },
       required: ['contractName'],
@@ -69,24 +101,56 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         contractName: {
           type: 'string',
-          description: 'Name of the smart contract to deploy (e.g. NorthveilToken or GalacticNFT)',
+          description: 'Name of the smart contract (e.g. WorkBaseToken, GalacticNFT). Used as the Solidity contract name.',
+        },
+        symbol: {
+          type: 'string',
+          description: 'Token ticker symbol (e.g. WBT, ARG). Recommended: 3-5 uppercase characters.',
         },
         contractType: {
           type: 'string',
-          description: 'Template category: erc20 (Fungible Token), erc721 / nft (NFT Collection), erc1155, staking, dao, custom',
+          description: 'Template category: erc20 (Fungible Token with mint+burn), erc721 / nft (NFT Collection with URI storage), custom',
           enum: ['erc20', 'erc721', 'nft', 'erc1155', 'staking', 'dao', 'custom'],
+        },
+        totalSupply: {
+          type: 'number',
+          description: 'Total token supply (e.g. 1000000000) or total max NFT collection size (e.g. 10000).',
+        },
+        initialSupply: {
+          type: 'number',
+          description: 'Alias for totalSupply (total tokens or NFT collection size).',
+        },
+        ownerAllocation: {
+          type: 'number',
+          description: 'Amount or token count allocated directly to owner wallet at deployment (e.g. 800000000 for 80% owner allocation).',
+        },
+        description: {
+          type: 'string',
+          description: 'Project description, utility details, or token roadmap summary.',
+        },
+        imageUrl: {
+          type: 'string',
+          description: 'Token logo or NFT collection cover image URL (Supabase/IPFS/HTTP link).',
+        },
+        websiteUrl: {
+          type: 'string',
+          description: 'Official project website URL (e.g. https://northveil.xyz).',
+        },
+        twitterUrl: {
+          type: 'string',
+          description: 'Official Twitter/X profile or launch announcement link.',
+        },
+        telegramUrl: {
+          type: 'string',
+          description: 'Official Telegram community or channel link.',
+        },
+        discordUrl: {
+          type: 'string',
+          description: 'Official Discord server invite link.',
         },
         network: {
           type: 'string',
-          description: 'Target EVM network: sepolia (testnet), ethereum (mainnet), polygon (mainnet), amoy (polygon testnet), base, base_sepolia, arbitrum, bsc',
-        },
-        bytecode: {
-          type: 'string',
-          description: 'Optional compiled EVM bytecode string (0x...)',
-        },
-        abi: {
-          type: 'string',
-          description: 'Optional contract ABI JSON string',
+          description: 'Target EVM network: sepolia (testnet), ethereum (mainnet), polygon, amoy, base, base_sepolia, arbitrum, bsc',
         },
       },
       required: ['contractName'],
@@ -192,19 +256,59 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'create_smart_contract',
-    description: 'Generates complete production-ready Solidity or Rust smart contract code based on a prompt.',
+    description: 'Generates complete production-ready Solidity or Rust smart contract code based on a prompt and detailed specifications (name, symbol, supply, owner allocation, metadata, image URL, socials).',
     annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
         prompt: {
           type: 'string',
-          description: 'Natural language specification of contract features',
+          description: 'Natural language specification of contract features and design goals.',
+        },
+        contractName: {
+          type: 'string',
+          description: 'Name of the smart contract (e.g. WorkBaseToken, ArgusCollection).',
+        },
+        symbol: {
+          type: 'string',
+          description: 'Token ticker symbol (e.g. WBT, ARG). Recommended 3-5 uppercase characters.',
         },
         contractType: {
           type: 'string',
-          description: 'Template category (erc20, erc721, staking, dao, custom)',
-          enum: ['erc20', 'erc721', 'staking', 'dao', 'custom'],
+          description: 'Template category (erc20, erc721, nft, erc1155, staking, dao, custom)',
+          enum: ['erc20', 'erc721', 'nft', 'erc1155', 'staking', 'dao', 'custom'],
+        },
+        totalSupply: {
+          type: 'number',
+          description: 'Total token supply (e.g. 1000000000) or total max NFT collection size (e.g. 10000).',
+        },
+        ownerAllocation: {
+          type: 'number',
+          description: 'Amount or percentage allocated to owner wallet at deployment (e.g. 800000000 for 80% owner allocation).',
+        },
+        description: {
+          type: 'string',
+          description: 'Project description, tokenomics summary, or roadmap notes.',
+        },
+        imageUrl: {
+          type: 'string',
+          description: 'Token logo or NFT collection image URL (Supabase/IPFS/HTTP link).',
+        },
+        websiteUrl: {
+          type: 'string',
+          description: 'Official project website URL.',
+        },
+        twitterUrl: {
+          type: 'string',
+          description: 'Official Twitter/X social link.',
+        },
+        telegramUrl: {
+          type: 'string',
+          description: 'Official Telegram group/channel link.',
+        },
+        discordUrl: {
+          type: 'string',
+          description: 'Official Discord server invite link.',
         },
       },
       required: ['prompt'],
@@ -214,12 +318,52 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         prompt: {
           type: 'string',
-          description: 'Natural language specification of contract features',
+          description: 'Natural language specification of contract features and design goals.',
+        },
+        contractName: {
+          type: 'string',
+          description: 'Name of the smart contract (e.g. WorkBaseToken, ArgusCollection).',
+        },
+        symbol: {
+          type: 'string',
+          description: 'Token ticker symbol (e.g. WBT, ARG). Recommended 3-5 uppercase characters.',
         },
         contractType: {
           type: 'string',
-          description: 'Template category (erc20, erc721, staking, dao, custom)',
-          enum: ['erc20', 'erc721', 'staking', 'dao', 'custom'],
+          description: 'Template category (erc20, erc721, nft, erc1155, staking, dao, custom)',
+          enum: ['erc20', 'erc721', 'nft', 'erc1155', 'staking', 'dao', 'custom'],
+        },
+        totalSupply: {
+          type: 'number',
+          description: 'Total token supply (e.g. 1000000000) or total max NFT collection size (e.g. 10000).',
+        },
+        ownerAllocation: {
+          type: 'number',
+          description: 'Amount or percentage allocated to owner wallet at deployment (e.g. 800000000 for 80% owner allocation).',
+        },
+        description: {
+          type: 'string',
+          description: 'Project description, tokenomics summary, or roadmap notes.',
+        },
+        imageUrl: {
+          type: 'string',
+          description: 'Token logo or NFT collection image URL (Supabase/IPFS/HTTP link).',
+        },
+        websiteUrl: {
+          type: 'string',
+          description: 'Official project website URL.',
+        },
+        twitterUrl: {
+          type: 'string',
+          description: 'Official Twitter/X social link.',
+        },
+        telegramUrl: {
+          type: 'string',
+          description: 'Official Telegram group/channel link.',
+        },
+        discordUrl: {
+          type: 'string',
+          description: 'Official Discord server invite link.',
         },
       },
       required: ['prompt'],

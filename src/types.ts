@@ -50,7 +50,8 @@ export interface CryptoAsset {
 }
 
 export interface NFTAttribute {
-  trait: string;
+  trait?: string;
+  trait_type?: string;
   value: string;
 }
 
