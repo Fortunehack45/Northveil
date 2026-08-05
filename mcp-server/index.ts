@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import rateLimit from 'express-rate-limit';
+import { rateLimit } from 'express-rate-limit';
 import { createClient } from '@supabase/supabase-js';
 import { ethers } from 'ethers';
 import { MCP_TOOLS } from './tools.js';
