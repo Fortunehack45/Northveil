@@ -619,6 +619,22 @@ app.all(['/mcp', '/api/mcp'], async (req: Request, res: Response) => {
   res.json(getOpenApiSpec(`https://${req.headers.host}`));
 });
 
+// Precision crypto & fiat formatters (supports micro-balances like 0.0000002 or 0.00000004)
+function formatCryptoAmount(num: number | string): string {
+  const val = typeof num === 'string' ? parseFloat(num) : num;
+  if (isNaN(val) || val === 0) return '0.00';
+  if (val < 0.000001) return val.toFixed(10).replace(/0+$/, '');
+  if (val < 0.01) return val.toFixed(8).replace(/0+$/, '');
+  return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+}
+
+function formatUsdValue(num: number): string {
+  if (isNaN(num) || num === 0) return '$0.00';
+  if (num < 0.000001) return `$${num.toFixed(10).replace(/0+$/, '')}`;
+  if (num < 0.01) return `$${num.toFixed(8).replace(/0+$/, '')}`;
+  return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`;
+}
+
 async function executeRealTool(name: string, args: any, walletAddress: string) {
   const cleanAddress = walletAddress.toLowerCase();
   
@@ -739,8 +755,8 @@ ${solCode}
 | Parameter | Value | Status |
 | :--- | :--- | :--- |
 | **Account Label** | Primary Vault | Active |
-| **Ethereum Mainnet Balance** | **${mainnetEth.toFixed(4)} ETH** | 🟢 Ethers.js Real RPC |
-| **Sepolia Testnet Balance** | **${sepoliaEth.toFixed(4)} Sepolia ETH** | 🟢 PublicNode Real RPC |
+| **Ethereum Mainnet Balance** | **${formatCryptoAmount(mainnetEth)} ETH** | 🟢 Ethers.js Real RPC |
+| **Sepolia Testnet Balance** | **${formatCryptoAmount(sepoliaEth)} Sepolia ETH** | 🟢 PublicNode Real RPC |
 | **Supabase DB Sync** | Connected (\`ulkbchewsrksgvlbzjzl\`) | 🟢 Live |
 | **Ethers.js RPC Provider** | \`${ETH_RPC_URL}\` | 🟢 Connected |
 `;
@@ -805,13 +821,13 @@ ${solCode}
 ### 📊 NORTHVEIL LIVE PORTFOLIO DASHBOARD (DIRECT BLOCKCHAIN RPC)
 
 > **Bound Wallet**: \`${walletAddress}\`  
-> **Total Net Worth**: **$${totalNetWorth.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD** 🟢 **Live RPC Sync**
+> **Total Net Worth**: **${formatUsdValue(totalNetWorth)}** 🟢 **Live RPC Sync**
 
 #### 💰 Real On-Chain Token Holdings:
 
 | Asset | Balance | Live Price (USD) | Total Value (USD) | Chain | Source |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-${holdings.map((h: any) => `| **${h.symbol}** | **${h.balance.toFixed(4)} ${h.symbol}** | $${h.priceUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })} | **$${h.totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}** | ${h.chain} | ${h.isRealOnChain ? '🟢 Direct RPC' : 'DB Sync'} |`).join('\n')}
+${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance)} ${h.symbol}** | ${formatUsdValue(h.priceUsd)} | **${formatUsdValue(h.totalUsd)}** | ${h.chain} | ${h.isRealOnChain ? '🟢 Direct RPC' : 'DB Sync'} |`).join('\n')}
 
 *Data Source: Live Ethers.js Direct Blockchain RPC + Coinpaprika Tickers API*
 `;
@@ -819,7 +835,8 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${h.balance.toFixed(4)} ${h.sy
       return {
         formattedMarkdown,
         walletAddress,
-        netWorthUsd: Number(totalNetWorth.toFixed(2)),
+        netWorthUsd: totalNetWorth,
+        formattedNetWorth: formatUsdValue(totalNetWorth),
         totalAssetsCount: holdings.length,
         assets: holdings,
       };

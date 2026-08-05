@@ -25,6 +25,22 @@ const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia
 const ethProvider = new ethers.JsonRpcProvider(ETH_RPC_URL, 1, { staticNetwork: ethers.Network.from(1) });
 const sepoliaProvider = new ethers.JsonRpcProvider(SEPOLIA_RPC_URL, 11155111, { staticNetwork: ethers.Network.from(11155111) });
 
+// Precision crypto & fiat formatters (supports micro-balances like 0.0000002 or 0.00000004)
+function formatCryptoAmount(num: number | string): string {
+  const val = typeof num === 'string' ? parseFloat(num) : num;
+  if (isNaN(val) || val === 0) return '0.00';
+  if (val < 0.000001) return val.toFixed(10).replace(/0+$/, '');
+  if (val < 0.01) return val.toFixed(8).replace(/0+$/, '');
+  return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+}
+
+function formatUsdValue(num: number): string {
+  if (isNaN(num) || num === 0) return '$0.00';
+  if (num < 0.000001) return `$${num.toFixed(10).replace(/0+$/, '')}`;
+  if (num < 0.01) return `$${num.toFixed(8).replace(/0+$/, '')}`;
+  return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`;
+}
+
 // Active SSE client sessions
 const sseSessions = new Map<string, { res: Response; apiKey: string; walletAddress: string; permissions: string[] }>();
 
@@ -874,13 +890,13 @@ ${solCode}
 ### 📊 NORTHVEIL LIVE PORTFOLIO DASHBOARD (DIRECT BLOCKCHAIN RPC)
 
 > **Bound Wallet**: \`${walletAddress}\`  
-> **Total Net Worth**: **$${totalNetWorth.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD** 🟢 **Live RPC Sync**
+> **Total Net Worth**: **${formatUsdValue(totalNetWorth)}** 🟢 **Live RPC Sync**
 
 #### 💰 Real On-Chain Token Holdings:
 
 | Asset | Balance | Live Price (USD) | Total Value (USD) | Chain | Source |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-${holdings.map((h: any) => `| **${h.symbol}** | **${h.balance.toFixed(4)} ${h.symbol}** | $${h.priceUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })} | **$${h.totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}** | ${h.chain} | ${h.isRealOnChain ? '🟢 Direct RPC' : 'DB Sync'} |`).join('\n')}
+${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance)} ${h.symbol}** | ${formatUsdValue(h.priceUsd)} | **${formatUsdValue(h.totalUsd)}** | ${h.chain} | ${h.isRealOnChain ? '🟢 Direct RPC' : 'DB Sync'} |`).join('\n')}
 
 *Data Source: Live Ethers.js Direct Blockchain RPC + Coinpaprika Tickers API*
 `;
@@ -888,7 +904,8 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${h.balance.toFixed(4)} ${h.sy
       return {
         formattedMarkdown,
         walletAddress,
-        netWorthUsd: Number(totalNetWorth.toFixed(2)),
+        netWorthUsd: totalNetWorth,
+        formattedNetWorth: formatUsdValue(totalNetWorth),
         totalAssetsCount: holdings.length,
         assets: holdings,
       };
@@ -897,20 +914,20 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${h.balance.toFixed(4)} ${h.sy
     case 'get_token_balance': {
       const sym = (args?.symbol || 'ETH').toUpperCase();
       let balance = 0;
-      let price = 1.0;
+      let price = 0;
 
       if (sym === 'ETH') {
-        balance = liveEthBalance;
+        balance = mainnetEth;
         price = ethPrice;
-      } else if (sym === 'BTC') {
-        balance = 0.25;
-        price = btcPrice;
-      } else if (sym === 'SOL') {
-        balance = 15.0;
-        price = solPrice;
+      } else if (sym === 'SEPOLIAETH' || sym === 'SEP') {
+        balance = sepoliaEth;
+        price = 0;
       } else {
-        balance = 1250.0;
-        price = 1.0;
+        const dbAsset = userDbAssets.find((a: any) => a.symbol?.toUpperCase() === sym);
+        if (dbAsset) {
+          balance = dbAsset.balance || 0;
+          price = dbAsset.price_usd || 1.0;
+        }
       }
 
       const totalVal = balance * price;
@@ -919,18 +936,19 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${h.balance.toFixed(4)} ${h.sy
 ### 💎 TOKEN BALANCE CARD: ${sym}
 
 > **Wallet**: \`${walletAddress}\`  
-> **Balance**: **${balance.toFixed(4)} ${sym}**  
-> **Market Price**: **$${price.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD**  
-> **Fiat Valuation**: **$${totalVal.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD** 🟢
+> **Balance**: **${formatCryptoAmount(balance)} ${sym}**  
+> **Market Price**: **${formatUsdValue(price)}**  
+> **Fiat Valuation**: **${formatUsdValue(totalVal)}** 🟢
 `;
 
       return {
         formattedMarkdown,
         walletAddress,
         symbol: sym,
-        balance: Number(balance.toFixed(4)),
-        priceUsd: Number(price.toFixed(2)),
-        fiatValueUsd: Number(totalVal.toFixed(2)),
+        balance,
+        formattedBalance: formatCryptoAmount(balance),
+        priceUsd: price,
+        fiatValueUsd: totalVal,
       };
     }
 
