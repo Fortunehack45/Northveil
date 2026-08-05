@@ -1,6 +1,6 @@
 /**
  * Northveil MCP Server Tool Definitions & Types
- * Compliant with Official Model Context Protocol (MCP) v2024-11-05 Spec (inputSchema) & OpenAPI 3.0 (parameters)
+ * Compliant with Official Model Context Protocol (MCP) v2024-11-05 Spec (inputSchema & annotations)
  */
 
 export interface MCPToolParameter {
@@ -10,9 +10,16 @@ export interface MCPToolParameter {
   enum?: string[];
 }
 
+export interface MCPToolAnnotations {
+  readOnly?: boolean;
+  destructive?: boolean;
+  confirmationRequired?: boolean;
+}
+
 export interface MCPToolDefinition {
   name: string;
   description: string;
+  annotations?: MCPToolAnnotations;
   inputSchema: {
     type: 'object';
     properties: Record<string, MCPToolParameter>;
@@ -28,7 +35,8 @@ export interface MCPToolDefinition {
 export const MCP_TOOLS: MCPToolDefinition[] = [
   {
     name: 'deploy_smart_contract',
-    description: 'Deploys a compiled Solidity smart contract to a real EVM blockchain network (Sepolia, Ethereum, Polygon). Returns deployed contract address & Etherscan link.',
+    description: 'Deploys a compiled Solidity smart contract to a real EVM blockchain network (Sepolia, Ethereum, Polygon). REQUIRES USER APPROVAL BEFORE BROADCASTING.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -75,8 +83,142 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     },
   },
   {
+    name: 'send_transfer',
+    description: 'Executes an on-chain cryptocurrency transfer from the user wallet to a recipient address. REQUIRES USER APPROVAL BEFORE SENDING FUNDS.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        token: {
+          type: 'string',
+          description: 'Token symbol to transfer (e.g. ETH, USDT, SOL)',
+        },
+        amount: {
+          type: 'number',
+          description: 'Amount of crypto units to transfer',
+        },
+        recipientAddress: {
+          type: 'string',
+          description: 'Destination blockchain recipient public address',
+        },
+        chain: {
+          type: 'string',
+          description: 'Target network id (default: active chain)',
+        },
+      },
+      required: ['token', 'amount', 'recipientAddress'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        token: {
+          type: 'string',
+          description: 'Token symbol to transfer (e.g. ETH, USDT, SOL)',
+        },
+        amount: {
+          type: 'number',
+          description: 'Amount of crypto units to transfer',
+        },
+        recipientAddress: {
+          type: 'string',
+          description: 'Destination blockchain recipient public address',
+        },
+        chain: {
+          type: 'string',
+          description: 'Target network id (default: active chain)',
+        },
+      },
+      required: ['token', 'amount', 'recipientAddress'],
+    },
+  },
+  {
+    name: 'execute_swap',
+    description: 'Executes a DEX token swap or cross-chain bridge trade via 1inch/Uniswap aggregation. REQUIRES USER APPROVAL BEFORE SWAPPING.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fromToken: {
+          type: 'string',
+          description: 'Source token symbol (e.g. ETH)',
+        },
+        toToken: {
+          type: 'string',
+          description: 'Destination token symbol (e.g. USDC)',
+        },
+        amount: {
+          type: 'number',
+          description: 'Amount of source token to swap',
+        },
+        slippageTolerance: {
+          type: 'number',
+          description: 'Slippage percentage tolerance (default: 0.5%)',
+        },
+      },
+      required: ['fromToken', 'toToken', 'amount'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        fromToken: {
+          type: 'string',
+          description: 'Source token symbol (e.g. ETH)',
+        },
+        toToken: {
+          type: 'string',
+          description: 'Destination token symbol (e.g. USDC)',
+        },
+        amount: {
+          type: 'number',
+          description: 'Amount of source token to swap',
+        },
+        slippageTolerance: {
+          type: 'number',
+          description: 'Slippage percentage tolerance (default: 0.5%)',
+        },
+      },
+      required: ['fromToken', 'toToken', 'amount'],
+    },
+  },
+  {
+    name: 'create_smart_contract',
+    description: 'Generates complete production-ready Solidity or Rust smart contract code based on a prompt.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: {
+          type: 'string',
+          description: 'Natural language specification of contract features',
+        },
+        contractType: {
+          type: 'string',
+          description: 'Template category (erc20, erc721, staking, dao, custom)',
+          enum: ['erc20', 'erc721', 'staking', 'dao', 'custom'],
+        },
+      },
+      required: ['prompt'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        prompt: {
+          type: 'string',
+          description: 'Natural language specification of contract features',
+        },
+        contractType: {
+          type: 'string',
+          description: 'Template category (erc20, erc721, staking, dao, custom)',
+          enum: ['erc20', 'erc721', 'staking', 'dao', 'custom'],
+        },
+      },
+      required: ['prompt'],
+    },
+  },
+  {
     name: 'get_wallet_info',
     description: 'Retrieves current wallet address, active chain, network status, and account metadata.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -99,6 +241,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   {
     name: 'get_portfolio',
     description: 'Fetches the complete asset portfolio including token balances, fiat USD valuations, 24h price changes, and net worth.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -121,6 +264,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   {
     name: 'get_token_balance',
     description: 'Queries the exact balance and USD market value for a specific cryptocurrency token symbol.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -140,141 +284,12 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         },
       },
       required: ['symbol'],
-    },
-  },
-  {
-    name: 'send_transfer',
-    description: 'Executes an on-chain cryptocurrency transfer from the user wallet to a destination recipient address.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        token: {
-          type: 'string',
-          description: 'Token symbol to transfer (e.g. ETH, USDT, SOL)',
-        },
-        amount: {
-          type: 'number',
-          description: 'Amount of crypto units to transfer',
-        },
-        recipientAddress: {
-          type: 'string',
-          description: 'Destination blockchain recipient public address',
-        },
-        chain: {
-          type: 'string',
-          description: 'Target network id (default: active chain)',
-        },
-      },
-      required: ['token', 'amount', 'recipientAddress'],
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        token: {
-          type: 'string',
-          description: 'Token symbol to transfer (e.g. ETH, USDT, SOL)',
-        },
-        amount: {
-          type: 'number',
-          description: 'Amount of crypto units to transfer',
-        },
-        recipientAddress: {
-          type: 'string',
-          description: 'Destination blockchain recipient public address',
-        },
-        chain: {
-          type: 'string',
-          description: 'Target network id (default: active chain)',
-        },
-      },
-      required: ['token', 'amount', 'recipientAddress'],
-    },
-  },
-  {
-    name: 'create_smart_contract',
-    description: 'Generates complete production-ready Solidity or Rust smart contract code based on a natural language specification prompt using Groq AI.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        prompt: {
-          type: 'string',
-          description: 'Natural language specification of contract features (e.g. "Staking vault with 14 day lockup")',
-        },
-        contractType: {
-          type: 'string',
-          description: 'Template category (erc20, erc721, staking, dao, custom)',
-          enum: ['erc20', 'erc721', 'staking', 'dao', 'custom'],
-        },
-      },
-      required: ['prompt'],
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        prompt: {
-          type: 'string',
-          description: 'Natural language specification of contract features (e.g. "Staking vault with 14 day lockup")',
-        },
-        contractType: {
-          type: 'string',
-          description: 'Template category (erc20, erc721, staking, dao, custom)',
-          enum: ['erc20', 'erc721', 'staking', 'dao', 'custom'],
-        },
-      },
-      required: ['prompt'],
-    },
-  },
-  {
-    name: 'execute_swap',
-    description: 'Executes a cross-DEX token swap or cross-chain bridge trade via 1inch/Uniswap/Li.Fi aggregation.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        fromToken: {
-          type: 'string',
-          description: 'Source token symbol (e.g. ETH)',
-        },
-        toToken: {
-          type: 'string',
-          description: 'Destination token symbol (e.g. USDC)',
-        },
-        amount: {
-          type: 'number',
-          description: 'Amount of source token to swap',
-        },
-        slippageTolerance: {
-          type: 'number',
-          description: 'Slippage percentage tolerance (default: 0.5%)',
-        },
-      },
-      required: ['fromToken', 'toToken', 'amount'],
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        fromToken: {
-          type: 'string',
-          description: 'Source token symbol (e.g. ETH)',
-        },
-        toToken: {
-          type: 'string',
-          description: 'Destination token symbol (e.g. USDC)',
-        },
-        amount: {
-          type: 'number',
-          description: 'Amount of source token to swap',
-        },
-        slippageTolerance: {
-          type: 'number',
-          description: 'Slippage percentage tolerance (default: 0.5%)',
-        },
-      },
-      required: ['fromToken', 'toToken', 'amount'],
     },
   },
   {
     name: 'get_transaction_history',
     description: 'Retrieves audit logs of past wallet transactions, swaps, sends, and contract executions.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -305,6 +320,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   {
     name: 'get_gas_estimate',
     description: 'Fetches real-time base fee, priority fee, and EIP-1559 gas price estimates across all 8 supported chains.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -326,7 +342,8 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'audit_smart_contract',
-    description: 'Performs automated static security analysis and AI vulnerability scan on a given smart contract byte or Solidity code string.',
+    description: 'Performs automated static security analysis and AI vulnerability scan on smart contract source code.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -351,6 +368,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   {
     name: 'get_nft_gallery',
     description: 'Lists owned NFTs across Ethereum, Solana, Polygon, and Arbitrum with floor prices.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {

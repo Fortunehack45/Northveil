@@ -81,6 +81,7 @@ export const DeveloperHubView: React.FC = () => {
     },
   ]);
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+  const [mcpApprovalMode, setMcpApprovalMode] = useState<'auto' | 'manual'>('auto');
 
   // Webhooks State
   const [webhooks, setWebhooks] = useState<WebhookSub[]>([

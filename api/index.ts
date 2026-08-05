@@ -6,7 +6,8 @@ import { ethers } from 'ethers';
 export const MCP_TOOLS = [
   {
     name: 'deploy_smart_contract',
-    description: 'Deploys a compiled Solidity smart contract to a real EVM blockchain network (Sepolia, Ethereum, Polygon). Returns deployed contract address & Etherscan link.',
+    description: 'Deploys a compiled Solidity smart contract to a real EVM blockchain network (Sepolia, Ethereum, Polygon). REQUIRES USER APPROVAL BEFORE BROADCASTING.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -31,6 +32,7 @@ export const MCP_TOOLS = [
   {
     name: 'get_wallet_info',
     description: 'Retrieves current wallet address, active chain, network status, and account metadata.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -47,6 +49,7 @@ export const MCP_TOOLS = [
   {
     name: 'get_portfolio',
     description: 'Fetches the complete asset portfolio including token balances, fiat USD valuations, 24h price changes, and net worth.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -63,6 +66,7 @@ export const MCP_TOOLS = [
   {
     name: 'get_token_balance',
     description: 'Queries the exact balance and USD market value for a specific cryptocurrency token symbol.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -80,7 +84,8 @@ export const MCP_TOOLS = [
   },
   {
     name: 'send_transfer',
-    description: 'Executes an on-chain cryptocurrency transfer from the user wallet to a destination recipient address.',
+    description: 'Executes an on-chain cryptocurrency transfer from the user wallet to a recipient address. REQUIRES USER APPROVAL BEFORE SENDING FUNDS.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -105,6 +110,7 @@ export const MCP_TOOLS = [
   {
     name: 'create_smart_contract',
     description: 'Generates complete production-ready Solidity smart contract code.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -124,7 +130,8 @@ export const MCP_TOOLS = [
   },
   {
     name: 'execute_swap',
-    description: 'Executes a DEX token swap or cross-chain bridge trade.',
+    description: 'Executes a DEX token swap or cross-chain bridge trade. REQUIRES USER APPROVAL BEFORE SWAPPING.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -147,6 +154,7 @@ export const MCP_TOOLS = [
   {
     name: 'get_transaction_history',
     description: 'Retrieves past wallet transactions.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -163,6 +171,7 @@ export const MCP_TOOLS = [
   {
     name: 'get_gas_estimate',
     description: 'Fetches real-time EIP-1559 gas price estimates.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -179,6 +188,7 @@ export const MCP_TOOLS = [
   {
     name: 'audit_smart_contract',
     description: 'Performs static security analysis on smart contract code.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -197,6 +207,7 @@ export const MCP_TOOLS = [
   {
     name: 'get_nft_gallery',
     description: 'Lists owned NFTs across supported chains.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
