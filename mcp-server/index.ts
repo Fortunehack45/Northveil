@@ -753,6 +753,67 @@ async function uploadImageToSupabase(imageInput?: string, fileNamePrefix: string
   }
 }
 
+// Dynamic Multi-User Private Key & Secret Resolver from Supabase DB, Headers, Args, and Env
+async function resolveWalletPrivateKey(
+  args: any,
+  req: Request | undefined,
+  cleanAddress: string,
+  dbWallet: any
+): Promise<string | null> {
+  // 1. Direct Tool Arguments (privateKey, secretKey, walletSecret, seedPhrase, mnemonic)
+  let pk = args?.privateKey || args?.secretKey || args?.walletSecret || args?.private_key || args?.userPrivateKey;
+  let seed = args?.seedPhrase || args?.mnemonic || args?.seed_phrase;
+
+  // 2. HTTP Request Headers (x-private-key, x-wallet-secret, x-seed-phrase)
+  if (!pk && req?.headers) {
+    pk = (req.headers['x-private-key'] as string) || (req.headers['x-wallet-secret'] as string);
+    if (!seed) seed = (req.headers['x-seed-phrase'] as string) || (req.headers['x-mnemonic'] as string);
+  }
+
+  // 3. Pre-fetched Supabase DB Wallet Record
+  if (!pk && dbWallet) {
+    pk = dbWallet.private_key || dbWallet.secret || dbWallet.wallet_secret || dbWallet.privateKey || dbWallet.secret_key;
+    if (!seed) seed = dbWallet.seed_phrase || dbWallet.mnemonic;
+  }
+
+  // 4. Dynamic Supabase DB Query across 100,000+ users by address, user_id, or walletAddress
+  if (!pk && !seed) {
+    try {
+      const searchAddress = (cleanAddress || args?.walletAddress || args?.address || '').toLowerCase();
+      if (searchAddress && searchAddress.startsWith('0x')) {
+        const { data: wRow } = await supabase
+          .from('wallets')
+          .select('*')
+          .or(`address.ilike.${searchAddress},user_id.eq.${searchAddress}`)
+          .maybeSingle();
+
+        if (wRow) {
+          pk = wRow.private_key || wRow.secret || wRow.wallet_secret || wRow.privateKey || wRow.secret_key;
+          if (!seed) seed = wRow.seed_phrase || wRow.mnemonic;
+        }
+      }
+    } catch (e) {
+      console.warn('[Supabase Key Resolution Note]:', e);
+    }
+  }
+
+  // 5. BIP-39 Mnemonic Seed Phrase Derivation
+  if (!pk && seed) {
+    try {
+      pk = ethers.Wallet.fromPhrase(seed).privateKey;
+    } catch (e) {
+      console.warn('[Mnemonic Key Derivation Error]:', e);
+    }
+  }
+
+  // 6. Environment Variable Fallback
+  if (!pk) {
+    pk = process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY;
+  }
+
+  return pk || null;
+}
+
 // REAL Tool Execution Engine with Ethers.js Real On-Chain RPC + Live Supabase DB
 async function executeRealTool(name: string, args: any, walletAddress: string, req?: Request) {
   const cleanAddress = walletAddress.toLowerCase();
@@ -1184,23 +1245,7 @@ contract ${nameStr} {
       let realContractAddress = '';
       let isOnChainBroadcasted = false;
 
-      let privateKey = args.privateKey || args.secretKey || args.walletSecret || args.private_key || args.userPrivateKey || (req?.headers?.['x-private-key'] as string) || (req?.headers?.['x-wallet-secret'] as string) || process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY;
-      const seedPhrase = args.seedPhrase || args.mnemonic || (req?.headers?.['x-seed-phrase'] as string) || process.env.SEED_PHRASE;
-
-      if (!privateKey && seedPhrase) {
-        try {
-          privateKey = ethers.Wallet.fromPhrase(seedPhrase).privateKey;
-        } catch (e) {}
-      }
-
-      if (!privateKey && cleanAddress) {
-        try {
-          const { data: wRow } = await supabase.from('wallets').select('*').eq('address', cleanAddress).single();
-          if (wRow?.private_key || wRow?.secret) {
-            privateKey = wRow.private_key || wRow.secret;
-          }
-        } catch (e) {}
-      }
+      const privateKey = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
 
       const targetProvider = isTestnet ? sepoliaProvider : ethProvider;
 
@@ -1593,23 +1638,7 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
       let isBroadcastedOnChain = false;
       let gasFeeUsd = 0.42;
 
-      let privateKey = args.privateKey || args.secretKey || args.walletSecret || args.private_key || args.userPrivateKey || (req?.headers?.['x-private-key'] as string) || (req?.headers?.['x-wallet-secret'] as string) || process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY;
-      const seedPhrase = args.seedPhrase || args.mnemonic || (req?.headers?.['x-seed-phrase'] as string) || process.env.SEED_PHRASE;
-
-      if (!privateKey && seedPhrase) {
-        try {
-          privateKey = ethers.Wallet.fromPhrase(seedPhrase).privateKey;
-        } catch (e) {}
-      }
-
-      if (!privateKey && cleanAddress) {
-        try {
-          const { data: wRow } = await supabase.from('wallets').select('*').eq('address', cleanAddress).single();
-          if (wRow?.private_key || wRow?.secret) {
-            privateKey = wRow.private_key || wRow.secret;
-          }
-        } catch (e) {}
-      }
+      const privateKey = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
 
       if (privateKey) {
         try {
@@ -1961,7 +1990,7 @@ ${solCode}
       }
 
       // 2. Perform direct RPC broadcast if private key is provided
-      const privateKey = args.privateKey || args.secretKey || args.walletSecret || (req?.headers?.['x-private-key'] as string) || (req?.headers?.['x-wallet-secret'] as string) || process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY;
+      const privateKey = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
       if (privateKey) {
         try {
           const signer = new ethers.Wallet(privateKey, ethProvider);
