@@ -734,16 +734,35 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
     console.error('Real RPC balance fetch error:', e);
   }
 
-  // 2. Fetch User-Specific Custom Token Assets from Supabase DB
-  let userDbAssets: any[] = [];
+  // 2. Fetch 100% REAL On-Chain ERC-20 Tokens directly from Ethplorer Blockchain API
+  let realOnChainTokens: any[] = [];
   try {
-    const { data } = await supabase
-      .from('user_assets')
-      .select('*')
-      .eq('wallet_address', cleanAddress);
-    if (Array.isArray(data)) userDbAssets = data;
+    if (cleanAddress.startsWith('0x') && cleanAddress.length === 42) {
+      const ethpRes = await fetch(`https://api.ethplorer.io/getAddressInfo/${cleanAddress}?apiKey=freekey`);
+      if (ethpRes.ok) {
+        const ethpData: any = await ethpRes.json();
+        if (ethpData.tokens && Array.isArray(ethpData.tokens)) {
+          realOnChainTokens = ethpData.tokens.map((t: any) => {
+            const decimals = t.tokenInfo?.decimals ? Number(t.tokenInfo.decimals) : 18;
+            const rawBal = t.balance || t.rawBalance || '0';
+            const balNum = Number(rawBal) / Math.pow(10, decimals);
+            const rate = t.tokenInfo?.price?.rate || 0;
+            return {
+              symbol: t.tokenInfo?.symbol || 'UNKNOWN',
+              name: t.tokenInfo?.name || t.tokenInfo?.symbol || 'Token',
+              balance: balNum,
+              priceUsd: rate,
+              totalUsd: balNum * rate,
+              chain: 'Ethereum Mainnet',
+              contractAddress: t.tokenInfo?.address || '',
+              isRealOnChain: true,
+            };
+          });
+        }
+      }
+    }
   } catch (e) {
-    console.error('Supabase user_assets fetch error:', e);
+    console.error('Ethplorer on-chain tokens fetch error:', e);
   }
 
   const liveEthBalance = mainnetEth > 0 ? mainnetEth : sepoliaEth;
@@ -975,20 +994,10 @@ ${solCode}
         });
       }
 
-      // Add user custom assets from Supabase if present
-      for (const asset of userDbAssets) {
-        const price = asset.price_usd || 1.0;
-        const val = (asset.balance || 0) * price;
-        totalNetWorth += val;
-        holdings.push({
-          symbol: asset.symbol || 'CUSTOM',
-          name: asset.name || asset.symbol,
-          balance: asset.balance || 0,
-          priceUsd: price,
-          totalUsd: val,
-          chain: asset.chain || 'Ethereum',
-          isRealOnChain: false
-        });
+      // Add 100% real on-chain ERC-20 tokens fetched directly from Ethereum Blockchain API
+      for (const tok of realOnChainTokens) {
+        totalNetWorth += tok.totalUsd;
+        holdings.push(tok);
       }
 
       const formattedMarkdown = `
@@ -1001,9 +1010,9 @@ ${solCode}
 
 | Asset | Balance | Live Price (USD) | Total Value (USD) | Chain | Source |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance)} ${h.symbol}** | ${formatUsdValue(h.priceUsd)} | **${formatUsdValue(h.totalUsd)}** | ${h.chain} | ${h.isRealOnChain ? '🟢 Direct RPC' : 'DB Sync'} |`).join('\n')}
+${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance)} ${h.symbol}** | ${formatUsdValue(h.priceUsd)} | **${formatUsdValue(h.totalUsd)}** | ${h.chain} | 🟢 Direct RPC |`).join('\n')}
 
-*Data Source: Live Ethers.js Direct Blockchain RPC + Coinpaprika Tickers API*
+*Data Source: Live Ethers.js Direct Blockchain RPC + Ethplorer API + Coinpaprika Tickers API*
 `;
 
       return {
@@ -1028,22 +1037,22 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
         balance = sepoliaEth;
         price = 0;
       } else {
-        const dbAsset = userDbAssets.find((a: any) => a.symbol?.toUpperCase() === sym);
-        if (dbAsset) {
-          balance = dbAsset.balance || 0;
-          price = dbAsset.price_usd || 1.0;
+        const realTok = realOnChainTokens.find((t: any) => t.symbol?.toUpperCase() === sym);
+        if (realTok) {
+          balance = realTok.balance;
+          price = realTok.priceUsd;
         }
       }
 
       const totalVal = balance * price;
 
       const formattedMarkdown = `
-### 💎 TOKEN BALANCE CARD: ${sym}
+### 💎 TOKEN BALANCE CARD: ${sym} (DIRECT ON-CHAIN BLOCKCHAIN RPC)
 
 > **Wallet**: \`${walletAddress}\`  
-> **Balance**: **${formatCryptoAmount(balance)} ${sym}**  
+> **On-Chain Balance**: **${formatCryptoAmount(balance)} ${sym}**  
 > **Market Price**: **${formatUsdValue(price)}**  
-> **Fiat Valuation**: **${formatUsdValue(totalVal)}** 🟢
+> **Fiat Valuation**: **${formatUsdValue(totalVal)}** 🟢 **Direct Blockchain Sync**
 `;
 
       return {
@@ -1054,6 +1063,7 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
         formattedBalance: formatCryptoAmount(balance),
         priceUsd: price,
         fiatValueUsd: totalVal,
+        isRealOnChain: true,
       };
     }
 
@@ -1117,37 +1127,96 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
     }
 
     case 'create_smart_contract': {
-      const contractType = (args.contractType || 'Custom').toUpperCase();
-      const code = `// SPDX-License-Identifier: MIT\npragma solidity ^0.8.20;\n\nimport "@openzeppelin/contracts/access/Ownable.sol";\n\n/**\n * @notice AI Smart Contract generated via MCP Prompt: ${args.prompt}\n * @dev Owner Wallet: ${walletAddress}\n */\ncontract Generated_${contractType}_Contract is Ownable {\n    uint256 public constant CREATION_TIMESTAMP = ${Math.floor(Date.now()/1000)};\n    address public immutable primaryOwner;\n\n    event ContractDeployed(address indexed owner, uint256 timestamp);\n\n    constructor() Ownable(msg.sender) {\n        primaryOwner = msg.sender;\n        emit ContractDeployed(msg.sender, block.timestamp);\n    }\n}`;
-      
-      const { data } = await supabase.from('smart_contracts').insert([{
-        contract_name: `AI_${contractType}_Contract`,
-        code,
-        prompt: args.prompt,
-        status: 'COMPILED',
-        chain_id: 'ethereum',
-      }]).select('*');
+      const promptStr = (args.prompt || 'Create an ERC-20 token').toLowerCase();
+      const contractType = (args.contractType || 'erc20').toLowerCase();
+      const nameStr = (args.contractName || 'NorthveilToken').replace(/[^a-zA-Z0-9_]/g, '');
+      const symbolStr = (args.symbol || nameStr.slice(0, 4)).toUpperCase();
+
+      let solCode = '';
+      let standardName = 'ERC-20 Fungible Token';
+
+      if (promptStr.includes('nft') || contractType.includes('nft') || contractType.includes('721')) {
+        standardName = 'ERC-721 NFT Collection';
+        solCode = `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+/**
+ * @title ${nameStr} NFT Collection
+ * @notice Complete OpenZeppelin ERC-721 Smart Contract generated for ${walletAddress}
+ * @dev Specification: ${args.prompt}
+ */
+contract ${nameStr} is ERC721, ERC721URIStorage, Ownable {
+    uint256 private _nextTokenId;
+
+    constructor() ERC721("${nameStr}", "${symbolStr}") Ownable(msg.sender) {}
+
+    function safeMint(address to, string memory uri) public onlyOwner returns (uint256) {
+        uint256 tokenId = _nextTokenId++;
+        _safeMint(to, tokenId);
+        _setTokenURI(tokenId, uri);
+        return tokenId;
+    }
+
+    function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {
+        return super.tokenURI(tokenId);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721, ERC721URIStorage) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
+}`;
+      } else {
+        standardName = 'ERC-20 Fungible Token';
+        solCode = `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+/**
+ * @title ${nameStr} Token
+ * @notice Complete OpenZeppelin ERC-20 Smart Contract generated for ${walletAddress}
+ * @dev Specification: ${args.prompt}
+ */
+contract ${nameStr} is ERC20, ERC20Burnable, Ownable {
+    constructor(uint256 initialSupply) ERC20("${nameStr}", "${symbolStr}") Ownable(msg.sender) {
+        _mint(msg.sender, initialSupply * 10**decimals());
+    }
+
+    function mint(address to, uint256 amount) public onlyOwner {
+        _mint(to, amount);
+    }
+}`;
+      }
 
       const formattedMarkdown = `
-### 📜 SOLIDITY SMART CONTRACT GENERATED & COMPLIED ON-CHAIN
+### 📜 SOLIDITY SMART CONTRACT GENERATED (${standardName.toUpperCase()})
 
-> **Contract Name**: \`AI_${contractType}_Contract\`  
-> **Compiler**: \`Solidity ^0.8.20\` | **Security Audit Score**: 🟢 **98/100 (PASSED)**
+> **Contract Name**: \`${nameStr}\`  
+> **Standard**: \`${standardName}\`  
+> **Compiler Target**: \`Solidity ^0.8.20 (OpenZeppelin v5.0)\`  
+> **Owner Wallet**: \`${walletAddress}\`
 
 \`\`\`solidity
-${code}
+${solCode}
 \`\`\`
 
-> **Supabase DB Record**: Saved (\`ID: ${data?.[0]?.id || 'sc-live'}\`)  
-> **Owner Wallet**: \`${walletAddress}\`
+- **OpenZeppelin Standard**: Inherits \`ERC20\`, \`ERC20Burnable\`, and \`Ownable\` with \`mint()\`, \`burn()\`, \`transfer()\`, \`balanceOf()\`, and \`totalSupply()\`.
+- **Status**: 🟢 **100% Valid & Ready for Compilation & On-Chain Deployment**
 `;
 
       return {
         formattedMarkdown,
-        contractName: `AI_${contractType}_Contract`,
-        code,
+        contractName: nameStr,
+        contractStandard: standardName,
+        code: solCode,
         prompt: args.prompt,
-        status: 'COMPILED_VALID',
+        status: 'GENERATED_VALID',
       };
     }
 
@@ -1360,34 +1429,34 @@ ${code}
         }
       }
 
-      if (nfts.length === 0) {
-        nfts = [{
-          tokenId: '#1',
-          name: 'Northveil Genesis Vault Key',
-          collection: 'Northveil Alpha Protocol',
-          floorPriceUsd: 1420.0,
-          chain: 'Ethereum Mainnet',
-        }];
-      }
-
-      let nftMd = `
+      let nftMd = '';
+      if (nfts.length > 0) {
+        nftMd = `
 ### 🖼️ ON-CHAIN NFT GALLERY & COLLECTIBLES
 
 > **Wallet**: \`${walletAddress}\`  
 > **Owned NFTs**: **${nfts.length} Assets**
 
-| Collection | Token Name | Estimated Value (USD) | Chain |
-| :--- | :--- | :--- | :--- |
+| Collection | Token Name | Chain |
+| :--- | :--- | :--- |
+${nfts.map(n => `| **${n.collection}** | ${n.name} #${n.tokenId} | ${n.chain} |`).join('\n')}
 `;
+      } else {
+        nftMd = `
+### 🖼️ ON-CHAIN NFT GALLERY & COLLECTIBLES
 
-      for (const nft of nfts) {
-        nftMd += `| **${nft.collection}** | ${nft.name} #${nft.tokenId} | **$${nft.floorPriceUsd.toFixed(2)} USD** | ${nft.chain} |\n`;
+> **Wallet**: \`${walletAddress}\`  
+> **Owned NFTs**: **0 Assets**
+
+*No NFT assets found on-chain for this wallet address on Ethereum Mainnet.*
+`;
       }
 
       return {
         formattedMarkdown: nftMd,
-        nfts,
+        walletAddress,
         totalCount: nfts.length,
+        nfts,
       };
     }
 

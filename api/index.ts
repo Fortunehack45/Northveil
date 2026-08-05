@@ -669,16 +669,35 @@ async function executeRealTool(name: string, args: any, walletAddress: string) {
     console.error('Real RPC balance fetch error:', e);
   }
 
-  // 2. Fetch User-Specific Custom Token Assets from Supabase DB
-  let userDbAssets: any[] = [];
+  // 2. Fetch 100% REAL On-Chain ERC-20 Tokens directly from Ethplorer Blockchain API
+  let realOnChainTokens: any[] = [];
   try {
-    const { data } = await supabase
-      .from('user_assets')
-      .select('*')
-      .eq('wallet_address', cleanAddress);
-    if (Array.isArray(data)) userDbAssets = data;
+    if (cleanAddress.startsWith('0x') && cleanAddress.length === 42) {
+      const ethpRes = await fetch(`https://api.ethplorer.io/getAddressInfo/${cleanAddress}?apiKey=freekey`);
+      if (ethpRes.ok) {
+        const ethpData: any = await ethpRes.json();
+        if (ethpData.tokens && Array.isArray(ethpData.tokens)) {
+          realOnChainTokens = ethpData.tokens.map((t: any) => {
+            const decimals = t.tokenInfo?.decimals ? Number(t.tokenInfo.decimals) : 18;
+            const rawBal = t.balance || t.rawBalance || '0';
+            const balNum = Number(rawBal) / Math.pow(10, decimals);
+            const rate = t.tokenInfo?.price?.rate || 0;
+            return {
+              symbol: t.tokenInfo?.symbol || 'UNKNOWN',
+              name: t.tokenInfo?.name || t.tokenInfo?.symbol || 'Token',
+              balance: balNum,
+              priceUsd: rate,
+              totalUsd: balNum * rate,
+              chain: 'Ethereum Mainnet',
+              contractAddress: t.tokenInfo?.address || '',
+              isRealOnChain: true,
+            };
+          });
+        }
+      }
+    }
   } catch (e) {
-    console.error('Supabase user_assets fetch error:', e);
+    console.error('Ethplorer on-chain tokens fetch error:', e);
   }
 
   const liveEthBalance = mainnetEth > 0 ? mainnetEth : sepoliaEth;
