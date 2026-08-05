@@ -17,10 +17,10 @@ export const getMcpServerUrl = (): string => {
       return `${protocol}//${hostname}:3001`;
     }
 
-    return window.location.origin;
+    return 'https://mcp.northveil.xyz';
   }
 
-  return 'http://localhost:3001';
+  return 'https://mcp.northveil.xyz';
 };
 
 export const getMcpSseUrl = (walletAddress?: string): string => {
