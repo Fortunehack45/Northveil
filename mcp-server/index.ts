@@ -1126,11 +1126,12 @@ contract ${nameStr} {
           const signer = new ethers.Wallet(privateKey, targetProvider);
           const factory = new ethers.ContractFactory(compiledAbi, compiledBytecode, signer);
           const deployTx = await factory.deploy();
+          await deployTx.waitForDeployment();
           realTxHash = deployTx.deploymentTransaction()?.hash || '';
           realContractAddress = await deployTx.getAddress();
           isOnChainBroadcasted = true;
         } catch (deployErr) {
-          console.warn('[Deploy] Direct RPC deploy fallback to signable intent:', deployErr);
+          console.warn('[Deploy] Direct RPC deploy attempt:', deployErr);
         }
       }
 
@@ -1141,10 +1142,6 @@ contract ${nameStr} {
         } catch {
           realContractAddress = ethers.getCreateAddress({ from: walletAddress, nonce: 0 });
         }
-      }
-
-      if (!realTxHash) {
-        realTxHash = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
       }
 
       // Save contract metadata to Supabase DB
@@ -1166,7 +1163,7 @@ contract ${nameStr} {
           discord_url: discordStr,
           network: networkName,
           predicted_address: realContractAddress,
-          tx_hash: realTxHash,
+          tx_hash: realTxHash || null,
           solidity_code: solCode,
           abi: JSON.stringify(compiledAbi),
           bytecode: compiledBytecode || null,
@@ -1174,7 +1171,7 @@ contract ${nameStr} {
             isTestnet,
             chainId,
             decimals: isNft ? 0 : 18,
-            broadcasted: true,
+            broadcasted: isOnChainBroadcasted,
             socials: { website: websiteStr, twitter: twitterStr, telegram: telegramStr, discord: discordStr }
           }
         }]).select('id');
@@ -1184,18 +1181,19 @@ contract ${nameStr} {
           dbRecordId = dbData[0].id;
         }
 
-        // Insert into transactions table as well for transaction history sync
-        await supabase.from('transactions').insert([{
-          wallet_address: cleanAddress,
-          tx_hash: realTxHash,
-          type: 'DEPLOY',
-          token_symbol: symbolStr,
-          amount: totalSupplyNum,
-          recipient: realContractAddress,
-          status: 'CONFIRMED',
-          chain_id: networkName,
-          gas_fee_usd: 0.85,
-        }]);
+        if (isOnChainBroadcasted && realTxHash) {
+          await supabase.from('transactions').insert([{
+            wallet_address: cleanAddress,
+            tx_hash: realTxHash,
+            type: 'DEPLOY',
+            token_symbol: symbolStr,
+            amount: totalSupplyNum,
+            recipient: realContractAddress,
+            status: 'CONFIRMED',
+            chain_id: networkName,
+            gas_fee_usd: 0.85,
+          }]);
+        }
       } catch (e) {
         console.warn('[Supabase] Contract record save note:', e);
       }
@@ -1204,14 +1202,14 @@ contract ${nameStr} {
       const reservePct = (((totalSupplyNum - ownerAllocNum) / (totalSupplyNum || 1)) * 100).toFixed(2);
 
       const formattedMarkdown = `
-### 🚀 SMART CONTRACT DEPLOYMENT CONFIRMED ON-CHAIN 🟢
+### 🚀 SMART CONTRACT DEPLOYMENT ${isOnChainBroadcasted ? 'CONFIRMED & BROADCASTED ON-CHAIN 🟢' : 'PAYLOAD COMPILED (Awaiting Signer Key) 🟡'}
 
 > **Contract Name**: \`${nameStr}\` (\`$${symbolStr}\`)  
 > **Contract Standard**: \`${isNft ? 'ERC-721 NFT Collection' : 'ERC-20 Fungible Token'}\`  
 > **Target Network**: \`${networkName}\` (Chain ID: \`${chainId}\` | ${isTestnet ? '🟡 TESTNET' : '🟢 MAINNET'})  
-> **Deployment Status**: 🟢 **BROADCASTED & CONFIRMED ON-CHAIN**  
+> **Deployment Status**: ${isOnChainBroadcasted ? `🟢 **BROADCASTED & CONFIRMED ON-CHAIN**` : `🟡 **SIGNABLE UNBROADCASTED PAYLOAD READY (Requires \`SEPOLIA_PRIVATE_KEY\` in \`.env\` for Direct Server Broadcast)**`}  
 > **Contract Address**: [\`${realContractAddress}\`](${explorerBase}/address/${realContractAddress})  
-> **Transaction Hash**: [\`${realTxHash}\`](${explorerBase}/tx/${realTxHash}) 🟢  
+${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](${explorerBase}/tx/${realTxHash}) 🟢` : ''}
 > **Owner Wallet**: \`${walletAddress}\`
 
 ---
@@ -1254,11 +1252,11 @@ ${solCode}
         reserveAllocation: reserveNum,
         contractType: isNft ? 'ERC-721' : 'ERC-20',
         contractAddress: realContractAddress,
-        txHash: realTxHash,
+        txHash: realTxHash || null,
         network: networkName,
         chainId,
         isTestnet,
-        broadcastedOnChain: true,
+        broadcastedOnChain: isOnChainBroadcasted,
         unsignedTxPayload: {
           to: null,
           data: compiledBytecode,
@@ -1271,11 +1269,11 @@ ${solCode}
         socials: { website: websiteStr, twitter: twitterStr, telegram: telegramStr, discord: discordStr },
         supabaseSaved: supabaseDbSaved,
         supabaseRecordId: dbRecordId,
-        explorerUrl: `${explorerBase}/tx/${realTxHash}`,
+        explorerUrl: realTxHash ? `${explorerBase}/tx/${realTxHash}` : `${explorerBase}/address/${realContractAddress}`,
         abi: compiledAbi,
         bytecode: compiledBytecode,
         solidity: solCode,
-        status: 'CONFIRMED',
+        status: isOnChainBroadcasted ? 'DEPLOYED_ON_CHAIN' : 'UNBROADCASTED_PAYLOAD_READY',
       };
     }
 
@@ -1521,10 +1519,11 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
             to: recipient,
             value: valueWei,
           });
+          await txResponse.wait(1);
           realTxHash = txResponse.hash;
           isBroadcastedOnChain = true;
         } catch (txErr) {
-          console.warn('[SendTransfer] Direct RPC broadcast fallback:', txErr);
+          console.warn('[SendTransfer] Direct RPC broadcast attempt:', txErr);
         }
       }
 
@@ -1538,21 +1537,17 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
         console.error('RPC feeData error:', e);
       }
 
-      if (!realTxHash) {
-        realTxHash = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-      }
-
       // Save transfer transaction to Supabase DB
       let dbRecordId: string | null = null;
       try {
         const { data: dbData } = await supabase.from('transactions').insert([{
           wallet_address: cleanAddress,
-          tx_hash: realTxHash,
+          tx_hash: realTxHash || null,
           type: 'SEND',
           token_symbol: token,
           amount: Number(amountStr),
           recipient: recipient,
-          status: 'CONFIRMED',
+          status: isBroadcastedOnChain ? 'CONFIRMED' : 'UNBROADCASTED_SIGNATURE_READY',
           chain_id: chainName,
           gas_fee_usd: Number(gasFeeUsd.toFixed(2)),
         }]).select('*');
@@ -1564,11 +1559,11 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
       const amountWeiHex = '0x' + ethers.parseEther(amountStr).toString(16);
 
       const formattedMarkdown = `
-### 🚀 ON-CHAIN BLOCKCHAIN TRANSACTION CONFIRMED & BROADCASTED 🟢
+### 🚀 ON-CHAIN BLOCKCHAIN TRANSACTION ${isBroadcastedOnChain ? 'CONFIRMED & BROADCASTED 🟢' : 'PAYLOAD GENERATED (Awaiting Signer Key) 🟡'}
 
-> **Status**: 🟢 **CONFIRMED & BROADCASTED ON BLOCKCHAIN**  
+> **Status**: ${isBroadcastedOnChain ? '🟢 **CONFIRMED & BROADCASTED ON BLOCKCHAIN**' : '🟡 **SIGNABLE UNBROADCASTED PAYLOAD READY (Requires `SEPOLIA_PRIVATE_KEY` in `.env` for Direct Server Broadcast)**'}  
 > **Network**: \`${chainName}\` (Chain ID: \`${chainId}\` | ${isTestnet ? '🟡 TESTNET' : '🟢 MAINNET'})  
-> **Transaction Hash**: [\`${realTxHash}\`](${explorerBase}/tx/${realTxHash}) 🟢  
+${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](${explorerBase}/tx/${realTxHash}) 🟢` : ''}
 > **Estimated Gas Fee**: \`$${gasFeeUsd.toFixed(2)} USD\`
 
 | Parameter | Value |
@@ -1577,15 +1572,15 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
 | **Sender Wallet** | \`${walletAddress}\` |
 | **Recipient Wallet** | \`${recipient}\` |
 | **Target Network** | \`${chainName}\` |
-| **Block Explorer** | [View Transaction on ${chainName}](${explorerBase}/tx/${realTxHash}) |
+${realTxHash ? `| **Block Explorer** | [View Transaction on ${chainName}](${explorerBase}/tx/${realTxHash}) |` : ''}
 | **Database Sync** | Saved to Supabase \`transactions\` ${dbRecordId ? `(\`ID: ${dbRecordId}\`)` : '(Synced)'} |
 `;
 
       return {
         formattedMarkdown,
-        txHash: realTxHash,
-        status: 'CONFIRMED',
-        broadcastedOnChain: true,
+        txHash: realTxHash || null,
+        status: isBroadcastedOnChain ? 'CONFIRMED' : 'UNBROADCASTED_PAYLOAD_READY',
+        broadcastedOnChain: isBroadcastedOnChain,
         unsignedTxPayload: {
           from: walletAddress,
           to: recipient,
@@ -1599,7 +1594,7 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
         recipient: recipient,
         chain: chainName,
         chainId,
-        explorerUrl: `${explorerBase}/tx/${realTxHash}`,
+        explorerUrl: realTxHash ? `${explorerBase}/tx/${realTxHash}` : explorerBase,
       };
     }
 
@@ -1913,13 +1908,13 @@ ${solCode}
         console.warn('[Supabase] Transaction history fetch note:', e);
       }
 
-      // 2. Fetch real on-chain transaction history from Blockscout multi-chain APIs
+      // 2. Fetch real on-chain transaction history from direct EVM Blockscout / Basescan txlist APIs
       const chainApis = [
-        { name: 'Sepolia Testnet', url: `https://eth-sepolia.blockscout.com/api/v2/addresses/${cleanAddress}/transactions?limit=${limit}`, explorer: 'https://sepolia.etherscan.io' },
-        { name: 'Ethereum Mainnet', url: `https://eth.blockscout.com/api/v2/addresses/${cleanAddress}/transactions?limit=${limit}`, explorer: 'https://etherscan.io' },
-        { name: 'Base Mainnet', url: `https://base.blockscout.com/api/v2/addresses/${cleanAddress}/transactions?limit=${limit}`, explorer: 'https://basescan.org' },
-        { name: 'Polygon Mainnet', url: `https://polygon.blockscout.com/api/v2/addresses/${cleanAddress}/transactions?limit=${limit}`, explorer: 'https://polygonscan.com' },
-        { name: 'Arbitrum One', url: `https://arbitrum.blockscout.com/api/v2/addresses/${cleanAddress}/transactions?limit=${limit}`, explorer: 'https://arbiscan.io' },
+        { name: 'Sepolia Testnet', url: `https://eth-sepolia.blockscout.com/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://sepolia.etherscan.io' },
+        { name: 'Base Mainnet', url: `https://api.basescan.org/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://basescan.org' },
+        { name: 'Ethereum Mainnet', url: `https://eth.blockscout.com/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://etherscan.io' },
+        { name: 'Polygon Mainnet', url: `https://polygon.blockscout.com/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://polygonscan.com' },
+        { name: 'Arbitrum One', url: `https://arbitrum.blockscout.com/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://arbiscan.io' },
       ];
 
       const results = await Promise.allSettled(
@@ -1927,19 +1922,28 @@ ${solCode}
           const res = await fetch(chain.url, { headers: { accept: 'application/json' } });
           if (!res.ok) return [];
           const data: any = await res.json();
-          if (!data.items || !Array.isArray(data.items)) return [];
-          return data.items.map((tx: any) => ({
-            hash: tx.hash,
-            type: tx.type === 'contract_creation' ? 'Deploy' : tx.from?.hash?.toLowerCase() === cleanAddress ? 'Send' : 'Receive',
-            from: tx.from?.hash || '',
-            to: tx.to?.hash || tx.created_contract?.hash || '',
-            value: tx.value ? Number(ethers.formatEther(tx.value)) : 0,
-            fee: tx.fee?.value ? Number(ethers.formatEther(tx.fee.value)) : 0,
-            status: tx.status === 'ok' ? 'Confirmed' : tx.status || 'Pending',
-            timestamp: tx.timestamp || '',
-            chain: chain.name,
-            explorerUrl: `${chain.explorer}/tx/${tx.hash}`,
-          }));
+          const items = Array.isArray(data.result) ? data.result : Array.isArray(data.items) ? data.items : [];
+          if (!items || items.length === 0) return [];
+
+          return items.map((tx: any) => {
+            const isContractCreate = !tx.to || tx.to === '' || tx.to === '0x0000000000000000000000000000000000000000' || tx.type === 'contract_creation';
+            const isSend = tx.from?.toLowerCase() === cleanAddress;
+            const ethVal = tx.value ? Number(ethers.formatEther(tx.value)) : 0;
+            const dateStr = tx.timeStamp ? new Date(Number(tx.timeStamp) * 1000).toISOString() : tx.timestamp || '';
+
+            return {
+              hash: tx.hash,
+              type: isContractCreate ? 'Deploy' : isSend ? 'Send' : 'Receive',
+              from: tx.from || '',
+              to: tx.to || tx.contractAddress || '',
+              value: ethVal,
+              fee: tx.gasPrice && tx.gasUsed ? Number(ethers.formatEther(BigInt(tx.gasPrice) * BigInt(tx.gasUsed))) : 0,
+              status: tx.isError === '0' || tx.status === 'ok' ? 'Confirmed' : 'Pending',
+              timestamp: dateStr,
+              chain: chain.name,
+              explorerUrl: `${chain.explorer}/tx/${tx.hash}`,
+            };
+          });
         })
       );
 
