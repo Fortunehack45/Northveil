@@ -1217,11 +1217,15 @@ ${code}
   }
 }
 
-app.listen(PORT, () => {
-  console.log(`⚡ Northveil UNIVERSAL AI Server listening on http://localhost:${PORT}`);
-  console.log(`🔌 HTTP JSON-RPC endpoint: http://localhost:${PORT}/mcp`);
-  console.log(`📄 OpenAPI 3.0 Schema: http://localhost:${PORT}/openapi.json`);
-  console.log(`📡 SSE Event Stream endpoint: http://localhost:${PORT}/sse`);
-  console.log(`🖼️ Interactive Wallet UI Widget: http://localhost:${PORT}/ui/widget`);
-  console.log(`🔒 Auth & Wallet Address Binding Active (Supabase DB + Ethers Real RPC)`);
-});
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`⚡ Northveil UNIVERSAL AI Server listening on http://localhost:${PORT}`);
+    console.log(`🔌 HTTP JSON-RPC endpoint: http://localhost:${PORT}/mcp`);
+    console.log(`📄 OpenAPI 3.0 Schema: http://localhost:${PORT}/openapi.json`);
+    console.log(`📡 SSE Event Stream endpoint: http://localhost:${PORT}/sse`);
+    console.log(`🖼️ Interactive Wallet UI Widget: http://localhost:${PORT}/ui/widget`);
+    console.log(`🔒 Auth & Wallet Address Binding Active (Supabase DB + Ethers Real RPC)`);
+  });
+}
+
+export default app;

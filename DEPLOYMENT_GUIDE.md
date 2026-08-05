@@ -75,6 +75,31 @@ vercel --prod
 
 ---
 
+## ⚡ STEP 1B: Standalone MCP Server Deployment (Recommended for Subdomains like `mcp.northveil.xyz`)
+
+To completely isolate the MCP server from static web assets and prevent any SPA catch-all rewrite collisions, deploy `./mcp-server` as a separate, dedicated project on Vercel or Render.
+
+### Steps to Deploy Standalone MCP Server on Vercel:
+1. Go to [vercel.com/new](https://vercel.com/new).
+2. Import the **`Northveil`** repository again as a new project.
+3. Set **Project Name**: `northveil-mcp` (or custom domain `mcp.northveil.xyz`).
+4. Set **Framework Preset**: `Other`.
+5. Set **Root Directory**: Click **Edit** and select **`mcp-server`**.
+6. Set **Environment Variables**:
+   - `SUPABASE_URL` = `https://ulkbchewsrksgvlbzjzl.supabase.co`
+   - `SUPABASE_ANON_KEY` = `<YOUR_SUPABASE_ANON_KEY>`
+7. Click **Deploy**.
+
+### ✅ Standalone MCP URLs:
+- **MCP Server Base URL**: `https://mcp.northveil.xyz` (or `https://northveil-mcp.vercel.app`)
+- **SSE Connection URL**: `https://mcp.northveil.xyz/sse`
+- **Health Check**: `https://mcp.northveil.xyz/health`
+- **OpenAPI 3.0 Spec**: `https://mcp.northveil.xyz/openapi.json`
+
+> 💡 **Pro-Tip**: In your Web Wallet project (`northveil-app`), add environment variable `VITE_MCP_SERVER_URL=https://mcp.northveil.xyz`. All wallet UI components, copy buttons, and test connection triggers will automatically point to your dedicated standalone MCP server!
+
+---
+
 ## 🌐 STEP 2: Deploying the Marketing & Documentation Website
 
 The documentation portal resides in `./website` and deploys as **Project 2** on Vercel.
