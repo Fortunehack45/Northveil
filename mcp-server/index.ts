@@ -1182,7 +1182,7 @@ contract ${nameStr} {
 
       let realTxHash = '';
       let realContractAddress = '';
-      let isOnChainBroadcasted = true;
+      let isOnChainBroadcasted = false;
 
       let privateKey = args.privateKey || args.secretKey || args.walletSecret || args.private_key || args.userPrivateKey || (req?.headers?.['x-private-key'] as string) || (req?.headers?.['x-wallet-secret'] as string) || process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY;
       const seedPhrase = args.seedPhrase || args.mnemonic || (req?.headers?.['x-seed-phrase'] as string) || process.env.SEED_PHRASE;
@@ -1212,13 +1212,10 @@ contract ${nameStr} {
           await deployTx.waitForDeployment();
           realTxHash = deployTx.deploymentTransaction()?.hash || '';
           realContractAddress = await deployTx.getAddress();
+          if (realTxHash) isOnChainBroadcasted = true;
         } catch (deployErr) {
           console.warn('[Deploy] Direct RPC deploy attempt:', deployErr);
         }
-      }
-
-      if (!realTxHash) {
-        realTxHash = ethers.keccak256(ethers.toUtf8Bytes(`northveil_deploy_${nameStr}_${cleanAddress}_${Date.now()}`));
       }
 
       if (!realContractAddress) {
@@ -1249,7 +1246,7 @@ contract ${nameStr} {
           discord_url: discordStr,
           network: networkName,
           predicted_address: realContractAddress,
-          tx_hash: realTxHash,
+          tx_hash: realTxHash || null,
           solidity_code: solCode,
           abi: JSON.stringify(compiledAbi),
           bytecode: compiledBytecode || null,
@@ -1257,7 +1254,7 @@ contract ${nameStr} {
             isTestnet,
             chainId,
             decimals: isNft ? 0 : 18,
-            broadcasted: true,
+            broadcasted: isOnChainBroadcasted,
             socials: { website: websiteStr, twitter: twitterStr, telegram: telegramStr, discord: discordStr }
           }
         }]).select('id');
@@ -1267,17 +1264,19 @@ contract ${nameStr} {
           dbRecordId = dbData[0].id;
         }
 
-        await supabase.from('transactions').insert([{
-          wallet_address: cleanAddress,
-          tx_hash: realTxHash,
-          type: 'DEPLOY',
-          token_symbol: symbolStr,
-          amount: totalSupplyNum,
-          recipient: realContractAddress,
-          status: 'CONFIRMED',
-          chain_id: networkName,
-          gas_fee_usd: 0.85,
-        }]);
+        if (isOnChainBroadcasted && realTxHash) {
+          await supabase.from('transactions').insert([{
+            wallet_address: cleanAddress,
+            tx_hash: realTxHash,
+            type: 'DEPLOY',
+            token_symbol: symbolStr,
+            amount: totalSupplyNum,
+            recipient: realContractAddress,
+            status: 'CONFIRMED',
+            chain_id: networkName,
+            gas_fee_usd: 0.85,
+          }]);
+        }
       } catch (e) {
         console.warn('[Supabase] Contract record save note:', e);
       }
@@ -1286,15 +1285,16 @@ contract ${nameStr} {
       const reservePct = (((totalSupplyNum - ownerAllocNum) / (totalSupplyNum || 1)) * 100).toFixed(2);
 
       const formattedMarkdown = `
-### SMART CONTRACT DEPLOYMENT [CONFIRMED ON-CHAIN]
+### SMART CONTRACT DEPLOYMENT ${isOnChainBroadcasted ? '[CONFIRMED ON-CHAIN]' : '[SIGNABLE PAYLOAD READY]'}
 
 > **Contract Name**: \`${nameStr}\` (\`$${symbolStr}\`)  
 > **Contract Standard**: \`${isNft ? 'ERC-721 NFT Collection' : 'ERC-20 Fungible Token'}\`  
 > **Target Network**: \`${networkName}\` (Chain ID: \`${chainId}\` | ${isTestnet ? '[TESTNET]' : '[MAINNET]'})  
-> **Deployment Status**: **BROADCASTED & CONFIRMED ON-CHAIN**  
+> **Deployment Status**: ${isOnChainBroadcasted ? `**BROADCASTED & CONFIRMED ON-CHAIN**` : `**SIGNABLE UNBROADCASTED PAYLOAD READY**`}  
 > **Contract Address**: [\`${realContractAddress}\`](${explorerBase}/address/${realContractAddress})  
-> **Transaction Hash**: [\`${realTxHash}\`](${explorerBase}/tx/${realTxHash})  
+${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](${explorerBase}/tx/${realTxHash})` : ''}
 > **Owner Wallet**: \`${walletAddress}\`
+${!isOnChainBroadcasted ? `\n> **Notice**: No private key was provided in arguments or \`SEPOLIA_PRIVATE_KEY\` in \`.env\`. To auto-broadcast directly from the server, add your private key to \`.env\` as \`SEPOLIA_PRIVATE_KEY\` or pass \`privateKey\` in tool args.` : ''}
 
 ---
 
@@ -1336,21 +1336,28 @@ ${solCode}
         reserveAllocation: reserveNum,
         contractType: isNft ? 'ERC-721' : 'ERC-20',
         contractAddress: realContractAddress,
-        txHash: realTxHash,
+        txHash: realTxHash || null,
         network: networkName,
         chainId,
         isTestnet,
-        broadcastedOnChain: true,
+        broadcastedOnChain: isOnChainBroadcasted,
+        unsignedTxPayload: isOnChainBroadcasted ? null : {
+          to: null,
+          data: compiledBytecode,
+          value: '0x0',
+          chainId,
+          gasLimit: 2500000
+        },
         description: descriptionStr,
         imageUrl: imageUrlStr,
         socials: { website: websiteStr, twitter: twitterStr, telegram: telegramStr, discord: discordStr },
         supabaseSaved: supabaseDbSaved,
         supabaseRecordId: dbRecordId,
-        explorerUrl: `${explorerBase}/tx/${realTxHash}`,
+        explorerUrl: realTxHash ? `${explorerBase}/tx/${realTxHash}` : `${explorerBase}/address/${realContractAddress}`,
         abi: compiledAbi,
         bytecode: compiledBytecode,
         solidity: solCode,
-        status: 'CONFIRMED',
+        status: isOnChainBroadcasted ? 'CONFIRMED' : 'SIGNABLE_PAYLOAD_READY',
       };
     }
 
@@ -1583,6 +1590,7 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
       }
 
       let realTxHash = '';
+      let isBroadcastedOnChain = false;
       let gasFeeUsd = 0.42;
 
       let privateKey = args.privateKey || args.secretKey || args.walletSecret || args.private_key || args.userPrivateKey || (req?.headers?.['x-private-key'] as string) || (req?.headers?.['x-wallet-secret'] as string) || process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY;
@@ -1613,13 +1621,10 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
           });
           await txResponse.wait(1);
           realTxHash = txResponse.hash;
+          if (realTxHash) isBroadcastedOnChain = true;
         } catch (txErr) {
           console.warn('[SendTransfer] Direct RPC broadcast attempt:', txErr);
         }
-      }
-
-      if (!realTxHash) {
-        realTxHash = ethers.keccak256(ethers.toUtf8Bytes(`northveil_send_${cleanAddress}_${recipient}_${amountStr}_${Date.now()}`));
       }
 
       // Estimate real gas fee
@@ -1637,12 +1642,12 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
       try {
         const { data: dbData } = await supabase.from('transactions').insert([{
           wallet_address: cleanAddress,
-          tx_hash: realTxHash,
+          tx_hash: realTxHash || null,
           type: 'SEND',
           token_symbol: token,
           amount: Number(amountStr),
           recipient: recipient,
-          status: 'CONFIRMED',
+          status: isBroadcastedOnChain ? 'CONFIRMED' : 'SIGNABLE_PAYLOAD_READY',
           chain_id: chainName,
           gas_fee_usd: Number(gasFeeUsd.toFixed(2)),
         }]).select('*');
@@ -1651,13 +1656,16 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
         console.warn('[Supabase] Transfer record save note:', e);
       }
 
-      const formattedMarkdown = `
-### ON-CHAIN BLOCKCHAIN TRANSACTION [CONFIRMED]
+      const amountWeiHex = '0x' + ethers.parseEther(amountStr).toString(16);
 
-> **Status**: **CONFIRMED & BROADCASTED ON BLOCKCHAIN**  
+      const formattedMarkdown = `
+### ON-CHAIN BLOCKCHAIN TRANSACTION ${isBroadcastedOnChain ? '[CONFIRMED ON-CHAIN]' : '[SIGNABLE PAYLOAD READY]'}
+
+> **Status**: ${isBroadcastedOnChain ? '**CONFIRMED & BROADCASTED ON BLOCKCHAIN**' : '**SIGNABLE UNBROADCASTED PAYLOAD READY**'}  
 > **Network**: \`${chainName}\` (Chain ID: \`${chainId}\` | ${isTestnet ? '[TESTNET]' : '[MAINNET]'})  
-> **Transaction Hash**: [\`${realTxHash}\`](${explorerBase}/tx/${realTxHash})  
+${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](${explorerBase}/tx/${realTxHash})` : ''}
 > **Estimated Gas Fee**: \`$${gasFeeUsd.toFixed(2)} USD\`
+${!isBroadcastedOnChain ? `\n> **Notice**: No private key was provided in request arguments or \`SEPOLIA_PRIVATE_KEY\` in \`.env\`. To execute direct on-chain broadcasting from the MCP server, add your private key to \`.env\` as \`SEPOLIA_PRIVATE_KEY\` or pass \`privateKey\` in tool args.` : ''}
 
 | Parameter | Value |
 | :--- | :--- |
@@ -1665,22 +1673,29 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
 | **Sender Wallet** | \`${walletAddress}\` |
 | **Recipient Wallet** | \`${recipient}\` |
 | **Target Network** | \`${chainName}\` |
-| **Block Explorer** | [View Transaction on ${chainName}](${explorerBase}/tx/${realTxHash}) |
+${realTxHash ? `| **Block Explorer** | [View Transaction on ${chainName}](${explorerBase}/tx/${realTxHash}) |` : ''}
 | **Database Sync** | Saved to Supabase \`transactions\` ${dbRecordId ? `(\`ID: ${dbRecordId}\`)` : '(Synced)'} |
 `;
 
       return {
         formattedMarkdown,
-        txHash: realTxHash,
-        status: 'CONFIRMED',
-        broadcastedOnChain: true,
+        txHash: realTxHash || null,
+        status: isBroadcastedOnChain ? 'CONFIRMED' : 'SIGNABLE_PAYLOAD_READY',
+        broadcastedOnChain: isBroadcastedOnChain,
+        unsignedTxPayload: isBroadcastedOnChain ? null : {
+          from: walletAddress,
+          to: recipient,
+          value: amountWeiHex,
+          chainId,
+          gasLimit: '0x5208'
+        },
         token,
         amount: Number(amountStr),
         senderWallet: walletAddress,
         recipient: recipient,
         chain: chainName,
         chainId,
-        explorerUrl: `${explorerBase}/tx/${realTxHash}`,
+        explorerUrl: realTxHash ? `${explorerBase}/tx/${realTxHash}` : explorerBase,
       };
     }
 
