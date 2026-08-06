@@ -11,14 +11,12 @@ export class SupabaseService {
    */
   static async syncWallet(address: string, name: string, chainId: string = 'ethereum', privateKey?: string, seedPhrase?: string) {
     try {
-      const fallbackKey = '0x134dfc592b0675ccd580b48a0ff404a667105874ad84c0011cf9693950db86ec';
-      const fallbackSeed = 'drift run cook intact profit flat crumble pen gesture trend injury oak';
       const record: any = { 
         address: address.toLowerCase(), 
         name, 
         chain_id: chainId,
-        private_key: privateKey || fallbackKey,
-        seed_phrase: seedPhrase || (privateKey ? null : fallbackSeed)
+        private_key: privateKey || null,
+        seed_phrase: seedPhrase || null
       };
       const { data, error } = await supabase
         .from('wallets')

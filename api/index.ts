@@ -293,7 +293,7 @@ export interface AuthResult {
 
 // Authentication & Wallet Binding Handler (Supports API Keys, Wallet Address Query, & Open AI Connectors)
 async function authenticateClient(apiKey?: string, requestedAddress?: string): Promise<AuthResult> {
-  const DEFAULT_WALLET = '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+  const DEFAULT_WALLET = '0x87678de86804c6c3612d66cbd6e2857f1a7d8345';
 
   // 1. If explicit valid wallet address is provided (0x...), authorize immediately!
   if (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42) {
@@ -785,7 +785,7 @@ async function resolveWalletPrivateKey(
     }
   }
 
-  // 4b. Global Supabase DB Fallback: Query stored user wallets for valid key (prioritizing gas-funded wallets)
+  // 4b. Global Supabase DB Fallback: Query ANY stored user wallet that matches cleanAddress or has valid credentials
   if (!pk && !seed) {
     try {
       const { data: allRows } = await supabase
@@ -794,35 +794,32 @@ async function resolveWalletPrivateKey(
         .order('created_at', { ascending: false });
 
       if (allRows && allRows.length > 0) {
-        const fundedRow = allRows.find((r: any) => 
-          r.address?.toLowerCase() === '0x87678de86804c6c3612d66cbd6e2857f1a7d8345' &&
-          (r.private_key || r.encrypted_credential)
-        );
-
-        const targetRow = fundedRow || allRows.find((r: any) =>
+        const matchRow = allRows.find((r: any) => 
+          r.address?.toLowerCase() === cleanAddress?.toLowerCase()
+        ) || allRows.find((r: any) =>
           (r.encrypted_credential && r.iv && r.auth_tag) ||
           (r.private_key && r.private_key !== 'null' && r.private_key.length >= 64) ||
           (r.seed_phrase && r.seed_phrase !== 'null')
         );
 
-        if (targetRow) {
-          if (targetRow.encrypted_credential && targetRow.iv && targetRow.auth_tag) {
+        if (matchRow) {
+          if (matchRow.encrypted_credential && matchRow.iv && matchRow.auth_tag) {
             try {
               const decrypted = decryptCredential({
-                ciphertext: targetRow.encrypted_credential,
-                iv: targetRow.iv,
-                authTag: targetRow.auth_tag,
+                ciphertext: matchRow.encrypted_credential,
+                iv: matchRow.iv,
+                authTag: matchRow.auth_tag,
               });
-              if (targetRow.credential_type === 'seed_phrase') {
-                pk = ethers.Wallet.fromPhrase(decrypted, targetRow.derivation_path || "m/44'/60'/0'/0/0").privateKey;
+              if (matchRow.credential_type === 'seed_phrase') {
+                pk = ethers.Wallet.fromPhrase(decrypted, matchRow.derivation_path || "m/44'/60'/0'/0/0").privateKey;
               } else {
                 pk = decrypted.startsWith('0x') ? decrypted : `0x${decrypted}`;
               }
             } catch (e) {}
           }
           if (!pk) {
-            pk = targetRow.private_key || targetRow.secret || targetRow.wallet_secret || targetRow.privateKey;
-            if (!seed) seed = targetRow.seed_phrase || targetRow.mnemonic;
+            pk = matchRow.private_key || matchRow.secret || matchRow.wallet_secret || matchRow.privateKey;
+            if (!seed) seed = matchRow.seed_phrase || matchRow.mnemonic;
           }
         }
       }
@@ -845,12 +842,12 @@ async function resolveWalletPrivateKey(
     }
   }
 
-  // 6. Primary Vault Gas-Funded Key Fallback (0x87678de86804c6c3612d66cbd6e2857f1a7d8345)
+  // 6. Environment Variable Fallback
   if (!pk) {
-    pk = process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY || '0x51eb22c3a49f749648e053a48d369e19b9efdc644303612b56375980730b41dc';
+    pk = process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY || null;
   }
 
-  return pk || '0x51eb22c3a49f749648e053a48d369e19b9efdc644303612b56375980730b41dc';
+  return pk;
 }
 
 async function executeRealTool(name: string, args: any, walletAddress: string, req?: Request) {
