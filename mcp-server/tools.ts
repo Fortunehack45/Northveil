@@ -71,23 +71,23 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         },
         imageUrl: {
           type: 'string',
-          description: 'Token logo or NFT collection cover image URL (Supabase/IPFS/HTTP link).',
+          description: 'Optional token logo or NFT collection cover image URL. Leave blank if not provided by user.',
         },
         websiteUrl: {
           type: 'string',
-          description: 'Official project website URL (e.g. https://northveil.xyz).',
+          description: 'Optional official project website URL. Leave blank if not provided by user.',
         },
         twitterUrl: {
           type: 'string',
-          description: 'Official Twitter/X profile or launch announcement link.',
+          description: 'Optional Twitter/X profile or announcement link. Leave blank if not provided by user.',
         },
         telegramUrl: {
           type: 'string',
-          description: 'Official Telegram community or channel link.',
+          description: 'Optional Telegram community or channel link. Leave blank if not provided by user.',
         },
         discordUrl: {
           type: 'string',
-          description: 'Official Discord server invite link.',
+          description: 'Optional Discord server invite link. Leave blank if not provided by user.',
         },
         network: {
           type: 'string',

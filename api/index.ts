@@ -748,8 +748,8 @@ function formatUsdValue(num: number): string {
 
 // Helper to upload token logos and NFT images directly to Supabase Storage bucket
 async function uploadImageToSupabase(imageInput?: string, fileNamePrefix: string = 'token-asset'): Promise<string> {
-  if (!imageInput || typeof imageInput !== 'string') {
-    return 'https://northveil.xyz/logo.png';
+  if (!imageInput || typeof imageInput !== 'string' || !imageInput.trim()) {
+    return '';
   }
 
   if (imageInput.startsWith('http://') || imageInput.startsWith('https://')) {
@@ -790,7 +790,7 @@ async function uploadImageToSupabase(imageInput?: string, fileNamePrefix: string
     return publicUrlData?.publicUrl || `https://ulkbchewsrksgvlbzjzl.supabase.co/storage/v1/object/public/token-assets/${fileName}`;
   } catch (e) {
     console.warn('[Supabase Storage Exception Note]:', e);
-    return 'https://northveil.xyz/logo.png';
+    return '';
   }
 }
 
@@ -845,11 +845,16 @@ function parsePromptParameters(promptStr: string, args: any) {
   }
   ownerAllocNum = Math.min(ownerAllocNum, totalSupplyNum);
 
-  // 4. Extract Socials & Website
-  const websiteStr = args?.websiteUrl || args?.website || (promptStr.match(/https?:\/\/[^\s]+/i)?.[0]) || 'https://northveil.xyz';
-  const twitterStr = args?.twitterUrl || args?.twitter || 'https://x.com/northveil';
-  const telegramStr = args?.telegramUrl || args?.telegram || 'https://t.me/northveil';
-  const discordStr = args?.discordUrl || args?.discord || 'https://discord.gg/northveil';
+  // 4. Extract Socials & Website (IF NOT PROVIDED BY USER, LEAVE BLANK "")
+  const extractUrl = (pattern: RegExp) => {
+    const match = (promptStr || '').match(pattern);
+    return match ? match[0] : '';
+  };
+
+  const websiteStr = args?.websiteUrl || args?.website || extractUrl(/https?:\/\/(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?!\/(?:x|twitter|t\.me|discord))/i) || '';
+  const twitterStr = args?.twitterUrl || args?.twitter || extractUrl(/https?:\/\/(?:x\.com|twitter\.com)\/[a-zA-Z0-9_]+/i) || '';
+  const telegramStr = args?.telegramUrl || args?.telegram || extractUrl(/https?:\/\/t\.me\/[a-zA-Z0-9_]+/i) || '';
+  const discordStr = args?.discordUrl || args?.discord || extractUrl(/https?:\/\/discord\.(?:gg|com\/invite)\/[a-zA-Z0-9_]+/i) || '';
 
   return {
     pragmaVersion,
