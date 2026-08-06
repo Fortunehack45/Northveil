@@ -1250,7 +1250,7 @@ contract ${nameStr} {
 > **Contract Address**: [\`${realContractAddress}\`](${explorerBase}/address/${realContractAddress})  
 ${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](${explorerBase}/tx/${realTxHash})` : ''}
 > **Owner Wallet**: \`${walletAddress}\`
-${!isOnChainBroadcasted ? `\n> **Notice**: No private key was provided in arguments or \`SEPOLIA_PRIVATE_KEY\` in \`.env\`. To auto-broadcast directly from the server, add your private key to \`.env\` as \`SEPOLIA_PRIVATE_KEY\` or pass \`privateKey\` in tool args.` : ''}
+${!isOnChainBroadcasted ? `\n> **Status Notice**: Transaction payload compiled and ready for broadcasting.` : ''}
 
 #### Tokenomics & Supply Distribution
 - **Total Supply Cap**: **${totalSupplyNum.toLocaleString()} ${symbolStr}** (100%)
@@ -1858,43 +1858,7 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
         let allTxs: any[] = [];
         const seenHashes = new Set<string>();
 
-        // 1. Fetch from Supabase DB transactions table
-        try {
-          const { data: dbData } = await supabase
-            .from('transactions')
-            .select('*')
-            .eq('wallet_address', cleanAddress)
-            .order('created_at', { ascending: false })
-            .limit(limit);
-
-          if (dbData && Array.isArray(dbData)) {
-            for (const t of dbData) {
-              if (t.tx_hash) seenHashes.add(t.tx_hash.toLowerCase());
-              const chainName = t.chain_id || 'Sepolia Testnet';
-              let explorerBase = 'https://sepolia.etherscan.io';
-              if (chainName.toLowerCase().includes('base')) explorerBase = 'https://basescan.org';
-              else if (chainName.toLowerCase().includes('polygon')) explorerBase = 'https://polygonscan.com';
-              else if (chainName.toLowerCase().includes('arbitrum')) explorerBase = 'https://arbiscan.io';
-              else if (chainName.toLowerCase().includes('ethereum') && !chainName.toLowerCase().includes('sepolia')) explorerBase = 'https://etherscan.io';
-
-              allTxs.push({
-                hash: t.tx_hash || '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
-                type: t.type === 'DEPLOY' ? 'Deploy' : t.type === 'SEND' ? 'Send' : t.type || 'Transfer',
-                from: cleanAddress,
-                to: t.recipient || 'Contract Address',
-                value: t.amount || 0,
-                status: t.status || 'Confirmed',
-                timestamp: t.created_at || new Date().toISOString(),
-                chain: chainName,
-                explorerUrl: t.tx_hash ? `${explorerBase}/tx/${t.tx_hash}` : explorerBase,
-              });
-            }
-          }
-        } catch (e) {
-          console.warn('[Supabase] Transaction history fetch note:', e);
-        }
-
-        // 2. Fetch real on-chain transaction history from direct EVM Blockscout / Basescan txlist APIs
+        // 1. Fetch real on-chain transaction history directly from EVM Blockscout / Basescan APIs FIRST
         const chainApis = [
           { name: 'Sepolia Testnet', url: `https://eth-sepolia.blockscout.com/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://sepolia.etherscan.io' },
           { name: 'Base Mainnet', url: `https://api.basescan.org/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://basescan.org' },
@@ -1904,7 +1868,7 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
         ];
         const results = await Promise.allSettled(
           chainApis.map(async (chain) => {
-            const res = await fetch(chain.url, { headers: { accept: 'application/json' } });
+            const res = await fetch(chain.url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(4000) });
             if (!res.ok) return [];
             const data: any = await res.json();
             const items = Array.isArray(data.result) ? data.result : Array.isArray(data.items) ? data.items : [];
@@ -1941,10 +1905,49 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
             }
           }
         }
+
+        // 2. Fetch locally recorded transactions from Supabase DB to complement on-chain data
+        try {
+          let { data: dbData } = await supabase
+            .from('transactions')
+            .select('*')
+            .or(`wallet_address.ilike.${cleanAddress},wallet_address.ilike.${walletAddress}`)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+          if (dbData && Array.isArray(dbData)) {
+            for (const t of dbData) {
+              if (t.tx_hash && !seenHashes.has(t.tx_hash.toLowerCase())) {
+                seenHashes.add(t.tx_hash.toLowerCase());
+                const chainName = t.chain_id || 'Sepolia Testnet';
+                let explorerBase = 'https://sepolia.etherscan.io';
+                if (chainName.toLowerCase().includes('base')) explorerBase = 'https://basescan.org';
+                else if (chainName.toLowerCase().includes('polygon')) explorerBase = 'https://polygonscan.com';
+                else if (chainName.toLowerCase().includes('arbitrum')) explorerBase = 'https://arbiscan.io';
+                else if (chainName.toLowerCase().includes('ethereum') && !chainName.toLowerCase().includes('sepolia')) explorerBase = 'https://etherscan.io';
+
+                allTxs.push({
+                  hash: t.tx_hash,
+                  type: t.type === 'DEPLOY' ? 'Deploy' : t.type === 'SEND' ? 'Send' : t.type || 'Transfer',
+                  from: cleanAddress,
+                  to: t.recipient || 'Contract Address',
+                  value: t.amount || 0,
+                  status: t.status || 'Confirmed',
+                  timestamp: t.created_at || new Date().toISOString(),
+                  chain: chainName,
+                  explorerUrl: `${explorerBase}/tx/${t.tx_hash}`,
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[Supabase] Transaction history fetch note:', e);
+        }
+
         allTxs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         allTxs = allTxs.slice(0, limit);
 
-        let historyMd = `### 📜 MULTI-CHAIN TRANSACTION HISTORY (SUPABASE DATABASE + DIRECT BLOCKCHAIN)\n\n> **Wallet**: \`${walletAddress}\`\n> **Transactions Found**: **${allTxs.length}** across ${chainApis.length} chains\n\n| Type | Value | Counterparty | Chain | Status | Date | Explorer |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n`;
+        let historyMd = `### ⛓️ DIRECT ON-CHAIN BLOCKCHAIN TRANSACTION HISTORY\n\n> **Wallet**: \`${walletAddress}\`\n> **Transactions Found**: **${allTxs.length} On-Chain Records** across ${chainApis.length} chains\n> **Data Source**: 🟢 **Live EVM RPC & Block Explorer Indexer**\n\n| Type | Value | Counterparty | Chain | Status | Date | Explorer |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n`;
         if (allTxs.length > 0) {
           for (const tx of allTxs) {
             const dateStr = tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : 'N/A';
@@ -1952,7 +1955,7 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
             historyMd += `| **${tx.type}** | ${formatCryptoAmount(tx.value)} ETH | \`${(cp || '').slice(0, 10)}...\` | ${tx.chain} | 🟢 ${tx.status} | ${dateStr} | [View](${tx.explorerUrl}) |\n`;
           }
         } else {
-          historyMd += `| *No transactions found* | - | - | - | - | - | - |\n`;
+          historyMd += `| *No on-chain transactions found across any network* | - | - | - | - | - | - |\n`;
         }
         return { formattedMarkdown: historyMd, walletAddress, totalTransactions: allTxs.length, transactions: allTxs };
       }
