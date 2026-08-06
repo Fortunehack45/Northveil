@@ -136,7 +136,7 @@ const RotatingRing: React.FC<{ size?: number; color?: string }> = ({ size = 96, 
 );
 
 export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({ onClose }) => {
-  const { seedPhrase, setSeedPhrase, restoreWalletFromSeed, createSubWallet, renameSubWallet, setActiveChain, setupVault } = useWallet();
+  const { seedPhrase, setSeedPhrase, restoreWalletFromSeed, restoreWalletFromPrivateKey, createSubWallet, renameSubWallet, setActiveChain, setupVault } = useWallet();
   const [selectedChain, setSelectedChain] = useState<NetworkId>('ethereum');
   const [step, setStep] = useState<
     'splash' | 'welcome' | 'createName' | 'createSeed' | 'createVerify' | 'createVault' | 'importWallet' | 'login' | 'processing'
@@ -236,7 +236,15 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({ onClos
     setProcessingProgress(70);
     await new Promise(r => setTimeout(r, 400));
 
-    const restored = restoreWalletFromSeed(seedPhrase);
+    const isPrivateKey = seedPhrase.length === 1 && (seedPhrase[0].startsWith('0x') || seedPhrase[0].length === 64);
+    let restored = false;
+
+    if (isPrivateKey) {
+      restored = restoreWalletFromPrivateKey(seedPhrase[0], walletNameInput, selectedChain);
+    } else {
+      restored = restoreWalletFromSeed(seedPhrase);
+    }
+
     if (restored) {
       renameSubWallet('acc-0', walletNameInput);
       setActiveChain(selectedChain);
@@ -268,9 +276,8 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({ onClos
         alert(validation.message || 'Invalid private key format for selected chain');
         return;
       }
-      // Deriving a single-address seed/account representation
-      alert('Private key validated! Note: Private key import controls only this single imported address.');
-      setSeedPhrase([]); // Single private key import mode
+      const cleanKey = key.startsWith('0x') ? key : `0x${key}`;
+      setSeedPhrase([cleanKey]);
       goForward('createVault');
     } else {
       alert(`${importType.toUpperCase()} import will be available in next release.`);

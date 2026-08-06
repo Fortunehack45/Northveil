@@ -791,39 +791,7 @@ export const INITIAL_ASSETS: CryptoAsset[] = [
   }
 ];
 
-export const INITIAL_NFTS: NFTAsset[] = [
-  {
-    id: 'nft-genesis-key',
-    name: 'Northveil Alpha Genesis Vault Pass',
-    collection: 'Northveil Core Protocol',
-    image: 'https://iili.io/CgBPBHv.jpg',
-    tokenId: '#0042',
-    network: 'ethereum',
-    floorPrice: '0.45 ETH',
-    estUsd: '$1,550.00',
-    contract: '0x3892a71d87192a71d87192a71d87192a71d87192',
-    attributes: [
-      { trait: 'Access Tier', value: 'Alpha Master' },
-      { trait: 'Security Level', value: 'AES-256-GCM' },
-      { trait: 'MCP Status', value: 'Unlimited Authority' }
-    ]
-  },
-  {
-    id: 'nft-[#0108]',
-    name: 'Northveil Quantum Node #0108',
-    collection: 'Northveil Cyber Network',
-    image: 'https://iili.io/CgBPBHv.jpg',
-    tokenId: '#0108',
-    network: 'base',
-    floorPrice: '0.18 ETH',
-    estUsd: '$620.00',
-    contract: '0x8891a71d87192a71d87192a71d87192a71d87198',
-    attributes: [
-      { trait: 'Network', value: 'Base L2' },
-      { trait: 'Multi-Tenant', value: 'Active' }
-    ]
-  }
-];
+export const INITIAL_NFTS: NFTAsset[] = [];
 
 export const INITIAL_TRANSACTIONS: Transaction[] = [];
 

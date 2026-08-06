@@ -78,8 +78,8 @@ export class VaultService {
    * @returns The encrypted vault object (also persisted to localStorage)
    */
   static async encryptAndSave(seedPhrase: string[], password: string): Promise<EncryptedVault> {
-    if (!seedPhrase || seedPhrase.length < 12) {
-      throw new Error('Invalid seed phrase: must be at least 12 words');
+    if (!seedPhrase || seedPhrase.length === 0) {
+      throw new Error('Invalid vault payload: cannot be empty');
     }
     if (!password || password.length < 1) {
       throw new Error('Password is required to encrypt the vault');

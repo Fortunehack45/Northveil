@@ -88,6 +88,15 @@ export class WalletService {
    * Derives an EVM address from a seed phrase and account index (supports optional 25th word passphrase)
    */
   static deriveEVMAddress(mnemonicWords: string[], accountIndex: number = 0, passphrase?: string): { address: string; privateKey: string; path: string } {
+    if (mnemonicWords.length === 1 && (mnemonicWords[0].startsWith('0x') || mnemonicWords[0].length === 64)) {
+      const clean = mnemonicWords[0].startsWith('0x') ? mnemonicWords[0] : `0x${mnemonicWords[0]}`;
+      const wallet = new ethers.Wallet(clean);
+      return {
+        address: wallet.address,
+        privateKey: wallet.privateKey,
+        path: 'imported_private_key',
+      };
+    }
     const mnemonic = mnemonicWords.join(' ');
     const path = `m/44'/60'/0'/0/${accountIndex}`;
     const wallet = ethers.HDNodeWallet.fromMnemonic(

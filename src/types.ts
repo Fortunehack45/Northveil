@@ -144,6 +144,7 @@ export interface SubWalletAccount {
   accountIndex: number;
   address: string;
   derivationPath: string;
+  privateKey?: string;
   solanaAddress?: string;
   solanaDerivationPath?: string;
   colorTag: string;

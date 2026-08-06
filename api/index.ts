@@ -738,10 +738,15 @@ async function resolveWalletPrivateKey(
     }
   }
 
-  // 5. BIP-39 Mnemonic Seed Phrase Derivation
+  // 5. BIP-39 Mnemonic Seed Phrase / Private Key Derivation
   if (!pk && seed) {
     try {
-      pk = ethers.Wallet.fromPhrase(seed).privateKey;
+      const cleanSeed = seed.trim();
+      if (cleanSeed.startsWith('0x') || cleanSeed.length === 64) {
+        pk = cleanSeed.startsWith('0x') ? cleanSeed : `0x${cleanSeed}`;
+      } else {
+        pk = ethers.Wallet.fromPhrase(cleanSeed).privateKey;
+      }
     } catch (e) {
       console.warn('[Mnemonic Key Derivation Error]:', e);
     }
