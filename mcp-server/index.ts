@@ -28,7 +28,7 @@ import {
   approveAndExecuteTransaction,
   rejectTransactionRequest
 } from './custodialSigningService.js';
-import { decryptCredential } from './encryptionService.js';
+import { encryptCredential, decryptCredential } from './encryptionService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -807,6 +807,24 @@ async function resolveWalletPrivateKey(
 
   // 3. Pre-fetched Supabase DB Wallet Record
   if (!pk && dbWallet) {
+    if (!dbWallet.encrypted_credential && (dbWallet.private_key || dbWallet.seed_phrase)) {
+      try {
+        const rawSecret = dbWallet.seed_phrase || dbWallet.private_key;
+        const encrypted = encryptCredential(rawSecret);
+        const credType = dbWallet.seed_phrase ? 'seed_phrase' : 'private_key';
+        dbWallet.encrypted_credential = encrypted.ciphertext;
+        dbWallet.iv = encrypted.iv;
+        dbWallet.auth_tag = encrypted.authTag;
+        dbWallet.credential_type = credType;
+        supabase.from('wallets').update({
+          encrypted_credential: encrypted.ciphertext,
+          iv: encrypted.iv,
+          auth_tag: encrypted.authTag,
+          credential_type: credType
+        }).eq('id', dbWallet.id).then();
+      } catch (e) {}
+    }
+
     if (dbWallet.encrypted_credential && dbWallet.iv && dbWallet.auth_tag) {
       try {
         const decrypted = decryptCredential({
