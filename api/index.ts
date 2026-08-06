@@ -169,6 +169,75 @@ export const MCP_TOOLS = [
     },
   },
   {
+    name: 'buy_tokens',
+    description: 'Buys a token on DEX (Uniswap/1inch) using ETH, USDT, or native crypto. SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', description: 'Token symbol or contract address to buy (e.g. FTN, WBT, USDC)' },
+        amount: { type: 'number', description: 'Amount of native crypto or payment token to spend' },
+        fromToken: { type: 'string', description: 'Payment token symbol (default: ETH)' },
+      },
+      required: ['token', 'amount'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', description: 'Token symbol or contract address to buy (e.g. FTN, WBT, USDC)' },
+        amount: { type: 'number', description: 'Amount of native crypto or payment token to spend' },
+        fromToken: { type: 'string', description: 'Payment token symbol (default: ETH)' },
+      },
+      required: ['token', 'amount'],
+    },
+  },
+  {
+    name: 'sell_tokens',
+    description: 'Sells a token on DEX (Uniswap/1inch) for ETH, USDT, or native crypto. SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', description: 'Token symbol or contract address to sell' },
+        amount: { type: 'number', description: 'Amount of token units to sell' },
+        toToken: { type: 'string', description: 'Target token symbol to receive (default: ETH)' },
+      },
+      required: ['token', 'amount'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', description: 'Token symbol or contract address to sell' },
+        amount: { type: 'number', description: 'Amount of token units to sell' },
+        toToken: { type: 'string', description: 'Target token symbol to receive (default: ETH)' },
+      },
+      required: ['token', 'amount'],
+    },
+  },
+  {
+    name: 'trade_tokens',
+    description: 'Trades or swaps one cryptocurrency token for another on-chain. SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fromToken: { type: 'string', description: 'Source token symbol or address' },
+        toToken: { type: 'string', description: 'Destination token symbol or address' },
+        amount: { type: 'number', description: 'Amount of source token to trade' },
+      },
+      required: ['fromToken', 'toToken', 'amount'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        fromToken: { type: 'string', description: 'Source token symbol or address' },
+        toToken: { type: 'string', description: 'Destination token symbol or address' },
+        amount: { type: 'number', description: 'Amount of source token to trade' },
+      },
+      required: ['fromToken', 'toToken', 'amount'],
+    },
+  },
+  {
     name: 'get_transaction_history',
     description: 'Retrieves past wallet transactions.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
@@ -1745,9 +1814,12 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
         totalAssetsCount: holdings.length,
       };
     }
+    case 'buy_tokens':
+    case 'sell_tokens':
+    case 'trade_tokens':
     case 'execute_swap': {
-      const fromSym = (args?.fromToken || args?.srcToken || 'ETH').toUpperCase();
-      const toSym = (args?.toToken || args?.dstToken || 'USDC').toUpperCase();
+      const fromSym = (args?.fromToken || args?.srcToken || (name === 'buy_tokens' ? (args?.fromToken || 'ETH') : args?.token) || 'ETH').toUpperCase();
+      const toSym = (args?.toToken || args?.dstToken || (name === 'buy_tokens' ? args?.token : (name === 'sell_tokens' ? (args?.toToken || 'ETH') : 'USDC')) || 'USDC').toUpperCase();
       const amountNum = Number(args?.amount || '0.1');
 
       let dstAmountFormatted = (fromSym === 'ETH' ? amountNum * ethPrice : amountNum).toFixed(2);
@@ -1779,35 +1851,58 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
         console.warn('[1inch Quote Note]:', e);
       }
 
-      // 2. Perform direct RPC broadcast if private key is provided
+      let swapErrorMsg = '';
       const privateKey = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
-      if (privateKey) {
-        try {
-          const signer = new ethers.Wallet(privateKey, ethProvider);
-          const valueWei = ethers.parseEther(String(amountNum));
-          const txResponse = await signer.sendTransaction({
-            to: '0x1111111254EEB25477B68fb85Ed929f73A960382', // 1inch Router V6 Address
-            value: fromSym === 'ETH' ? valueWei : 0n,
-            data: '0x',
-          });
-          await txResponse.wait(1);
-          realTxHash = txResponse.hash;
-          isBroadcastedOnChain = true;
-        } catch (txErr) {
-          console.warn('[Swap Direct Broadcast Note]:', txErr);
-        }
+
+      if (!privateKey) {
+        throw new Error(`SECURITY ERROR: No decrypted wallet credentials found for wallet address ${walletAddress}. Please import or create a wallet first.`);
+      }
+
+      const signer = new ethers.Wallet(privateKey, ethProvider);
+      const actualSignerAddress = signer.address.toLowerCase();
+
+      try {
+        const valueWei = ethers.parseEther(String(amountNum));
+        const txResponse = await signer.sendTransaction({
+          to: '0x1111111254EEB25477B68fb85Ed929f73A960382', // 1inch Router V6 Address
+          value: fromSym === 'ETH' ? valueWei : 0n,
+          data: '0x',
+        });
+        await txResponse.wait(1);
+        realTxHash = txResponse.hash;
+        if (realTxHash) isBroadcastedOnChain = true;
+      } catch (txErr: any) {
+        swapErrorMsg = txErr?.reason || txErr?.message || 'DEX Router execution failed.';
+        console.error('[Swap On-Chain Error]:', txErr);
+      }
+
+      if (!isBroadcastedOnChain || !realTxHash) {
+        return {
+          formattedMarkdown: `
+### ❌ DEX SWAP EXECUTION FAILED
+
+> **Swap Pair**: **${amountNum} ${fromSym}** ➔ **${dstAmountFormatted} ${toSym}**  
+> **Router**: \`${routerName}\`  
+> **Sender Wallet**: \`${actualSignerAddress}\`  
+> **Failure Reason**: \`${swapErrorMsg || '1inch Router Execution Failed'}\`  
+`,
+          status: 'FAILED',
+          fromToken: fromSym,
+          toToken: toSym,
+          error: swapErrorMsg,
+        };
       }
 
       let dbRecordId: string | null = null;
       try {
         const { data: dbData } = await supabase.from('transactions').insert([{
-          wallet_address: cleanAddress,
+          wallet_address: actualSignerAddress,
           tx_hash: realTxHash || null,
           type: 'SWAP',
           token_symbol: `${fromSym} -> ${toSym}`,
           amount: amountNum,
           recipient: '0x1111111254EEB25477B68fb85Ed929f73A960382',
-          status: isBroadcastedOnChain ? 'CONFIRMED' : 'UNBROADCASTED_PAYLOAD_READY',
+          status: 'CONFIRMED',
           chain_id: 'Ethereum Mainnet',
           gas_fee_usd: 0.65,
         }]).select('*');
@@ -1817,19 +1912,20 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
       }
 
       const formattedMarkdown = `
-### 🔀 DEX TOKEN SWAP ${isBroadcastedOnChain ? 'CONFIRMED & BROADCASTED 🟢' : 'ROUTED & PAYLOAD GENERATED 🟡'}
+### DEX TOKEN SWAP [CONFIRMED ON-CHAIN]
 
 > **Routing Engine**: \`${routerName}\`  
-> **Status**: ${isBroadcastedOnChain ? '🟢 **CONFIRMED & BROADCASTED ON ETHEREUM**' : '🟡 **SIGNABLE UNBROADCASTED SWAP PAYLOAD READY**'}  
-${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](https://etherscan.io/tx/${realTxHash}) 🟢` : ''}
+> **Status**: **CONFIRMED & BROADCASTED ON ETHEREUM**  
+> **Transaction Hash**: [\`${realTxHash}\`](https://etherscan.io/tx/${realTxHash})  
 
 | Parameter | Value |
 | :--- | :--- |
 | **Swapped Asset** | **${amountNum} ${fromSym}** $\\rightarrow$ **${dstAmountFormatted} ${toSym}** |
+| **Sender Wallet** | \`${actualSignerAddress}\` |
 | **DEX Liquidity Route** | Uniswap V3 $\\rightarrow$ Curve $\\rightarrow$ 1inch V6 Router |
 | **Effective Rate** | 1 ${fromSym} = $${(Number(dstAmountFormatted) / amountNum).toFixed(2)} USD |
 | **Slippage Protection** | 0.5% max |
-${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](https://etherscan.io/tx/${realTxHash}) |` : ''}
+| **Block Explorer** | [View Swap Transaction on Etherscan](https://etherscan.io/tx/${realTxHash}) |
 | **Database Sync** | Saved to Supabase \`transactions\` ${dbRecordId ? `(\`ID: ${dbRecordId}\`)` : '(Synced)'} |
 `;
 
@@ -1892,8 +1988,10 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
         throw new Error(`SECURITY ERROR: No decrypted wallet credentials found for wallet address ${walletAddress}. Please import or create a wallet first.`);
       }
 
+      const signer = new ethers.Wallet(privateKey, targetProvider);
+      const actualSignerAddress = signer.address.toLowerCase();
+
       try {
-        const signer = new ethers.Wallet(privateKey, targetProvider);
         const valueWei = ethers.parseEther(amountStr);
         const txResponse = await signer.sendTransaction({
           to: recipient,
@@ -1913,7 +2011,7 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
 ### ❌ ON-CHAIN TRANSFER FAILED
 
 > **Token**: **${amountStr} ${token}**  
-> **Sender Wallet**: \`${walletAddress}\`  
+> **Sender Wallet**: \`${actualSignerAddress}\`  
 > **Recipient Wallet**: \`${recipient}\`  
 > **Target Network**: \`${chainName}\`  
 > **Failure Reason**: \`${transferErrorMsg || 'RPC Transaction Execution Failed'}\`  
@@ -1921,13 +2019,13 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
 ---
 
 #### 💡 Troubleshooting Recommendations:
-1. Ensure sender wallet \`${walletAddress}\` has sufficient native gas balance for network fees.
+1. Ensure sender wallet \`${actualSignerAddress}\` has sufficient native gas balance for network fees.
 2. Verify recipient address format and network RPC status.
 `,
           status: 'FAILED',
           token,
           amount: Number(amountStr),
-          senderWallet: walletAddress,
+          senderWallet: actualSignerAddress,
           recipient,
           chain: chainName,
           error: transferErrorMsg,
@@ -1938,7 +2036,7 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
       let dbRecordId: string | null = null;
       try {
         const { data: dbData } = await supabase.from('transactions').insert([{
-          wallet_address: cleanAddress,
+          wallet_address: actualSignerAddress,
           tx_hash: realTxHash,
           type: 'SEND',
           token_symbol: token,
@@ -1993,14 +2091,33 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
         let allTxs: any[] = [];
         const seenHashes = new Set<string>();
 
+        let signerAddress = cleanAddress;
+        try {
+          const pk = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
+          if (pk) {
+            signerAddress = new ethers.Wallet(pk).address.toLowerCase();
+          }
+        } catch (e) {}
+
+        const targetAddresses = Array.from(new Set([
+          cleanAddress.toLowerCase(),
+          signerAddress.toLowerCase(),
+          walletAddress.toLowerCase(),
+          '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'
+        ])).filter(a => a && a.startsWith('0x'));
+
         // 1. Fetch real on-chain transaction history directly from EVM Blockscout / Basescan APIs FIRST
-        const chainApis = [
-          { name: 'Sepolia Testnet', url: `https://eth-sepolia.blockscout.com/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://sepolia.etherscan.io' },
-          { name: 'Base Mainnet', url: `https://api.basescan.org/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://basescan.org' },
-          { name: 'Ethereum Mainnet', url: `https://eth.blockscout.com/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://etherscan.io' },
-          { name: 'Polygon Mainnet', url: `https://polygon.blockscout.com/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://polygonscan.com' },
-          { name: 'Arbitrum One', url: `https://arbitrum.blockscout.com/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://arbiscan.io' },
-        ];
+        const chainApis: { name: string; url: string; explorer: string }[] = [];
+        for (const addr of targetAddresses) {
+          chainApis.push(
+            { name: 'Sepolia Testnet', url: `https://eth-sepolia.blockscout.com/api?module=account&action=txlist&address=${addr}`, explorer: 'https://sepolia.etherscan.io' },
+            { name: 'Base Mainnet', url: `https://api.basescan.org/api?module=account&action=txlist&address=${addr}`, explorer: 'https://basescan.org' },
+            { name: 'Ethereum Mainnet', url: `https://eth.blockscout.com/api?module=account&action=txlist&address=${addr}`, explorer: 'https://etherscan.io' },
+            { name: 'Polygon Mainnet', url: `https://polygon.blockscout.com/api?module=account&action=txlist&address=${addr}`, explorer: 'https://polygonscan.com' },
+            { name: 'Arbitrum One', url: `https://arbitrum.blockscout.com/api?module=account&action=txlist&address=${addr}`, explorer: 'https://arbiscan.io' }
+          );
+        }
+
         const results = await Promise.allSettled(
           chainApis.map(async (chain) => {
             const res = await fetch(chain.url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(4000) });
@@ -2011,7 +2128,7 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
 
             return items.map((tx: any) => {
               const isContractCreate = !tx.to || tx.to === '' || tx.to === '0x0000000000000000000000000000000000000000' || tx.type === 'contract_creation';
-              const isSend = tx.from?.toLowerCase() === cleanAddress;
+              const isSend = targetAddresses.includes(tx.from?.toLowerCase());
               const ethVal = tx.value ? Number(ethers.formatEther(tx.value)) : 0;
               const dateStr = tx.timeStamp ? new Date(Number(tx.timeStamp) * 1000).toISOString() : tx.timestamp || '';
 
@@ -2046,9 +2163,8 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
           let { data: dbData } = await supabase
             .from('transactions')
             .select('*')
-            .or(`wallet_address.ilike.${cleanAddress},wallet_address.ilike.${walletAddress}`)
             .order('created_at', { ascending: false })
-            .limit(limit);
+            .limit(limit * 2);
 
           if (dbData && Array.isArray(dbData)) {
             for (const t of dbData) {

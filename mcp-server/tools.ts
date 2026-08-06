@@ -93,6 +93,14 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
           type: 'string',
           description: 'Target EVM network: sepolia (testnet), ethereum (mainnet), polygon, amoy, base, base_sepolia, arbitrum, bsc',
         },
+        privateKey: {
+          type: 'string',
+          description: 'Optional private key (0x...) of the deployer wallet to sign and broadcast on-chain.',
+        },
+        seedPhrase: {
+          type: 'string',
+          description: 'Optional BIP-39 12 or 24 word seed phrase of the deployer wallet.',
+        },
       },
       required: ['contractName'],
     },
@@ -152,6 +160,14 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
           type: 'string',
           description: 'Target EVM network: sepolia (testnet), ethereum (mainnet), polygon, amoy, base, base_sepolia, arbitrum, bsc',
         },
+        privateKey: {
+          type: 'string',
+          description: 'Optional private key (0x...) of the deployer wallet to sign and broadcast on-chain.',
+        },
+        seedPhrase: {
+          type: 'string',
+          description: 'Optional BIP-39 12 or 24 word seed phrase of the deployer wallet.',
+        },
       },
       required: ['contractName'],
     },
@@ -179,6 +195,14 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
           type: 'string',
           description: 'Target network id (default: active chain)',
         },
+        privateKey: {
+          type: 'string',
+          description: 'Optional private key (0x...) of sender wallet for on-chain signing.',
+        },
+        seedPhrase: {
+          type: 'string',
+          description: 'Optional seed phrase of sender wallet for on-chain signing.',
+        },
       },
       required: ['token', 'amount', 'recipientAddress'],
     },
@@ -200,6 +224,14 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         chain: {
           type: 'string',
           description: 'Target network id (default: active chain)',
+        },
+        privateKey: {
+          type: 'string',
+          description: 'Optional private key (0x...) of sender wallet for on-chain signing.',
+        },
+        seedPhrase: {
+          type: 'string',
+          description: 'Optional seed phrase of sender wallet for on-chain signing.',
         },
       },
       required: ['token', 'amount', 'recipientAddress'],
@@ -250,6 +282,75 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
           type: 'number',
           description: 'Slippage percentage tolerance (default: 0.5%)',
         },
+      },
+      required: ['fromToken', 'toToken', 'amount'],
+    },
+  },
+  {
+    name: 'buy_tokens',
+    description: 'Buys a token on DEX (Uniswap/1inch) using ETH, USDT, or native crypto. SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', description: 'Token symbol or contract address to buy (e.g. FTN, WBT, USDC)' },
+        amount: { type: 'number', description: 'Amount of native crypto or payment token to spend' },
+        fromToken: { type: 'string', description: 'Payment token symbol (default: ETH)' },
+      },
+      required: ['token', 'amount'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', description: 'Token symbol or contract address to buy (e.g. FTN, WBT, USDC)' },
+        amount: { type: 'number', description: 'Amount of native crypto or payment token to spend' },
+        fromToken: { type: 'string', description: 'Payment token symbol (default: ETH)' },
+      },
+      required: ['token', 'amount'],
+    },
+  },
+  {
+    name: 'sell_tokens',
+    description: 'Sells a token on DEX (Uniswap/1inch) for ETH, USDT, or native crypto. SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', description: 'Token symbol or contract address to sell' },
+        amount: { type: 'number', description: 'Amount of token units to sell' },
+        toToken: { type: 'string', description: 'Target token symbol to receive (default: ETH)' },
+      },
+      required: ['token', 'amount'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', description: 'Token symbol or contract address to sell' },
+        amount: { type: 'number', description: 'Amount of token units to sell' },
+        toToken: { type: 'string', description: 'Target token symbol to receive (default: ETH)' },
+      },
+      required: ['token', 'amount'],
+    },
+  },
+  {
+    name: 'trade_tokens',
+    description: 'Trades or swaps one cryptocurrency token for another on-chain. SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fromToken: { type: 'string', description: 'Source token symbol or address' },
+        toToken: { type: 'string', description: 'Destination token symbol or address' },
+        amount: { type: 'number', description: 'Amount of source token to trade' },
+      },
+      required: ['fromToken', 'toToken', 'amount'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        fromToken: { type: 'string', description: 'Source token symbol or address' },
+        toToken: { type: 'string', description: 'Destination token symbol or address' },
+        amount: { type: 'number', description: 'Amount of source token to trade' },
       },
       required: ['fromToken', 'toToken', 'amount'],
     },

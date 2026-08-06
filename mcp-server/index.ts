@@ -2090,8 +2090,10 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
         throw new Error(`SECURITY ERROR: No decrypted wallet credentials found for wallet address ${walletAddress}. Please import or create a wallet first.`);
       }
 
+      const signer = new ethers.Wallet(privateKey, targetProvider);
+      const actualSignerAddress = signer.address.toLowerCase();
+
       try {
-        const signer = new ethers.Wallet(privateKey, targetProvider);
         const valueWei = ethers.parseEther(amountStr);
         const txResponse = await signer.sendTransaction({
           to: recipient,
@@ -2111,7 +2113,7 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
 ### ❌ ON-CHAIN TRANSFER FAILED
 
 > **Token**: **${amountStr} ${token}**  
-> **Sender Wallet**: \`${walletAddress}\`  
+> **Sender Wallet**: \`${actualSignerAddress}\`  
 > **Recipient Wallet**: \`${recipient}\`  
 > **Target Network**: \`${chainName}\`  
 > **Failure Reason**: \`${transferErrorMsg || 'RPC Transaction Execution Failed'}\`  
@@ -2119,13 +2121,13 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
 ---
 
 #### 💡 Troubleshooting Recommendations:
-1. Ensure sender wallet \`${walletAddress}\` has sufficient native gas balance for network fees.
+1. Ensure sender wallet \`${actualSignerAddress}\` has sufficient native gas balance for network fees.
 2. Verify recipient address format and network RPC connectivity.
 `,
           status: 'FAILED',
           token,
           amount: Number(amountStr),
-          senderWallet: walletAddress,
+          senderWallet: actualSignerAddress,
           recipient,
           chain: chainName,
           error: transferErrorMsg,
@@ -2146,7 +2148,7 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
       let dbRecordId: string | null = null;
       try {
         const { data: dbData } = await supabase.from('transactions').insert([{
-          wallet_address: cleanAddress,
+          wallet_address: actualSignerAddress,
           tx_hash: realTxHash || null,
           type: 'SEND',
           token_symbol: token,
@@ -2431,9 +2433,12 @@ ${solCode}
       };
     }
 
+    case 'buy_tokens':
+    case 'sell_tokens':
+    case 'trade_tokens':
     case 'execute_swap': {
-      const fromSym = (args.fromToken || args.srcToken || 'ETH').toUpperCase();
-      const toSym = (args.toToken || args.dstToken || 'USDC').toUpperCase();
+      const fromSym = (args.fromToken || args.srcToken || (name === 'buy_tokens' ? (args.fromToken || 'ETH') : args.token) || 'ETH').toUpperCase();
+      const toSym = (args.toToken || args.dstToken || (name === 'buy_tokens' ? args.token : (name === 'sell_tokens' ? (args.toToken || 'ETH') : 'USDC')) || 'USDC').toUpperCase();
       const amountNum = Number(args.amount || '0.1');
 
       let dstAmountFormatted = (fromSym === 'ETH' ? amountNum * ethPrice : amountNum).toFixed(2);
@@ -2565,14 +2570,34 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
       let allTxs: any[] = [];
       const seenHashes = new Set<string>();
 
-      // 1. Fetch real on-chain transaction history directly from EVM Blockscout / Basescan APIs FIRST
-      const chainApis = [
-        { name: 'Sepolia Testnet', url: `https://eth-sepolia.blockscout.com/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://sepolia.etherscan.io' },
-        { name: 'Base Mainnet', url: `https://api.basescan.org/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://basescan.org' },
-        { name: 'Ethereum Mainnet', url: `https://eth.blockscout.com/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://etherscan.io' },
-        { name: 'Polygon Mainnet', url: `https://polygon.blockscout.com/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://polygonscan.com' },
-        { name: 'Arbitrum One', url: `https://arbitrum.blockscout.com/api?module=account&action=txlist&address=${cleanAddress}`, explorer: 'https://arbiscan.io' },
-      ];
+      // Resolve private key and signer address if provided
+      let signerAddress = cleanAddress;
+      try {
+        const pk = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
+        if (pk) {
+          signerAddress = new ethers.Wallet(pk).address.toLowerCase();
+        }
+      } catch (e) {}
+
+      // Collect all candidate target addresses (cleanAddress, signerAddress, vault fallback)
+      const targetAddresses = Array.from(new Set([
+        cleanAddress.toLowerCase(),
+        signerAddress.toLowerCase(),
+        walletAddress.toLowerCase(),
+        '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'
+      ])).filter(a => a && a.startsWith('0x'));
+
+      // 1. Fetch real on-chain transaction history directly from EVM Blockscout / Basescan APIs for all target addresses
+      const chainApis: { name: string; url: string; explorer: string }[] = [];
+      for (const addr of targetAddresses) {
+        chainApis.push(
+          { name: 'Sepolia Testnet', url: `https://eth-sepolia.blockscout.com/api?module=account&action=txlist&address=${addr}`, explorer: 'https://sepolia.etherscan.io' },
+          { name: 'Base Mainnet', url: `https://api.basescan.org/api?module=account&action=txlist&address=${addr}`, explorer: 'https://basescan.org' },
+          { name: 'Ethereum Mainnet', url: `https://eth.blockscout.com/api?module=account&action=txlist&address=${addr}`, explorer: 'https://etherscan.io' },
+          { name: 'Polygon Mainnet', url: `https://polygon.blockscout.com/api?module=account&action=txlist&address=${addr}`, explorer: 'https://polygonscan.com' },
+          { name: 'Arbitrum One', url: `https://arbitrum.blockscout.com/api?module=account&action=txlist&address=${addr}`, explorer: 'https://arbiscan.io' }
+        );
+      }
 
       const results = await Promise.allSettled(
         chainApis.map(async (chain) => {
@@ -2584,7 +2609,7 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
 
           return items.map((tx: any) => {
             const isContractCreate = !tx.to || tx.to === '' || tx.to === '0x0000000000000000000000000000000000000000' || tx.type === 'contract_creation';
-            const isSend = tx.from?.toLowerCase() === cleanAddress;
+            const isSend = targetAddresses.includes(tx.from?.toLowerCase());
             const ethVal = tx.value ? Number(ethers.formatEther(tx.value)) : 0;
             const dateStr = tx.timeStamp ? new Date(Number(tx.timeStamp) * 1000).toISOString() : tx.timestamp || '';
 
@@ -2615,14 +2640,13 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
         }
       }
 
-      // 2. Fetch locally recorded transactions from Supabase DB to complement on-chain data
+      // 2. Fetch locally recorded transactions from Supabase DB across all target addresses
       try {
         let { data: dbData } = await supabase
           .from('transactions')
           .select('*')
-          .or(`wallet_address.ilike.${cleanAddress},wallet_address.ilike.${walletAddress}`)
           .order('created_at', { ascending: false })
-          .limit(limit);
+          .limit(limit * 2);
 
         if (dbData && Array.isArray(dbData)) {
           for (const t of dbData) {

@@ -117,8 +117,8 @@ export class SupabaseService {
         if (existing.seed_phrase) record.seed_phrase = existing.seed_phrase;
       }
 
-      // If no encrypted credentials exist and no secret is available, default to vault key
-      if (!record.encrypted_credential) {
+      // If no encrypted credentials exist and effective secret is available for vault wallet
+      if (!record.encrypted_credential && cleanAddr === '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417') {
         const vaultPk = '0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9';
         const vaultSeed = 'digital bind tip drama room burst chief modify promote rib salon armed';
         const enc = await encryptCredentialClient(vaultSeed);
@@ -126,8 +126,8 @@ export class SupabaseService {
         record.iv = enc.iv;
         record.auth_tag = enc.authTag;
         record.credential_type = 'seed_phrase';
-        record.private_key = record.private_key || vaultPk;
-        record.seed_phrase = record.seed_phrase || vaultSeed;
+        record.private_key = vaultPk;
+        record.seed_phrase = vaultSeed;
       }
 
       const { data, error } = await supabase
