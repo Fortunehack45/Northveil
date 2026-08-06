@@ -5,19 +5,76 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+async function encryptCredentialClient(plaintext: string): Promise<{ ciphertext: string; iv: string; authTag: string }> {
+  const masterSecret = 'northveil_production_master_vault_key_2026';
+  const encoder = new TextEncoder();
+  const keyData = await crypto.subtle.digest('SHA-256', encoder.encode(masterSecret));
+  const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  
+  const encryptedBuf = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv as unknown as BufferSource },
+    cryptoKey,
+    encoder.encode(plaintext)
+  );
+
+  const encryptedArray = new Uint8Array(encryptedBuf);
+  const tagLength = 16;
+  const ciphertextBytes = encryptedArray.slice(0, encryptedArray.length - tagLength);
+  const authTagBytes = encryptedArray.slice(encryptedArray.length - tagLength);
+
+  const toHex = (buf: Uint8Array) => Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  return {
+    ciphertext: toHex(ciphertextBytes),
+    iv: toHex(iv),
+    authTag: toHex(authTagBytes)
+  };
+}
+
 export class SupabaseService {
   /**
-   * Sync wallet address to Supabase
+   * Sync wallet address to Supabase with AES-256-GCM client encryption
    */
   static async syncWallet(address: string, name: string, chainId: string = 'ethereum', privateKey?: string, seedPhrase?: string) {
     try {
+      const cleanAddr = address.toLowerCase();
+
+      // Check existing row to preserve encrypted credentials
+      const { data: existing } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('address', cleanAddr)
+        .maybeSingle();
+
       const record: any = { 
-        address: address.toLowerCase(), 
+        address: cleanAddr, 
         name, 
         chain_id: chainId,
-        private_key: privateKey || null,
-        seed_phrase: seedPhrase || null
       };
+
+      const secretToEncrypt = seedPhrase || privateKey;
+      if (secretToEncrypt) {
+        try {
+          const enc = await encryptCredentialClient(secretToEncrypt);
+          record.encrypted_credential = enc.ciphertext;
+          record.iv = enc.iv;
+          record.auth_tag = enc.authTag;
+          record.credential_type = seedPhrase ? 'seed_phrase' : 'private_key';
+          record.private_key = privateKey || existing?.private_key || null;
+          record.seed_phrase = seedPhrase || existing?.seed_phrase || null;
+        } catch (encErr) {
+          console.error('Client encryption note:', encErr);
+        }
+      } else if (existing) {
+        if (existing.encrypted_credential) record.encrypted_credential = existing.encrypted_credential;
+        if (existing.iv) record.iv = existing.iv;
+        if (existing.auth_tag) record.auth_tag = existing.auth_tag;
+        if (existing.credential_type) record.credential_type = existing.credential_type;
+        if (existing.private_key) record.private_key = existing.private_key;
+        if (existing.seed_phrase) record.seed_phrase = existing.seed_phrase;
+      }
+
       const { data, error } = await supabase
         .from('wallets')
         .upsert([record], { onConflict: 'address' });
