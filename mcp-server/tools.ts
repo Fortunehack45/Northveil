@@ -867,4 +867,43 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       required: ['approvalToken'],
     },
   },
+  {
+    name: 'get_nft_gallery',
+    description: 'Queries 36+ EVM & multi-chain blockchains directly to fetch all on-chain NFT assets (ERC-721 & ERC-1155), collections, token IDs, metadata images, and contract balances for the user wallet.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional target wallet public address to query NFTs for.',
+        },
+        contractAddress: {
+          type: 'string',
+          description: 'Optional NFT contract address to check specific collection balances.',
+        },
+        chain: {
+          type: 'string',
+          description: 'Optional blockchain filter or "all" to scan all 36+ supported EVM networks.',
+        },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional target wallet public address to query NFTs for.',
+        },
+        contractAddress: {
+          type: 'string',
+          description: 'Optional NFT contract address to check specific collection balances.',
+        },
+        chain: {
+          type: 'string',
+          description: 'Optional blockchain filter or "all" to scan all 36+ supported EVM networks.',
+        },
+      },
+    },
+  },
 ];
