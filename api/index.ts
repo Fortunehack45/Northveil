@@ -9,10 +9,22 @@ import { encryptCredential, decryptCredential } from '../mcp-server/encryptionSe
 
 function findImports(importPath: string) {
   try {
-    if (importPath.startsWith('@openzeppelin/')) {
-      const fullPath = path.resolve('node_modules', importPath);
-      if (fs.existsSync(fullPath)) {
-        return { contents: fs.readFileSync(fullPath, 'utf8') };
+    const cleanPath = importPath.replace(/^@openzeppelin\/contracts\//, '');
+    const ozCandidates = [
+      path.resolve('node_modules', importPath),
+      path.resolve('node_modules', '@openzeppelin', 'contracts', cleanPath),
+      path.resolve('node_modules', '@openzeppelin', 'contracts', 'token', 'ERC20', cleanPath),
+      path.resolve('node_modules', '@openzeppelin', 'contracts', 'token', 'ERC721', cleanPath),
+      path.resolve('node_modules', '@openzeppelin', 'contracts', 'token', 'ERC20', 'extensions', cleanPath),
+      path.resolve('node_modules', '@openzeppelin', 'contracts', 'token', 'ERC721', 'extensions', cleanPath),
+      path.resolve('node_modules', '@openzeppelin', 'contracts', 'utils', cleanPath),
+      path.resolve('node_modules', '@openzeppelin', 'contracts', 'access', cleanPath),
+      path.resolve('node_modules', '@openzeppelin', importPath)
+    ];
+
+    for (const cand of ozCandidates) {
+      if (fs.existsSync(cand) && fs.statSync(cand).isFile()) {
+        return { contents: fs.readFileSync(cand, 'utf8') };
       }
     }
   } catch (e) {}
@@ -782,6 +794,75 @@ async function uploadImageToSupabase(imageInput?: string, fileNamePrefix: string
   }
 }
 
+// Dynamic prompt parameter parser (extracts pragma, total supply, owner allocation, and socials)
+function parsePromptParameters(promptStr: string, args: any) {
+  const text = (promptStr || '').toLowerCase();
+
+  // 1. Extract Pragma version
+  let pragmaVersion = args?.pragma || args?.solidityVersion || args?.solidity_version;
+  if (!pragmaVersion) {
+    const pragmaMatch = (promptStr || '').match(/(?:pragma\s+solidity\s+|^|\s|\^)(0\.8\.\d+|\^0\.8\.\d+)/i);
+    if (pragmaMatch && pragmaMatch[1]) {
+      pragmaVersion = pragmaMatch[1].startsWith('^') || pragmaMatch[1].startsWith('0.') ? pragmaMatch[1] : `^${pragmaMatch[1]}`;
+    }
+  }
+  if (!pragmaVersion) pragmaVersion = '^0.8.20';
+  if (!pragmaVersion.startsWith('^') && !pragmaVersion.startsWith('>=')) {
+    pragmaVersion = `^${pragmaVersion}`;
+  }
+
+  // 2. Extract Total Supply
+  let totalSupplyNum = Number(args?.totalSupply || args?.initialSupply || 0);
+  if (!totalSupplyNum) {
+    const supplyMatch = text.match(/(\d+(?:,\d+)*(?:\.\d+)?)\s*(billion|million|k|tokens)?\s*(?:supply|total|max|tokens)?/i);
+    if (supplyMatch) {
+      let baseVal = parseFloat(supplyMatch[1].replace(/,/g, ''));
+      const unit = (supplyMatch[2] || '').toLowerCase();
+      if (unit === 'billion') baseVal *= 1_000_000_000;
+      else if (unit === 'million') baseVal *= 1_000_000;
+      else if (unit === 'k') baseVal *= 1_000;
+      totalSupplyNum = baseVal;
+    }
+  }
+  if (!totalSupplyNum || isNaN(totalSupplyNum)) {
+    totalSupplyNum = text.includes('nft') || text.includes('721') ? 10000 : 1000000000;
+  }
+
+  // 3. Extract Owner Allocation Percentage or Amount
+  let ownerAllocNum = args?.ownerAllocation !== undefined ? Number(args.ownerAllocation) : -1;
+  if (ownerAllocNum < 0) {
+    if (text.includes('100%') || text.includes('all to owner') || text.includes('entire supply') || text.includes('mint all') || text.includes('owner allocation 100%')) {
+      ownerAllocNum = totalSupplyNum;
+    } else if (text.includes('50%')) {
+      ownerAllocNum = Math.floor(totalSupplyNum * 0.5);
+    } else if (text.includes('90%')) {
+      ownerAllocNum = Math.floor(totalSupplyNum * 0.9);
+    } else if (text.includes('80%')) {
+      ownerAllocNum = Math.floor(totalSupplyNum * 0.8);
+    } else {
+      ownerAllocNum = Math.floor(totalSupplyNum * 0.8);
+    }
+  }
+  ownerAllocNum = Math.min(ownerAllocNum, totalSupplyNum);
+
+  // 4. Extract Socials & Website
+  const websiteStr = args?.websiteUrl || args?.website || (promptStr.match(/https?:\/\/[^\s]+/i)?.[0]) || 'https://northveil.xyz';
+  const twitterStr = args?.twitterUrl || args?.twitter || 'https://x.com/northveil';
+  const telegramStr = args?.telegramUrl || args?.telegram || 'https://t.me/northveil';
+  const discordStr = args?.discordUrl || args?.discord || 'https://discord.gg/northveil';
+
+  return {
+    pragmaVersion,
+    totalSupplyNum,
+    ownerAllocNum,
+    reserveNum: Math.max(0, totalSupplyNum - ownerAllocNum),
+    websiteStr,
+    twitterStr,
+    telegramStr,
+    discordStr,
+  };
+}
+
 // Dynamic Multi-User Private Key & Secret Resolver from Supabase DB, Headers, Args, and Env
 async function resolveWalletPrivateKey(
   args: any,
@@ -1041,23 +1122,26 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
 
   switch (name) {
     case 'deploy_smart_contract': {
+      const promptStr = (args?.prompt || '').toLowerCase();
+      const parsed = parsePromptParameters(promptStr, args);
       const nameStr = (args?.contractName || args?.name || 'NorthveilToken').replace(/[^a-zA-Z0-9_]/g, '');
       const typeStr = (args?.contractType || args?.type || 'erc20').toLowerCase();
       const network = (args?.network || args?.chain || 'sepolia').toLowerCase();
       const symbolStr = (args?.symbol || args?.ticker || args?.tokenSymbol || nameStr.slice(0, 4)).toUpperCase();
-      const isNft = typeStr.includes('nft') || typeStr.includes('721');
+      const isNft = typeStr.includes('nft') || typeStr.includes('721') || promptStr.includes('nft');
 
-      const totalSupplyNum = Number(args?.totalSupply || args?.initialSupply || (isNft ? 10000 : 1000000000));
-      const ownerAllocNum = args?.ownerAllocation !== undefined ? Math.min(Number(args.ownerAllocation), totalSupplyNum) : Math.floor(totalSupplyNum * 0.8);
-      const reserveNum = Math.max(0, totalSupplyNum - ownerAllocNum);
+      const totalSupplyNum = parsed.totalSupplyNum;
+      const ownerAllocNum = parsed.ownerAllocNum;
+      const reserveNum = parsed.reserveNum;
+      const pragmaVersion = parsed.pragmaVersion;
 
       const descriptionStr = args?.description || args?.prompt || `Production smart contract for ${nameStr} (${symbolStr}) deployed via Northveil MCP.`;
       const rawImageInput = args?.imageUrl || args?.logoUrl || args?.image || args?.logo || args?.file;
       const imageUrlStr = await uploadImageToSupabase(rawImageInput, symbolStr.toLowerCase());
-      const websiteStr = args?.websiteUrl || args?.website || 'https://northveil.xyz';
-      const twitterStr = args?.twitterUrl || args?.twitter || 'https://x.com/northveil';
-      const telegramStr = args?.telegramUrl || args?.telegram || 'https://t.me/northveil';
-      const discordStr = args?.discordUrl || args?.discord || 'https://discord.gg/northveil';
+      const websiteStr = parsed.websiteStr;
+      const twitterStr = parsed.twitterStr;
+      const telegramStr = parsed.telegramStr;
+      const discordStr = parsed.discordStr;
 
       // Network resolution: Testnets vs Mainnets
       let chainId = 11155111;
@@ -1081,12 +1165,8 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
         chainId = 56; explorerBase = 'https://bscscan.com'; networkName = 'BNB Smart Chain Mainnet'; isTestnet = false;
       }
 
-      let solCode = '';
-      let abi: any[] = [];
-
-      if (isNft) {
-        solCode = `// SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+      let solCode = isNft ? `// SPDX-License-Identifier: MIT
+pragma solidity ${pragmaVersion};
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
@@ -1121,11 +1201,8 @@ contract ${nameStr} is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
     function supportsInterface(bytes4 interfaceId) public view override(ERC721, ERC721Enumerable, ERC721URIStorage) returns (bool) { return super.supportsInterface(interfaceId); }
     function _update(address to, uint256 tokenId, address auth) internal override(ERC721, ERC721Enumerable) returns (address) { return super._update(to, tokenId, auth); }
     function _increaseBalance(address account, uint128 value) internal override(ERC721, ERC721Enumerable) { super._increaseBalance(account, value); }
-}`;
-        abi = ["constructor()", "function safeMint(address to, string uri) returns (uint256)", "function maxSupply() view returns (uint256)", "function balanceOf(address owner) view returns (uint256)"];
-      } else {
-        solCode = `// SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+}` : `// SPDX-License-Identifier: MIT
+pragma solidity ${pragmaVersion};
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
@@ -1146,17 +1223,11 @@ contract ${nameStr} is ERC20, ERC20Burnable, Ownable {
         _mint(to, amount);
     }
 }`;
-        abi = ["constructor()", "function mint(address to, uint256 amount)", "function burn(uint256 amount)", "function transfer(address to, uint256 amount) returns (bool)"];
-      }
 
-      // Dynamic Compilation using solc
-      let compiledBytecode = '';
-      let compiledAbi = abi;
-      try {
-        const solcModule = await import('solc');
-        const solc = solcModule.default || solcModule;
-        const standaloneSolCode = isNft ? `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+      let abi: any[] = isNft ? ["constructor()", "function safeMint(address to, string uri) returns (uint256)", "function maxSupply() view returns (uint256)", "function balanceOf(address owner) view returns (uint256)"] : ["constructor()", "function mint(address to, uint256 amount)", "function burn(uint256 amount)", "function transfer(address to, uint256 amount) returns (bool)"];
+
+      const standaloneSolCode = isNft ? `// SPDX-License-Identifier: MIT
+pragma solidity ${pragmaVersion};
 
 contract ${nameStr} {
     string public name = "${nameStr}";
@@ -1222,7 +1293,7 @@ contract ${nameStr} {
         return baseURI;
     }
 }` : `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ${pragmaVersion};
 
 contract ${nameStr} {
     string public name = "${nameStr}";
@@ -1298,32 +1369,84 @@ contract ${nameStr} {
     }
 }`;
 
-        const userSolCode = args.solidityCode || args.sourceCode || args.code || args.solidity_code || '';
-        const solCodeToCompile = userSolCode ? userSolCode : (solCode || standaloneSolCode);
+      const userSolCode = args?.solidityCode || args?.sourceCode || args?.code || args?.solidity_code || '';
+      let solCodeToCompile = userSolCode ? userSolCode : solCode;
+
+      let compiledBytecode = '';
+      let compiledAbi = abi;
+      let solcErrorMsg = '';
+
+      try {
+        const solcModule = await import('solc');
+        const solc = solcModule.default || solcModule;
 
         const input = {
           language: 'Solidity',
           sources: { 'Contract.sol': { content: solCodeToCompile } },
           settings: { outputSelection: { '*': { '*': ['abi', 'evm.bytecode'] } } }
         };
-        const compOutput = JSON.parse(solc.compile(JSON.stringify(input), { import: findImports }));
-        
+        let compOutput = JSON.parse(solc.compile(JSON.stringify(input), { import: findImports }));
+
         let targetContractKey = nameStr;
         if (compOutput.contracts?.['Contract.sol']) {
-          const contractKeys = Object.keys(compOutput.contracts['Contract.sol']);
-          if (contractKeys.length > 0) {
-            targetContractKey = contractKeys.find(k => k.toLowerCase() === nameStr.toLowerCase()) || contractKeys[contractKeys.length - 1];
+          const keys = Object.keys(compOutput.contracts['Contract.sol']);
+          if (keys.length > 0) {
+            targetContractKey = keys.find(k => k.toLowerCase() === nameStr.toLowerCase()) || keys[keys.length - 1];
           }
         }
 
-        const contractRes = compOutput.contracts?.['Contract.sol']?.[targetContractKey];
+        let contractRes = compOutput.contracts?.['Contract.sol']?.[targetContractKey];
+
+        if (!contractRes || !contractRes.evm?.bytecode?.object) {
+          if (compOutput.errors && Array.isArray(compOutput.errors)) {
+            const errs = compOutput.errors.filter((e: any) => e.severity === 'error');
+            if (errs.length > 0) {
+              solcErrorMsg = errs.map((e: any) => e.formattedMessage || e.message).join('\n');
+            }
+          }
+
+          if (solCodeToCompile !== standaloneSolCode) {
+            console.warn('[Solc Note] Primary compilation note, attempting standalone template:', solcErrorMsg);
+            const fallbackInput = {
+              language: 'Solidity',
+              sources: { 'Contract.sol': { content: standaloneSolCode } },
+              settings: { outputSelection: { '*': { '*': ['abi', 'evm.bytecode'] } } }
+            };
+            const fallbackComp = JSON.parse(solc.compile(JSON.stringify(fallbackInput)));
+            targetContractKey = nameStr;
+            contractRes = fallbackComp.contracts?.['Contract.sol']?.[targetContractKey];
+            if (contractRes && contractRes.evm?.bytecode?.object) {
+              solCodeToCompile = standaloneSolCode;
+            }
+          }
+        }
+
         if (contractRes && contractRes.evm?.bytecode?.object) {
           compiledBytecode = '0x' + contractRes.evm.bytecode.object;
           compiledAbi = contractRes.abi;
           solCode = solCodeToCompile;
         }
-      } catch (solcErr) {
-        console.warn('[Solc Compiler] Compile warning:', solcErr);
+      } catch (solcErr: any) {
+        solcErrorMsg = solcErr?.message || String(solcErr);
+      }
+
+      if (!compiledBytecode) {
+        return {
+          formattedMarkdown: `
+### ❌ SOLC SOLIDITY COMPILATION FAILED
+
+> **Contract Name**: \`${nameStr}\` (\`$${symbolStr}\`)  
+> **Compiler Target**: \`Solidity ${pragmaVersion}\`  
+
+\`\`\`
+${solcErrorMsg || 'Failed to compile Solidity bytecode for contract.'}
+\`\`\`
+`,
+          status: 'FAILED',
+          contractName: nameStr,
+          symbol: symbolStr,
+          error: solcErrorMsg || 'Compilation failed',
+        };
       }
 
       let realTxHash = '';
