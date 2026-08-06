@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { ethers } from 'ethers';
+import solc from 'solc';
 export const MCP_TOOLS = [
   {
     name: 'deploy_smart_contract',
@@ -1001,7 +1002,7 @@ contract ${nameStr} is ERC20, ERC20Burnable, Ownable {
         const solcModule = await import('solc');
         const solc = solcModule.default || solcModule;
         const standaloneSolCode = isNft ? `// SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.0;
 
 contract ${nameStr} {
     string public name = "${nameStr}";
@@ -1067,7 +1068,7 @@ contract ${nameStr} {
         return baseURI;
     }
 }` : `// SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.0;
 
 contract ${nameStr} {
     string public name = "${nameStr}";

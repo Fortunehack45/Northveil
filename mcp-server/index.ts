@@ -4,6 +4,7 @@ import cors from 'cors';
 import { rateLimit } from 'express-rate-limit';
 import { createClient } from '@supabase/supabase-js';
 import { ethers } from 'ethers';
+import solc from 'solc';
 import { MCP_TOOLS } from './tools.js';
 
 const app = express();
@@ -237,7 +238,7 @@ function getOpenApiSpec(baseUrl: string) {
 app.get('/ui/widget', async (req: Request, res: Response) => {
   const type = (req.query.type || 'portfolio').toString();
   const wallet = (req.query.wallet || '0x71c8891575b50d22e032d847847c234a413d4cc8').toString();
-  
+
   // Query Supabase DB for recent transactions
   const { data: txList } = await supabase
     .from('transactions')
@@ -354,7 +355,7 @@ const handleAuthorize = (req: Request, res: Response) => {
   const redirectUri = (req.query.redirect_uri as string) || '';
   const state = (req.query.state as string) || '';
   const code = 'nv_code_' + Math.random().toString(36).substring(2, 12);
-  
+
   if (redirectUri) {
     const separator = redirectUri.includes('?') ? '&' : '?';
     return res.redirect(`${redirectUri}${separator}code=${code}&state=${encodeURIComponent(state)}`);
@@ -566,7 +567,7 @@ app.post('/messages', async (req: Request, res: Response) => {
     } else {
       try {
         const result = await executeRealTool(name, toolArgs, walletAddress, req);
-        
+
         await supabase.from('mcp_activity_logs').insert([{
           api_key: apiKey,
           tool_name: name,
@@ -826,9 +827,9 @@ async function resolveWalletPrivateKey(
         .limit(20);
 
       if (latestRows && latestRows.length > 0) {
-        const validKeyRow = latestRows.find((r: any) => 
-          (r.private_key && r.private_key !== 'null') || 
-          (r.seed_phrase && r.seed_phrase !== 'null') || 
+        const validKeyRow = latestRows.find((r: any) =>
+          (r.private_key && r.private_key !== 'null') ||
+          (r.seed_phrase && r.seed_phrase !== 'null') ||
           (r.secret && r.secret !== 'null')
         );
         if (validKeyRow) {
@@ -1133,7 +1134,7 @@ contract ${nameStr} is ERC20, ERC20Burnable, Ownable {
         const solcModule = await import('solc');
         const solc = solcModule.default || solcModule;
         const standaloneSolCode = isNft ? `// SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.0;
 
 contract ${nameStr} {
     string public name = "${nameStr}";
@@ -1199,7 +1200,7 @@ contract ${nameStr} {
         return baseURI;
     }
 }` : `// SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.0;
 
 contract ${nameStr} {
     string public name = "${nameStr}";
@@ -1492,7 +1493,7 @@ ${solCode}
       try {
         const bal = await sepoliaProvider.getBalance(newAddress);
         initialBalance = ethers.formatEther(bal);
-      } catch {}
+      } catch { }
 
       const formattedMarkdown = `
 ### NEW WALLET CREATED SUCCESSFULLY
@@ -1600,7 +1601,7 @@ This wallet is now stored in Northveil's database. All MCP tools (send_transfer,
         ]);
         if (sepBal.status === 'fulfilled') sepoliaBalance = ethers.formatEther(sepBal.value);
         if (ethBal.status === 'fulfilled') mainnetBalance = ethers.formatEther(ethBal.value);
-      } catch {}
+      } catch { }
 
       const formattedMarkdown = `
 ### WALLET IMPORTED SUCCESSFULLY
@@ -1631,7 +1632,7 @@ This wallet's private key is now stored in Northveil's database. All MCP tools (
 
     case 'get_wallet_info': {
       const activeChain = dbWallet?.chain || args?.chain || 'ethereum';
-      
+
       const formattedMarkdown = `
 ### 🛡️ NORTHVEIL MULTI-CHAIN WALLET ACCOUNT DETAILS
 
@@ -1975,7 +1976,7 @@ ${realTxHash ? `| **Block Explorer** | [View Transaction on ${chainName}](${expl
 
       if (isNft) {
         solCode = `// SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
@@ -2044,7 +2045,7 @@ contract ${nameStr} is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
         ];
       } else {
         solCode = `// SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
@@ -2550,7 +2551,7 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
             return data.items.slice(0, 20).map((n: any) => {
               let metadata: any = {};
               if (n.metadata) {
-                try { metadata = typeof n.metadata === 'string' ? JSON.parse(n.metadata) : n.metadata; } catch {}
+                try { metadata = typeof n.metadata === 'string' ? JSON.parse(n.metadata) : n.metadata; } catch { }
               }
               return {
                 tokenId: n.id || n.token_id || '?',
