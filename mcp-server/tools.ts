@@ -35,7 +35,7 @@ export interface MCPToolDefinition {
 export const MCP_TOOLS: MCPToolDefinition[] = [
   {
     name: 'deploy_smart_contract',
-    description: 'Deploys an ERC-20 token, ERC-721 NFT collection, or custom smart contract to Mainnet or Testnet EVM blockchains (Ethereum, Sepolia, Polygon, Base, Arbitrum, BSC). REQUIRES USER APPROVAL BEFORE BROADCASTING.',
+    description: 'Deploys an ERC-20 token, ERC-721 NFT collection, or custom smart contract to Mainnet or Testnet EVM blockchains (Ethereum, Sepolia, Polygon, Base, Arbitrum, BSC). SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
     annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
@@ -92,18 +92,6 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         network: {
           type: 'string',
           description: 'Target EVM network: sepolia (testnet), ethereum (mainnet), polygon, amoy, base, base_sepolia, arbitrum, bsc',
-        },
-        privateKey: {
-          type: 'string',
-          description: 'User wallet private key (0x...) for direct on-chain signing and automatic transaction broadcasting.',
-        },
-        walletSecret: {
-          type: 'string',
-          description: 'User wallet secret or private key for on-chain contract deployment.',
-        },
-        seedPhrase: {
-          type: 'string',
-          description: 'User 12/24-word seed phrase or mnemonic for wallet key derivation.',
         },
       },
       required: ['contractName'],
@@ -170,7 +158,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'send_transfer',
-    description: 'Executes an on-chain cryptocurrency transfer from the user wallet to a recipient address. Supports direct signing when private key/secret is supplied. REQUIRES USER APPROVAL BEFORE SENDING FUNDS.',
+    description: 'Executes an on-chain cryptocurrency transfer from the user wallet to a recipient address. SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
     annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
@@ -190,18 +178,6 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         chain: {
           type: 'string',
           description: 'Target network id (default: active chain)',
-        },
-        privateKey: {
-          type: 'string',
-          description: 'User wallet private key (0x...) for direct on-chain signing and transfer broadcasting.',
-        },
-        walletSecret: {
-          type: 'string',
-          description: 'User wallet secret or private key for on-chain transfer.',
-        },
-        seedPhrase: {
-          type: 'string',
-          description: 'User 12/24-word seed phrase or mnemonic for wallet signing.',
         },
       },
       required: ['token', 'amount', 'recipientAddress'],
@@ -225,25 +201,13 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
           type: 'string',
           description: 'Target network id (default: active chain)',
         },
-        privateKey: {
-          type: 'string',
-          description: 'User wallet private key (0x...) for direct on-chain signing and transfer broadcasting.',
-        },
-        walletSecret: {
-          type: 'string',
-          description: 'User wallet secret or private key for on-chain transfer.',
-        },
-        seedPhrase: {
-          type: 'string',
-          description: 'User 12/24-word seed phrase or mnemonic for wallet signing.',
-        },
       },
       required: ['token', 'amount', 'recipientAddress'],
     },
   },
   {
     name: 'execute_swap',
-    description: 'Executes a DEX token swap or cross-chain bridge trade via 1inch/Uniswap aggregation. Supports direct signing when private key/secret is supplied. REQUIRES USER APPROVAL BEFORE SWAPPING.',
+    description: 'Executes a DEX token swap or cross-chain bridge trade via 1inch/Uniswap aggregation. SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
     annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
@@ -263,18 +227,6 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         slippageTolerance: {
           type: 'number',
           description: 'Slippage percentage tolerance (default: 0.5%)',
-        },
-        privateKey: {
-          type: 'string',
-          description: 'User wallet private key (0x...) for direct DEX swap execution.',
-        },
-        walletSecret: {
-          type: 'string',
-          description: 'User wallet secret or private key for swap execution.',
-        },
-        seedPhrase: {
-          type: 'string',
-          description: 'User 12/24-word seed phrase or mnemonic for wallet signing.',
         },
       },
       required: ['fromToken', 'toToken', 'amount'],
