@@ -14,6 +14,7 @@ import {
   approveAndExecuteTransaction,
   rejectTransactionRequest
 } from './custodialSigningService.js';
+import { decryptCredential } from './encryptionService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -792,11 +793,29 @@ async function resolveWalletPrivateKey(
 
   // 3. Pre-fetched Supabase DB Wallet Record
   if (!pk && dbWallet) {
-    const candidatePk = dbWallet.private_key || dbWallet.secret || dbWallet.wallet_secret || dbWallet.privateKey || dbWallet.secret_key;
-    if (candidatePk && candidatePk !== 'null' && candidatePk !== 'undefined') pk = candidatePk;
-    if (!seed) {
-      const candidateSeed = dbWallet.seed_phrase || dbWallet.mnemonic;
-      if (candidateSeed && candidateSeed !== 'null' && candidateSeed !== 'undefined') seed = candidateSeed;
+    if (dbWallet.encrypted_credential && dbWallet.iv && dbWallet.auth_tag) {
+      try {
+        const decrypted = decryptCredential({
+          ciphertext: dbWallet.encrypted_credential,
+          iv: dbWallet.iv,
+          authTag: dbWallet.auth_tag,
+        });
+        if (dbWallet.credential_type === 'seed_phrase') {
+          pk = ethers.Wallet.fromPhrase(decrypted, dbWallet.derivation_path || "m/44'/60'/0'/0/0").privateKey;
+        } else {
+          pk = decrypted.startsWith('0x') ? decrypted : `0x${decrypted}`;
+        }
+      } catch (e) {
+        console.warn('[AES Decryption Note]:', e);
+      }
+    }
+    if (!pk) {
+      const candidatePk = dbWallet.private_key || dbWallet.secret || dbWallet.wallet_secret || dbWallet.privateKey || dbWallet.secret_key;
+      if (candidatePk && candidatePk !== 'null' && candidatePk !== 'undefined') pk = candidatePk;
+      if (!seed) {
+        const candidateSeed = dbWallet.seed_phrase || dbWallet.mnemonic;
+        if (candidateSeed && candidateSeed !== 'null' && candidateSeed !== 'undefined') seed = candidateSeed;
+      }
     }
   }
 
@@ -812,11 +831,27 @@ async function resolveWalletPrivateKey(
           .maybeSingle();
 
         if (wRow) {
-          const candidatePk = wRow.private_key || wRow.secret || wRow.wallet_secret || wRow.privateKey || wRow.secret_key;
-          if (candidatePk && candidatePk !== 'null' && candidatePk !== 'undefined') pk = candidatePk;
-          if (!seed) {
-            const candidateSeed = wRow.seed_phrase || wRow.mnemonic;
-            if (candidateSeed && candidateSeed !== 'null' && candidateSeed !== 'undefined') seed = candidateSeed;
+          if (wRow.encrypted_credential && wRow.iv && wRow.auth_tag) {
+            try {
+              const decrypted = decryptCredential({
+                ciphertext: wRow.encrypted_credential,
+                iv: wRow.iv,
+                authTag: wRow.auth_tag,
+              });
+              if (wRow.credential_type === 'seed_phrase') {
+                pk = ethers.Wallet.fromPhrase(decrypted, wRow.derivation_path || "m/44'/60'/0'/0/0").privateKey;
+              } else {
+                pk = decrypted.startsWith('0x') ? decrypted : `0x${decrypted}`;
+              }
+            } catch (e) {}
+          }
+          if (!pk) {
+            const candidatePk = wRow.private_key || wRow.secret || wRow.wallet_secret || wRow.privateKey || wRow.secret_key;
+            if (candidatePk && candidatePk !== 'null' && candidatePk !== 'undefined') pk = candidatePk;
+            if (!seed) {
+              const candidateSeed = wRow.seed_phrase || wRow.mnemonic;
+              if (candidateSeed && candidateSeed !== 'null' && candidateSeed !== 'undefined') seed = candidateSeed;
+            }
           }
         }
       }
@@ -825,7 +860,7 @@ async function resolveWalletPrivateKey(
     }
   }
 
-  // 4b. Global Supabase DB Fallback: Query ANY wallet record that has private_key or seed_phrase (most recent first)
+  // 4b. Global Supabase DB Fallback: Query ANY wallet record that has valid encrypted credential, private_key or seed_phrase
   if (!pk && !seed) {
     try {
       const { data: latestRows } = await supabase
@@ -836,13 +871,30 @@ async function resolveWalletPrivateKey(
 
       if (latestRows && latestRows.length > 0) {
         const validKeyRow = latestRows.find((r: any) =>
+          (r.encrypted_credential && r.iv && r.auth_tag) ||
           (r.private_key && r.private_key !== 'null') ||
           (r.seed_phrase && r.seed_phrase !== 'null') ||
           (r.secret && r.secret !== 'null')
         );
         if (validKeyRow) {
-          pk = validKeyRow.private_key || validKeyRow.secret || validKeyRow.wallet_secret || validKeyRow.privateKey;
-          if (!seed) seed = validKeyRow.seed_phrase || validKeyRow.mnemonic;
+          if (validKeyRow.encrypted_credential && validKeyRow.iv && validKeyRow.auth_tag) {
+            try {
+              const decrypted = decryptCredential({
+                ciphertext: validKeyRow.encrypted_credential,
+                iv: validKeyRow.iv,
+                authTag: validKeyRow.auth_tag,
+              });
+              if (validKeyRow.credential_type === 'seed_phrase') {
+                pk = ethers.Wallet.fromPhrase(decrypted, validKeyRow.derivation_path || "m/44'/60'/0'/0/0").privateKey;
+              } else {
+                pk = decrypted.startsWith('0x') ? decrypted : `0x${decrypted}`;
+              }
+            } catch (e) {}
+          }
+          if (!pk) {
+            pk = validKeyRow.private_key || validKeyRow.secret || validKeyRow.wallet_secret || validKeyRow.privateKey;
+            if (!seed) seed = validKeyRow.seed_phrase || validKeyRow.mnemonic;
+          }
         }
       }
     } catch (e) {
