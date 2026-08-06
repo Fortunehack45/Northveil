@@ -841,12 +841,12 @@ async function resolveWalletPrivateKey(
     }
   }
 
-  // 6. Primary Vault Key Fallback (0x87678de86804c6c3612d66cbd6e2857f1a7d8345 with Sepolia ETH gas)
+  // 6. Environment Variable Fallback
   if (!pk) {
-    pk = process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY || '0x51eb22c3a49f749648e053a48d369e19b9efdc644303612b56375980730b41dc';
+    pk = process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY || null;
   }
 
-  return pk || '0x51eb22c3a49f749648e053a48d369e19b9efdc644303612b56375980730b41dc';
+  return pk;
 }
 
 async function executeRealTool(name: string, args: any, walletAddress: string, req?: Request) {
@@ -1214,32 +1214,55 @@ contract ${nameStr} {
       let realTxHash = '';
       let realContractAddress = '';
       let isOnChainBroadcasted = false;
+      let deployErrorMsg = '';
 
       const privateKey = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
 
-      const targetProvider = isTestnet ? sepoliaProvider : ethProvider;
-
-      if (privateKey && compiledBytecode) {
-        try {
-          const signer = new ethers.Wallet(privateKey, targetProvider);
-          const factory = new ethers.ContractFactory(compiledAbi, compiledBytecode, signer);
-          const deployTx = await factory.deploy();
-          await deployTx.waitForDeployment();
-          realTxHash = deployTx.deploymentTransaction()?.hash || '';
-          realContractAddress = await deployTx.getAddress();
-          if (realTxHash) isOnChainBroadcasted = true;
-        } catch (deployErr) {
-          console.warn('[Deploy] Direct RPC deploy attempt:', deployErr);
-        }
+      if (!privateKey) {
+        throw new Error(`SECURITY ERROR: No decrypted wallet credentials found for wallet address ${walletAddress}. Please import or create a wallet first.`);
       }
 
-      if (!realContractAddress) {
-        try {
-          const nonce = await targetProvider.getTransactionCount(walletAddress).catch(() => 0);
-          realContractAddress = ethers.getCreateAddress({ from: walletAddress, nonce });
-        } catch {
-          realContractAddress = ethers.getCreateAddress({ from: walletAddress, nonce: 0 });
-        }
+      if (!compiledBytecode) {
+        throw new Error(`SOLC COMPILATION FAILURE: Failed to compile Solidity bytecode for contract ${nameStr}.`);
+      }
+
+      const targetProvider = isTestnet ? sepoliaProvider : ethProvider;
+
+      try {
+        const signer = new ethers.Wallet(privateKey, targetProvider);
+        const factory = new ethers.ContractFactory(compiledAbi, compiledBytecode, signer);
+        const deployTx = await factory.deploy();
+        await deployTx.waitForDeployment();
+        realTxHash = deployTx.deploymentTransaction()?.hash || '';
+        realContractAddress = await deployTx.getAddress();
+        if (realTxHash && realContractAddress) isOnChainBroadcasted = true;
+      } catch (deployErr: any) {
+        deployErrorMsg = deployErr?.reason || deployErr?.message || 'On-chain RPC deployment failed.';
+        console.error('[Deploy On-Chain Error]:', deployErr);
+      }
+
+      if (!isOnChainBroadcasted || !realContractAddress) {
+        return {
+          formattedMarkdown: `
+### ❌ SMART CONTRACT DEPLOYMENT FAILED ON-CHAIN
+
+> **Contract Name**: \`${nameStr}\` (\`$${symbolStr}\`)  
+> **Target Network**: \`${networkName}\` (Chain ID: \`${chainId}\`)  
+> **Deployer Wallet**: \`${walletAddress}\`  
+> **Failure Reason**: \`${deployErrorMsg || 'RPC Execution Failed or Insufficient Gas Funds'}\`  
+
+---
+
+#### 💡 Troubleshooting Recommendations:
+1. Ensure deployer wallet \`${walletAddress}\` has active native gas funds on \`${networkName}\`.
+2. Verify contract constructor parameters and network RPC status.
+`,
+          status: 'FAILED',
+          contractName: nameStr,
+          symbol: symbolStr,
+          network: networkName,
+          error: deployErrorMsg,
+        };
       }
 
       // Save contract metadata to Supabase DB
@@ -1812,43 +1835,56 @@ ${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](http
       }
 
       let realTxHash = '';
+      let isBroadcastedOnChain = false;
       let gasFeeUsd = 0.42;
+      let transferErrorMsg = '';
 
-      let privateKey = args?.privateKey || args?.secretKey || args?.walletSecret || args?.private_key || args?.userPrivateKey || (req?.headers?.['x-private-key'] as string) || (req?.headers?.['x-wallet-secret'] as string) || process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY;
-      const seedPhrase = args?.seedPhrase || args?.mnemonic || (req?.headers?.['x-seed-phrase'] as string) || process.env.SEED_PHRASE;
+      const privateKey = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
 
-      if (!privateKey && seedPhrase) {
-        try {
-          privateKey = ethers.Wallet.fromPhrase(seedPhrase).privateKey;
-        } catch (e) {}
+      if (!privateKey) {
+        throw new Error(`SECURITY ERROR: No decrypted wallet credentials found for wallet address ${walletAddress}. Please import or create a wallet first.`);
       }
 
-      if (!privateKey && cleanAddress) {
-        try {
-          const { data: wRow } = await supabase.from('wallets').select('*').eq('address', cleanAddress).single();
-          if (wRow?.private_key || wRow?.secret) {
-            privateKey = wRow.private_key || wRow.secret;
-          }
-        } catch (e) {}
+      try {
+        const signer = new ethers.Wallet(privateKey, targetProvider);
+        const valueWei = ethers.parseEther(amountStr);
+        const txResponse = await signer.sendTransaction({
+          to: recipient,
+          value: valueWei,
+        });
+        await txResponse.wait(1);
+        realTxHash = txResponse.hash;
+        if (realTxHash) isBroadcastedOnChain = true;
+      } catch (txErr: any) {
+        transferErrorMsg = txErr?.reason || txErr?.message || 'On-chain transaction broadcast failed.';
+        console.error('[SendTransfer On-Chain Error]:', txErr);
       }
 
-      if (privateKey) {
-        try {
-          const signer = new ethers.Wallet(privateKey, targetProvider);
-          const valueWei = ethers.parseEther(amountStr);
-          const txResponse = await signer.sendTransaction({
-            to: recipient,
-            value: valueWei,
-          });
-          await txResponse.wait(1);
-          realTxHash = txResponse.hash;
-        } catch (txErr) {
-          console.warn('[SendTransfer] Direct RPC broadcast attempt:', txErr);
-        }
-      }
+      if (!isBroadcastedOnChain || !realTxHash) {
+        return {
+          formattedMarkdown: `
+### ❌ ON-CHAIN TRANSFER FAILED
 
-      if (!realTxHash) {
-        realTxHash = ethers.keccak256(ethers.toUtf8Bytes(`northveil_send_${cleanAddress}_${recipient}_${amountStr}_${Date.now()}`));
+> **Token**: **${amountStr} ${token}**  
+> **Sender Wallet**: \`${walletAddress}\`  
+> **Recipient Wallet**: \`${recipient}\`  
+> **Target Network**: \`${chainName}\`  
+> **Failure Reason**: \`${transferErrorMsg || 'RPC Transaction Execution Failed'}\`  
+
+---
+
+#### 💡 Troubleshooting Recommendations:
+1. Ensure sender wallet \`${walletAddress}\` has sufficient native gas balance for network fees.
+2. Verify recipient address format and network RPC status.
+`,
+          status: 'FAILED',
+          token,
+          amount: Number(amountStr),
+          senderWallet: walletAddress,
+          recipient,
+          chain: chainName,
+          error: transferErrorMsg,
+        };
       }
 
       // Save transfer transaction to Supabase DB

@@ -916,12 +916,12 @@ async function resolveWalletPrivateKey(
     }
   }
 
-  // 6. Hardcoded Server Active Key & Environment Variable Fallback
+  // 6. Environment Variable Fallback
   if (!pk) {
-    pk = process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY || '0x51eb22c3a49f749648e053a48d369e19b9efdc644303612b56375980730b41dc';
+    pk = process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY || null;
   }
 
-  return pk || '0x51eb22c3a49f749648e053a48d369e19b9efdc644303612b56375980730b41dc';
+  return pk;
 }
 
 // REAL Tool Execution Engine with Ethers.js Real On-Chain RPC + Live Supabase DB
@@ -1444,32 +1444,55 @@ contract ${nameStr} {
       let realTxHash = '';
       let realContractAddress = '';
       let isOnChainBroadcasted = false;
+      let deployErrorMsg = '';
 
       const privateKey = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
 
-      const targetProvider = isTestnet ? sepoliaProvider : ethProvider;
-
-      if (privateKey && compiledBytecode) {
-        try {
-          const signer = new ethers.Wallet(privateKey, targetProvider);
-          const factory = new ethers.ContractFactory(compiledAbi, compiledBytecode, signer);
-          const deployTx = await factory.deploy();
-          await deployTx.waitForDeployment();
-          realTxHash = deployTx.deploymentTransaction()?.hash || '';
-          realContractAddress = await deployTx.getAddress();
-          if (realTxHash) isOnChainBroadcasted = true;
-        } catch (deployErr) {
-          console.warn('[Deploy] Direct RPC deploy attempt:', deployErr);
-        }
+      if (!privateKey) {
+        throw new Error(`SECURITY ERROR: No decrypted wallet credentials found for wallet address ${walletAddress}. Please import or create a wallet first.`);
       }
 
-      if (!realContractAddress) {
-        try {
-          const nonce = await targetProvider.getTransactionCount(walletAddress).catch(() => 0);
-          realContractAddress = ethers.getCreateAddress({ from: walletAddress, nonce });
-        } catch {
-          realContractAddress = ethers.getCreateAddress({ from: walletAddress, nonce: 0 });
-        }
+      if (!compiledBytecode) {
+        throw new Error(`SOLC COMPILATION FAILURE: Failed to compile Solidity bytecode for contract ${nameStr}.`);
+      }
+
+      const targetProvider = isTestnet ? sepoliaProvider : ethProvider;
+
+      try {
+        const signer = new ethers.Wallet(privateKey, targetProvider);
+        const factory = new ethers.ContractFactory(compiledAbi, compiledBytecode, signer);
+        const deployTx = await factory.deploy();
+        await deployTx.waitForDeployment();
+        realTxHash = deployTx.deploymentTransaction()?.hash || '';
+        realContractAddress = await deployTx.getAddress();
+        if (realTxHash && realContractAddress) isOnChainBroadcasted = true;
+      } catch (deployErr: any) {
+        deployErrorMsg = deployErr?.reason || deployErr?.message || 'On-chain RPC deployment failed.';
+        console.error('[Deploy On-Chain Error]:', deployErr);
+      }
+
+      if (!isOnChainBroadcasted || !realContractAddress) {
+        return {
+          formattedMarkdown: `
+### ❌ SMART CONTRACT DEPLOYMENT FAILED ON-CHAIN
+
+> **Contract Name**: \`${nameStr}\` (\`$${symbolStr}\`)  
+> **Target Network**: \`${networkName}\` (Chain ID: \`${chainId}\`)  
+> **Deployer Wallet**: \`${walletAddress}\`  
+> **Failure Reason**: \`${deployErrorMsg || 'RPC Execution Failed or Insufficient Gas Funds'}\`  
+
+---
+
+#### 💡 Troubleshooting Recommendations:
+1. Ensure deployer wallet \`${walletAddress}\` has active native gas funds on \`${networkName}\`.
+2. Verify contract constructor parameters and network RPC status.
+`,
+          status: 'FAILED',
+          contractName: nameStr,
+          symbol: symbolStr,
+          network: networkName,
+          error: deployErrorMsg,
+        };
       }
 
       // Save contract metadata to Supabase DB
@@ -2011,23 +2034,54 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
       let realTxHash = '';
       let isBroadcastedOnChain = false;
       let gasFeeUsd = 0.42;
+      let transferErrorMsg = '';
 
       const privateKey = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
 
-      if (privateKey) {
-        try {
-          const signer = new ethers.Wallet(privateKey, targetProvider);
-          const valueWei = ethers.parseEther(amountStr);
-          const txResponse = await signer.sendTransaction({
-            to: recipient,
-            value: valueWei,
-          });
-          await txResponse.wait(1);
-          realTxHash = txResponse.hash;
-          if (realTxHash) isBroadcastedOnChain = true;
-        } catch (txErr) {
-          console.warn('[SendTransfer] Direct RPC broadcast attempt:', txErr);
-        }
+      if (!privateKey) {
+        throw new Error(`SECURITY ERROR: No decrypted wallet credentials found for wallet address ${walletAddress}. Please import or create a wallet first.`);
+      }
+
+      try {
+        const signer = new ethers.Wallet(privateKey, targetProvider);
+        const valueWei = ethers.parseEther(amountStr);
+        const txResponse = await signer.sendTransaction({
+          to: recipient,
+          value: valueWei,
+        });
+        await txResponse.wait(1);
+        realTxHash = txResponse.hash;
+        if (realTxHash) isBroadcastedOnChain = true;
+      } catch (txErr: any) {
+        transferErrorMsg = txErr?.reason || txErr?.message || 'On-chain transaction broadcast failed.';
+        console.error('[SendTransfer On-Chain Error]:', txErr);
+      }
+
+      if (!isBroadcastedOnChain || !realTxHash) {
+        return {
+          formattedMarkdown: `
+### ❌ ON-CHAIN TRANSFER FAILED
+
+> **Token**: **${amountStr} ${token}**  
+> **Sender Wallet**: \`${walletAddress}\`  
+> **Recipient Wallet**: \`${recipient}\`  
+> **Target Network**: \`${chainName}\`  
+> **Failure Reason**: \`${transferErrorMsg || 'RPC Transaction Execution Failed'}\`  
+
+---
+
+#### 💡 Troubleshooting Recommendations:
+1. Ensure sender wallet \`${walletAddress}\` has sufficient native gas balance for network fees.
+2. Verify recipient address format and network RPC connectivity.
+`,
+          status: 'FAILED',
+          token,
+          amount: Number(amountStr),
+          senderWallet: walletAddress,
+          recipient,
+          chain: chainName,
+          error: transferErrorMsg,
+        };
       }
 
       // Estimate real gas fee
@@ -2363,23 +2417,44 @@ ${solCode}
         console.warn('[1inch Quote Note]:', e);
       }
 
-      // 2. Perform direct RPC broadcast if private key is provided
+      let swapErrorMsg = '';
       const privateKey = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
-      if (privateKey) {
-        try {
-          const signer = new ethers.Wallet(privateKey, ethProvider);
-          const valueWei = ethers.parseEther(String(amountNum));
-          const txResponse = await signer.sendTransaction({
-            to: '0x1111111254EEB25477B68fb85Ed929f73A960382', // 1inch Router V6 Address
-            value: fromSym === 'ETH' ? valueWei : 0n,
-            data: '0x',
-          });
-          await txResponse.wait(1);
-          realTxHash = txResponse.hash;
-          isBroadcastedOnChain = true;
-        } catch (txErr) {
-          console.warn('[Swap Direct Broadcast Note]:', txErr);
-        }
+
+      if (!privateKey) {
+        throw new Error(`SECURITY ERROR: No decrypted wallet credentials found for wallet address ${walletAddress}. Please import or create a wallet first.`);
+      }
+
+      try {
+        const signer = new ethers.Wallet(privateKey, ethProvider);
+        const valueWei = ethers.parseEther(String(amountNum));
+        const txResponse = await signer.sendTransaction({
+          to: '0x1111111254EEB25477B68fb85Ed929f73A960382', // 1inch Router V6 Address
+          value: fromSym === 'ETH' ? valueWei : 0n,
+          data: '0x',
+        });
+        await txResponse.wait(1);
+        realTxHash = txResponse.hash;
+        if (realTxHash) isBroadcastedOnChain = true;
+      } catch (txErr: any) {
+        swapErrorMsg = txErr?.reason || txErr?.message || 'DEX Router execution failed.';
+        console.error('[Swap On-Chain Error]:', txErr);
+      }
+
+      if (!isBroadcastedOnChain || !realTxHash) {
+        return {
+          formattedMarkdown: `
+### ❌ DEX SWAP EXECUTION FAILED
+
+> **Swap Pair**: **${amountNum} ${fromSym}** ➔ **${dstAmountFormatted} ${toSym}**  
+> **Router**: \`${routerName}\`  
+> **Sender Wallet**: \`${walletAddress}\`  
+> **Failure Reason**: \`${swapErrorMsg || '1inch Router Execution Failed'}\`  
+`,
+          status: 'FAILED',
+          fromToken: fromSym,
+          toToken: toSym,
+          error: swapErrorMsg,
+        };
       }
 
       let dbRecordId: string | null = null;

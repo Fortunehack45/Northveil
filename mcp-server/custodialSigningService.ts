@@ -358,9 +358,13 @@ export async function approveAndExecuteTransaction(approvalToken: string, userId
     }
   }
 
-  // Fallback to active server vault key if wallet record is not encrypted
+  // Check environment variables if not present in wallet vault
   if (!signingPrivateKey) {
-    signingPrivateKey = process.env.SEPOLIA_PRIVATE_KEY || '0x51eb22c3a49f749648e053a48d369e19b9efdc644303612b56375980730b41dc';
+    signingPrivateKey = process.env.SEPOLIA_PRIVATE_KEY || process.env.PRIVATE_KEY || null;
+  }
+
+  if (!signingPrivateKey) {
+    throw new Error(`SECURITY ERROR: No decrypted credential or private key found for wallet address ${reqRecord.wallet_address}.`);
   }
 
   // 5. Reconstruct approved transaction & sign in memory
