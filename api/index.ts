@@ -1229,16 +1229,29 @@ contract ${nameStr} {
     }
 }`;
 
+        const userSolCode = args.solidityCode || args.sourceCode || args.code || args.solidity_code || '';
+        const solCodeToCompile = userSolCode ? userSolCode : (solCode || standaloneSolCode);
+
         const input = {
           language: 'Solidity',
-          sources: { 'Contract.sol': { content: standaloneSolCode } },
+          sources: { 'Contract.sol': { content: solCodeToCompile } },
           settings: { outputSelection: { '*': { '*': ['abi', 'evm.bytecode'] } } }
         };
-        const compOutput = JSON.parse(solc.compile(JSON.stringify(input)));
-        const contractRes = compOutput.contracts?.['Contract.sol']?.[nameStr];
+        const compOutput = JSON.parse(solc.compile(JSON.stringify(input), { import: findImports }));
+        
+        let targetContractKey = nameStr;
+        if (compOutput.contracts?.['Contract.sol']) {
+          const contractKeys = Object.keys(compOutput.contracts['Contract.sol']);
+          if (contractKeys.length > 0) {
+            targetContractKey = contractKeys.find(k => k.toLowerCase() === nameStr.toLowerCase()) || contractKeys[contractKeys.length - 1];
+          }
+        }
+
+        const contractRes = compOutput.contracts?.['Contract.sol']?.[targetContractKey];
         if (contractRes && contractRes.evm?.bytecode?.object) {
           compiledBytecode = '0x' + contractRes.evm.bytecode.object;
           compiledAbi = contractRes.abi;
+          solCode = solCodeToCompile;
         }
       } catch (solcErr) {
         console.warn('[Solc Compiler] Compile warning:', solcErr);
@@ -1260,9 +1273,10 @@ contract ${nameStr} {
       }
 
       const targetProvider = isTestnet ? sepoliaProvider : ethProvider;
+      const signer = new ethers.Wallet(privateKey, targetProvider);
+      const actualSignerAddress = signer.address.toLowerCase();
 
       try {
-        const signer = new ethers.Wallet(privateKey, targetProvider);
         const factory = new ethers.ContractFactory(compiledAbi, compiledBytecode, signer);
         const deployTx = await factory.deploy();
         await deployTx.waitForDeployment();
@@ -1281,13 +1295,13 @@ contract ${nameStr} {
 
 > **Contract Name**: \`${nameStr}\` (\`$${symbolStr}\`)  
 > **Target Network**: \`${networkName}\` (Chain ID: \`${chainId}\`)  
-> **Deployer Wallet**: \`${walletAddress}\`  
+> **Deployer Wallet**: \`${actualSignerAddress}\`  
 > **Failure Reason**: \`${deployErrorMsg || 'RPC Execution Failed or Insufficient Gas Funds'}\`  
 
 ---
 
 #### 💡 Troubleshooting Recommendations:
-1. Ensure deployer wallet \`${walletAddress}\` has active native gas funds on \`${networkName}\`.
+1. Ensure deployer wallet \`${actualSignerAddress}\` has active native gas funds on \`${networkName}\`.
 2. Verify contract constructor parameters and network RPC status.
 `,
           status: 'FAILED',
