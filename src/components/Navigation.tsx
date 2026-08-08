@@ -104,20 +104,20 @@ export const Navigation: React.FC<NavigationProps> = ({
       {isMobileOpen && (
         <div
           onClick={onCloseMobile}
-          className="md:hidden fixed inset-0 bg-black/80 backdrop-blur-xs z-40 transition-opacity"
+          className="md:hidden fixed inset-0 bg-black/80 z-40 transition-opacity"
         />
       )}
 
       {/* Sidebar (Desktop + Mobile Drawer) */}
       <aside
-        className={`w-64 bg-[#0d0d10] border-r-2 border-white flex flex-col h-full shrink-0 select-none transition-transform duration-300 ${
+        className={`w-64 bg-[#0e1017] border-r-2 border-white flex flex-col h-full shrink-0 select-none transition-transform duration-300 ${
           isMobileOpen
             ? 'fixed inset-y-0 left-0 z-50 flex shadow-[8px_0px_20px_rgba(0,0,0,0.9)] translate-x-0'
             : 'hidden md:flex z-30'
         }`}
       >
         {/* Northveil Brand Header */}
-        <div className="p-4 sm:p-5 border-b-2 border-white/20 shrink-0 bg-[#0d0d10]">
+        <div className="p-4 sm:p-5 border-b-2 border-white/20 shrink-0 bg-[#0e1017]">
           <div className="flex items-center justify-between">
             <button 
               onClick={() => {
@@ -125,16 +125,21 @@ export const Navigation: React.FC<NavigationProps> = ({
                 window.dispatchEvent(new CustomEvent('reset-portfolio'));
                 if (isMobileOpen && onCloseMobile) onCloseMobile();
               }}
-              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+              className="flex items-center gap-3 cursor-pointer hover:opacity-90 transition-opacity"
             >
               <img 
                 src="https://iili.io/CgBPBHv.jpg" 
                 alt="Northveil Logo" 
-                className="w-9 h-9 object-cover rounded-md border border-white/20 bg-black shadow-[3px_3px_0px_0px_#ccff00] shrink-0 bg-[#000]" 
+                className="w-9 h-9 object-cover rounded-none border-2 border-white bg-black shadow-[3px_3px_0px_0px_#d4ff00] shrink-0 bg-[#000]" 
               />
-              <span className="text-xl font-black tracking-tighter text-white font-mono uppercase">
-                North<span className="text-[#ccff00]">veil</span>
-              </span>
+              <div className="flex flex-col text-left font-mono">
+                <span className="text-lg font-black tracking-tighter text-white uppercase leading-tight">
+                  North<span className="text-[#d4ff00]">veil</span>
+                </span>
+                <span className="text-[9px] font-bold text-[#00f0ff] uppercase tracking-wider -mt-0.5">
+                  AI DEFI VAULT
+                </span>
+              </div>
             </button>
             {isMobileOpen && (
               <button
@@ -148,11 +153,11 @@ export const Navigation: React.FC<NavigationProps> = ({
         </div>
 
         {/* Navigation Items - Scrollable list */}
-        <nav className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-3">
-          {/* Desktop Core Apps section (shown on desktop so desktop users can click all 5 core apps) */}
+        <nav className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-3 font-mono">
+          {/* Desktop Core Apps section */}
           <div className="hidden md:block space-y-1.5">
-            <div className="px-2 py-0.5 text-[10px] font-mono font-black text-[#ccff00] uppercase tracking-wider">
-              CORE APPS
+            <div className="px-2 py-0.5 text-[10px] font-black text-[#d4ff00] uppercase tracking-wider">
+              CORE ECOSYSTEM
             </div>
             {coreNavItems.map((item) => {
               const isActive = activeTab === item.id;
@@ -168,8 +173,8 @@ export const Navigation: React.FC<NavigationProps> = ({
                   }}
                   className={`w-full flex items-center gap-3 px-3 py-2 font-mono font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-[#ccff00] text-black border-2 border-black shadow-[3px_3px_0px_0px_#ff007f] translate-x-0.5'
-                      : 'bg-[#16161c] text-slate-300 border-2 border-white/20 hover:border-white hover:text-white hover:bg-[#202028] shadow-[2px_2px_0px_0px_#000]'
+                      ? 'bg-[#d4ff00] text-black border-2 border-black shadow-[3px_3px_0px_0px_#ff007f] translate-x-0.5'
+                      : 'bg-[#151821] text-slate-200 border-2 border-white/20 hover:border-white hover:text-white hover:bg-[#1d212d] shadow-[2px_2px_0px_0px_#000]'
                   }`}
                 >
                   <span className="shrink-0">{item.icon}</span>
@@ -179,10 +184,10 @@ export const Navigation: React.FC<NavigationProps> = ({
             })}
           </div>
 
-          {/* Secondary Tools & Services section (On mobile, only this section is shown so items in bottom nav bar are NOT repeated) */}
+          {/* Secondary Tools & Services section */}
           <div className="space-y-1.5">
-            <div className="px-2 py-0.5 text-[10px] font-mono font-black text-[#00f0ff] uppercase tracking-wider">
-              {isMobileOpen ? 'MORE SERVICES & TOOLS' : 'SERVICES & TOOLS'}
+            <div className="px-2 py-0.5 text-[10px] font-black text-[#00f0ff] uppercase tracking-wider">
+              {isMobileOpen ? 'MORE SERVICES & TOOLS' : 'SERVICES & PROTOCOLS'}
             </div>
             {secondaryNavItems.map((item) => {
               const isActive = activeTab === item.id;
@@ -196,7 +201,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                   className={`w-full flex items-center gap-3 px-3 py-2 font-mono font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
                     isActive
                       ? 'bg-[#00f0ff] text-black border-2 border-black shadow-[3px_3px_0px_0px_#ff007f] translate-x-0.5'
-                      : 'bg-[#16161c] text-slate-300 border-2 border-white/20 hover:border-white hover:text-white hover:bg-[#202028] shadow-[2px_2px_0px_0px_#000]'
+                      : 'bg-[#151821] text-slate-200 border-2 border-white/20 hover:border-white hover:text-white hover:bg-[#1d212d] shadow-[2px_2px_0px_0px_#000]'
                   }`}
                 >
                   <span className="shrink-0">{item.icon}</span>
@@ -208,11 +213,11 @@ export const Navigation: React.FC<NavigationProps> = ({
         </nav>
 
         {/* Footer Actions - Fixed at Bottom */}
-        <div className="p-3 border-t-2 border-white/20 bg-[#0d0d10] shrink-0 space-y-2">
+        <div className="p-3 border-t-2 border-white/20 bg-[#0e1017] shrink-0 space-y-2 font-mono">
           {/* Account Profile Badge */}
           {activeSubWallet && (
-            <div className="p-2.5 bg-[#0a0a0c] border-2 border-white/40 shadow-[2px_2px_0px_0px_#000] flex items-center gap-2.5 mb-2 font-mono">
-              <BlockiesAvatar address={activeSubWallet.address} size={32} />
+            <div className="p-2 bg-[#0a0b0e] border-2 border-white/40 shadow-[2px_2px_0px_0px_#000] flex items-center gap-2.5 mb-2 font-mono">
+              <BlockiesAvatar address={activeSubWallet.address} size={30} />
               <div className="min-w-0 flex-1">
                 <span className="text-xs font-black text-white block truncate uppercase">{activeSubWallet.name}</span>
                 <span className="text-[10px] text-[#00f0ff] font-bold block truncate font-mono">
@@ -244,8 +249,8 @@ export const Navigation: React.FC<NavigationProps> = ({
         </div>
       </aside>
 
-      {/* Mobile Fixed Bottom Navigation Bar (Top 5 Pages requested: Home, Buy & Sell, Swap, NFT, DApps) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#0f0f13] border-t-2 border-white flex items-center justify-around z-40 px-1 font-mono select-none shadow-[0px_-4px_12px_rgba(0,0,0,0.8)]">
+      {/* Mobile Fixed Bottom Navigation Bar */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#0e1017] border-t-2 border-white flex items-center justify-around z-40 px-1 font-mono select-none shadow-[0px_-4px_12px_rgba(0,0,0,0.8)]">
         {coreNavItems.map((item) => {
           const isActive = activeTab === item.id;
           return (
@@ -260,20 +265,20 @@ export const Navigation: React.FC<NavigationProps> = ({
               }}
               className={`flex-1 flex flex-col items-center justify-center py-1 transition-all cursor-pointer ${
                 isActive
-                  ? 'text-[#ccff00] font-black scale-105'
+                  ? 'text-[#d4ff00] font-black scale-105'
                   : 'text-slate-400 hover:text-white font-bold'
               }`}
             >
               <div
                 className={`p-1 border-2 transition-all ${
                   isActive
-                    ? 'bg-[#ccff00] text-black border-black shadow-[2px_2px_0px_0px_#ff007f]'
+                    ? 'bg-[#d4ff00] text-black border-black shadow-[2px_2px_0px_0px_#ff007f]'
                     : 'bg-transparent border-transparent'
                 }`}
               >
                 {item.icon}
               </div>
-              <span className="text-[8.5px] uppercase tracking-tighter mt-0.5 truncate max-w-[56px] text-center">
+              <span className="text-[8.5px] uppercase tracking-tighter mt-0.5 truncate max-w-[56px] text-center font-black">
                 {item.label === 'TRADE & SWAP' ? 'SWAP' : item.label === 'DAPP BROWSER' ? 'DAPPS' : item.label}
               </span>
             </button>

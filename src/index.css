@@ -1,145 +1,245 @@
 @import "tailwindcss";
 
 @layer utilities {
+
   /* Hide scrollbar for Chrome, Safari and Opera */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
   /* Hide scrollbar for IE, Edge and Firefox */
   .no-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
 
+:root {
+  color-scheme: dark;
+}
+
 body {
-  background-color: #0a0a0c;
+  background-color: #0a0b0e;
   color: #f8fafc;
-  font-family: 'Space Grotesk', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Space Grotesk', 'JetBrains Mono', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow-x: hidden;
 }
 
-/* Neo-Brutalist Grid Background */
+/* Polished Neo-Brutalist Grid Background */
 .brutal-grid-bg {
-  background-color: #0d0d10;
-  background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  background-size: 32px 32px;
+  background-color: #0a0b0e;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 
-/* Neo-Brutalist Utility Classes */
+/* Professional Neo-Brutalist Cards */
 .brutal-card {
-  background-color: #141419;
+  background-color: #12141a;
   border: 2px solid #ffffff;
-  box-shadow: 5px 5px 0px 0px #ccff00;
+  box-shadow: 4px 4px 0px 0px #d4ff00;
+  border-radius: 0px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.brutal-card:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 6px 6px 0px 0px #d4ff00;
 }
 
 .brutal-card-pink {
-  background-color: #141419;
+  background-color: #12141a;
   border: 2px solid #ffffff;
-  box-shadow: 5px 5px 0px 0px #ff007f;
+  box-shadow: 4px 4px 0px 0px #ff007f;
+  border-radius: 0px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.brutal-card-pink:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 6px 6px 0px 0px #ff007f;
 }
 
 .brutal-card-cyan {
-  background-color: #141419;
+  background-color: #12141a;
   border: 2px solid #ffffff;
-  box-shadow: 5px 5px 0px 0px #00f0ff;
+  box-shadow: 4px 4px 0px 0px #00f0ff;
+  border-radius: 0px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.brutal-card-cyan:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 6px 6px 0px 0px #00f0ff;
 }
 
 .brutal-card-yellow {
-  background-color: #141419;
+  background-color: #12141a;
   border: 2px solid #ffffff;
-  box-shadow: 5px 5px 0px 0px #ffe600;
+  box-shadow: 4px 4px 0px 0px #ffe600;
+  border-radius: 0px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.brutal-card-yellow:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 6px 6px 0px 0px #ffe600;
 }
 
 .brutal-card-white {
-  background-color: #141419;
+  background-color: #12141a;
   border: 2px solid #ffffff;
-  box-shadow: 5px 5px 0px 0px #ffffff;
+  box-shadow: 4px 4px 0px 0px #ffffff;
+  border-radius: 0px;
 }
 
-.brutal-btn-yellow {
-  background-color: #ffe600;
-  color: #000000;
-  font-weight: 900;
-  border: 2px solid #000000;
-  box-shadow: 4px 4px 0px 0px #000000;
-  transition: all 0.1s ease;
-}
-
-.brutal-btn-yellow:hover {
-  background-color: #fff066;
-  transform: translate(-1px, -1px);
-  box-shadow: 5px 5px 0px 0px #000000;
-}
-
-.brutal-btn-yellow:active {
-  transform: translate(3px, 3px);
-  box-shadow: 1px 1px 0px 0px #000000;
-}
-
+/* Polished Neo-Brutalist Buttons */
 .brutal-btn-lime {
-  background-color: #ccff00;
-  color: #000000;
-  font-weight: 900;
-  border: 2px solid #000000;
-  box-shadow: 4px 4px 0px 0px #000000;
-  transition: all 0.1s ease;
+  background-color: #d4ff00 !important;
+  color: #000000 !important;
+  font-weight: 900 !important;
+  border: 2px solid #000000 !important;
+  box-shadow: 3px 3px 0px 0px #000000 !important;
+  border-radius: 0px !important;
+  transition: all 0.1s ease !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
 }
 
 .brutal-btn-lime:hover {
-  background-color: #d8ff33;
-  transform: translate(-1px, -1px);
-  box-shadow: 5px 5px 0px 0px #000000;
+  background-color: #e0ff33 !important;
+  transform: translate(-1px, -1px) !important;
+  box-shadow: 4px 4px 0px 0px #000000 !important;
 }
 
 .brutal-btn-lime:active {
-  transform: translate(3px, 3px);
-  box-shadow: 1px 1px 0px 0px #000000;
+  transform: translate(2px, 2px) !important;
+  box-shadow: 1px 1px 0px 0px #000000 !important;
+}
+
+.brutal-btn-yellow {
+  background-color: #ffe600 !important;
+  color: #000000 !important;
+  font-weight: 900 !important;
+  border: 2px solid #000000 !important;
+  box-shadow: 3px 3px 0px 0px #000000 !important;
+  border-radius: 0px !important;
+  transition: all 0.1s ease !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+}
+
+.brutal-btn-yellow:hover {
+  background-color: #ffeb33 !important;
+  transform: translate(-1px, -1px) !important;
+  box-shadow: 4px 4px 0px 0px #000000 !important;
+}
+
+.brutal-btn-yellow:active {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 1px 1px 0px 0px #000000 !important;
 }
 
 .brutal-btn-pink {
-  background-color: #ff007f;
-  color: #ffffff;
-  font-weight: 900;
-  border: 2px solid #000000;
-  box-shadow: 4px 4px 0px 0px #000000;
-  transition: all 0.1s ease;
+  background-color: #ff007f !important;
+  color: #ffffff !important;
+  font-weight: 900 !important;
+  border: 2px solid #000000 !important;
+  box-shadow: 3px 3px 0px 0px #000000 !important;
+  border-radius: 0px !important;
+  transition: all 0.1s ease !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
 }
 
 .brutal-btn-pink:hover {
-  background-color: #ff3399;
-  transform: translate(-1px, -1px);
-  box-shadow: 5px 5px 0px 0px #000000;
+  background-color: #ff3399 !important;
+  transform: translate(-1px, -1px) !important;
+  box-shadow: 4px 4px 0px 0px #000000 !important;
 }
 
 .brutal-btn-pink:active {
-  transform: translate(3px, 3px);
-  box-shadow: 1px 1px 0px 0px #000000;
+  transform: translate(2px, 2px) !important;
+  box-shadow: 1px 1px 0px 0px #000000 !important;
 }
 
+.brutal-btn-cyan {
+  background-color: #00f0ff !important;
+  color: #000000 !important;
+  font-weight: 900 !important;
+  border: 2px solid #000000 !important;
+  box-shadow: 3px 3px 0px 0px #000000 !important;
+  border-radius: 0px !important;
+  transition: all 0.1s ease !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+}
+
+.brutal-btn-cyan:hover {
+  background-color: #33f3ff !important;
+  transform: translate(-1px, -1px) !important;
+  box-shadow: 4px 4px 0px 0px #000000 !important;
+}
+
+.brutal-btn-cyan:active {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 1px 1px 0px 0px #000000 !important;
+}
+
+/* Polished Badges */
 .brutal-badge-lime {
-  background-color: #ccff00;
-  color: #000000;
-  border: 1.5px solid #000000;
-  font-weight: 900;
-  text-transform: uppercase;
+  background-color: #d4ff00 !important;
+  color: #000000 !important;
+  border: 1.5px solid #000000 !important;
+  font-weight: 900 !important;
+  border-radius: 0px !important;
+  text-transform: uppercase !important;
 }
 
 .brutal-badge-pink {
-  background-color: #ff007f;
-  color: #ffffff;
-  border: 1.5px solid #000000;
-  font-weight: 900;
-  text-transform: uppercase;
+  background-color: #ff007f !important;
+  color: #ffffff !important;
+  border: 1.5px solid #000000 !important;
+  font-weight: 900 !important;
+  border-radius: 0px !important;
+  text-transform: uppercase !important;
 }
 
 .brutal-badge-cyan {
-  background-color: #00f0ff;
-  color: #000000;
-  border: 1.5px solid #000000;
-  font-weight: 900;
-  text-transform: uppercase;
+  background-color: #00f0ff !important;
+  color: #000000 !important;
+  border: 1.5px solid #000000 !important;
+  font-weight: 900 !important;
+  border-radius: 0px !important;
+  text-transform: uppercase !important;
 }
 
+.brutal-badge-yellow {
+  background-color: #ffe600 !important;
+  color: #000000 !important;
+  border: 1.5px solid #000000 !important;
+  font-weight: 900 !important;
+  border-radius: 0px !important;
+  text-transform: uppercase !important;
+}
+
+/* Custom Neo-Brutalist Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0b0e;
+  border-left: 2px solid #ffffff;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d4ff00;
+  border: 2px solid #000000;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ff007f;
+}

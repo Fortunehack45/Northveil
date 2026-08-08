@@ -56,35 +56,35 @@ export const Hero: React.FC<HeroProps> = ({ onExploreMcp, onExploreApi }) => {
   ];
 
   return (
-    <div className="relative pt-6 pb-20 px-2 sm:px-4 bg-[#0a0a0c] brutal-grid text-left font-mono">
+    <div className="relative pt-6 pb-20 px-2 sm:px-4 bg-[#0a0b0e] brutal-grid text-left font-mono">
       <div className="max-w-[96%] mx-auto space-y-12">
         
         {/* HERO POSTER BANNER */}
-        <div className="bg-[#ccff00] text-black border-4 border-black p-6 sm:p-12 shadow-[8px_8px_0px_0px_#00f0ff] space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 text-xs font-black uppercase border-b-3 border-black pb-4">
-            <span className="bg-black text-[#ccff00] px-3 py-1 border border-black">
+        <div className="bg-[#d4ff00] text-black border-3 border-black p-6 sm:p-12 shadow-[6px_6px_0px_0px_#00f0ff] space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 text-xs font-black uppercase border-b-2 border-black pb-4">
+            <span className="bg-black text-[#d4ff00] px-3 py-1 border border-black font-mono">
               REAL ON-CHAIN BROADCAST ENGINE
             </span>
-            <span className="bg-white text-black px-3 py-1 border border-black">
+            <span className="bg-white text-black px-3 py-1 border border-black font-mono">
               MCP SSE STREAMING CONNECTED
             </span>
           </div>
 
-          <h1 className="text-4xl sm:text-7xl lg:text-8xl font-black text-black uppercase tracking-tighter leading-[0.9]">
+          <h1 className="text-4xl sm:text-7xl lg:text-8xl font-black text-black uppercase tracking-tighter leading-[0.9] font-mono">
             NORTHVEIL IS... <br />
-            <span className="bg-black text-[#ccff00] px-2 py-0.5 inline-block my-1">ON-CHAIN AI WALLET</span> <br />
+            <span className="bg-black text-[#d4ff00] px-2.5 py-0.5 inline-block my-1">ON-CHAIN AI WALLET</span> <br />
             INFRASTRUCTURE.
           </h1>
 
-          <p className="text-sm sm:text-base font-bold text-black max-w-5xl leading-relaxed border-t-3 border-black pt-4">
+          <p className="text-sm sm:text-base font-bold text-black max-w-5xl leading-relaxed border-t-2 border-black pt-4 font-mono">
             NORTHVEIL CONNECTS ANTHROPIC CLAUDE WEB, CHATGPT ACTIONS, AND CURSOR IDE DIRECTLY TO REAL BLOCKCHAIN RPC NODES. EXECUTE MULTI-CHAIN PORTFOLIO ANALYTICS, TOKEN SWAPS, AND SMART CONTRACT DEPLOYMENTS WITH ZERO KNOWLEDGE SECURITY.
           </p>
 
           {/* Action CTAs */}
-          <div className="flex flex-wrap gap-4 pt-2">
+          <div className="flex flex-wrap gap-4 pt-2 font-mono">
             <button
               onClick={onExploreMcp}
-              className="px-8 py-4 bg-black text-[#ccff00] font-black text-sm uppercase border-3 border-black shadow-[4px_4px_0px_0px_#ffffff] hover:bg-[#00f0ff] hover:text-black transition-all flex items-center gap-3 cursor-pointer"
+              className="px-8 py-4 bg-black text-[#d4ff00] font-black text-sm uppercase border-2 border-black shadow-[4px_4px_0px_0px_#ffffff] hover:bg-[#00f0ff] hover:text-black transition-all flex items-center gap-3 cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
             >
               <Cpu className="w-5 h-5 stroke-[3]" />
               <span>MCP AI SERVER MANUAL</span>

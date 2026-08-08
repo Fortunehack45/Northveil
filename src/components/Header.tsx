@@ -147,7 +147,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
   };
 
   return (
-    <header className="w-full h-14 sm:h-20 px-2 sm:px-8 border-b-2 border-white bg-[#0f0f13] flex items-center justify-between gap-2 sm:gap-4 shrink-0 z-30 relative">
+    <header className="w-full h-14 sm:h-20 px-2 sm:px-8 border-b-2 border-white bg-[#10131c] flex items-center justify-between gap-2 sm:gap-4 shrink-0 z-30 relative font-mono">
       {(isWalletMenuOpen || isNotifOpen) && (
         <div
           onClick={() => {
@@ -162,7 +162,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
       <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
         <button
           onClick={onToggleMobileNav}
-          className="md:hidden text-black bg-[#ccff00] p-1.5 rounded-none border-2 border-black shadow-[2px_2px_0px_0px_#000] font-black cursor-pointer active:translate-x-0.5 active:translate-y-0.5 active:shadow-none shrink-0"
+          className="md:hidden text-black bg-[#d4ff00] p-1.5 border-2 border-black shadow-[2px_2px_0px_0px_#000] font-black cursor-pointer active:translate-x-0.5 active:translate-y-0.5 shrink-0"
           aria-label="Open menu"
         >
           <Menu className="w-4 h-4 stroke-[3]" />
@@ -172,7 +172,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
           <BlockiesAvatar address={activeSubWallet?.address || '0x0000000000000000000000000000000000000000'} size={32} />
           <h2 className="text-xs sm:text-sm font-black text-white tracking-tight font-mono truncate flex items-center gap-1.5">
             <span className="hidden md:inline text-slate-400">VAULT:</span>
-            <span className="bg-[#ccff00] text-black px-1.5 py-0.5 border border-black shadow-[2px_2px_0px_0px_#000]">
+            <span className="bg-[#d4ff00] text-black px-1.5 py-0.5 border border-black shadow-[2px_2px_0px_0px_#000]">
               {activeSubWallet?.name || 'ACCOUNT 1'}
             </span>
           </h2>
@@ -183,12 +183,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
           <div className="relative w-full">
             <input
               type="text"
-              placeholder="SEARCH CRYPTO, TICKER OR ADDRESS..."
+              placeholder="SEARCH CRYPTO, TICKER OR CONTRACT..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#181820] border-2 border-white text-white placeholder-slate-400 text-xs font-mono font-bold pl-9 pr-7 py-1.5 sm:py-2 shadow-[3px_3px_0px_0px_#ccff00] focus:outline-none focus:bg-[#20202c] transition-all uppercase"
+              className="w-full bg-[#181c28] border-2 border-white text-white placeholder-slate-400 text-xs font-mono font-bold pl-9 pr-7 py-1.5 sm:py-2 shadow-[3px_3px_0px_0px_#d4ff00] focus:outline-none focus:bg-[#202534] transition-all uppercase"
             />
-            <Search className="w-3.5 h-3.5 text-[#ccff00] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none stroke-[3]" />
+            <Search className="w-3.5 h-3.5 text-[#d4ff00] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none stroke-[3]" />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
@@ -201,9 +201,9 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
 
             {/* Live Token & Address Search Results Dropdown */}
             {searchQuery.trim().length > 0 && (
-              <div className="absolute left-0 right-0 top-11 bg-[#141419] border-2 border-white shadow-[6px_6px_0px_0px_#ccff00] p-2.5 z-50 space-y-2 animate-fadeIn font-mono">
+              <div className="absolute left-0 right-0 top-11 bg-[#141824] border-2 border-white shadow-[5px_5px_0px_0px_#d4ff00] p-2.5 z-50 space-y-2 animate-fadeIn font-mono">
                 <div className="flex items-center justify-between border-b border-white/20 pb-1.5 text-[10px]">
-                  <span className="font-black text-[#ccff00] uppercase tracking-wider">
+                  <span className="font-black text-[#d4ff00] uppercase tracking-wider">
                     TOKENS FOUND ({matchingSearchAssets.length})
                   </span>
                   {searchQuery.trim().startsWith('0x') && (
@@ -220,7 +220,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
                           setSearchQuery('');
                           window.dispatchEvent(new CustomEvent('open-token-details', { detail: asset }));
                         }}
-                        className="p-2 bg-[#0a0a0c] border border-white/20 hover:border-[#ccff00] hover:bg-[#1a1a24] transition-all cursor-pointer flex items-center justify-between gap-2"
+                        className="p-2 bg-[#0a0b0e] border border-white/20 hover:border-[#d4ff00] hover:bg-[#1c2130] transition-all cursor-pointer flex items-center justify-between gap-2"
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <img
@@ -250,7 +250,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
                           </div>
                           <div
                             className={`text-[9px] font-bold ${
-                              asset.change24h >= 0 ? 'text-[#ccff00]' : 'text-[#ff007f]'
+                              asset.change24h >= 0 ? 'text-[#d4ff00]' : 'text-[#ff007f]'
                             }`}
                           >
                             {asset.change24h >= 0 ? '+' : ''}
@@ -274,7 +274,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
         </div>
       </div>
 
-      {/* Right Actions: Multi-Wallet Selector, Chain Selector, Notification Bell, User Avatar badge */}
+      {/* Right Actions: Multi-Wallet Selector, Chain Selector, Notification Bell */}
       <div className="flex items-center gap-1.5 sm:gap-3 font-mono shrink-0">
         {/* Sub-Wallet Selector Button & Dropdown */}
         <div className="relative z-50">
@@ -283,7 +283,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
               setIsWalletMenuOpen(!isWalletMenuOpen);
               setIsNotifOpen(false);
             }}
-            className="px-1.5 sm:px-3 py-1.5 sm:py-2 bg-[#0a0a0c] text-white border-2 border-white shadow-[2px_2px_0px_0px_#00f0ff] sm:shadow-[3px_3px_0px_0px_#00f0ff] font-black text-[11px] sm:text-xs uppercase flex items-center gap-1 sm:gap-2 cursor-pointer hover:bg-[#141419] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none max-w-[130px] sm:max-w-none"
+            className="px-1.5 sm:px-3 py-1.5 sm:py-2 bg-[#0a0b0e] text-white border-2 border-white shadow-[2px_2px_0px_0px_#00f0ff] sm:shadow-[3px_3px_0px_0px_#00f0ff] font-black text-[11px] sm:text-xs uppercase flex items-center gap-1 sm:gap-2 cursor-pointer hover:bg-[#141824] active:translate-x-0.5 active:translate-y-0.5 max-w-[130px] sm:max-w-none"
           >
             <span
               className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full border border-black shrink-0"
@@ -298,12 +298,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
 
           {/* Sub-Wallet Menu Dropdown */}
           {isWalletMenuOpen && (
-            <div className="absolute right-0 top-11 sm:top-12 w-[calc(100vw-24px)] max-w-xs sm:w-80 bg-[#141419] border-2 border-white shadow-[6px_6px_0px_0px_#00f0ff] p-3 z-50 space-y-3 font-mono animate-fadeIn">
+            <div className="absolute right-0 top-11 sm:top-12 w-[calc(100vw-24px)] max-w-xs sm:w-80 bg-[#141824] border-2 border-white shadow-[5px_5px_0px_0px_#00f0ff] p-3 z-50 space-y-3 font-mono animate-fadeIn">
               <div className="flex items-center justify-between border-b-2 border-white pb-2">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <Wallet className="w-3 h-3 text-[#00f0ff]" /> HD SUB-WALLETS ({(subWallets || []).length})
+                  <Wallet className="w-3 h-3 text-[#00f0ff]" /> HD ACCOUNTS ({(subWallets || []).length})
                 </span>
-                <span className="text-[9px] bg-[#ccff00] text-black px-1 font-black uppercase border border-black">
+                <span className="text-[9px] bg-[#d4ff00] text-black px-1 font-black uppercase border border-black">
                   BIP-44
                 </span>
               </div>
@@ -326,7 +326,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
                       className={`p-2 border-2 text-xs cursor-pointer flex items-center justify-between transition-all ${
                         isActive
                           ? 'bg-[#00f0ff] text-black border-black font-black shadow-[2px_2px_0px_0px_#000]'
-                          : 'bg-[#0a0a0c] text-white border-white/30 hover:border-white'
+                          : 'bg-[#0a0b0e] text-white border-white/30 hover:border-white'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
@@ -345,7 +345,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
                       <button
                         onClick={(e) => handleCopyAddr(e, w.address)}
                         className={`p-1 border border-black text-[9px] cursor-pointer ${
-                          isActive ? 'bg-black text-[#00f0ff]' : 'bg-[#181820] text-white'
+                          isActive ? 'bg-black text-[#00f0ff]' : 'bg-[#181c28] text-white'
                         }`}
                         title="Copy Address"
                       >
@@ -356,16 +356,16 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
                 })}
               </div>
 
-              {/* Create Sub-Wallet Inline Form or Trigger */}
+              {/* Create Sub-Wallet Inline Form */}
               {isCreatingWallet ? (
-                <div className="p-2 bg-[#0a0a0c] border-2 border-white space-y-2">
+                <div className="p-2 bg-[#0a0b0e] border-2 border-white space-y-2">
                   <input
                     type="text"
-                    placeholder="WALLET LABEL (e.g. Savings)"
+                    placeholder="ACCOUNT LABEL (e.g. Trading)"
                     value={newWalletName}
                     onChange={(e) => setNewWalletName(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleCreateNewSubWallet()}
-                    className="w-full bg-[#181820] border border-white p-1.5 text-xs text-white focus:outline-none"
+                    className="w-full bg-[#181c28] border border-white p-1.5 text-xs text-white focus:outline-none"
                     autoFocus
                   />
                   <div className="flex gap-1.5">

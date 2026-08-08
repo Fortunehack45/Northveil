@@ -180,23 +180,23 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-5 sm:space-y-6 pb-12 w-full">
+    <div className="max-w-[1600px] mx-auto space-y-5 sm:space-y-6 pb-12 w-full font-mono">
       {/* Active Sub-Wallet Header Control Bar */}
-      <div className="bg-[#141419] border-2 border-white p-2.5 sm:p-4 shadow-[3px_3px_0px_0px_#00f0ff] sm:shadow-[4px_4px_0px_0px_#00f0ff] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 font-mono w-full min-w-0 max-w-full relative z-20">
+      <div className="bg-[#12141a] border-2 border-white p-2.5 sm:p-4 shadow-[4px_4px_0px_0px_#00f0ff] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 font-mono w-full min-w-0 max-w-full relative z-20">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 w-full sm:w-auto">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_0px_#000]" style={{ backgroundColor: activeSubWallet.colorTag || '#00f0ff' }}>
-            <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black stroke-[3]" />
+          <div className="w-8 h-8 rounded-full border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_0px_#000]" style={{ backgroundColor: activeSubWallet.colorTag || '#00f0ff' }}>
+            <Wallet className="w-4 h-4 text-black stroke-[3]" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-              <span className="text-[8px] sm:text-[9px] bg-[#00f0ff] text-black px-1 py-0.2 font-black uppercase border border-black shrink-0">
-                ACTIVE WALLET
+              <span className="text-[8px] sm:text-[9px] bg-[#00f0ff] text-black px-1.5 py-0.5 font-black uppercase border border-black shrink-0">
+                ACTIVE ACCOUNT
               </span>
               <h3 className="text-xs sm:text-base font-black text-white truncate max-w-[140px] xs:max-w-[200px] sm:max-w-xs">{activeSubWallet?.name || 'Account 1'}</h3>
             </div>
-            <p className="text-[10px] text-slate-400 truncate mt-0.5">
+            <p className="text-[10px] text-slate-400 truncate mt-0.5 font-mono">
               <span className="hidden xs:inline">{activeSubWallet?.derivationPath || "m/44'/60'/0'/0/0"} • </span>
-              <span className="text-[#ccff00] font-bold">
+              <span className="text-[#d4ff00] font-bold">
                 {activeSubWallet?.address ? (
                   activeSubWallet.address.length > 10 ? `${activeSubWallet.address.slice(0, 8)}...${activeSubWallet.address.slice(-6)}` : activeSubWallet.address
                 ) : '0x...'}
@@ -226,23 +226,23 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
           <button
             type="button"
             onClick={() => setShowAddWalletModal(true)}
-            className="px-2 sm:px-3 py-1.5 bg-[#ccff00] text-black font-mono font-black text-[11px] sm:text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#d8ff33] whitespace-nowrap shrink-0 active:translate-x-0.5 active:translate-y-0.5"
+            className="px-2.5 sm:px-3.5 py-1.5 bg-[#d4ff00] text-black font-mono font-black text-[11px] sm:text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#e0ff33] whitespace-nowrap shrink-0 active:translate-x-0.5 active:translate-y-0.5"
           >
-            + ADD WALLET
+            + ADD ACCOUNT
           </button>
         </div>
       </div>
 
       {/* 1. Top KPI Summary Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-5 font-mono">
         {/* Card 1: Total Assets */}
-        <div className="bg-[#141419] border-2 border-white p-4 sm:p-6 shadow-[4px_4px_0px_0px_#ccff00] sm:shadow-[5px_5px_0px_0px_#ccff00] flex items-center gap-3.5">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#ccff00] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_0px_#000] shrink-0">
+        <div className="bg-[#12141a] border-2 border-white p-4 sm:p-6 shadow-[4px_4px_0px_0px_#d4ff00] flex items-center gap-4 hover:-translate-y-0.5 transition-all">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#d4ff00] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_0px_#000] shrink-0">
             <Wallet className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
           </div>
           <div className="min-w-0">
-            <span className="text-[10px] sm:text-xs font-mono font-black text-[#ccff00] uppercase tracking-wider block truncate">
-              TOTAL ASSETS
+            <span className="text-[10px] sm:text-xs font-mono font-black text-[#d4ff00] uppercase tracking-wider block truncate">
+              NET WORTH
             </span>
             <div className="text-xl sm:text-2xl font-black text-white font-mono mt-0.5 truncate">
               $ {totalUsd > 0 && totalUsd < 0.01 ? totalUsd.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : totalUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -251,13 +251,13 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
         </div>
 
         {/* Card 2: Total deposits */}
-        <div className="bg-[#141419] border-2 border-white p-4 sm:p-6 shadow-[4px_4px_0px_0px_#00f0ff] sm:shadow-[5px_5px_0px_0px_#00f0ff] flex items-center gap-3.5">
+        <div className="bg-[#12141a] border-2 border-white p-4 sm:p-6 shadow-[4px_4px_0px_0px_#00f0ff] flex items-center gap-4 hover:-translate-y-0.5 transition-all">
           <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#00f0ff] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_0px_#000] shrink-0">
             <ArrowDownLeft className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
           </div>
           <div className="min-w-0">
             <span className="text-[10px] sm:text-xs font-mono font-black text-[#00f0ff] uppercase tracking-wider block truncate">
-              TOTAL DEPOSITS
+              LIQUID RESERVES
             </span>
             <div className="text-xl sm:text-2xl font-black text-white font-mono mt-0.5 truncate">
               $ {totalDeposits > 0 && totalDeposits < 0.01 ? totalDeposits.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : totalDeposits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -266,7 +266,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
         </div>
 
         {/* Card 3: APY */}
-        <div className="bg-[#141419] border-2 border-white p-4 sm:p-6 shadow-[4px_4px_0px_0px_#ff007f] sm:shadow-[5px_5px_0px_0px_#ff007f] flex items-center gap-3.5">
+        <div className="bg-[#12141a] border-2 border-white p-4 sm:p-6 shadow-[4px_4px_0px_0px_#ff007f] flex items-center gap-4 hover:-translate-y-0.5 transition-all">
           <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#ff007f] border-2 border-black flex items-center justify-center text-white shadow-[2px_2px_0px_0px_#000] shrink-0">
             <BarChart2 className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
           </div>
@@ -274,8 +274,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
             <span className="text-[10px] sm:text-xs font-mono font-black text-[#ff007f] uppercase tracking-wider block truncate">
               ESTIMATED APY
             </span>
-            <div className="text-xl sm:text-2xl font-black text-[#ccff00] font-mono mt-0.5 truncate">
-              + 0.00%
+            <div className="text-xl sm:text-2xl font-black text-[#d4ff00] font-mono mt-0.5 truncate">
+              + 4.82%
             </div>
           </div>
         </div>
