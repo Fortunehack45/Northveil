@@ -217,7 +217,7 @@ export async function createTransactionRequest(input: CreateTxRequestInput) {
 
   // 1. Verify wallet exists in Supabase
   const { data: walletRecord } = await supabase.from('wallets').select('*').eq('address', address).maybeSingle();
-  
+
   const provider = getProviderForNetwork(network);
   let estimatedFeeUsd = 0.42;
   try {
@@ -225,7 +225,7 @@ export async function createTransactionRequest(input: CreateTxRequestInput) {
     if (feeData.gasPrice) {
       estimatedFeeUsd = Number(ethers.formatUnits(feeData.gasPrice * 21000n, 'gwei')) * (3450 / 1e9);
     }
-  } catch {}
+  } catch { }
 
   const totalAmount = Number(input.amount) + (input.asset === 'ETH' ? (estimatedFeeUsd / 3450) : 0);
 

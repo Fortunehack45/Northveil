@@ -44,6 +44,18 @@ const MainContent: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [activeTab]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    if (action === 'transfer' || action === 'send') {
+      setActiveTab('developerHub');
+    } else if (action === 'swap') {
+      setActiveTab('dexBridge');
+    } else if (action === 'contract_metadata') {
+      setActiveTab('smartContractStudio');
+    }
+  }, []);
+
   if (isLocked) {
     return (
       <div className="min-h-screen bg-[#0a0a0c] brutal-grid-bg flex items-center justify-center p-4">

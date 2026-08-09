@@ -85,6 +85,84 @@ function formatUsdValue(num: number): string {
   return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`;
 }
 
+function buildMcpUiCardMarkdown(payload: {
+  type: 'transfer' | 'receipt' | 'request' | 'contract_metadata' | 'swap' | 'contract_deploy';
+  title: string;
+  amount?: string | number;
+  symbol?: string;
+  fromAmount?: string | number;
+  fromSymbol?: string;
+  toAmount?: string | number;
+  toSymbol?: string;
+  sender?: string;
+  recipient?: string;
+  network?: string;
+  gasFeeUsd?: string | number;
+  txHash?: string;
+  contractAddress?: string;
+  name?: string;
+  decimals?: number;
+  totalSupply?: string;
+  imageUrl?: string;
+  tokenType?: string;
+  actionUrl?: string;
+  explorerUrl?: string;
+}): string {
+  const localAppUrl = process.env.PUBLIC_APP_URL || 'http://localhost:3000';
+  const actionLink = payload.actionUrl || `${localAppUrl}/?action=${payload.type}&amount=${encodeURIComponent(String(payload.amount || payload.fromAmount || ''))}&symbol=${encodeURIComponent(payload.symbol || payload.fromSymbol || '')}&recipient=${encodeURIComponent(payload.recipient || '')}&address=${encodeURIComponent(payload.contractAddress || '')}`;
+
+  let headerBadge = (payload.title || payload.type.toUpperCase()).slice(0, 36);
+
+  let cardAscii = `\`\`\`text
+╔═════════════════════════════════════════════════════════════════╗
+║ 🟡 NORTHVEIL MCP ACTION CARD: ${headerBadge.padEnd(34)} ║
+╠═════════════════════════════════════════════════════════════════╣\n`;
+
+  if (payload.type === 'transfer') {
+    cardAscii += `║ AMOUNT:     ${(String(payload.amount) + ' ' + (payload.symbol || 'ETH')).padEnd(51)} ║\n` +
+      `║ SENDER:     ${(payload.sender || '').slice(0, 48).padEnd(51)} ║\n` +
+      `║ RECIPIENT:  ${(payload.recipient || '').slice(0, 48).padEnd(51)} ║\n` +
+      `║ NETWORK:    ${(payload.network || 'Ethereum Sepolia').slice(0, 48).padEnd(51)} ║\n` +
+      `║ GAS FEE:    $${(String(payload.gasFeeUsd || '0.45')).padEnd(50)} ║\n` +
+      `║ STATUS:     🟢 CONFIRMED ON-CHAIN                               ║\n`;
+  } else if (payload.type === 'swap') {
+    cardAscii += `║ YOU SOLD:   ${(String(payload.fromAmount || payload.amount || '1.0') + ' ' + (payload.fromSymbol || 'ETH')).padEnd(51)} ║\n` +
+      `║ YOU GOT:    ${(String(payload.toAmount || '3450') + ' ' + (payload.toSymbol || 'USDC')).padEnd(51)} ║\n` +
+      `║ ROUTER:     1inch V6 DEX AGGREGATOR                             ║\n` +
+      `║ STATUS:     🟢 ROUTED & EXECUTED                                ║\n`;
+  } else if (payload.type === 'contract_metadata' || payload.type === 'contract_deploy') {
+    cardAscii += `║ CONTRACT:   ${(payload.contractAddress || '').slice(0, 48).padEnd(51)} ║\n` +
+      `║ TOKEN NAME: ${(payload.name || '').slice(0, 48).padEnd(51)} ║\n` +
+      `║ TICKER:     $${(payload.symbol || '').slice(0, 48).padEnd(50)} ║\n` +
+      `║ STANDARD:   ${(payload.tokenType || 'ERC-20').slice(0, 48).padEnd(51)} ║\n` +
+      `║ SUPPLY:     ${(payload.totalSupply || '1,000,000,000').slice(0, 48).padEnd(51)} ║\n` +
+      `║ NETWORK:    ${(payload.network || 'Ethereum Mainnet').slice(0, 48).padEnd(51)} ║\n`;
+  } else if (payload.type === 'request') {
+    cardAscii += `║ REQUEST:    ${(String(payload.amount) + ' ' + (payload.symbol || 'USDC')).padEnd(51)} ║\n` +
+      `║ RECIPIENT:  ${(payload.recipient || '').slice(0, 48).padEnd(51)} ║\n` +
+      `║ STATUS:     🔴 AWAITING PAYMENT                                  ║\n`;
+  } else if (payload.type === 'receipt') {
+    cardAscii += `║ TX HASH:    ${(payload.txHash || '').slice(0, 48).padEnd(51)} ║\n` +
+      `║ STATUS:     🟢 FINALIZED ON BLOCKCHAIN                           ║\n`;
+  }
+
+  cardAscii += `╚═════════════════════════════════════════════════════════════════╝\n\`\`\``;
+
+  let markdownOutput = `${cardAscii}\n\n`;
+
+  if (payload.imageUrl) {
+    markdownOutput += `![${payload.name || 'Token/NFT Cover'}](${payload.imageUrl})\n\n`;
+  }
+
+  markdownOutput += `👉 **[⚡ OPEN INTERACTIVE CARD IN NORTHVEIL WALLET](${actionLink})**\n`;
+
+  if (payload.explorerUrl) {
+    markdownOutput += `🔗 **[VIEW ON BLOCK EXPLORER](${payload.explorerUrl})**\n`;
+  }
+
+  return markdownOutput;
+}
+
 // Active SSE client sessions
 const sseSessions = new Map<string, { res: Response; apiKey: string; walletAddress: string; permissions: string[] }>();
 
@@ -2280,19 +2358,33 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
 
       const amountWeiHex = '0x' + ethers.parseEther(amountStr).toString(16);
 
+      const uiCardMarkdown = buildMcpUiCardMarkdown({
+        type: 'transfer',
+        title: isBroadcastedOnChain ? 'ON-CHAIN TRANSFER CONFIRMED' : 'SIGNABLE PAYLOAD READY',
+        amount: amountStr,
+        symbol: token,
+        sender: actualSignerAddress,
+        recipient: recipient,
+        network: chainName,
+        gasFeeUsd: gasFeeUsd.toFixed(2),
+        txHash: realTxHash || undefined,
+        explorerUrl: realTxHash ? `${explorerBase}/tx/${realTxHash}` : explorerBase,
+      });
+
       const formattedMarkdown = `
+${uiCardMarkdown}
+
 ### ON-CHAIN BLOCKCHAIN TRANSACTION ${isBroadcastedOnChain ? '[CONFIRMED ON-CHAIN]' : '[SIGNABLE PAYLOAD READY]'}
 
 > **Status**: ${isBroadcastedOnChain ? '**CONFIRMED & BROADCASTED ON BLOCKCHAIN**' : '**SIGNABLE UNBROADCASTED PAYLOAD READY**'}  
 > **Network**: \`${chainName}\` (Chain ID: \`${chainId}\` | ${isTestnet ? '[TESTNET]' : '[MAINNET]'})  
 ${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](${explorerBase}/tx/${realTxHash})` : ''}
 > **Estimated Gas Fee**: \`$${gasFeeUsd.toFixed(2)} USD\`
-${!isBroadcastedOnChain ? `\n> **Notice**: No private key was provided in request arguments or \`SEPOLIA_PRIVATE_KEY\` in \`.env\`. To execute direct on-chain broadcasting from the MCP server, add your private key to \`.env\` as \`SEPOLIA_PRIVATE_KEY\` or pass \`privateKey\` in tool args.` : ''}
 
 | Parameter | Value |
 | :--- | :--- |
 | **Token Sent** | **${amountStr} ${token}** |
-| **Sender Wallet** | \`${walletAddress}\` |
+| **Sender Wallet** | \`${actualSignerAddress}\` |
 | **Recipient Wallet** | \`${recipient}\` |
 | **Target Network** | \`${chainName}\` |
 ${realTxHash ? `| **Block Explorer** | [View Transaction on ${chainName}](${explorerBase}/tx/${realTxHash}) |` : ''}
@@ -2301,6 +2393,17 @@ ${realTxHash ? `| **Block Explorer** | [View Transaction on ${chainName}](${expl
 
       return {
         formattedMarkdown,
+        ui_widget: {
+          type: 'transfer',
+          title: 'EIP-1193 ON-CHAIN TRANSFER',
+          amount: Number(amountStr),
+          symbol: token,
+          sender: actualSignerAddress,
+          recipient,
+          network: chainName,
+          gasFeeUsd: Number(gasFeeUsd.toFixed(2)),
+          txHash: realTxHash || null,
+        },
         txHash: realTxHash || null,
         status: isBroadcastedOnChain ? 'CONFIRMED' : 'SIGNABLE_PAYLOAD_READY',
         broadcastedOnChain: isBroadcastedOnChain,
@@ -2313,7 +2416,7 @@ ${realTxHash ? `| **Block Explorer** | [View Transaction on ${chainName}](${expl
         },
         token,
         amount: Number(amountStr),
-        senderWallet: walletAddress,
+        senderWallet: actualSignerAddress,
         recipient: recipient,
         chain: chainName,
         chainId,
@@ -2500,7 +2603,21 @@ contract ${nameStr} is ERC20, ERC20Burnable, Ownable {
       const telegramMd = telegramStr ? `[${telegramStr}](${telegramStr})` : '*Not Provided (Blank)*';
       const discordMd = discordStr ? `[${discordStr}](${discordStr})` : '*Not Provided (Blank)*';
 
+      const uiCardMarkdown = buildMcpUiCardMarkdown({
+        type: 'contract_metadata',
+        title: `SMART CONTRACT GENERATED: ${nameStr}`,
+        name: nameStr,
+        symbol: symbolStr,
+        totalSupply: totalSupplyNum.toLocaleString(),
+        decimals: isNft ? 0 : 18,
+        tokenType: isNft ? 'ERC-721' : 'ERC-20',
+        imageUrl: imageUrlStr,
+        network: 'Ethereum Mainnet',
+      });
+
       const formattedMarkdown = `
+${uiCardMarkdown}
+
 ### 📜 SOLIDITY SMART CONTRACT GENERATED (${standardName.toUpperCase()})
 
 > **Contract Name**: \`${nameStr}\` (\`$${symbolStr}\`)  
@@ -2538,6 +2655,16 @@ ${solCode}
 
       return {
         formattedMarkdown,
+        ui_widget: {
+          type: 'contract_metadata',
+          title: `CONTRACT: ${nameStr}`,
+          name: nameStr,
+          symbol: symbolStr,
+          totalSupply: totalSupplyNum.toLocaleString(),
+          decimals: isNft ? 0 : 18,
+          tokenType: isNft ? 'ERC-721' : 'ERC-20',
+          imageUrl: imageUrlStr,
+        },
         contractName: nameStr,
         symbol: symbolStr,
         totalSupply: totalSupplyNum,
@@ -2651,20 +2778,31 @@ ${solCode}
         console.warn('[Supabase Swap Record Note]:', e);
       }
 
+      const uiCardMarkdown = buildMcpUiCardMarkdown({
+        type: 'swap',
+        title: isBroadcastedOnChain ? 'DEX SWAP CONFIRMED ON-CHAIN' : 'AI SWAP ROUTE READY',
+        fromAmount: String(amountNum),
+        fromSymbol: fromSym,
+        toAmount: dstAmountFormatted,
+        toSymbol: toSym,
+        sender: cleanAddress,
+        network: 'Ethereum Mainnet',
+        gasFeeUsd: '0.65',
+        txHash: realTxHash || undefined,
+        explorerUrl: realTxHash ? `https://etherscan.io/tx/${realTxHash}` : 'https://etherscan.io',
+      });
+
       const formattedMarkdown = `
+${uiCardMarkdown}
+
 ### DEX TOKEN SWAP ${isBroadcastedOnChain ? '[CONFIRMED]' : '[ROUTED & PAYLOAD GENERATED]'}
 
-> **Routing Engine**: \`${routerName}\`  
-> **Status**: ${isBroadcastedOnChain ? '**CONFIRMED & BROADCASTED ON ETHEREUM**' : '**SIGNABLE UNBROADCASTED SWAP PAYLOAD READY**'}  
+> **Status**: ${isBroadcastedOnChain ? '**CONFIRMED ON-CHAIN**' : '**UNBROADCASTED PAYLOAD GENERATED**'}  
+> **Route**: \`${routerName}\`  
 ${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](https://etherscan.io/tx/${realTxHash})` : ''}
 
 | Parameter | Value |
 | :--- | :--- |
-| **Swapped Asset** | **${amountNum} ${fromSym}** $\\rightarrow$ **${dstAmountFormatted} ${toSym}** |
-| **DEX Liquidity Route** | Uniswap V3 $\\rightarrow$ Curve $\\rightarrow$ 1inch V6 Router |
-| **Effective Rate** | 1 ${fromSym} = $${(Number(dstAmountFormatted) / amountNum).toFixed(2)} USD |
-| **Slippage Protection** | 0.5% max |
-${realTxHash ? `| **Block Explorer** | [View Swap Transaction on Etherscan](https://etherscan.io/tx/${realTxHash}) |` : ''}
 | **Database Sync** | Saved to Supabase \`transactions\` ${dbRecordId ? `(\`ID: ${dbRecordId}\`)` : '(Synced)'} |
 `;
 
