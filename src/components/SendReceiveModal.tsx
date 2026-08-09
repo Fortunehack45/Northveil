@@ -58,7 +58,7 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 animate-fadeIn">
       {/* Token Search Modal */}
       <TokenSearchModal
         isOpen={isTokenSearchOpen}
@@ -71,7 +71,10 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
         title="SELECT ASSET FOR TRANSACTION"
       />
 
-      <div className="bg-[#141419] border-4 border-white p-5 sm:p-8 max-w-md w-full shadow-[10px_10px_0px_0px_#ccff00] relative space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar font-mono">
+      <div className="bg-[#141419] border-t-4 sm:border-4 border-white p-5 sm:p-8 max-w-md w-full rounded-t-3xl sm:rounded-none shadow-[0px_-8px_20px_rgba(0,0,0,0.9)] sm:shadow-[10px_10px_0px_0px_#ccff00] relative space-y-4 max-h-[88vh] sm:max-h-[90vh] overflow-y-auto no-scrollbar font-mono">
+        {/* Native Mobile Sheet Pull Handle Bar */}
+        <div className="w-12 h-1.5 bg-white/40 rounded-full mx-auto sm:hidden -mt-1 mb-2" />
+
         <div className="flex items-center justify-between border-b-2 border-white pb-3">
           <h3 className="text-xl font-black text-white font-mono uppercase flex items-center gap-2 tracking-tight">
             {mode === 'send' ? <Send className="w-5 h-5 text-[#ccff00] stroke-[3]" /> : <QrCode className="w-5 h-5 text-[#ccff00] stroke-[3]" />}
@@ -79,7 +82,7 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
           </h3>
           <button
             onClick={onClose}
-            className="p-1 px-3 border-2 border-black bg-[#ff007f] text-white font-black hover:bg-[#ff3399]"
+            className="p-1 px-3 border-2 border-black bg-[#ff007f] text-white font-black hover:bg-[#ff3399] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
           >
             ✕
           </button>

@@ -442,71 +442,71 @@ export const DAppBrowserView: React.FC = () => {
             </div>
           )}
 
-          {/* Simulated Active DApp UI Screen */}
-          <div className="bg-[#0a0a0c] border-2 border-white p-6 min-h-[420px] space-y-6 flex flex-col justify-between relative shadow-[4px_4px_0px_0px_#000]">
-            {/* Top Interactive DApp Widget Header */}
-            <div className="flex items-center justify-between border-b-2 border-white/20 pb-4">
+          {/* Active Web3 DApp Browser Frame */}
+          <div className="bg-[#0a0a0c] border-2 border-white p-3 sm:p-4 min-h-[600px] flex flex-col justify-between relative shadow-[4px_4px_0px_0px_#000] font-mono">
+            {/* Top Interactive Browser Address Bar Controls */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b-2 border-white/20 pb-3 mb-3">
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-[#ccff00]" />
-                <span className="w-3 h-3 rounded-full bg-[#ff007f]" />
-                <span className="w-3 h-3 rounded-full bg-[#00f0ff]" />
-                <span className="text-xs font-mono text-slate-400 ml-2 uppercase">
-                  {activeDApp.name} Web3 Workspace Frame
-                </span>
+                <button
+                  onClick={() => {
+                    const iframe = document.getElementById('dapp-iframe-frame') as HTMLIFrameElement;
+                    if (iframe) iframe.src = activeDApp.url;
+                  }}
+                  className="p-1.5 bg-[#181c28] text-white border border-white/30 hover:border-white cursor-pointer"
+                  title="Reload dApp Page"
+                >
+                  <RefreshCw className="w-4 h-4 stroke-[2.5]" />
+                </button>
+
+                <div className="flex-1 flex items-center bg-[#181c28] border-2 border-white px-3 py-1.5 shadow-[2px_2px_0px_0px_#d4ff00]">
+                  <Lock className="w-3.5 h-3.5 text-[#d4ff00] mr-2 shrink-0 stroke-[3]" />
+                  <input
+                    type="text"
+                    value={activeDApp.url}
+                    readOnly
+                    className="bg-transparent text-xs text-white font-mono font-bold w-full focus:outline-none"
+                  />
+                  <span className="text-[9px] font-black bg-[#d4ff00] text-black px-1.5 py-0.5 border border-black uppercase shrink-0 ml-2">
+                    EIP-1193 INJECTED
+                  </span>
+                </div>
               </div>
-              <div className="bg-[#181820] text-[#ccff00] font-mono text-xs font-bold px-3 py-1 border border-white/30">
-                INJECTED PROVIDER ACTIVE
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleSimulateDAppInteraction(`Execute Smart Protocol Interaction on ${activeDApp.name}`)}
+                  className="px-3 py-1.5 bg-[#d4ff00] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#e0ff33] flex items-center gap-1.5"
+                >
+                  <Zap className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>SIGN & EXECUTE</span>
+                </button>
+                <a
+                  href={activeDApp.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-[#00f0ff] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#33f3ff] flex items-center gap-1.5"
+                >
+                  <span>OPEN NEW TAB</span>
+                  <ExternalLink className="w-3.5 h-3.5 stroke-[3]" />
+                </a>
               </div>
             </div>
 
-            {/* DApp Specific Simulated Interface */}
-            <div className="max-w-xl mx-auto w-full bg-[#141419] border-2 border-white p-6 space-y-6 shadow-[6px_6px_0px_0px_#ff007f]">
-              <div className="text-center space-y-2 border-b-2 border-white pb-4">
-                <div className="text-4xl">{activeDApp.icon}</div>
-                <h4 className="text-lg font-black text-white font-mono uppercase">
-                  {activeDApp.name} Interactive Portal
-                </h4>
-                <p className="text-xs text-slate-300 font-mono">
-                  {activeDApp.description}
-                </p>
-              </div>
-
-              {/* Action Simulation Buttons */}
-              <div className="space-y-3 font-mono">
-                <div className="flex justify-between text-xs text-slate-300">
-                  <span>WALLET STATUS:</span>
-                  <span className="text-[#ccff00] font-black">CONNECTED (0x71C8...C8)</span>
-                </div>
-                <div className="flex justify-between text-xs text-slate-300">
-                  <span>GAS REFUELER:</span>
-                  <span className="text-[#00f0ff] font-black">OPTIMAL (12 GWEI)</span>
-                </div>
-
-                <div className="pt-2 space-y-2">
-                  <button
-                    disabled={simulatedTxPending}
-                    onClick={() => handleSimulateDAppInteraction(`Execute Smart Protocol Swap on ${activeDApp.name}`)}
-                    className="w-full py-3.5 bg-[#ccff00] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:bg-[#d8ff33] active:translate-x-1 active:translate-y-1 active:shadow-none cursor-pointer flex items-center justify-center gap-2 transition-all"
-                  >
-                    {simulatedTxPending ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>SIGNING DAPP PAYLOAD...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="w-4 h-4 stroke-[3]" />
-                        <span>INTERACT WITH {activeDApp.name.toUpperCase()}</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
+            {/* Real Embedded Web Frame */}
+            <div className="relative flex-1 min-h-[500px] w-full border-2 border-white bg-black">
+              <iframe
+                id="dapp-iframe-frame"
+                src={activeDApp.url}
+                className="w-full h-[520px] bg-black border-none"
+                title={activeDApp.name}
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+              />
             </div>
 
             {/* DApp Footer Specs */}
-            <div className="text-center text-[10px] font-mono text-slate-500 uppercase border-t-2 border-white/20 pt-3">
-              Cryptfast Sandbox Guard • EIP-1193 Web3 Provider API Injected • Hardware Security Active
+            <div className="text-center text-[10px] font-mono text-slate-400 uppercase border-t-2 border-white/20 pt-3 mt-3 flex items-center justify-between">
+              <span>Northveil Web3 Sandbox Guard Active</span>
+              <span className="text-[#d4ff00] font-bold">RPC NODE: ETHEREUM MAINNET (EIP-1193 CONNECTED)</span>
             </div>
           </div>
         </div>

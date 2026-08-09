@@ -23,6 +23,17 @@ body {
   color: #f8fafc;
   font-family: 'Space Grotesk', 'JetBrains Mono', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior-y: none;
+}
+
+/* Native Mobile Safe Area Helpers */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Polished Neo-Brutalist Grid Background */

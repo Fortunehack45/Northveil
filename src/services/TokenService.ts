@@ -15,8 +15,10 @@ const ERC20_ABI = [
 export class TokenService {
   static async fetchLivePricesMap(): Promise<Record<string, { usd: number; change24h: number }>> {
     let livePrices: Record<string, { usd: number; change24h: number }> = {};
+
+    // Provider 1: CoinPaprika Ticker Feed
     try {
-      const response = await fetch('https://api.coinpaprika.com/v1/tickers?limit=250');
+      const response = await fetch('https://api.coinpaprika.com/v1/tickers?limit=300');
       if (response.ok) {
         const paprikaData = await response.json();
         if (Array.isArray(paprikaData)) {
@@ -31,8 +33,49 @@ export class TokenService {
         }
       }
     } catch (e) {
-      console.warn('Live price ticker fetch failed:', e);
+      console.warn('CoinPaprika price fetch fallback:', e);
     }
+
+    // Provider 2: CryptoCompare Price Feed Multi-Symbol Fallback
+    try {
+      const symbols = 'ETH,BTC,SOL,BNB,USDT,USDC,MATIC,AVAX,XRP,ADA,DOGE,SHIB,LINK,ARB,OP,SUI,APT,NEAR,TON';
+      const ccResponse = await fetch(`https://min-api.cryptocompare.com/data/pricemulti?fsyms=${symbols}&tsyms=USD`);
+      if (ccResponse.ok) {
+        const ccData = await ccResponse.json();
+        Object.keys(ccData).forEach((sym) => {
+          if (ccData[sym]?.USD && (!livePrices[sym] || livePrices[sym].usd === 0)) {
+            livePrices[sym] = {
+              usd: Number(ccData[sym].USD),
+              change24h: livePrices[sym]?.change24h || 0,
+            };
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('CryptoCompare price fetch fallback:', e);
+    }
+
+    // Provider 3: CoinCap Asset Feed Fallback
+    try {
+      const ccResponse = await fetch('https://api.coincap.io/v2/assets?limit=100');
+      if (ccResponse.ok) {
+        const coincapData = await ccResponse.json();
+        if (Array.isArray(coincapData.data)) {
+          coincapData.data.forEach((item: any) => {
+            const sym = (item.symbol || '').toUpperCase();
+            if (sym && (!livePrices[sym] || livePrices[sym].usd === 0)) {
+              livePrices[sym] = {
+                usd: Number(item.priceUsd || 0),
+                change24h: Number(item.changePercent24Hr || 0),
+              };
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('CoinCap price fetch fallback:', e);
+    }
+
     return livePrices;
   }
 

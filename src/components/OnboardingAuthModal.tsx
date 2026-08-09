@@ -303,7 +303,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({ onClos
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
         style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(12px)' }}
         variants={backdropVariant}
         initial="hidden"
@@ -313,7 +313,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({ onClos
         <ParticleField />
 
         <motion.div
-          className="bg-[#141419] border-4 border-white max-w-xl w-full shadow-[12px_12px_0px_0px_#ccff00] relative max-h-[90vh] overflow-y-auto no-scrollbar font-mono z-10"
+          className="bg-[#141419] border-t-4 sm:border-4 border-white max-w-xl w-full rounded-t-3xl sm:rounded-none shadow-[0px_-8px_20px_rgba(0,0,0,0.9)] sm:shadow-[12px_12px_0px_0px_#ccff00] relative max-h-[88vh] sm:max-h-[90vh] overflow-y-auto no-scrollbar font-mono z-10"
           variants={modalVariant}
           initial="hidden"
           animate="visible"

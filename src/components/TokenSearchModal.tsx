@@ -113,10 +113,13 @@ export const TokenSearchModal: React.FC<TokenSearchModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-150">
-      <div className="bg-[#141419] border-2 border-white p-6 sm:p-8 max-w-lg w-full shadow-[12px_12px_0px_0px_#00f0ff] relative space-y-5 max-h-[85vh] flex flex-col font-mono">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-[#141419] border-t-4 sm:border-2 border-white p-5 sm:p-8 max-w-lg w-full rounded-t-3xl sm:rounded-none shadow-[0px_-8px_20px_rgba(0,0,0,0.9)] sm:shadow-[12px_12px_0px_0px_#00f0ff] relative space-y-4 sm:space-y-5 max-h-[88vh] sm:max-h-[85vh] flex flex-col font-mono">
+        {/* Native Mobile Sheet Pull Handle Bar */}
+        <div className="w-12 h-1.5 bg-white/40 rounded-full mx-auto sm:hidden -mt-1 mb-1" />
+
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b-2 border-white pb-4 shrink-0">
+        <div className="flex items-center justify-between border-b-2 border-white pb-3 sm:pb-4 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-1.5 bg-[#00f0ff] text-black border border-black shadow-[2px_2px_0px_0px_#000]">
               <Coins className="w-4 h-4 stroke-[3]" />

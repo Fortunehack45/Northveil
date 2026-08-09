@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from 'react';
 import {
   NetworkId,
   CryptoAsset,
@@ -294,7 +294,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, [activeSubWallet?.address]);
 
-  // Persist assets to address-scoped localStorage
+  // Address-scoped asset persistence
   useEffect(() => {
     if (activeSubWallet?.address && assets && assets.length > 0) {
       localStorage.setItem(`northveil_v3_assets_${activeSubWallet.address.toLowerCase()}`, JSON.stringify(assets));
