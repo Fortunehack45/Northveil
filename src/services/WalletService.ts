@@ -150,6 +150,20 @@ export class WalletService {
   }
 
   /**
+   * Cryptographically signs an EIP-191 message using the derived EVM wallet
+   */
+  static async signMessage(mnemonicWords: string[], accountIndex: number, message: string, passphrase?: string): Promise<string> {
+    const mnemonic = mnemonicWords.join(' ');
+    const path = `m/44'/60'/0'/0/${accountIndex}`;
+    const hdNode = ethers.HDNodeWallet.fromMnemonic(
+      ethers.Mnemonic.fromPhrase(mnemonic, passphrase),
+      path
+    );
+    const wallet = new ethers.Wallet(hdNode.privateKey);
+    return wallet.signMessage(message);
+  }
+
+  /**
    * Retrieves an ethers.Wallet instance connected to a provider securely in memory
    */
   static getEVMWallet(mnemonicWords: string[], accountIndex: number, provider: ethers.Provider, passphrase?: string): ethers.Wallet {

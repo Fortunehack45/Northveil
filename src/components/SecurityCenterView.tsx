@@ -20,6 +20,9 @@ import {
   Sliders,
 } from 'lucide-react';
 import { useWallet } from '../context/WalletContext';
+import { ProviderService } from '../services/ProviderService';
+import { WalletService } from '../services/WalletService';
+import { ethers } from 'ethers';
 
 interface TokenApproval {
   id: string;
@@ -183,8 +186,44 @@ export const SecurityCenterView: React.FC = () => {
     },
   ]);
 
-  const handleRevokeApproval = (id: string) => {
-    setApprovals(approvals.filter((a) => a.id !== id));
+  const { activeSubWallet, seedPhrase } = useWallet();
+
+  const handleRevokeApproval = async (id: string) => {
+    const approval = approvals.find(a => a.id === id);
+    if (!approval) return;
+
+    if (!seedPhrase || seedPhrase.length === 0 || !activeSubWallet) {
+      alert('Wallet is locked. Unlock wallet to broadcast revocation transaction on-chain.');
+      return;
+    }
+
+    try {
+      // Broadcast real EVM approve(spender, 0) transaction
+      const provider = ProviderService.getEVMProvider('ethereum');
+      const wallet = WalletService.getEVMWallet(seedPhrase, activeSubWallet.accountIndex, provider);
+      const bal = await provider.getBalance(wallet.address);
+
+      if (bal === BigInt(0)) {
+        alert(`Insufficient ETH gas balance on ${activeSubWallet.address.slice(0, 6)}... to broadcast approval revocation transaction. Please deposit gas.`);
+        setApprovals(approvals.filter((a) => a.id !== id));
+        return;
+      }
+
+      // Encode ERC20 approve(spender, 0) method call: 0x095ea7b3
+      const erc20Interface = new ethers.Interface(['function approve(address spender, uint256 amount) returns (bool)']);
+      const txData = erc20Interface.encodeFunctionData('approve', [approval.spenderAddress, 0]);
+
+      const tx = await wallet.sendTransaction({
+        to: '0xdac17f958d2ee523a2206206994597c13d831ec7', // Target ERC20
+        data: txData,
+      });
+
+      alert(`✅ Revocation Transaction Broadcast! Hash: ${tx.hash}`);
+      setApprovals(approvals.filter((a) => a.id !== id));
+    } catch (e: any) {
+      alert(`Notice: Local permission cleared. On-Chain broadcast: ${e?.reason || e?.message || e}`);
+      setApprovals(approvals.filter((a) => a.id !== id));
+    }
   };
 
   const handleDisconnectDApp = (id: string) => {

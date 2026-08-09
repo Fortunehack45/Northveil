@@ -351,8 +351,13 @@ export const SecurityBackupView: React.FC = () => {
                     <div className="flex items-center gap-3">
                       <span className="text-xl">{hw.icon}</span>
                       <div>
-                        <div className="font-mono font-black text-xs text-white">{hw.name}</div>
-                        <div className="text-[10px] font-mono text-slate-400">WEBUSB / BLUETOOTH ENABLED</div>
+                        <div className="font-mono font-black text-xs text-white flex items-center gap-1.5">
+                          <span>{hw.name}</span>
+                          <span className="px-1.5 py-0.2 bg-[#ff007f] text-white text-[8px] font-black uppercase">
+                            UNDER DEV
+                          </span>
+                        </div>
+                        <div className="text-[10px] font-mono text-slate-400">WEBUSB / BLUETOOTH PAIRING IN DEV</div>
                       </div>
                     </div>
 

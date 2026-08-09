@@ -19,6 +19,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { useWallet } from '../context/WalletContext';
+import { WalletService } from '../services/WalletService';
 
 interface DApp {
   id: string;
@@ -216,14 +217,31 @@ export const DAppBrowserView: React.FC = () => {
     );
   };
 
-  const handleSimulateDAppInteraction = (actionName: string) => {
+  const { seedPhrase, activeSubWallet } = useWallet();
+
+  const handleSimulateDAppInteraction = async (actionName: string) => {
     setSimulatedTxPending(true);
     setSimulatedTxSuccess(null);
-    setTimeout(() => {
+
+    if (!seedPhrase || seedPhrase.length === 0 || !activeSubWallet) {
       setSimulatedTxPending(false);
-      setSimulatedTxSuccess(`Successfully executed "${actionName}" on ${activeDApp?.name}!`);
+      setSimulatedTxSuccess('⚠️ Wallet is locked. Unlock wallet to sign EIP-1193 payload.');
       setTimeout(() => setSimulatedTxSuccess(null), 4000);
-    }, 1500);
+      return;
+    }
+
+    try {
+      const messageToSign = `Northveil EIP-1193 Signature Request:\nApp: ${activeDApp?.name || 'Web3 DApp'}\nAction: ${actionName}\nTimestamp: ${new Date().toISOString()}`;
+      const signedHash = await WalletService.signMessage(seedPhrase, activeSubWallet.accountIndex, messageToSign);
+
+      setSimulatedTxPending(false);
+      setSimulatedTxSuccess(`✅ EIP-191 Signature Created! Hash: ${signedHash.slice(0, 18)}...${signedHash.slice(-10)}`);
+      setTimeout(() => setSimulatedTxSuccess(null), 6000);
+    } catch (err: any) {
+      setSimulatedTxPending(false);
+      setSimulatedTxSuccess(`❌ Signature Failed: ${err?.message || err}`);
+      setTimeout(() => setSimulatedTxSuccess(null), 4000);
+    }
   };
 
   return (
