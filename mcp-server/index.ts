@@ -150,6 +150,11 @@ function buildMcpUiCardMarkdown(payload: {
 
   let markdownOutput = `${cardAscii}\n\n`;
 
+  const serverBaseUrl = process.env.PUBLIC_MCP_URL || 'http://localhost:3001';
+  const svgCardUrl = `${serverBaseUrl}/widget/svg?type=${payload.type}&amount=${encodeURIComponent(String(payload.amount || payload.fromAmount || ''))}&symbol=${encodeURIComponent(payload.symbol || payload.fromSymbol || '')}&recipient=${encodeURIComponent(payload.recipient || '')}&address=${encodeURIComponent(payload.contractAddress || '')}&name=${encodeURIComponent(payload.name || '')}`;
+
+  markdownOutput += `![NORTHVEIL ACTION CARD](${svgCardUrl})\n\n`;
+
   if (payload.imageUrl) {
     markdownOutput += `![${payload.name || 'Token/NFT Cover'}](${payload.imageUrl})\n\n`;
   }
@@ -201,6 +206,81 @@ app.use('/sse', apiRateLimiter);
 // Favicon Redirect Route for Browser & MCP Clients
 app.get(['/favicon.ico', '/favicon.png', '/favicon.jpg'], (req: Request, res: Response) => {
   res.redirect(301, 'https://iili.io/CgBPBHv.jpg');
+});
+
+// Dynamic Visual Graphic UI Card Generator (Renders directly in Claude & ChatGPT chat markdown)
+app.get('/widget/svg', (req: Request, res: Response) => {
+  const type = (req.query.type as string) || 'transfer';
+  const amount = (req.query.amount as string) || '0.25';
+  const symbol = (req.query.symbol as string) || 'ETH';
+  const recipient = (req.query.recipient as string) || '0x742d35Cc6634C0532925a3b844Bc454e4438f44e';
+  const network = (req.query.network as string) || 'Ethereum Sepolia';
+  const gasFeeUsd = (req.query.gasFeeUsd as string) || '0.45';
+  const name = (req.query.name as string) || 'Northveil Contract';
+  const contractAddress = (req.query.address as string) || '0xdAC17F958D2ee523a2206206994597C13D831ec7';
+  const fromAmount = (req.query.fromAmount as string) || amount;
+  const fromSymbol = (req.query.fromSymbol as string) || symbol;
+  const toAmount = (req.query.toAmount as string) || '3,450.00';
+  const toSymbol = (req.query.toSymbol as string) || 'USDC';
+
+  const width = 600;
+  const height = type === 'contract_metadata' || type === 'contract_deploy' ? 300 : 260;
+
+  let headerBg = '#ccff00';
+  let badgeText = 'ON-CHAIN ACTION CARD';
+
+  if (type === 'transfer') {
+    headerBg = '#ccff00'; badgeText = 'EIP-1193 TRANSFER INTENT';
+  } else if (type === 'swap') {
+    headerBg = '#ffe600'; badgeText = '1INCH / UNISWAP DEX SWAP';
+  } else if (type === 'contract_metadata' || type === 'contract_deploy') {
+    headerBg = '#00f0ff'; badgeText = 'SMART CONTRACT INSPECTOR';
+  } else if (type === 'request') {
+    headerBg = '#ff007f'; badgeText = 'INSTANT PAYMENT REQUEST';
+  } else if (type === 'receipt') {
+    headerBg = '#00f0ff'; badgeText = 'TRANSACTION RECEIPT';
+  }
+
+  const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <rect width="${width}" height="${height}" fill="#0a0a0c" rx="8"/>
+    <rect x="6" y="6" width="${width - 12}" height="${height - 12}" fill="#141419" stroke="#ffffff" stroke-width="3" rx="6"/>
+    <rect x="6" y="6" width="${width - 12}" height="46" fill="${headerBg}" stroke="#ffffff" stroke-width="2"/>
+    <text x="20" y="34" font-family="monospace" font-weight="900" font-size="15" fill="#000000">⚡ NORTHVEIL: ${badgeText}</text>
+    <rect x="${width - 130}" y="14" width="110" height="24" fill="#000000" rx="4"/>
+    <text x="${width - 75}" y="30" font-family="monospace" font-weight="bold" font-size="10" fill="#ccff00" text-anchor="middle">ONLINE • 18ms</text>
+    ${type === 'transfer' ? `
+      <text x="24" y="82" font-family="monospace" font-size="11" fill="#94a3b8">AMOUNT TO TRANSFER</text>
+      <text x="24" y="108" font-family="monospace" font-weight="900" font-size="22" fill="#ccff00">${amount} ${symbol}</text>
+      <text x="24" y="145" font-family="monospace" font-size="11" fill="#94a3b8">RECIPIENT ADDRESS</text>
+      <text x="24" y="165" font-family="monospace" font-weight="bold" font-size="12" fill="#ffffff">${recipient.slice(0, 42)}</text>
+      <text x="24" y="198" font-family="monospace" font-size="11" fill="#94a3b8">NETWORK: <tspan fill="#00f0ff">${network}</tspan></text>
+      <text x="320" y="198" font-family="monospace" font-size="11" fill="#94a3b8">ESTIMATED GAS: <tspan fill="#ccff00">$${gasFeeUsd} USD</tspan></text>
+      <rect x="24" y="215" width="${width - 48}" height="32" fill="#ccff00" stroke="#000000" stroke-width="2" rx="4"/>
+      <text x="${width / 2}" y="236" font-family="monospace" font-weight="900" font-size="12" fill="#000000" text-anchor="middle">CONFIRM &amp; BROADCAST ON-CHAIN</text>
+    ` : type === 'swap' ? `
+      <text x="24" y="82" font-family="monospace" font-size="11" fill="#94a3b8">YOU PAY</text>
+      <text x="24" y="108" font-family="monospace" font-weight="900" font-size="20" fill="#ff007f">${fromAmount} ${fromSymbol}</text>
+      <text x="300" y="82" font-family="monospace" font-size="11" fill="#94a3b8">YOU RECEIVE</text>
+      <text x="300" y="108" font-family="monospace" font-weight="900" font-size="20" fill="#ccff00">~${toAmount} ${toSymbol}</text>
+      <text x="24" y="152" font-family="monospace" font-size="11" fill="#94a3b8">ROUTER: <tspan fill="#00f0ff">1inch V6 DEX AGGREGATOR</tspan></text>
+      <text x="24" y="180" font-family="monospace" font-size="11" fill="#94a3b8">SLIPPAGE TOLERANCE: <tspan fill="#ffe600">0.5% MAX</tspan></text>
+      <rect x="24" y="202" width="${width - 48}" height="34" fill="#ffe600" stroke="#000000" stroke-width="2" rx="4"/>
+      <text x="${width / 2}" y="224" font-family="monospace" font-weight="900" font-size="12" fill="#000000" text-anchor="middle">EXECUTE DEX SWAP</text>
+    ` : `
+      <text x="24" y="82" font-family="monospace" font-size="11" fill="#94a3b8">CONTRACT ADDRESS</text>
+      <text x="24" y="105" font-family="monospace" font-weight="bold" font-size="12" fill="#00f0ff">${contractAddress.slice(0, 42)}</text>
+      <text x="24" y="140" font-family="monospace" font-size="11" fill="#94a3b8">TOKEN NAME: <tspan fill="#ffffff">${name}</tspan></text>
+      <text x="300" y="140" font-family="monospace" font-size="11" fill="#94a3b8">SYMBOL: <tspan fill="#ccff00">$${symbol}</tspan></text>
+      <text x="24" y="170" font-family="monospace" font-size="11" fill="#94a3b8">TOTAL SUPPLY: <tspan fill="#ffffff">1,000,000,000</tspan></text>
+      <text x="300" y="170" font-family="monospace" font-size="11" fill="#94a3b8">DECIMALS: <tspan fill="#00f0ff">18</tspan></text>
+      <rect x="24" y="195" width="${width - 48}" height="34" fill="#00f0ff" stroke="#000000" stroke-width="2" rx="4"/>
+      <text x="${width / 2}" y="217" font-family="monospace" font-weight="900" font-size="12" fill="#000000" text-anchor="middle">INSPECT CONTRACT ON EXPLORER</text>
+    `}
+  </svg>`;
+
+  res.setHeader('Content-Type', 'image/svg+xml');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  return res.send(svgContent);
 });
 
 export interface AuthResult {
