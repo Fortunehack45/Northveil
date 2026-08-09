@@ -14,8 +14,14 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.NorthveilClient = void 0;
-var client_js_1 = require("./client.js");
+exports.Northveil = exports.NorthveilClient = void 0;
+exports.createNorthveil = createNorthveil;
+const client_js_1 = require("./client.js");
 Object.defineProperty(exports, "NorthveilClient", { enumerable: true, get: function () { return client_js_1.NorthveilClient; } });
+Object.defineProperty(exports, "Northveil", { enumerable: true, get: function () { return client_js_1.NorthveilClient; } });
+function createNorthveil(config) {
+    return new client_js_1.NorthveilClient(config);
+}
+exports.default = client_js_1.NorthveilClient;
 __exportStar(require("./types.js"), exports);
 //# sourceMappingURL=index.js.map
