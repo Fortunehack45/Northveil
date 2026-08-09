@@ -1,0 +1,7 @@
+# Source & Config
+src/
+tsconfig.json
+
+# Tooling & Tests
+*.log
+node_modules/
