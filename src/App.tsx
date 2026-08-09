@@ -21,6 +21,8 @@ import { BuySellView } from './components/BuySellView';
 import { CreateTicketView } from './components/CreateTicketView';
 import { ReportBugView } from './components/ReportBugView';
 import { NetworkManagerView } from './components/NetworkManagerView';
+import { AdminPanelView } from './components/AdminPanelView';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 
 const MainContent: React.FC = () => {
   const { isLocked, unlockWalletWithBiometrics, unlockVault } = useWallet();
@@ -175,7 +177,10 @@ const MainContent: React.FC = () => {
               <ReportBugView onBack={() => setActiveTab('helpSupport')} />
             )}
             {activeTab === 'networkManager' && <NetworkManagerView />}
+            {activeTab === 'adminPanel' && <AdminPanelView />}
           </main>
+
+          <PWAInstallPrompt />
         </div>
       </div>
 

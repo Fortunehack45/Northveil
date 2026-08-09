@@ -37,7 +37,8 @@ export type TabType =
   | 'systemMetrics'
   | 'helpSupport'
   | 'reportBug'
-  | 'networkManager';
+  | 'networkManager'
+  | 'adminPanel';
 
 interface NavigationProps {
   activeTab: TabType;
@@ -69,6 +70,7 @@ export const Navigation: React.FC<NavigationProps> = ({
     { id: 'historyTax', label: 'TAX & HISTORY', icon: <FileText className="w-4 h-4 stroke-[2.5]" /> },
     { id: 'securityCenter', label: 'SECURITY SHIELD', icon: <ShieldAlert className="w-4 h-4 stroke-[2.5]" /> },
     { id: 'developerHub', label: 'AI & DEV HUB', icon: <Bot className="w-4 h-4 stroke-[2.5]" /> },
+    { id: 'adminPanel', label: 'ADMIN PANEL', icon: <ShieldAlert className="w-4 h-4 text-[#ff007f] stroke-[3]" /> },
     { id: 'securityBackup', label: 'SETTINGS', icon: <Settings className="w-4 h-4 stroke-[2.5]" /> },
     { id: 'systemMetrics', label: 'PROFILE', icon: <User className="w-4 h-4 stroke-[2.5]" /> },
     { id: 'helpSupport', label: 'HELP & SUPPORT', icon: <HelpCircle className="w-4 h-4 stroke-[2.5]" /> },

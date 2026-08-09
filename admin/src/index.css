@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #0a0b0e;
+  color: #f8fafc;
+  font-family: 'Space Grotesk', 'JetBrains Mono', system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Polished Neo-Brutalist Grid Background */
+.brutal-grid-bg {
+  background-color: #0a0b0e;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+}

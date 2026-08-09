@@ -6,13 +6,10 @@
     <meta name="theme-color" content="#0a0b0e" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="google-site-verification" content="mnaDg3qxkT-xSIM40aLO8ATMLZWUR0H70UC9QfxLseU" />
-    <title>Northveil - Native AI Web3 Wallet & Multi-Chain Vault</title>
+    <title>Northveil - Super Admin Protocol Portal</title>
     <link rel="icon" type="image/jpeg" href="https://iili.io/CgBPBHv.jpg" />
     <link rel="shortcut icon" href="https://iili.io/CgBPBHv.jpg" />
     <link rel="apple-touch-icon" href="https://iili.io/CgBPBHv.jpg" />
-    <meta property="og:image" content="https://iili.io/CgBPBHv.jpg" />
-    <meta name="twitter:image" content="https://iili.io/CgBPBHv.jpg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Space+Grotesk:wght@500;700;900&display=swap" rel="stylesheet">
@@ -23,13 +20,8 @@
       if (typeof global === 'undefined') {
         window.global = window;
       }
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
-        });
-      }
     </script>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <div id="admin-root"></div>
+    <script type="module" src="/src/admin.tsx"></script>
   </body>
 </html>
