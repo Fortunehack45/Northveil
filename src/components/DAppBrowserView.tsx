@@ -145,8 +145,8 @@ export const DAppBrowserView: React.FC = () => {
   const [activeDApp, setActiveDApp] = useState<DApp | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [bookmarkedDApps, setBookmarkedDApps] = useState<string[]>(['uniswap', 'aave', 'lido']);
-  const [simulatedTxPending, setSimulatedTxPending] = useState<boolean>(false);
-  const [simulatedTxSuccess, setSimulatedTxSuccess] = useState<string | null>(null);
+  const [txPending, setTxPending] = useState<boolean>(false);
+  const [txStatusMessage, setTxStatusMessage] = useState<string | null>(null);
 
   const categories = ['All', 'DeFi', 'Lending', 'NFT', 'Staking', 'Predictions'];
 
@@ -170,44 +170,40 @@ export const DAppBrowserView: React.FC = () => {
     if (!urlInput || !urlInput.trim()) return;
     const trimmed = urlInput.trim();
 
-    // Check if input matches a known featured dapp
-    const found = FEATURED_DAPPS.find(
-      (d) =>
-        d.url.toLowerCase().includes(trimmed.toLowerCase()) ||
-        d.name.toLowerCase() === trimmed.toLowerCase()
-    );
-    if (found) {
-      setActiveDApp(found);
-      return;
-    }
+    // Check if input is a valid URL domain format (e.g. uniswap.org, https://app.aave.com)
+    const hasProtocol = /^https?:\/\//i.test(trimmed);
+    const hasDomainDot = /\.[a-z]{2,}$/i.test(trimmed.split('/')[0]);
 
-    const isFullUrl = trimmed.startsWith('http://') || trimmed.startsWith('https://');
-    const hasDomainDot = trimmed.includes('.') && !trimmed.includes(' ');
-
-    let targetUrl = '';
-    let targetName = '';
-
-    if (isFullUrl || hasDomainDot) {
-      targetUrl = isFullUrl ? trimmed : 'https://' + trimmed;
-      targetName = trimmed.replace('https://', '').replace('http://', '').split('/')[0];
+    if (hasProtocol || hasDomainDot) {
+      const finalUrl = hasProtocol ? trimmed : `https://${trimmed}`;
+      setActiveDApp({
+        id: 'custom-' + Date.now(),
+        name: trimmed.replace(/^https?:\/\//i, '').split('/')[0],
+        category: 'DeFi',
+        description: `Custom Web3 dApp Session for ${trimmed}`,
+        url: finalUrl,
+        icon: '🌐',
+        users24h: 'Live',
+        volume24h: 'Direct URL',
+        network: userSettings.preferredNetwork || 'Ethereum',
+        color: '#ccff00',
+      });
     } else {
-      // Direct Google Search Query
-      targetUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
-      targetName = `Google: "${trimmed}"`;
+      // Non-URL input routes directly to Google Search Engine
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
+      setActiveDApp({
+        id: 'google-' + Date.now(),
+        name: `Google Search: "${trimmed}"`,
+        category: 'DeFi',
+        description: `Google Web Search results for ${trimmed}`,
+        url: googleUrl,
+        icon: '🔍',
+        users24h: 'Google Engine',
+        volume24h: 'Search Results',
+        network: userSettings.preferredNetwork || 'Ethereum',
+        color: '#00f0ff',
+      });
     }
-
-    setActiveDApp({
-      id: 'custom-' + Date.now(),
-      name: targetName,
-      category: 'DeFi',
-      description: `Google Web Search & Browsing for ${targetName}`,
-      url: targetUrl,
-      icon: '🔍',
-      users24h: 'Google Search Engine',
-      volume24h: 'Live Web Query',
-      network: userSettings.preferredNetwork || 'Ethereum',
-      color: '#ccff00',
-    });
   };
 
   const toggleBookmark = (id: string, e: React.MouseEvent) => {
@@ -220,13 +216,13 @@ export const DAppBrowserView: React.FC = () => {
   const { seedPhrase, activeSubWallet } = useWallet();
 
   const handleSimulateDAppInteraction = async (actionName: string) => {
-    setSimulatedTxPending(true);
-    setSimulatedTxSuccess(null);
+    setTxPending(true);
+    setTxStatusMessage(null);
 
     if (!seedPhrase || seedPhrase.length === 0 || !activeSubWallet) {
-      setSimulatedTxPending(false);
-      setSimulatedTxSuccess('⚠️ Wallet is locked. Unlock wallet to sign EIP-1193 payload.');
-      setTimeout(() => setSimulatedTxSuccess(null), 4000);
+      setTxPending(false);
+      setTxStatusMessage('⚠️ Wallet is locked. Unlock wallet to sign EIP-1193 payload.');
+      setTimeout(() => setTxStatusMessage(null), 4000);
       return;
     }
 
@@ -234,13 +230,13 @@ export const DAppBrowserView: React.FC = () => {
       const messageToSign = `Northveil EIP-1193 Signature Request:\nApp: ${activeDApp?.name || 'Web3 DApp'}\nAction: ${actionName}\nTimestamp: ${new Date().toISOString()}`;
       const signedHash = await WalletService.signMessage(seedPhrase, activeSubWallet.accountIndex, messageToSign);
 
-      setSimulatedTxPending(false);
-      setSimulatedTxSuccess(`✅ EIP-191 Signature Created! Hash: ${signedHash.slice(0, 18)}...${signedHash.slice(-10)}`);
-      setTimeout(() => setSimulatedTxSuccess(null), 6000);
+      setTxPending(false);
+      setTxStatusMessage(`✅ EIP-191 Signature Created! Hash: ${signedHash.slice(0, 18)}...${signedHash.slice(-10)}`);
+      setTimeout(() => setTxStatusMessage(null), 6000);
     } catch (err: any) {
-      setSimulatedTxPending(false);
-      setSimulatedTxSuccess(`❌ Signature Failed: ${err?.message || err}`);
-      setTimeout(() => setSimulatedTxSuccess(null), 4000);
+      setTxPending(false);
+      setTxStatusMessage(`❌ Signature Failed: ${err?.message || err}`);
+      setTimeout(() => setTxStatusMessage(null), 4000);
     }
   };
 
@@ -492,10 +488,10 @@ export const DAppBrowserView: React.FC = () => {
           </div>
 
           {/* Feedback Banner for DApp Interaction */}
-          {simulatedTxSuccess && (
+          {txStatusMessage && (
             <div className="bg-[#ccff00] text-black border-2 border-black p-4 font-mono font-black text-xs uppercase shadow-[4px_4px_0px_0px_#000] flex items-center gap-2">
               <CheckCircle className="w-5 h-5 stroke-[3]" />
-              <span>{simulatedTxSuccess}</span>
+              <span>{txStatusMessage}</span>
             </div>
           )}
 

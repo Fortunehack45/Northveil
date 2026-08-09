@@ -186,15 +186,9 @@ export class AIService {
    */
   private async streamChat(messages: AIMessage[], callbacks: AIStreamCallbacks): Promise<void> {
     if (!this.isConfigured) {
-      const mockResponse = this.getMockResponse(messages);
-      // Simulate streaming
-      let accumulated = '';
-      for (const char of mockResponse) {
-        accumulated += char;
-        callbacks.onToken(char);
-        await new Promise(r => setTimeout(r, 8));
-      }
-      callbacks.onComplete(accumulated);
+      const msg = '⚠️ GROQ API KEY REQUIRED FOR LIVE LLM GENERATION. Please provide your Groq API key (VITE_GROQ_API_KEY) in settings.';
+      callbacks.onToken(msg);
+      callbacks.onComplete(msg);
       return;
     }
 
