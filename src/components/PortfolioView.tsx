@@ -218,10 +218,19 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
 
   const sortedAssets = useMemo(() => {
     return [...filteredAssetsList].sort((a, b) => {
+      // Rule 1: Always put tokens with positive balance (> 0) at the top of the list
+      const hasBalA = a.balance > 0 ? 1 : 0;
+      const hasBalB = b.balance > 0 ? 1 : 0;
+      if (hasBalB !== hasBalA) return hasBalB - hasBalA;
+
+      // Rule 2: Sort by total USD valuation
       const valA = a.balance * a.priceUsd;
       const valB = b.balance * b.priceUsd;
       if (valB !== valA) return valB - valA;
+
+      // Rule 3: Sort by raw token quantity
       if (b.balance !== a.balance) return b.balance - a.balance;
+
       return a.symbol.localeCompare(b.symbol);
     });
   }, [filteredAssetsList]);

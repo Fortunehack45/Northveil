@@ -83,8 +83,8 @@ export class TokenService {
     // Fetch live API prices map
     const livePrices = await this.fetchLivePricesMap().catch(() => ({}));
 
-    // Helper timeout wrapper (4 seconds max per balance query)
-    const withTimeout = <T>(promise: Promise<T>, ms: number = 4000): Promise<T> => {
+    // Helper timeout wrapper (8 seconds max per balance query for slow testnets)
+    const withTimeout = <T>(promise: Promise<T>, ms: number = 8000): Promise<T> => {
       return Promise.race([
         promise,
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))

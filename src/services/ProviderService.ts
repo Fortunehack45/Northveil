@@ -24,13 +24,13 @@ export class ProviderService {
         rpcUrls.push('https://eth.llamarpc.com', 'https://cloudflare-eth.com');
         break;
       case 'sepolia':
-        rpcUrls.push('https://rpc.sepolia.org', 'https://ethereum-sepolia-rpc.publicnode.com');
+        rpcUrls.push('https://ethereum-sepolia-rpc.publicnode.com', 'https://1rpc.io/sepolia', 'https://rpc2.sepolia.org');
         break;
       case 'polygon':
         rpcUrls.push('https://polygon-rpc.com', 'https://rpc-mainnet.maticvigil.com');
         break;
       case 'polygon_amoy':
-        rpcUrls.push('https://rpc-amoy.polygon.technology', 'https://polygon-amoy-bor-rpc.publicnode.com');
+        rpcUrls.push('https://polygon-amoy-bor-rpc.publicnode.com', 'https://1rpc.io/amoy', 'https://rpc-amoy.polygon.technology');
         break;
       case 'arbitrum':
         rpcUrls.push('https://arb1.arbitrum.io/rpc', 'https://rpc.ankr.com/arbitrum');
@@ -39,7 +39,7 @@ export class ProviderService {
         rpcUrls.push('https://bsc-dataseed.binance.org', 'https://bsc-dataseed1.defibit.io');
         break;
       case 'bsc_testnet':
-        rpcUrls.push('https://data-seed-prebsc-1-s1.binance.org:8545/', 'https://bsc-testnet-rpc.publicnode.com');
+        rpcUrls.push('https://bsc-testnet-rpc.publicnode.com', 'https://data-seed-prebsc-1-s1.binance.org:8545/', 'https://data-seed-prebsc-2-s1.binance.org:8545/');
         break;
       case 'avalanche':
         rpcUrls.push('https://api.avax.network/ext/bc/C/rpc', 'https://rpc.ankr.com/avalanche');
