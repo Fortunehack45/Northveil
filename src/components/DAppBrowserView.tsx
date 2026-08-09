@@ -166,34 +166,47 @@ export const DAppBrowserView: React.FC = () => {
 
   const handleNavigateUrl = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!urlInput) return;
-    // Check if input matches a known dapp
+    if (!urlInput || !urlInput.trim()) return;
+    const trimmed = urlInput.trim();
+
+    // Check if input matches a known featured dapp
     const found = FEATURED_DAPPS.find(
       (d) =>
-        d.url.toLowerCase().includes(urlInput.toLowerCase()) ||
-        d.name.toLowerCase() === urlInput.toLowerCase()
+        d.url.toLowerCase().includes(trimmed.toLowerCase()) ||
+        d.name.toLowerCase() === trimmed.toLowerCase()
     );
     if (found) {
       setActiveDApp(found);
-    } else {
-      // Create a dynamic virtual DApp view
-      let formattedUrl = urlInput;
-      if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
-        formattedUrl = 'https://' + formattedUrl;
-      }
-      setActiveDApp({
-        id: 'custom-' + Date.now(),
-        name: urlInput.replace('https://', '').replace('http://', '').split('/')[0],
-        category: 'DeFi',
-        description: `External Web3 Application injected at ${formattedUrl}`,
-        url: formattedUrl,
-        icon: '🌐',
-        users24h: '10K+',
-        volume24h: '$50M',
-        network: userSettings.preferredNetwork || 'Ethereum',
-        color: '#ccff00',
-      });
+      return;
     }
+
+    const isFullUrl = trimmed.startsWith('http://') || trimmed.startsWith('https://');
+    const hasDomainDot = trimmed.includes('.') && !trimmed.includes(' ');
+
+    let targetUrl = '';
+    let targetName = '';
+
+    if (isFullUrl || hasDomainDot) {
+      targetUrl = isFullUrl ? trimmed : 'https://' + trimmed;
+      targetName = trimmed.replace('https://', '').replace('http://', '').split('/')[0];
+    } else {
+      // Direct Google Search Query
+      targetUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
+      targetName = `Google: "${trimmed}"`;
+    }
+
+    setActiveDApp({
+      id: 'custom-' + Date.now(),
+      name: targetName,
+      category: 'DeFi',
+      description: `Google Web Search & Browsing for ${targetName}`,
+      url: targetUrl,
+      icon: '🔍',
+      users24h: 'Google Search Engine',
+      volume24h: 'Live Web Query',
+      network: userSettings.preferredNetwork || 'Ethereum',
+      color: '#ccff00',
+    });
   };
 
   const toggleBookmark = (id: string, e: React.MouseEvent) => {
@@ -278,12 +291,38 @@ export const DAppBrowserView: React.FC = () => {
             </button>
           </div>
 
-          <button
-            type="submit"
-            className="px-3 sm:px-5 py-2.5 bg-[#ccff00] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] sm:shadow-[3px_3px_0px_0px_#000] hover:bg-[#d8ff33] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none cursor-pointer shrink-0"
-          >
-            GO
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="submit"
+              className="px-3 sm:px-4 py-2.5 bg-[#ccff00] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:bg-[#d8ff33] cursor-pointer"
+            >
+              GO
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const query = urlInput.trim() || 'crypto web3 dapps';
+                const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+                setActiveDApp({
+                  id: 'google-' + Date.now(),
+                  name: `Google Search: "${query}"`,
+                  category: 'DeFi',
+                  description: `Google Web Search results for ${query}`,
+                  url: googleUrl,
+                  icon: '🔍',
+                  users24h: 'Google Engine',
+                  volume24h: 'Search Results',
+                  network: userSettings.preferredNetwork || 'Ethereum',
+                  color: '#00f0ff',
+                });
+              }}
+              className="px-3 sm:px-4 py-2.5 bg-[#00f0ff] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:bg-[#33f3ff] cursor-pointer flex items-center gap-1"
+              title="Search with Google Search Engine"
+            >
+              <Search className="w-3.5 h-3.5 stroke-[3]" />
+              <span className="hidden sm:inline">GOOGLE</span>
+            </button>
+          </div>
         </form>
       </div>
 
