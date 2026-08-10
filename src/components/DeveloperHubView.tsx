@@ -782,72 +782,56 @@ export const DeveloperHubView: React.FC = () => {
                 </span>
               </div>
 
-              {/* CLAUDE DESKTOP GUIDE */}
+              {/* CLAUDE & CURSOR DIRECT URL CONNECTOR GUIDE */}
               <div className="space-y-4">
                 <h5 className="text-xs font-black text-[#ccff00] uppercase flex items-center gap-2 border-b border-white/20 pb-2">
-                  <Bot className="w-4 h-4 text-[#ccff00]" /> OPTION A: CLAUDE DESKTOP APP SETUP
+                  <Bot className="w-4 h-4 text-[#ccff00]" /> OPTION A: CLAUDE & CURSOR DIRECT SSE REMOTE CONNECTOR (ZERO JSON FILE NEEDED)
                 </h5>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                   <div className="p-3.5 bg-[#141419] border-2 border-white space-y-1.5">
                     <span className="w-6 h-6 rounded-full bg-[#ccff00] text-black font-black flex items-center justify-center text-xs">1</span>
-                    <p className="font-black text-white uppercase">Open Settings</p>
-                    <p className="text-[10px] text-slate-400">Open Claude Desktop ➔ Settings ➔ Developer Tab.</p>
+                    <p className="font-black text-white uppercase">Click "Add Custom Connector"</p>
+                    <p className="text-[10px] text-slate-400">In Claude (or Cursor / Windsurf Settings ➔ MCP), click "Add Custom Connector" or "Add Remote MCP Server".</p>
                   </div>
 
                   <div className="p-3.5 bg-[#141419] border-2 border-white space-y-1.5">
                     <span className="w-6 h-6 rounded-full bg-[#00f0ff] text-black font-black flex items-center justify-center text-xs">2</span>
-                    <p className="font-black text-white uppercase">Edit Config File</p>
-                    <p className="text-[10px] text-slate-400">Click "Edit Config" to open <code>claude_desktop_config.json</code>.</p>
+                    <p className="font-black text-white uppercase">Paste Direct SSE Server URL</p>
+                    <p className="text-[10px] text-slate-400">Copy & paste your personal wallet connection URL below. No JSON file editing required!</p>
                   </div>
 
                   <div className="p-3.5 bg-[#141419] border-2 border-white space-y-1.5">
                     <span className="w-6 h-6 rounded-full bg-[#ff007f] text-white font-black flex items-center justify-center text-xs">3</span>
-                    <p className="font-black text-white uppercase">Paste JSON Config</p>
-                    <p className="text-[10px] text-slate-400">Paste the Northveil MCP JSON snippet below into your config.</p>
-                  </div>
-
-                  <div className="p-3.5 bg-[#141419] border-2 border-white space-y-1.5">
-                    <span className="w-6 h-6 rounded-full bg-[#ffe600] text-black font-black flex items-center justify-center text-xs">4</span>
-                    <p className="font-black text-white uppercase">Restart Claude</p>
-                    <p className="text-[10px] text-slate-400">Restart Claude Desktop. The Northveil hammer 🔨 icon will appear!</p>
+                    <p className="font-black text-white uppercase">Click Connect & Done!</p>
+                    <p className="text-[10px] text-slate-400">Click Save / Connect. Your wallet is bound automatically to your AI assistant session!</p>
                   </div>
                 </div>
 
-                {/* Copyable JSON Snippet */}
-                <div className="bg-[#141419] p-4 border-2 border-white space-y-2">
+                {/* Direct Remote URL Copy Box */}
+                <div className="bg-[#141419] p-4 border-2 border-[#ccff00] space-y-3 shadow-[4px_4px_0px_0px_#ccff00]">
                   <div className="flex items-center justify-between text-xs font-bold text-slate-300">
-                    <span>CLAUDE_DESKTOP_CONFIG.JSON SNIPPET:</span>
+                    <span className="text-[#ccff00] font-black uppercase">🔗 YOUR DIRECT REMOTE MCP SSE URL (PASTE DIRECTLY INTO CLAUDE / CURSOR):</span>
                     <button
                       onClick={() => {
-                        const snippet = JSON.stringify({
-                          mcpServers: {
-                            "northveil-wallet": {
-                              command: "node",
-                              args: [`${getMcpServerUrl()}/sse?wallet_address=${activeAddress}`],
-                              env: { NORTHVEIL_API_KEY: activeKey }
-                            }
-                          }
-                        }, null, 2);
-                        navigator.clipboard.writeText(snippet);
-                        alert('Claude Desktop Config Snippet Copied!');
+                        const directUrl = `${getMcpServerUrl()}/sse?wallet_address=${activeAddress}`;
+                        navigator.clipboard.writeText(directUrl);
+                        alert(`Direct MCP SSE URL copied!\n\n${directUrl}`);
                       }}
-                      className="px-3 py-1 bg-[#ccff00] text-black font-black text-[10px] uppercase border border-black shadow-[1px_1px_0px_0px_#000] cursor-pointer hover:bg-[#d8ff33]"
+                      className="px-3.5 py-1.5 bg-[#ccff00] text-black font-black text-xs uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#d8ff33]"
                     >
-                      COPY CLAUDE JSON SNIPPET
+                      COPY DIRECT REMOTE URL
                     </button>
                   </div>
-                  <pre className="text-[11px] text-[#ccff00] font-mono bg-[#0a0a0c] p-3 border border-white/20 overflow-x-auto">
-{JSON.stringify({
-  mcpServers: {
-    "northveil-wallet": {
-      command: "node",
-      args: [`${getMcpServerUrl()}/sse?wallet_address=${activeAddress}`],
-      env: { NORTHVEIL_API_KEY: activeKey }
-    }
-  }
-}, null, 2)}
-                  </pre>
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${getMcpServerUrl()}/sse?wallet_address=${activeAddress}`}
+                    className="w-full bg-[#0a0a0c] border-2 border-white p-3 text-xs font-mono font-black text-[#ccff00]"
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    💡 <b>No JSON config files needed</b>. Just paste this URL directly into Claude's Custom Connector field or Cursor IDE's MCP Server URL settings.
+                  </p>
                 </div>
               </div>
 

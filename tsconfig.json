@@ -22,5 +22,7 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": ["src/**/*", "mcp-server/**/*"],
+  "exclude": ["admin", "mcp-status", "website", "dist", "node_modules"]
 }
