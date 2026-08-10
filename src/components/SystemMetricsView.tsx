@@ -22,6 +22,11 @@ import {
   Smartphone,
   CheckCircle2,
   AlertCircle,
+  Shield,
+  Zap,
+  Flame,
+  Key,
+  Terminal,
 } from 'lucide-react';
 
 interface Contact {
@@ -49,7 +54,16 @@ export const SystemMetricsView: React.FC = () => {
   const [walletName, setWalletName] = useState('ARKHAN DEFI VAULT #1');
   const [isEditingName, setIsEditingName] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState('VAULT');
-  const avatars = ['VAULT', 'NEXUS', 'CORE', 'PRIME', 'ALPHA', 'NODE', 'MATRIX', 'CYBER'];
+  const avatarList = [
+    { id: 'VAULT', label: 'VAULT', icon: Shield },
+    { id: 'NEXUS', label: 'NEXUS', icon: Zap },
+    { id: 'CORE', label: 'CORE', icon: Cpu },
+    { id: 'PRIME', label: 'PRIME', icon: Flame },
+    { id: 'ALPHA', label: 'ALPHA', icon: Lock },
+    { id: 'NODE', label: 'NODE', icon: Globe },
+    { id: 'MATRIX', label: 'MATRIX', icon: Key },
+    { id: 'CYBER', label: 'CYBER', icon: Terminal },
+  ];
 
   // Multi-wallet list
   const [walletAccounts, setWalletAccounts] = useState<WalletAccount[]>([
@@ -234,18 +248,25 @@ export const SystemMetricsView: React.FC = () => {
             </h3>
 
             <p className="text-xs text-slate-300">SELECT AVATAR ICON FOR YOUR ON-CHAIN PROFILE:</p>
-            <div className="flex flex-wrap gap-3">
-              {avatars.map((av) => (
-                <button
-                  key={av}
-                  onClick={() => setSelectedAvatar(av)}
-                  className={`w-12 h-12 text-2xl flex items-center justify-center border-2 border-black shadow-[3px_3px_0px_0px_#000] cursor-pointer transition-all ${
-                    selectedAvatar === av ? 'bg-[#00f0ff] scale-105' : 'bg-[#0a0a0c] text-white hover:bg-white/10'
-                  }`}
-                >
-                  {av}
-                </button>
-              ))}
+            <div className="flex flex-wrap gap-2.5">
+              {avatarList.map((item) => {
+                const IconComponent = item.icon;
+                const isSelected = selectedAvatar === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSelectedAvatar(item.id)}
+                    className={`px-3 py-2 text-xs font-mono font-black uppercase border-2 border-black flex items-center gap-1.5 shadow-[3px_3px_0px_0px_#000] cursor-pointer transition-all ${
+                      isSelected ? 'bg-[#00f0ff] text-black font-black scale-105' : 'bg-[#0a0a0c] text-white hover:bg-white/10'
+                    }`}
+                    title={item.label}
+                  >
+                    <IconComponent className="w-4 h-4 stroke-[2.5] shrink-0" />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             <div className="pt-4 border-t-2 border-white/20 space-y-3">
