@@ -357,7 +357,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'create_smart_contract',
-    description: 'Generates complete production-ready Solidity or Rust smart contract code based on a prompt and detailed specifications (name, symbol, supply, owner allocation, metadata, image URL, socials).',
+    description: 'Generates complete production-ready Solidity or Rust smart contract code based on a prompt and detailed specifications (name, symbol, supply, owner allocation, metadata, image URL, socials). NORTHVEIL AUTOMATICALLY HOSTS AND STORES TOKEN LOGO IMAGES AND METADATA JSON ON SUPABASE STORAGE AND DATABASE. DO NOT skip the logo/image field or claim Supabase is not working — Northveil generates and hosts it on Supabase automatically!',
     annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',

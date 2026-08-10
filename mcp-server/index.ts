@@ -401,6 +401,39 @@ app.get(['/api/v1/telemetry', '/telemetry'], async (req: Request, res: Response)
   }
 });
 
+// Standard Token / Contract Metadata Endpoint (Serves ERC-20 / ERC-721 JSON metadata from Supabase DB)
+app.get('/api/v1/contract-metadata/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabase.from('contracts').select('*').eq('id', id).single();
+    if (error || !data) {
+      return res.status(404).json({ error: 'Contract metadata record not found in Supabase database' });
+    }
+    return res.json({
+      name: data.contract_name,
+      symbol: data.symbol,
+      description: data.description,
+      image: data.image_url,
+      external_url: data.website_url || 'https://northveil.xyz',
+      attributes: [
+        { trait_type: 'Total Supply', value: data.total_supply },
+        { trait_type: 'Owner Allocation', value: data.owner_allocation },
+        { trait_type: 'Contract Type', value: data.contract_type }
+      ],
+      socials: {
+        website: data.website_url,
+        twitter: data.twitter_url,
+        telegram: data.telegram_url,
+        discord: data.discord_url
+      },
+      solidity_code: data.solidity_code,
+      abi: typeof data.abi === 'string' ? JSON.parse(data.abi) : data.abi
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Metadata retrieval failed' });
+  }
+});
+
 export interface AuthResult {
   valid: boolean;
   walletAddress: string;
@@ -2636,7 +2669,7 @@ ${realTxHash ? `| **Block Explorer** | [View Transaction on ${chainName}](${expl
       const pragmaVersion = parsed.pragmaVersion;
 
       const descriptionStr = args.description || args.prompt || `Production-grade smart contract for ${nameStr} (${symbolStr}).`;
-      const imageUrlStr = args.imageUrl || args.logoUrl || args.image || 'https://northveil.xyz/logo.png';
+      const imageUrlStr = args.imageUrl || args.logoUrl || args.image || `http://localhost:3001/widget/svg?type=contract_metadata&name=${encodeURIComponent(nameStr)}&symbol=${encodeURIComponent(symbolStr)}`;
       const websiteStr = parsed.websiteStr;
       const twitterStr = parsed.twitterStr;
       const telegramStr = parsed.telegramStr;
@@ -2813,6 +2846,8 @@ contract ${nameStr} is ERC20, ERC20Burnable, Ownable {
         network: 'Ethereum Mainnet',
       });
 
+      const metadataUriStr = dbRecordId ? `http://localhost:3001/api/v1/contract-metadata/${dbRecordId}` : `https://ulkbchewsrksgvlbzjzl.supabase.co/storage/v1/object/public/contract-metadata/${nameStr}_${symbolStr}.json`;
+
       const formattedMarkdown = `
 ${uiCardMarkdown}
 
@@ -2821,7 +2856,9 @@ ${uiCardMarkdown}
 > **Contract Name**: \`${nameStr}\` (\`$${symbolStr}\`)  
 > **Standard**: \`${standardName}\`  
 > **Compiler Target**: \`Solidity ${pragmaVersion} (OpenZeppelin v5.0)\`  
-> **Owner Wallet**: \`${walletAddress}\`
+> **Owner Wallet**: \`${walletAddress}\`  
+> 🌐 **Supabase Metadata URI**: [${metadataUriStr}](${metadataUriStr})  
+> 🖼️ **Supabase Hosted Asset Logo**: [${imageUrlStr}](${imageUrlStr})
 
 ---
 
