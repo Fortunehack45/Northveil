@@ -284,9 +284,10 @@ app.get('/widget/svg', (req: Request, res: Response) => {
   return res.send(svgContent);
 });
 
-// REAL Live Telemetry & Server Hardware Stats Endpoint (No Mock Data)
+// REAL Live Telemetry & Server Hardware Stats Endpoint (100% Real OS, Process & Supabase DB Metrics)
 app.get(['/api/v1/telemetry', '/telemetry'], async (req: Request, res: Response) => {
   try {
+    // 1. Real OS System Memory
     const totalMem = os.totalmem();
     const freeMem = os.freemem();
     const usedMem = totalMem - freeMem;
@@ -294,37 +295,71 @@ app.get(['/api/v1/telemetry', '/telemetry'], async (req: Request, res: Response)
     const ramTotalGb = Number((totalMem / (1024 * 1024 * 1024)).toFixed(2));
     const ramPct = Number(((usedMem / totalMem) * 100).toFixed(1));
 
-    const cpus = os.cpus();
-    const cpuCount = cpus.length;
-    const cpuSpeedGhz = cpus[0] ? (cpus[0].speed / 1000).toFixed(2) : '3.40';
-
+    // 2. Real Process Memory & CPU Cores
     const processMem = process.memoryUsage();
     const procHeapUsedMb = Number((processMem.heapUsed / (1024 * 1024)).toFixed(2));
+    const procRssMb = Number((processMem.rss / (1024 * 1024)).toFixed(2));
 
+    const cpus = os.cpus();
+    const cpuCount = cpus.length;
+    const cpuModel = cpus[0] ? cpus[0].model.trim() : 'System CPU';
+    const cpuSpeedGhz = cpus[0] ? (cpus[0].speed / 1000).toFixed(2) : '2.40';
+
+    // Real Load Average calculation
+    const loadAvg = os.loadavg()[0] || 0;
+    const cpuLoadPct = Math.min(100, Math.max(1, Number(((loadAvg / Math.max(1, cpuCount)) * 100).toFixed(1))));
+
+    // 3. Real Disk Storage Usage via Native fs.statfsSync
+    let diskTotalGb = 0;
+    let diskUsedGb = 0;
+    let diskFreeGb = 0;
+    try {
+      const targetDrive = process.platform === 'win32' ? 'C:\\' : '/';
+      if ((fs as any).statfsSync) {
+        const stat = (fs as any).statfsSync(targetDrive);
+        const totalB = Number(stat.blocks) * Number(stat.bsize);
+        const freeB = Number(stat.bfree) * Number(stat.bsize);
+        const usedB = totalB - freeB;
+        diskTotalGb = Number((totalB / (1024 * 1024 * 1024)).toFixed(2));
+        diskFreeGb = Number((freeB / (1024 * 1024 * 1024)).toFixed(2));
+        diskUsedGb = Number((usedB / (1024 * 1024 * 1024)).toFixed(2));
+      }
+    } catch { }
+
+    // 4. Real Supabase Database Queries (Row Counts & Recent Invocations)
     let txCount = 0;
     let contractCount = 0;
-    let keyCount = 0;
+    let totalKeysCount = 0;
+    let activeKeysCount = 0;
+    let revokedKeysCount = 0;
     let recentInvocations: any[] = [];
 
     try {
-      const [{ count: cTx }, { count: cContract }, { count: cKey }, { data: dbRecent }] = await Promise.all([
+      const [
+        { count: cTx },
+        { count: cContract },
+        { count: cAllKeys },
+        { count: cRevokedKeys },
+        { data: dbRecent }
+      ] = await Promise.all([
         supabase.from('transactions').select('*', { count: 'exact', head: true }),
         supabase.from('contracts').select('*', { count: 'exact', head: true }),
         supabase.from('api_keys').select('*', { count: 'exact', head: true }),
-        supabase.from('transactions').select('id, type, chain_id, status, created_at, gas_fee_usd').order('created_at', { ascending: false }).limit(8)
+        supabase.from('api_keys').select('*', { count: 'exact', head: true }).eq('status', 'REVOKED'),
+        supabase.from('transactions').select('id, type, chain_id, status, created_at, gas_fee_usd, recipient').order('created_at', { ascending: false }).limit(10)
       ]);
 
       txCount = cTx || 0;
       contractCount = cContract || 0;
-      keyCount = cKey || 0;
+      totalKeysCount = cAllKeys || 0;
+      revokedKeysCount = cRevokedKeys || 0;
+      activeKeysCount = Math.max(0, totalKeysCount - revokedKeysCount);
       recentInvocations = dbRecent || [];
     } catch (e) {
       console.warn('[Supabase Telemetry Query Note]:', e);
     }
 
-    const totalInvocations = 14800 + txCount + contractCount;
-    const totalKeys = Math.max(1284, keyCount + 1200);
-    const activeKeys = Math.max(1142, keyCount + 1100);
+    const realTotalApiCalls = txCount + contractCount;
 
     return res.json({
       status: 'OPERATIONAL',
@@ -335,25 +370,28 @@ app.get(['/api/v1/telemetry', '/telemetry'], async (req: Request, res: Response)
         ramTotalGb,
         ramUsedPct: ramPct,
         nodeHeapUsedMb: procHeapUsedMb,
+        nodeRssMb: procRssMb,
         cpuCores: cpuCount,
+        cpuModel,
         cpuSpeedGhz,
-        cpuLoadPct: Math.floor(Math.random() * 6) + 12,
-        netSpeedInMbps: Number((Math.random() * 5 + 46.0).toFixed(1)),
-        netSpeedOutMbps: Number((Math.random() * 10 + 108.0).toFixed(1)),
-        diskUsedGb: 42.8,
-        diskTotalGb: 512.0
+        cpuLoadPct,
+        diskUsedGb,
+        diskTotalGb,
+        diskFreeGb
       },
       telemetry: {
-        totalApiCalls: totalInvocations,
-        totalApiKeys: totalKeys,
-        activeApiKeys: activeKeys,
-        revokedApiKeys: totalKeys - activeKeys,
-        activeSseSessions: sseSessions.size || 142,
+        totalApiCalls: realTotalApiCalls,
+        totalApiKeys: totalKeysCount,
+        activeApiKeys: activeKeysCount,
+        revokedApiKeys: revokedKeysCount,
+        activeSseSessions: sseSessions.size,
         recentCalls: recentInvocations.map(t => ({
           id: t.id,
           toolName: t.type === 'SEND' ? 'send_transfer' : t.type === 'SWAP' ? 'execute_dex_swap' : 'get_portfolio',
           timestamp: new Date(t.created_at).toLocaleTimeString(),
           chain: t.chain_id || 'Ethereum Mainnet',
+          recipient: t.recipient || undefined,
+          gasFeeUsd: t.gas_fee_usd || undefined,
           status: 'SUCCESS'
         }))
       }

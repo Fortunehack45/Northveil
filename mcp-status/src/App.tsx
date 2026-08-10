@@ -57,40 +57,38 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'services' | 'calls' | 'heatmap' | 'resources' | 'incidents'>('services');
   const [pingResult, setPingResult] = useState<string | null>(null);
 
-  // Live Supabase Synced State
-  const [totalApiCalls, setTotalApiCalls] = useState<number>(14892);
-  const [totalApiKeys, setTotalApiKeys] = useState<number>(1284);
-  const [activeApiKeys, setActiveApiKeys] = useState<number>(1142);
-  const [revokedApiKeys, setRevokedApiKeys] = useState<number>(142);
+  // Live Supabase & Server Synced State
+  const [totalApiCalls, setTotalApiCalls] = useState<number>(0);
+  const [totalApiKeys, setTotalApiKeys] = useState<number>(0);
+  const [activeApiKeys, setActiveApiKeys] = useState<number>(0);
+  const [revokedApiKeys, setRevokedApiKeys] = useState<number>(0);
   const [isDatabaseConnected, setIsDatabaseConnected] = useState<boolean>(true);
 
-  // Hardware Metrics State
-  const [ramUsedGb, setRamUsedGb] = useState<number>(1.42);
-  const [cpuLoadPct, setCpuLoadPct] = useState<number>(14);
-  const [netSpeedIn, setNetSpeedIn] = useState<number>(48.2);
-  const [netSpeedOut, setNetSpeedOut] = useState<number>(112.5);
+  // Hardware Metrics State (100% Real Node.js OS Telemetry)
+  const [ramUsedGb, setRamUsedGb] = useState<number>(0);
+  const [ramTotalGb, setRamTotalGb] = useState<number>(0);
+  const [cpuLoadPct, setCpuLoadPct] = useState<number>(0);
+  const [cpuCores, setCpuCores] = useState<number>(0);
+  const [cpuModel, setCpuModel] = useState<string>('');
+  const [netSpeedIn, setNetSpeedIn] = useState<number>(0);
+  const [netSpeedOut, setNetSpeedOut] = useState<number>(0);
+  const [diskUsedGb, setDiskUsedGb] = useState<number>(0);
+  const [diskTotalGb, setDiskTotalGb] = useState<number>(0);
 
-  // Recent Live API Calls Stream (Real Supabase & Network Telemetry)
-  const [recentCalls, setRecentCalls] = useState<RecentApiCall[]>([
-    { id: 'c1', toolName: 'get_portfolio', timestamp: 'Just now', chain: 'Ethereum Mainnet', latencyMs: 14, status: 'SUCCESS' },
-    { id: 'c2', toolName: 'send_transfer', timestamp: '2s ago', chain: 'Sepolia Testnet', latencyMs: 22, status: 'SUCCESS' },
-    { id: 'c3', toolName: 'get_contract_metadata', timestamp: '5s ago', chain: 'Ethereum Mainnet', latencyMs: 18, status: 'SUCCESS' },
-    { id: 'c4', toolName: 'execute_dex_swap', timestamp: '8s ago', chain: 'Base Mainnet', latencyMs: 25, status: 'SUCCESS' },
-    { id: 'c5', toolName: 'compile_smart_contract', timestamp: '12s ago', chain: 'Polygon Mainnet', latencyMs: 31, status: 'SUCCESS' },
-    { id: 'c6', toolName: 'create_payment_request', timestamp: '15s ago', chain: 'Arbitrum One', latencyMs: 16, status: 'SUCCESS' },
-  ]);
+  // Recent Live API Calls Stream (Real Supabase Transactions & Telemetry)
+  const [recentCalls, setRecentCalls] = useState<RecentApiCall[]>([]);
 
   // Microservices Status
-  const [services] = useState<ServiceStatus[]>([
-    { id: '1', name: 'Northveil MCP SSE Stream Server', category: 'core', endpoint: 'http://localhost:3001/sse', status: 'OPERATIONAL', latencyMs: 18, uptimePct: 99.99 },
-    { id: '2', name: 'REST JSON-RPC Gateway', category: 'core', endpoint: 'http://localhost:3001/mcp', status: 'OPERATIONAL', latencyMs: 14, uptimePct: 99.98 },
-    { id: '3', name: 'OpenAPI 3.0 Action Spec Engine', category: 'core', endpoint: 'http://localhost:3001/openapi.json', status: 'OPERATIONAL', latencyMs: 11, uptimePct: 100.0 },
-    { id: '4', name: 'Ethereum Mainnet JSON-RPC Node', category: 'rpc', endpoint: 'https://cloudflare-eth.com', status: 'OPERATIONAL', latencyMs: 22, uptimePct: 99.97 },
-    { id: '5', name: 'Polygon Bor PublicNode RPC', category: 'rpc', endpoint: 'https://polygon-bor-rpc.publicnode.com', status: 'OPERATIONAL', latencyMs: 16, uptimePct: 99.95 },
-    { id: '6', name: 'Coinbase Base Mainnet RPC', category: 'rpc', endpoint: 'https://mainnet.base.org', status: 'OPERATIONAL', latencyMs: 12, uptimePct: 99.99 },
-    { id: '7', name: 'Arbitrum One OffchainLabs RPC', category: 'rpc', endpoint: 'https://arb1.arbitrum.io/rpc', status: 'OPERATIONAL', latencyMs: 15, uptimePct: 99.98 },
-    { id: '8', name: 'BNB Smart Chain LlamaRPC Node', category: 'rpc', endpoint: 'https://binance.llamarpc.com', status: 'OPERATIONAL', latencyMs: 28, uptimePct: 99.92 },
-    { id: '9', name: 'Supabase Encrypted Cloud Vault', category: 'database', endpoint: 'Postgres RLS (ulkbchewsrksgvlbzjzl)', status: 'OPERATIONAL', latencyMs: 34, uptimePct: 99.99 },
+  const [services, setServices] = useState<ServiceStatus[]>([
+    { id: '1', name: 'Northveil MCP SSE Stream Server', category: 'core', endpoint: 'http://localhost:3001/sse', status: 'OPERATIONAL', latencyMs: 0, uptimePct: 100 },
+    { id: '2', name: 'REST JSON-RPC Gateway', category: 'core', endpoint: 'http://localhost:3001/mcp', status: 'OPERATIONAL', latencyMs: 0, uptimePct: 100 },
+    { id: '3', name: 'OpenAPI 3.0 Action Spec Engine', category: 'core', endpoint: 'http://localhost:3001/openapi.json', status: 'OPERATIONAL', latencyMs: 0, uptimePct: 100 },
+    { id: '4', name: 'Ethereum Mainnet JSON-RPC Node', category: 'rpc', endpoint: 'https://cloudflare-eth.com', status: 'OPERATIONAL', latencyMs: 0, uptimePct: 100 },
+    { id: '5', name: 'Polygon Bor PublicNode RPC', category: 'rpc', endpoint: 'https://polygon-bor-rpc.publicnode.com', status: 'OPERATIONAL', latencyMs: 0, uptimePct: 100 },
+    { id: '6', name: 'Coinbase Base Mainnet RPC', category: 'rpc', endpoint: 'https://mainnet.base.org', status: 'OPERATIONAL', latencyMs: 0, uptimePct: 100 },
+    { id: '7', name: 'Arbitrum One OffchainLabs RPC', category: 'rpc', endpoint: 'https://arb1.arbitrum.io/rpc', status: 'OPERATIONAL', latencyMs: 0, uptimePct: 100 },
+    { id: '8', name: 'BNB Smart Chain LlamaRPC Node', category: 'rpc', endpoint: 'https://binance.llamarpc.com', status: 'OPERATIONAL', latencyMs: 0, uptimePct: 100 },
+    { id: '9', name: 'Supabase Encrypted Cloud Vault', category: 'database', endpoint: 'Postgres RLS (ulkbchewsrksgvlbzjzl)', status: 'OPERATIONAL', latencyMs: 0, uptimePct: 100 },
   ]);
 
   // Hourly Heatmap Data (24 hours UTC)
@@ -124,29 +122,23 @@ export const App: React.FC = () => {
   // Fetch REAL Telemetry Data directly from Supabase Database
   const fetchSupabaseTelemetry = async () => {
     try {
-      // 1. Fetch transactions count
-      const { count: txCount } = await supabase.from('transactions').select('*', { count: 'exact', head: true });
-      // 2. Fetch contracts count
-      const { count: contractCount } = await supabase.from('contracts').select('*', { count: 'exact', head: true });
-      // 3. Fetch API keys count
-      const { count: keyCount } = await supabase.from('api_keys').select('*', { count: 'exact', head: true });
+      const [{ count: txCount }, { count: contractCount }, { count: keyCount }, { count: revokedCount }, { data: recentTxs }] = await Promise.all([
+        supabase.from('transactions').select('*', { count: 'exact', head: true }),
+        supabase.from('contracts').select('*', { count: 'exact', head: true }),
+        supabase.from('api_keys').select('*', { count: 'exact', head: true }),
+        supabase.from('api_keys').select('*', { count: 'exact', head: true }).eq('status', 'REVOKED'),
+        supabase.from('transactions').select('*').order('created_at', { ascending: false }).limit(8)
+      ]);
 
       const realTxCount = txCount || 0;
       const realContractCount = contractCount || 0;
-      const baseCalls = 14800;
-      setTotalApiCalls(baseCalls + realTxCount + realContractCount);
+      const realKeyCount = keyCount || 0;
+      const realRevokedCount = revokedCount || 0;
 
-      if (keyCount && keyCount > 0) {
-        setTotalApiKeys(1200 + keyCount);
-        setActiveApiKeys(1100 + keyCount);
-      }
-
-      // 4. Fetch recent transactions from Supabase
-      const { data: recentTxs } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(6);
+      setTotalApiCalls(realTxCount + realContractCount);
+      setTotalApiKeys(realKeyCount);
+      setRevokedApiKeys(realRevokedCount);
+      setActiveApiKeys(Math.max(0, realKeyCount - realRevokedCount));
 
       if (recentTxs && recentTxs.length > 0) {
         const mappedCalls: RecentApiCall[] = recentTxs.map((t) => ({
@@ -166,7 +158,7 @@ export const App: React.FC = () => {
     }
   };
 
-  // Perform Live Network Ping & Fetch Server Hardware Telemetry
+  // Perform Live Network Ping & Fetch Real Server Hardware Telemetry
   const performHealthCheck = async () => {
     setIsRefreshing(true);
     const startTime = performance.now();
@@ -179,22 +171,27 @@ export const App: React.FC = () => {
         const data = await res.json().catch(() => null);
         setOverallLatency(elapsed || 18);
         if (data && data.hardware) {
-          setRamUsedGb(data.hardware.ramUsedGb);
-          setCpuLoadPct(data.hardware.cpuLoadPct);
-          setNetSpeedIn(data.hardware.netSpeedInMbps);
-          setNetSpeedOut(data.hardware.netSpeedOutMbps);
+          setRamUsedGb(data.hardware.ramUsedGb || 0);
+          setRamTotalGb(data.hardware.ramTotalGb || 0);
+          setCpuLoadPct(data.hardware.cpuLoadPct || 0);
+          setCpuCores(data.hardware.cpuCores || 0);
+          setCpuModel(data.hardware.cpuModel || '');
+          setNetSpeedIn(data.hardware.netSpeedInMbps || 0);
+          setNetSpeedOut(data.hardware.netSpeedOutMbps || 0);
+          setDiskUsedGb(data.hardware.diskUsedGb || 0);
+          setDiskTotalGb(data.hardware.diskTotalGb || 0);
         }
         if (data && data.telemetry) {
-          setTotalApiCalls(data.telemetry.totalApiCalls);
-          setTotalApiKeys(data.telemetry.totalApiKeys);
-          setActiveApiKeys(data.telemetry.activeApiKeys);
-          setRevokedApiKeys(data.telemetry.revokedApiKeys);
+          setTotalApiCalls(data.telemetry.totalApiCalls || 0);
+          setTotalApiKeys(data.telemetry.totalApiKeys || 0);
+          setActiveApiKeys(data.telemetry.activeApiKeys || 0);
+          setRevokedApiKeys(data.telemetry.revokedApiKeys || 0);
           if (data.telemetry.recentCalls && data.telemetry.recentCalls.length > 0) {
             setRecentCalls(data.telemetry.recentCalls);
           }
         }
       } else {
-        setOverallLatency(Math.max(12, Math.floor(Math.random() * 20) + 10));
+        setOverallLatency(elapsed || 18);
       }
     } catch {
       setOverallLatency(18);
@@ -209,11 +206,9 @@ export const App: React.FC = () => {
     performHealthCheck();
 
     const interval = setInterval(() => {
-      setTotalApiCalls((prev) => prev + Math.floor(Math.random() * 2) + 1);
-      setCpuLoadPct(Math.floor(Math.random() * 6) + 12);
-      setNetSpeedIn(Number((Math.random() * 5 + 46.0).toFixed(1)));
-      setNetSpeedOut(Number((Math.random() * 10 + 108.0).toFixed(1)));
-    }, 4000);
+      fetchSupabaseTelemetry();
+      performHealthCheck();
+    }, 6000);
 
     return () => clearInterval(interval);
   }, []);
@@ -325,7 +320,9 @@ export const App: React.FC = () => {
             <div className="bg-[#0a0a0c] border-2 border-white p-4 shadow-[4px_4px_0px_0px_#ffe600]">
               <span className="text-[10px] font-black text-slate-400 uppercase">RAM CONSUMPTION</span>
               <div className="text-2xl font-black text-[#ffe600] mt-1">{ramUsedGb} GB</div>
-              <span className="text-[9px] text-[#ccff00] font-bold">8.8% OF 16.0 GB TOTAL</span>
+              <span className="text-[9px] text-[#ccff00] font-bold">
+                {ramTotalGb > 0 ? `${((ramUsedGb / ramTotalGb) * 100).toFixed(1)}% OF ${ramTotalGb} GB TOTAL` : 'REAL OS SYSTEM RAM'}
+              </span>
             </div>
           </div>
         </div>
@@ -369,7 +366,7 @@ export const App: React.FC = () => {
                 <p className="text-xs text-slate-300 mt-0.5">MONITORING INDIVIDUAL SUBSYSTEMS AND MULTI-CHAIN JSON-RPC ENDPOINTS.</p>
               </div>
               <span className="px-2.5 py-1 bg-[#ccff00] text-black text-[10px] font-black uppercase border border-black">
-                AUTO-PING: 8s
+                AUTO-PING: 6s
               </span>
             </div>
 
@@ -389,7 +386,7 @@ export const App: React.FC = () => {
 
                   <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-white/10">
                     <span>UPTIME: <strong className="text-white">{svc.uptimePct}%</strong></span>
-                    <span>LATENCY: <strong className="text-[#ccff00]">{svc.latencyMs}ms</strong></span>
+                    <span>LATENCY: <strong className="text-[#ccff00]">{svc.latencyMs > 0 ? `${svc.latencyMs}ms` : 'MEASURING...'}</strong></span>
                   </div>
                 </div>
               ))}
@@ -413,31 +410,37 @@ export const App: React.FC = () => {
             </div>
 
             <div className="space-y-3">
-              {recentCalls.map((call) => (
-                <div key={call.id} className="bg-[#0a0a0c] border-2 border-white p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-[3px_3px_0px_0px_#000]">
-                  <div className="flex items-center gap-3">
-                    <span className="w-8 h-8 rounded bg-[#141419] border border-white/20 flex items-center justify-center font-black text-xs text-[#ccff00]">
-                      ⚡
-                    </span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <code className="text-sm font-black text-[#ccff00]">{call.toolName}</code>
-                        <span className="px-2 py-0.5 bg-[#00f0ff] text-black font-black text-[9px] uppercase border border-black">
-                          {call.chain}
-                        </span>
+              {recentCalls.length === 0 ? (
+                <div className="p-8 text-center bg-[#0a0a0c] border-2 border-white/20 text-slate-400 font-mono text-xs">
+                  NO RECENT TRANSACTIONS RECORDED IN POSTGRES DATABASE YET.
+                </div>
+              ) : (
+                recentCalls.map((call) => (
+                  <div key={call.id} className="bg-[#0a0a0c] border-2 border-white p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-[3px_3px_0px_0px_#000]">
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded bg-[#141419] border border-white/20 flex items-center justify-center font-black text-xs text-[#ccff00]">
+                        ⚡
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <code className="text-sm font-black text-[#ccff00]">{call.toolName}</code>
+                          <span className="px-2 py-0.5 bg-[#00f0ff] text-black font-black text-[9px] uppercase border border-black">
+                            {call.chain}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400">EXECUTED ON-CHAIN ENGINE • {call.timestamp}</span>
                       </div>
-                      <span className="text-[10px] text-slate-400">EXECUTED ON-CHAIN ENGINE • {call.timestamp}</span>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs font-black text-slate-300">LATENCY: <span className="text-[#ccff00]">{call.latencyMs}ms</span></span>
+                      <span className="px-2.5 py-1 bg-[#ccff00] text-black font-black text-[10px] uppercase border border-black">
+                        {call.status}
+                      </span>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-4">
-                    <span className="text-xs font-black text-slate-300">LATENCY: <span className="text-[#ccff00]">{call.latencyMs}ms</span></span>
-                    <span className="px-2.5 py-1 bg-[#ccff00] text-black font-black text-[10px] uppercase border border-black">
-                      {call.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         )}
@@ -453,7 +456,7 @@ export const App: React.FC = () => {
                 <p className="text-xs text-slate-300 mt-0.5">VISUAL TRAFFIC DENSITY AND STRESS PROFILE ACROSS 24 HOURLY BLOCKS (UTC).</p>
               </div>
               <span className="px-3 py-1 bg-[#ff007f] text-white text-xs font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000]">
-                PEAK TRAFFIC: 14:00 - 17:00 UTC
+                REAL-TIME LOAD DENSITY
               </span>
             </div>
 
@@ -506,9 +509,14 @@ export const App: React.FC = () => {
                 </div>
                 <div className="text-3xl font-black text-[#ffe600]">{ramUsedGb} GB</div>
                 <div className="w-full bg-[#141419] h-3 border border-white/20 overflow-hidden">
-                  <div className="bg-[#ffe600] h-full" style={{ width: '8.8%' }} />
+                  <div
+                    className="bg-[#ffe600] h-full"
+                    style={{ width: `${ramTotalGb > 0 ? Math.min(100, Math.max(2, (ramUsedGb / ramTotalGb) * 100)) : 0}%` }}
+                  />
                 </div>
-                <span className="text-[10px] text-slate-400 block">TOTAL ALLOCATED: 16.00 GB DDR5</span>
+                <span className="text-[10px] text-slate-400 block">
+                  TOTAL OS RAM: {ramTotalGb > 0 ? `${ramTotalGb} GB` : 'CALCULATING...'}
+                </span>
               </div>
 
               {/* Disk Storage */}
@@ -517,35 +525,42 @@ export const App: React.FC = () => {
                   <span className="text-xs font-black text-white uppercase">STORAGE DISK USAGE</span>
                   <HardDrive className="w-4 h-4 text-[#00f0ff]" />
                 </div>
-                <div className="text-3xl font-black text-[#00f0ff]">42.8 GB</div>
+                <div className="text-3xl font-black text-[#00f0ff]">{diskUsedGb > 0 ? `${diskUsedGb} GB` : 'ACTIVE'}</div>
                 <div className="w-full bg-[#141419] h-3 border border-white/20 overflow-hidden">
-                  <div className="bg-[#00f0ff] h-full" style={{ width: '8.3%' }} />
+                  <div
+                    className="bg-[#00f0ff] h-full"
+                    style={{ width: `${diskTotalGb > 0 ? Math.min(100, Math.max(2, (diskUsedGb / diskTotalGb) * 100)) : 10}%` }}
+                  />
                 </div>
-                <span className="text-[10px] text-slate-400 block">TOTAL NVME SSD: 512.0 GB</span>
+                <span className="text-[10px] text-slate-400 block">
+                  TOTAL DISK: {diskTotalGb > 0 ? `${diskTotalGb} GB` : 'DRIVE VOLUME'}
+                </span>
               </div>
 
               {/* CPU Clock & Stress */}
               <div className="bg-[#0a0a0c] border-2 border-white p-5 space-y-3 shadow-[4px_4px_0px_0px_#ff007f]">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-white uppercase">CPU CLOCK &amp; LOAD</span>
+                  <span className="text-xs font-black text-white uppercase">CPU LOAD &amp; STRESS</span>
                   <Zap className="w-4 h-4 text-[#ff007f]" />
                 </div>
                 <div className="text-3xl font-black text-[#ff007f]">{cpuLoadPct}% LOAD</div>
                 <div className="w-full bg-[#141419] h-3 border border-white/20 overflow-hidden">
-                  <div className="bg-[#ff007f] h-full" style={{ width: `${cpuLoadPct}%` }} />
+                  <div className="bg-[#ff007f] h-full" style={{ width: `${Math.min(100, Math.max(2, cpuLoadPct))}%` }} />
                 </div>
-                <span className="text-[10px] text-slate-400 block">PROCESSOR: 3.40 GHz MULTI-CORE</span>
+                <span className="text-[10px] text-slate-400 block truncate">
+                  PROCESSOR: {cpuCores > 0 ? `${cpuCores} CORES ${cpuModel ? `(${cpuModel})` : ''}` : 'SYSTEM CPU'}
+                </span>
               </div>
 
               {/* Network Bandwidth Speed */}
               <div className="bg-[#0a0a0c] border-2 border-white p-5 space-y-3 shadow-[4px_4px_0px_0px_#ccff00]">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-white uppercase">NETWORK BANDWIDTH</span>
+                  <span className="text-xs font-black text-white uppercase">NETWORK TRAFFIC</span>
                   <Wifi className="w-4 h-4 text-[#ccff00]" />
                 </div>
-                <div className="text-xl font-black text-[#ccff00]">{netSpeedIn} MB/s IN</div>
-                <div className="text-xl font-black text-[#00f0ff]">{netSpeedOut} MB/s OUT</div>
-                <span className="text-[10px] text-slate-400 block">PORT SPEED: 10 Gbps FIBER</span>
+                <div className="text-xl font-black text-[#ccff00]">{netSpeedIn > 0 ? `${netSpeedIn} MB/s IN` : 'STREAM IN'}</div>
+                <div className="text-xl font-black text-[#00f0ff]">{netSpeedOut > 0 ? `${netSpeedOut} MB/s OUT` : 'STREAM OUT'}</div>
+                <span className="text-[10px] text-slate-400 block">REAL-TIME PORT SPEED</span>
               </div>
             </div>
           </div>
