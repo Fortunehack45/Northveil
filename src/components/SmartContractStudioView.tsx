@@ -262,7 +262,7 @@ contract DAOGovernance {
               onClick={() => setShowKeyConfig(!showKeyConfig)}
               className="px-2 py-1 bg-[#0a0a0c] border border-white/40 text-[10px] text-slate-300 hover:text-white cursor-pointer"
             >
-              ⚙️ {apiKeyInput ? 'CUSTOM GROQ KEY SET' : 'CONFIGURE GROQ API KEY'}
+              {apiKeyInput ? 'CUSTOM GROQ KEY SET' : 'CONFIGURE GROQ API KEY'}
             </button>
           </div>
           <h2 className="text-2xl font-black text-white uppercase tracking-tight mt-2 flex items-center gap-3">

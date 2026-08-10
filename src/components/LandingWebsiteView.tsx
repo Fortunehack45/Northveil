@@ -171,26 +171,26 @@ export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({ onLaunch
                 <div className="p-4 bg-[#0a0a0c] border-2 border-[#ccff00] space-y-2">
                   <div className="text-[10px] text-slate-400 uppercase font-black">PRIMARY BOUND VAULT</div>
                   <div className="text-xs text-white font-bold word-break-all font-mono">0x71C8891575b50d22e032d847847c234a413d4cc8</div>
-                  <div className="text-2xl font-black text-[#ccff00]">$345,920.50 USD <span className="text-xs text-[#00f0ff]">🟢 +4.2%</span></div>
+                  <div className="text-2xl font-black text-[#ccff00]">$345,920.50 USD <span className="text-xs text-[#00f0ff]">+4.2%</span></div>
                 </div>
 
                 <div className="space-y-2 font-mono text-xs">
                   <div className="p-3 bg-[#16161f] border border-white/20 flex justify-between items-center">
-                    <span className="font-bold text-white">💎 Ethereum (ETH)</span>
+                    <span className="font-bold text-white">Ethereum (ETH)</span>
                     <span className="text-[#00f0ff] font-black">45.20 ETH</span>
                   </div>
                   <div className="p-3 bg-[#16161f] border border-white/20 flex justify-between items-center">
-                    <span className="font-bold text-white">🟠 Bitcoin (BTC)</span>
+                    <span className="font-bold text-white">Bitcoin (BTC)</span>
                     <span className="text-[#ccff00] font-black">0.25 BTC</span>
                   </div>
                   <div className="p-3 bg-[#16161f] border border-white/20 flex justify-between items-center">
-                    <span className="font-bold text-white">🟣 Solana (SOL)</span>
+                    <span className="font-bold text-white">Solana (SOL)</span>
                     <span className="text-[#ff007f] font-black">15.00 SOL</span>
                   </div>
                 </div>
 
                 <div className="p-3 bg-[#00f0ff] text-black font-black text-xs uppercase text-center border-2 border-black shadow-[3px_3px_0px_0px_#000]">
-                  ⚡ CLAUDE MCP SSE PROTOCOL CONNECTED
+                  CLAUDE MCP SSE PROTOCOL CONNECTED
                 </div>
               </div>
             </div>
@@ -276,7 +276,7 @@ export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({ onLaunch
                         : 'bg-[#0a0a0c] text-slate-300 border-white/10 hover:border-white hover:text-white'
                     }`}
                   >
-                    <div className="truncate">⚡ {t.name}</div>
+                    <div className="truncate">{t.name}</div>
                   </button>
                 ))}
               </div>

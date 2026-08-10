@@ -19,6 +19,7 @@ import {
   ArrowUpRight,
   LayoutGrid,
   List,
+  Edit3,
 } from 'lucide-react';
 
 import { TokenDetailsView } from './TokenDetailsView';
@@ -269,10 +270,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                   setRenameInput(activeSubWallet?.name || '');
                   setShowRenameModal(true);
                 }}
-                className="px-1.5 py-0.5 bg-[#ff007f] text-white text-[9px] font-black uppercase border border-black shadow-[1.5px_1.5px_0px_0px_#000] cursor-pointer hover:bg-[#ff3399] active:translate-x-0.5 active:translate-y-0.5"
+                className="px-1.5 py-0.5 bg-[#ff007f] text-white text-[9px] font-black uppercase border border-black shadow-[1.5px_1.5px_0px_0px_#000] cursor-pointer hover:bg-[#ff3399] active:translate-x-0.5 active:translate-y-0.5 flex items-center gap-1 shrink-0"
                 title="Rename this Wallet (Saved Locally)"
               >
-                ✏️ RENAME
+                <Edit3 className="w-3 h-3 stroke-[2.5]" />
+                <span>RENAME</span>
               </button>
             </div>
             <p className="text-[10px] text-slate-400 truncate mt-0.5 font-mono">
@@ -421,7 +423,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                   </h3>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 max-w-full">
                   {/* Asset Dropdown Pill */}
                   <CustomSelect
                     options={['ETH', 'BTC', 'SOL']}
@@ -440,12 +442,12 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                   </div>
 
                   {/* Timeframe Pills */}
-                  <div className="flex items-center gap-1 bg-[#0a0a0c] p-1 border-2 border-white">
+                  <div className="flex items-center gap-1 bg-[#0a0a0c] p-1 border-2 border-white max-w-full overflow-x-auto no-scrollbar shrink-0">
                     {(['1H', '1D', '1W', '1M', '3M', '6M', '1Y'] as const).map((tf) => (
                       <button
                         key={tf}
                         onClick={() => setTimeframe(tf)}
-                        className={`px-2.5 py-1 text-[11px] font-mono font-black transition-all cursor-pointer ${
+                        className={`px-2 py-1 text-[10px] sm:text-[11px] font-mono font-black transition-all cursor-pointer whitespace-nowrap ${
                           timeframe === tf
                             ? 'bg-[#d4ff00] text-black border border-black shadow-[2px_2px_0px_0px_#000]'
                             : 'text-slate-300 hover:text-white'

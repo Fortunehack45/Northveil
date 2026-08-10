@@ -472,7 +472,7 @@ export const DeveloperHubView: React.FC = () => {
                   onClick={() => handleSendMessage(p)}
                   className="px-2.5 py-1 bg-[#0a0a0c] border border-white text-[10px] text-slate-300 font-mono font-bold uppercase hover:text-[#ccff00] hover:border-[#ccff00] cursor-pointer shadow-[2px_2px_0px_0px_#000]"
                 >
-                  ⚡ {p}
+                  {p}
                 </button>
               ))}
             </div>
@@ -601,17 +601,17 @@ export const DeveloperHubView: React.FC = () => {
             <div className="p-6 bg-[#0a0a0c] border-2 border-[#ccff00] space-y-5 shadow-[6px_6px_0px_0px_#ccff00]">
               <div className="flex items-center justify-between border-b border-white/20 pb-3 flex-wrap gap-2">
                 <h4 className="text-sm font-black text-[#ccff00] uppercase flex items-center gap-2">
-                  ⚡ DYNAMIC CONNECTOR SETTINGS (AUTO-BOUND TO {activeAddress.slice(0, 6)}...{activeAddress.slice(-4)})
+                  DYNAMIC CONNECTOR SETTINGS (AUTO-BOUND TO {activeAddress.slice(0, 6)}...{activeAddress.slice(-4)})
                 </h4>
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={async () => {
                       await SupabaseService.bindApiKeyToWallet(activeKey, activeAddress, 'Northveil Primary Wallet');
-                      alert(`✅ SUCCESS! API Key ${activeKey} is now bound directly to your logged-in wallet address:\n${activeAddress}`);
+                      alert(`SUCCESS! API Key ${activeKey} is now bound directly to your logged-in wallet address:\n${activeAddress}`);
                     }}
                     className="px-3 py-1.5 bg-[#00f0ff] text-black font-black text-xs uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#33f3ff] transition-all flex items-center gap-1.5"
                   >
-                    🔗 LINK KEY TO MY WALLET
+                    LINK KEY TO MY WALLET
                   </button>
                   <button
                     onClick={() => {
@@ -830,7 +830,7 @@ export const DeveloperHubView: React.FC = () => {
                     className="w-full bg-[#0a0a0c] border-2 border-white p-3 text-xs font-mono font-black text-[#ccff00]"
                   />
                   <p className="text-[10px] text-slate-400">
-                    💡 <b>No JSON config files needed</b>. Just paste this URL directly into Claude's Custom Connector field or Cursor IDE's MCP Server URL settings.
+                    <b>No JSON config files needed</b>. Just paste this URL directly into Claude's Custom Connector field or Cursor IDE's MCP Server URL settings.
                   </p>
                 </div>
               </div>

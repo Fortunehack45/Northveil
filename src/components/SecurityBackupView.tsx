@@ -224,7 +224,7 @@ export const SecurityBackupView: React.FC = () => {
             </div>
 
             <p className="text-xs font-mono font-black bg-[#ff007f] text-white p-3 border-2 border-black shadow-[3px_3px_0px_0px_#000] mb-4 uppercase">
-              ⚠️ WARNING: ANYONE WITH YOUR {seedPhrase.length === 1 ? 'PRIVATE KEY' : 'SEED PHRASE'} CAN STEAL YOUR FUNDS. NEVER SHARE IT WITH ANYONE!
+              WARNING: ANYONE WITH YOUR {seedPhrase.length === 1 ? 'PRIVATE KEY' : 'SEED PHRASE'} CAN STEAL YOUR FUNDS. NEVER SHARE IT WITH ANYONE!
             </p>
 
             {/* Seed / Key Grid */}
@@ -338,9 +338,9 @@ export const SecurityBackupView: React.FC = () => {
 
             <div className="space-y-2">
               {[
-                { type: 'ledger', name: 'LEDGER NANO S / X / FLEX', icon: '🔴' },
-                { type: 'trezor', name: 'TREZOR MODEL T / SAFE 3', icon: '🟢' },
-                { type: 'gridplus', name: 'GRIDPLUS LATTICE1', icon: '⚡' },
+                { type: 'ledger', name: 'LEDGER NANO S / X / FLEX', icon: 'LEDGER' },
+                { type: 'trezor', name: 'TREZOR MODEL T / SAFE 3', icon: 'TREZOR' },
+                { type: 'gridplus', name: 'GRIDPLUS LATTICE1', icon: 'GRIDPLUS' },
               ].map((hw) => {
                 const isSelected = hardwareWallet.deviceType === hw.type;
                 return (

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useWallet } from '../context/WalletContext';
 import { CustomSelect } from './CustomSelect';
-import { Layers, TrendingUp, Sparkles, Gift, ShieldCheck, ArrowUpRight, Calculator } from 'lucide-react';
+import { Layers, TrendingUp, Sparkles, Gift, ShieldCheck, ArrowUpRight, Calculator, Zap } from 'lucide-react';
 
 export const StakingView: React.FC = () => {
   const {
@@ -147,7 +147,7 @@ export const StakingView: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between border-b-2 border-white/20 pb-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl">⚡</span>
+                      <Zap className="w-5 h-5 text-[#ccff00] stroke-[3]" />
                       <div>
                         <div className="font-mono font-black text-white uppercase">{pos.assetSymbol} STAKING</div>
                         <div className="text-[10px] font-mono text-slate-400 uppercase">{pos.validatorName}</div>

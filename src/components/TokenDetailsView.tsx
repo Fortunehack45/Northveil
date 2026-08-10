@@ -446,11 +446,16 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
                 <YAxis 
                   domain={['auto', 'auto']} 
                   stroke="#475569" 
-                  tick={{ fill: '#94a3b8', fontSize: 10 }} 
-                  tickFormatter={(value) => `$${value.toLocaleString()}`}
-                  width={80}
+                  tick={{ fill: '#94a3b8', fontSize: 9 }} 
+                  tickFormatter={(value) => {
+                    if (value >= 1000) return `$${Math.round(value).toLocaleString()}`;
+                    if (value >= 1) return `$${value.toFixed(2)}`;
+                    return `$${value.toFixed(4)}`;
+                  }}
+                  width={55}
                   axisLine={false}
                   tickLine={false}
+                  orientation="left"
                 />
                 <RechartsTooltip 
                   contentStyle={{ backgroundColor: '#000', border: '2px solid #ccff00', borderRadius: 0, boxShadow: '4px 4px 0px 0px #ccff00' }}

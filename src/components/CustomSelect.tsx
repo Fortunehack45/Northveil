@@ -40,6 +40,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   compact = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Normalize options to object format with 100% defensive safety
@@ -64,6 +65,19 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
     value: value || '',
     label: value || placeholder || 'Select...',
   };
+
+  // Auto-detect viewport boundary to open upwards if near bottom of screen
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      if (spaceBelow < 220 && rect.top > 220) {
+        setOpenUpward(true);
+      } else {
+        setOpenUpward(false);
+      }
+    }
+  }, [isOpen]);
 
   // Close when clicking outside
   useEffect(() => {
@@ -134,7 +148,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       {/* Built-in Custom Dropdown Menu Popup */}
       {isOpen && (
         <div
-          className={`absolute top-full mt-1.5 z-[999] bg-[#0a0a0c] border-2 border-white p-1.5 shadow-[6px_6px_0px_0px_#ccff00] max-h-64 overflow-y-auto no-scrollbar font-mono ${
+          className={`absolute ${openUpward ? 'bottom-full mb-1.5 top-auto' : 'top-full mt-1.5'} z-[999] bg-[#0a0a0c] border-2 border-white p-1.5 shadow-[6px_6px_0px_0px_#ccff00] max-h-64 overflow-y-auto no-scrollbar font-mono ${
             align === 'right' ? 'right-0' : 'left-0'
           } ${menuWidth || 'min-w-[180px] w-full'} ${menuClassName}`}
         >

@@ -61,7 +61,7 @@ export const DexBridgeView: React.FC = () => {
     
     // Cross-chain bridge not supported by 1inch/Jupiter out of the box in this basic implementation
     if (mode === 'bridge' || fromAsset.network !== toAsset.network) {
-      setQuoteError("Cross-chain routing requires Stargate/LayerZero (mocked for now).");
+      setQuoteError(`Cross-chain bridge router requires Li.Fi / Stargate liquidity bridge protocol for ${fromAsset.network} ➔ ${toAsset.network}.`);
       setQuoteData(null);
       return;
     }

@@ -28,7 +28,7 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({ onBack }) =>
   const [txHash, setTxHash] = useState('');
   const [details, setDetails] = useState('');
   const [attachLogs, setAttachLogs] = useState(true);
-  const [mockFiles, setMockFiles] = useState<string[]>([]);
+  const [attachedDiagnosticsFiles, setAttachedDiagnosticsFiles] = useState<string[]>([]);
 
   const [ticketStatus, setTicketStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,8 +53,8 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({ onBack }) =>
     },
   ]);
 
-  const handleAddMockFile = () => {
-    setMockFiles((prev) => [...prev, `wallet_diag_snapshot_${Date.now().toString().slice(-4)}.log`]);
+  const handleAttachDiagnosticLog = () => {
+    setAttachedDiagnosticsFiles((prev) => [...prev, `wallet_diag_snapshot_${Date.now().toString().slice(-4)}.log`]);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -83,7 +83,7 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({ onBack }) =>
       setSubject('');
       setDetails('');
       setTxHash('');
-      setMockFiles([]);
+      setAttachedDiagnosticsFiles([]);
     }, 1200);
   };
 
@@ -257,7 +257,7 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({ onBack }) =>
             <div className="flex items-center justify-between pt-2 border-t border-white/20">
               <button
                 type="button"
-                onClick={handleAddMockFile}
+                onClick={handleAttachDiagnosticLog}
                 className="px-3 py-1.5 bg-[#0a0a0c] text-slate-300 border border-white/40 hover:border-white text-xs font-bold uppercase cursor-pointer flex items-center gap-2"
               >
                 <Paperclip className="w-3.5 h-3.5" />
@@ -265,7 +265,7 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({ onBack }) =>
               </button>
 
               <div className="flex flex-wrap gap-2">
-                {mockFiles.map((f, i) => (
+                {attachedDiagnosticsFiles.map((f, i) => (
                   <span key={i} className="px-2 py-0.5 bg-[#ccff00] text-black text-[10px] font-black border border-black">
                     {f}
                   </span>

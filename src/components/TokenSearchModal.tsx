@@ -113,7 +113,7 @@ export const TokenSearchModal: React.FC<TokenSearchModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-150">
       <div className="bg-[#141419] border-t-4 sm:border-2 border-white p-5 sm:p-8 max-w-lg w-full rounded-t-3xl sm:rounded-none shadow-[0px_-8px_20px_rgba(0,0,0,0.9)] sm:shadow-[12px_12px_0px_0px_#00f0ff] relative space-y-4 sm:space-y-5 max-h-[88vh] sm:max-h-[85vh] flex flex-col font-mono">
         {/* Native Mobile Sheet Pull Handle Bar */}
         <div className="w-12 h-1.5 bg-white/40 rounded-full mx-auto sm:hidden -mt-1 mb-1" />
@@ -182,7 +182,7 @@ export const TokenSearchModal: React.FC<TokenSearchModalProps> = ({
         </div>
 
         {/* Token List View */}
-        <div className="overflow-y-auto no-scrollbar flex-1 space-y-2 pr-1 divide-y divide-white/10">
+        <div className="overflow-y-auto no-scrollbar flex-1 space-y-2 pr-1 pb-20 sm:pb-4 divide-y divide-white/10">
           {filteredAssets.length === 0 ? (
             <div className="py-8 text-center space-y-4 font-mono">
               {showContractImportButton ? (

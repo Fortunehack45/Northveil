@@ -93,7 +93,7 @@ const FEATURED_DAPPS: DApp[] = [
     category: 'Predictions',
     description: 'Decentralized information & event prediction markets platform.',
     url: 'https://polymarket.com',
-    icon: '📈',
+    icon: 'POLY',
     badge: 'TRENDING',
     users24h: '210.4K',
     volume24h: '$120M',
@@ -106,7 +106,7 @@ const FEATURED_DAPPS: DApp[] = [
     category: 'DeFi',
     description: 'Deep liquidity exchange for stablecoins with low slippage.',
     url: 'https://curve.fi',
-    icon: '🌈',
+    icon: 'CRV',
     users24h: '29.3K',
     volume24h: '$410M',
     network: 'Multi-Chain',
@@ -118,7 +118,7 @@ const FEATURED_DAPPS: DApp[] = [
     category: 'DeFi',
     description: 'Leading DEX on BNB Chain with yield farming, lotteries & NFTs.',
     url: 'https://pancakeswap.finance',
-    icon: '🥞',
+    icon: 'CAKE',
     users24h: '185.2K',
     volume24h: '$620M',
     network: 'BNB Chain / Base',
@@ -130,7 +130,7 @@ const FEATURED_DAPPS: DApp[] = [
     category: 'DeFi',
     description: 'L1 perpetual DEX with sub-second order book matching.',
     url: 'https://app.hyperliquid.xyz',
-    icon: '⚡',
+    icon: 'HYPER',
     badge: 'NEW',
     users24h: '64.8K',
     volume24h: '$2.1B',
@@ -182,7 +182,7 @@ export const DAppBrowserView: React.FC = () => {
         category: 'DeFi',
         description: `Custom Web3 dApp Session for ${trimmed}`,
         url: finalUrl,
-        icon: '🌐',
+        icon: 'WEB3',
         users24h: 'Live',
         volume24h: 'Direct URL',
         network: userSettings.preferredNetwork || 'Ethereum',
@@ -215,7 +215,7 @@ export const DAppBrowserView: React.FC = () => {
 
   const { seedPhrase, activeSubWallet } = useWallet();
 
-  const handleSimulateDAppInteraction = async (actionName: string) => {
+  const handleExecuteDAppInteraction = async (actionName: string) => {
     setTxPending(true);
     setTxStatusMessage(null);
 
@@ -527,7 +527,7 @@ export const DAppBrowserView: React.FC = () => {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => handleSimulateDAppInteraction(`Execute Smart Protocol Interaction on ${activeDApp.name}`)}
+                  onClick={() => handleExecuteDAppInteraction(`Execute Smart Protocol Interaction on ${activeDApp.name}`)}
                   className="px-3 py-1.5 bg-[#d4ff00] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#e0ff33] flex items-center gap-1.5"
                 >
                   <Zap className="w-3.5 h-3.5 stroke-[3]" />

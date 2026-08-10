@@ -48,8 +48,8 @@ export const SystemMetricsView: React.FC = () => {
   // Wallet Name & Avatar State
   const [walletName, setWalletName] = useState('ARKHAN DEFI VAULT #1');
   const [isEditingName, setIsEditingName] = useState(false);
-  const [selectedAvatar, setSelectedAvatar] = useState('⚡');
-  const avatars = ['⚡', '🤖', '💀', '👾', '🦊', '💎', '🚀', '🔮'];
+  const [selectedAvatar, setSelectedAvatar] = useState('VAULT');
+  const avatars = ['VAULT', 'NEXUS', 'CORE', 'PRIME', 'ALPHA', 'NODE', 'MATRIX', 'CYBER'];
 
   // Multi-wallet list
   const [walletAccounts, setWalletAccounts] = useState<WalletAccount[]>([
@@ -157,42 +157,42 @@ export const SystemMetricsView: React.FC = () => {
     <div className="max-w-[1600px] mx-auto space-y-6 pb-12 w-full font-mono select-none">
       {/* Top Banner Header */}
       <div className="bg-[#141419] border-2 border-white p-6 sm:p-8 shadow-[8px_8px_0px_0px_#ccff00] flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="flex items-center gap-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5 w-full min-w-0">
           {/* Avatar box */}
-          <div className="w-16 h-16 bg-[#ccff00] border-4 border-black text-black text-3xl font-black flex items-center justify-center shadow-[4px_4px_0px_0px_#000] shrink-0">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 bg-[#ccff00] border-4 border-black text-black text-xs sm:text-lg font-black flex items-center justify-center shadow-[4px_4px_0px_0px_#000] shrink-0 uppercase">
             {selectedAvatar}
           </div>
 
-          <div>
-            <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1 w-full">
+            <div className="flex items-center gap-2 flex-wrap max-w-full">
               {isEditingName ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full max-w-full min-w-0 flex-wrap">
                   <input
                     type="text"
                     value={walletName}
                     onChange={(e) => setWalletName(e.target.value)}
-                    className="bg-[#0a0a0c] border-2 border-white px-3 py-1 text-lg font-black text-white focus:outline-none uppercase"
+                    className="bg-[#0a0a0c] border-2 border-white px-2.5 py-1 text-sm sm:text-lg font-black text-white focus:outline-none uppercase min-w-0 flex-1"
                   />
                   <button
                     onClick={() => setIsEditingName(false)}
-                    className="px-3 py-1 bg-[#ccff00] text-black font-black text-xs uppercase border border-black shadow-[2px_2px_0px_0px_#000]"
+                    className="px-3 py-1 bg-[#ccff00] text-black font-black text-xs uppercase border border-black shadow-[2px_2px_0px_0px_#000] shrink-0 cursor-pointer"
                   >
                     SAVE
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-black text-white uppercase tracking-tight">{walletName}</h2>
+                <div className="flex items-center gap-2 min-w-0 max-w-full">
+                  <h2 className="text-base sm:text-2xl font-black text-white uppercase tracking-tight truncate max-w-full">{walletName}</h2>
                   <button
                     onClick={() => setIsEditingName(true)}
-                    className="text-slate-400 hover:text-[#ccff00] p-1"
+                    className="text-slate-400 hover:text-[#ccff00] p-1 shrink-0 cursor-pointer"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                 </div>
               )}
             </div>
-            <p className="text-xs text-slate-300 mt-1">
+            <p className="text-[10px] sm:text-xs text-slate-300 mt-1">
               ACCOUNT DASHBOARD, MULTI-WALLET MANAGER, CONTACTS, PREFERENCES & TELEMETRY.
             </p>
           </div>

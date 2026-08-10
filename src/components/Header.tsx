@@ -298,7 +298,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
 
           {/* Sub-Wallet Menu Dropdown */}
           {isWalletMenuOpen && (
-            <div className="absolute right-0 top-11 sm:top-12 w-[calc(100vw-24px)] max-w-xs sm:w-80 bg-[#141824] border-2 border-white shadow-[5px_5px_0px_0px_#00f0ff] p-3 z-50 space-y-3 font-mono animate-fadeIn">
+            <div className="absolute right-0 top-11 sm:top-12 w-[calc(100vw-32px)] max-w-[290px] sm:w-80 bg-[#141824] border-2 border-white shadow-[5px_5px_0px_0px_#00f0ff] p-3 z-50 space-y-3 font-mono animate-fadeIn">
               <div className="flex items-center justify-between border-b-2 border-white pb-2">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
                   <Wallet className="w-3 h-3 text-[#00f0ff]" /> HD ACCOUNTS ({(subWallets || []).length})
