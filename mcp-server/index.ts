@@ -2669,7 +2669,30 @@ ${realTxHash ? `| **Block Explorer** | [View Transaction on ${chainName}](${expl
       const pragmaVersion = parsed.pragmaVersion;
 
       const descriptionStr = args.description || args.prompt || `Production-grade smart contract for ${nameStr} (${symbolStr}).`;
-      const imageUrlStr = args.imageUrl || args.logoUrl || args.image || `http://localhost:3001/widget/svg?type=contract_metadata&name=${encodeURIComponent(nameStr)}&symbol=${encodeURIComponent(symbolStr)}`;
+      let imageUrlStr = args.imageUrl || args.logoUrl || args.image;
+
+      if (args.imageBase64) {
+        try {
+          const rawBase64 = args.imageBase64.replace(/^data:[^;]+;base64,/, '');
+          const buffer = Buffer.from(rawBase64, 'base64');
+          const fileExt = args.imageBase64.includes('image/svg') ? 'svg' : args.imageBase64.includes('image/jpeg') ? 'jpg' : 'png';
+          const fileName = `${nameStr}_${symbolStr}_${Date.now()}.${fileExt}`;
+          
+          const { data: uploadData } = await supabase.storage.from('contract-metadata').upload(fileName, buffer, {
+            contentType: fileExt === 'svg' ? 'image/svg+xml' : `image/${fileExt}`,
+            upsert: true
+          });
+          if (uploadData?.path) {
+            imageUrlStr = `https://ulkbchewsrksgvlbzjzl.supabase.co/storage/v1/object/public/contract-metadata/${uploadData.path}`;
+          }
+        } catch (e) {
+          console.warn('[Supabase Storage] Base64 upload note:', e);
+        }
+      }
+
+      if (!imageUrlStr) {
+        imageUrlStr = `http://localhost:3001/widget/svg?type=contract_metadata&name=${encodeURIComponent(nameStr)}&symbol=${encodeURIComponent(symbolStr)}`;
+      }
       const websiteStr = parsed.websiteStr;
       const twitterStr = parsed.twitterStr;
       const telegramStr = parsed.telegramStr;
@@ -2915,6 +2938,47 @@ ${solCode}
         abi,
         prompt: args.prompt,
         status: 'GENERATED_VALID',
+      };
+    }
+
+    case 'upload_contract_asset': {
+      const fileBase64 = args.fileBase64 || args.image || args.base64;
+      if (!fileBase64) {
+        throw new Error('Missing fileBase64 payload');
+      }
+
+      const rawBase64 = fileBase64.replace(/^data:[^;]+;base64,/, '');
+      const buffer = Buffer.from(rawBase64, 'base64');
+      const symbolStr = (args.contractSymbol || 'ASSET').toUpperCase();
+      const mimeType = args.contentType || (fileBase64.includes('image/svg') ? 'image/svg+xml' : 'image/png');
+      const ext = mimeType.includes('svg') ? 'svg' : mimeType.includes('jpeg') ? 'jpg' : 'png';
+      const fileName = args.fileName || `${symbolStr}_logo_${Date.now()}.${ext}`;
+
+      let publicUrl = `http://localhost:3001/widget/svg?type=contract_metadata&name=${encodeURIComponent(symbolStr)}&symbol=${encodeURIComponent(symbolStr)}`;
+
+      try {
+        const { data: uploadData, error: uploadErr } = await supabase.storage.from('contract-metadata').upload(fileName, buffer, {
+          contentType: mimeType,
+          upsert: true
+        });
+
+        if (!uploadErr && uploadData?.path) {
+          publicUrl = `https://ulkbchewsrksgvlbzjzl.supabase.co/storage/v1/object/public/contract-metadata/${uploadData.path}`;
+        }
+      } catch (e) {
+        console.warn('[Supabase Storage Upload Note]:', e);
+      }
+
+      return {
+        success: true,
+        fileName,
+        publicUrl,
+        contentType: mimeType,
+        sizeBytes: buffer.length,
+        markdown: `### 🖼️ CONTRACT ASSET UPLOADED TO SUPABASE STORAGE
+> **File Name**: \`${fileName}\`  
+> **Size**: \`${(buffer.length / 1024).toFixed(2)} KB\`  
+> **Public CDN URL**: [${publicUrl}](${publicUrl})`
       };
     }
 

@@ -357,7 +357,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'create_smart_contract',
-    description: 'Generates complete production-ready Solidity or Rust smart contract code based on a prompt and detailed specifications (name, symbol, supply, owner allocation, metadata, image URL, socials). NORTHVEIL AUTOMATICALLY HOSTS AND STORES TOKEN LOGO IMAGES AND METADATA JSON ON SUPABASE STORAGE AND DATABASE. DO NOT skip the logo/image field or claim Supabase is not working — Northveil generates and hosts it on Supabase automatically!',
+    description: 'Generates complete production-ready Solidity or Rust smart contract code based on a prompt and detailed specifications (name, symbol, supply, owner allocation, metadata, image URL/Base64, socials). Northveil automatically generates and hosts fallback token logos and metadata JSON on Supabase Storage and Postgres database whenever an explicit image parameter is not provided.',
     annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
@@ -394,6 +394,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         imageUrl: {
           type: 'string',
           description: 'Token logo or NFT collection image URL (Supabase/IPFS/HTTP link).',
+        },
+        imageBase64: {
+          type: 'string',
+          description: 'Raw base64-encoded image string (data:image/png;base64,... or raw base64). Uploaded directly to Supabase Storage.',
         },
         websiteUrl: {
           type: 'string',
@@ -468,6 +472,55 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         },
       },
       required: ['prompt'],
+    },
+  },
+  {
+    name: 'upload_contract_asset',
+    description: 'Uploads a token logo or NFT collection image asset (via base64 encoded image string, file payload, or SVG string) to Supabase Storage and returns a permanent public Supabase CDN URL.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fileBase64: {
+          type: 'string',
+          description: 'Base64 encoded file string (e.g. data:image/png;base64,... or raw base64 data).',
+        },
+        fileName: {
+          type: 'string',
+          description: 'Target file name (e.g. "nerd_logo.png", "token_icon.svg").',
+        },
+        contentType: {
+          type: 'string',
+          description: 'MIME type of the uploaded file (e.g. "image/png", "image/jpeg", "image/svg+xml").',
+        },
+        contractSymbol: {
+          type: 'string',
+          description: 'Associated contract ticker symbol (e.g. NRD).',
+        },
+      },
+      required: ['fileBase64'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        fileBase64: {
+          type: 'string',
+          description: 'Base64 encoded file string (e.g. data:image/png;base64,... or raw base64 data).',
+        },
+        fileName: {
+          type: 'string',
+          description: 'Target file name (e.g. "nerd_logo.png", "token_icon.svg").',
+        },
+        contentType: {
+          type: 'string',
+          description: 'MIME type of the uploaded file (e.g. "image/png", "image/jpeg", "image/svg+xml").',
+        },
+        contractSymbol: {
+          type: 'string',
+          description: 'Associated contract ticker symbol (e.g. NRD).',
+        },
+      },
+      required: ['fileBase64'],
     },
   },
   {
