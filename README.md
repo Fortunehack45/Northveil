@@ -1,4 +1,3 @@
-
 # Multi-Chain Wallet Import & Asset Discovery
 Complete Technical Documentation
 
