@@ -577,13 +577,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       try {
         // Fetch all tokens, NFTs, and transaction history across major chains
-        const [
-          ethTokens, polyTokens, arbTokens, baseTokens, bscTokens, avaxTokens, sepoliaTokens,
-          ethNative, polyNative, arbNative, baseNative, bscNative, avaxNative, sepoliaNative,
-          ethNfts, polyNfts, arbNfts, baseNfts, bscNfts, avaxNfts, sepoliaNfts,
-          history,
-          ethTxs, polyTxs, arbTxs, baseTxs, bscTxs, avaxTxs, sepoliaTxs
-        ] = await Promise.all([
+        const indexerResults = await Promise.allSettled([
           IndexerService.fetchAllTokens(evmAddress, 'eth', apiKey),
           IndexerService.fetchAllTokens(evmAddress, 'polygon', apiKey),
           IndexerService.fetchAllTokens(evmAddress, 'arbitrum', apiKey),
@@ -614,6 +608,45 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           IndexerService.fetchTransactionHistory(evmAddress, 'avalanche', apiKey),
           IndexerService.fetchTransactionHistory(evmAddress, 'sepolia', apiKey)
         ]);
+
+        const getRes = <T,>(idx: number, fallback: T): T => {
+          const res = indexerResults[idx];
+          return (res && res.status === 'fulfilled') ? (res.value as T) : fallback;
+        };
+
+        const ethTokens = getRes<any[]>(0, []);
+        const polyTokens = getRes<any[]>(1, []);
+        const arbTokens = getRes<any[]>(2, []);
+        const baseTokens = getRes<any[]>(3, []);
+        const bscTokens = getRes<any[]>(4, []);
+        const avaxTokens = getRes<any[]>(5, []);
+        const sepoliaTokens = getRes<any[]>(6, []);
+
+        const ethNative = getRes<number>(7, 0);
+        const polyNative = getRes<number>(8, 0);
+        const arbNative = getRes<number>(9, 0);
+        const baseNative = getRes<number>(10, 0);
+        const bscNative = getRes<number>(11, 0);
+        const avaxNative = getRes<number>(12, 0);
+        const sepoliaNative = getRes<number>(13, 0);
+
+        const ethNfts = getRes<any[]>(14, []);
+        const polyNfts = getRes<any[]>(15, []);
+        const arbNfts = getRes<any[]>(16, []);
+        const baseNfts = getRes<any[]>(17, []);
+        const bscNfts = getRes<any[]>(18, []);
+        const avaxNfts = getRes<any[]>(19, []);
+        const sepoliaNfts = getRes<any[]>(20, []);
+
+        const history = getRes<any[]>(21, []);
+
+        const ethTxs = getRes<any[]>(22, []);
+        const polyTxs = getRes<any[]>(23, []);
+        const arbTxs = getRes<any[]>(24, []);
+        const baseTxs = getRes<any[]>(25, []);
+        const bscTxs = getRes<any[]>(26, []);
+        const avaxTxs = getRes<any[]>(27, []);
+        const sepoliaTxs = getRes<any[]>(28, []);
 
         // Append native balances to the token arrays manually
         const addNativeToken = (networkId: string, tokens: any[], balance: number) => {
@@ -1078,7 +1111,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         assetSymbol: asset.symbol,
         network: asset.network,
         amountStaked: amount,
-        apy: asset.apy || 5.0,
+        apy: asset.apy || 0,
         rewardsClaimed: 0,
         pendingRewards: 0,
         stakedDate: new Date().toISOString().split('T')[0],

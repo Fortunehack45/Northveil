@@ -20,6 +20,7 @@ import {
   LayoutGrid,
   List,
   Edit3,
+  Globe,
 } from 'lucide-react';
 
 import { TokenDetailsView } from './TokenDetailsView';
@@ -199,20 +200,20 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
     if (showZeroBalances) return assets;
 
     return assets.filter(asset => {
-      const symUpper = asset.symbol?.toUpperCase() || '';
-      const isMainNative = MAIN_NATIVE_SYMBOLS.has(symUpper) || 
-                           asset.id?.startsWith('native-') || 
-                           asset.id?.endsWith('-native') || 
-                           asset.id?.endsWith('-main') ||
-                           !asset.contractAddress;
+      // 1. All primary native blockchain coins are ALWAYS shown regardless of balance
+      const isNativeChainAsset = !asset.contractAddress || 
+                                 asset.contractAddress === '0x0000000000000000000000000000000000000000' ||
+                                 asset.id?.startsWith('native-') ||
+                                 asset.id?.endsWith('-native') ||
+                                 asset.id?.endsWith('-main') ||
+                                 ['ethereum', 'base', 'polygon', 'arbitrum', 'bsc', 'avalanche', 'solana', 'bitcoin', 'optimism', 'linea', 'scroll', 'celo', 'mantle', 'zksync', 'sepolia'].includes(asset.network);
 
-      // Rule 1: Always include main coins from the primary blockchains even if balance is 0
-      if (isMainNative) return true;
+      if (isNativeChainAsset) return true;
 
-      // Rule 2: Include ANY token with positive balance > 0 (including micro-balances < 0.000000000001)
+      // 2. All secondary tokens with positive balance > 0 (including micro-balances) are shown
       return asset.balance > 0;
     });
-  }, [assets, showZeroBalances, MAIN_NATIVE_SYMBOLS]);
+  }, [assets, showZeroBalances]);
 
   const sortedAssets = useMemo(() => {
     return [...filteredAssetsList].sort((a, b) => {
@@ -387,17 +388,17 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
           </div>
         </div>
 
-        {/* Card 3: APY */}
-        <div className="bg-[#12141a] border-2 border-white p-4 sm:p-6 shadow-[4px_4px_0px_0px_#ff007f] flex items-center gap-4 hover:-translate-y-0.5 transition-all">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#ff007f] border-2 border-black flex items-center justify-center text-white shadow-[2px_2px_0px_0px_#000] shrink-0">
-            <BarChart2 className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
+        {/* Card 3: Active Blockchains */}
+        <div className="bg-[#12141a] border-2 border-white p-4 sm:p-6 shadow-[4px_4px_0px_0px_#00f0ff] flex items-center gap-4 hover:-translate-y-0.5 transition-all">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#00f0ff] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_0px_#000] shrink-0">
+            <Globe className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
           </div>
           <div className="min-w-0">
-            <span className="text-[10px] sm:text-xs font-mono font-black text-[#ff007f] uppercase tracking-wider block truncate">
-              ESTIMATED APY
+            <span className="text-[10px] sm:text-xs font-mono font-black text-[#00f0ff] uppercase tracking-wider block truncate">
+              ACTIVE BLOCKCHAINS
             </span>
-            <div className="text-xl sm:text-2xl font-black text-[#d4ff00] font-mono mt-0.5 truncate">
-              + 4.82%
+            <div className="text-xl sm:text-2xl font-black text-white font-mono mt-0.5 truncate">
+              15 NETWORKS LIVE
             </div>
           </div>
         </div>

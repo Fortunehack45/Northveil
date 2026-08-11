@@ -382,11 +382,11 @@ export const TokenDetailsView: React.FC<TokenDetailsViewProps> = ({
         </div>
 
         <div className="bg-[#141419] border-2 border-white p-3 sm:p-4 shadow-[2px_2px_0px_0px_#000] sm:shadow-[4px_4px_0px_0px_#000] space-y-1">
-          <span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase block truncate">STAKING YIELD</span>
+          <span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase block truncate">STAKABLE STATUS</span>
           <span className="text-base sm:text-xl font-black text-[#ffe600] truncate block">
-            {asset.isStakable ? `${asset.apy}% APY` : 'NOT STAKABLE'}
+            {asset.isStakable ? 'ON-CHAIN STAKABLE' : 'NOT STAKABLE'}
           </span>
-          <span className="text-[9px] sm:text-[10px] text-slate-500 font-bold block truncate">PASSIVE YIELD</span>
+          <span className="text-[9px] sm:text-[10px] text-slate-500 font-bold block truncate">PROTOCOL LEVEL</span>
         </div>
       </div>
 
