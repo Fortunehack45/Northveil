@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export interface McpWidgetPayload {
-  type: 'transfer' | 'receipt' | 'request' | 'contract_metadata' | 'swap';
+  type: 'transfer' | 'receipt' | 'request' | 'contract_metadata' | 'swap' | 'contract_deploy';
   title?: string;
   sender?: string;
   recipient?: string;
@@ -301,6 +301,66 @@ export const McpActionWidget: React.FC<McpActionWidgetProps> = ({ payload, onExe
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleCopy(payload.contractAddress || '0xdac17f958d2ee523a2206206994597c13d831ec7')}
+            className="flex-1 py-2 bg-[#0a0a0c] text-white font-black text-xs uppercase border-2 border-white hover:bg-white/10 cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-[#ccff00]" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copied ? 'COPIED ADDRESS' : 'COPY CONTRACT ADDRESS'}</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 5. SMART CONTRACT DEPLOYMENT CARD
+  if (payload.type === 'contract_deploy') {
+    const resolvedImage = payload.imageUrl || 'https://iili.io/CgBPBHv.jpg';
+    return (
+      <div className="bg-[#141419] border-3 border-white p-5 shadow-[6px_6px_0px_0px_#00f0ff] font-mono space-y-4 my-3 text-left">
+        <div className="flex items-center justify-between border-b-2 border-white pb-3">
+          <div className="flex items-center gap-2">
+            <FileCode className="w-4 h-4 text-[#00f0ff] stroke-[3]" />
+            <span className="font-black text-white text-xs uppercase tracking-wider">
+              {payload.title || 'SMART CONTRACT DEPLOYMENT'}
+            </span>
+          </div>
+          <span className="px-2 py-0.5 bg-[#00f0ff] text-black font-black text-[9px] uppercase border border-black shadow-[1.5px_1.5px_0px_0px_#000]">
+            {payload.tokenType || 'ERC-20'} ON-CHAIN
+          </span>
+        </div>
+
+        <div className="bg-[#0a0a0c] border-2 border-white p-4 flex flex-col sm:flex-row items-start gap-4">
+          <div className="w-20 h-20 bg-black border-2 border-white shrink-0 overflow-hidden relative shadow-[3px_3px_0px_0px_#00f0ff]">
+            <img
+              src={resolvedImage}
+              alt={payload.name || 'Contract Logo'}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as any).src = 'https://iili.io/CgBPBHv.jpg';
+              }}
+            />
+          </div>
+
+          <div className="space-y-1.5 flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-sm font-black text-white uppercase truncate">{payload.name || 'DEPLOYED TOKEN'}</h4>
+              <span className="text-xs font-black text-[#00f0ff] bg-[#141419] px-2 py-0.5 border border-white/30">
+                ${payload.symbol || 'NRD'}
+              </span>
+            </div>
+
+            <div className="text-[10px] text-slate-300 font-mono space-y-0.5">
+              <div className="truncate">
+                Address: <code className="text-[#ccff00]">{payload.contractAddress || '0x56F0...5417'}</code>
+              </div>
+              <div>Network: {payload.network || 'Sepolia Testnet'}</div>
+              <div>Supply Cap: {payload.totalSupply || '100,000,000'}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleCopy(payload.contractAddress || '0x56F0...5417')}
             className="flex-1 py-2 bg-[#0a0a0c] text-white font-black text-xs uppercase border-2 border-white hover:bg-white/10 cursor-pointer flex items-center justify-center gap-1.5"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-[#ccff00]" /> : <Copy className="w-3.5 h-3.5" />}

@@ -291,6 +291,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       // Default to clean zero-balance INITIAL_ASSETS
       const zeroAssets = INITIAL_ASSETS.map(a => ({ ...a, balance: 0 }));
       setAssets(zeroAssets);
+
+      // Trigger background live multi-chain RPC balance update
+      TokenService.fetchLiveBalancesAndPrices(INITIAL_ASSETS, activeSubWallet.address, '', '').then((live) => {
+        if (live && live.length > 0) setAssets(live);
+      }).catch((e) => console.warn('[MultiChain Balance Sync Note]:', e));
     }
   }, [activeSubWallet?.address]);
 

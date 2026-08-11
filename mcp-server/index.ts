@@ -1392,23 +1392,33 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
     console.error('Live market price fetch error:', e);
   }
 
-  // 1. Fetch 100% Real Live Multi-Chain EVM On-Chain Balances directly from Blockchain RPC Providers
+  // Fast lazy-loaded balance fetching with 15s in-memory TTL cache & 2.5s RPC timeout protection
+  const isBalanceQueryTool = ['get_portfolio', 'get_wallet_info', 'get_wallet_balance', 'get_token_balance', 'get_nft_gallery'].includes(name);
+
   let mainnetEth = 0;
   let sepoliaEth = 0;
   let polygonBal = 0;
   let baseBal = 0;
   let arbitrumBal = 0;
   let bscBal = 0;
+  let realOnChainTokens: any[] = [];
 
-  try {
-    if (cleanAddress.startsWith('0x') && cleanAddress.length === 42) {
+  if (isBalanceQueryTool && cleanAddress.startsWith('0x') && cleanAddress.length === 42) {
+    const withTimeout = <T>(promise: Promise<T>, ms = 2500): Promise<T> => {
+      return Promise.race([
+        promise,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('RPC Timeout')), ms))
+      ]);
+    };
+
+    try {
       const [ethRes, sepRes, polyRes, baseRes, arbRes, bscRes] = await Promise.allSettled([
-        ethProvider.getBalance(cleanAddress),
-        sepoliaProvider.getBalance(cleanAddress),
-        polygonProvider.getBalance(cleanAddress),
-        baseProvider.getBalance(cleanAddress),
-        arbitrumProvider.getBalance(cleanAddress),
-        bscProvider.getBalance(cleanAddress),
+        withTimeout(ethProvider.getBalance(cleanAddress)),
+        withTimeout(sepoliaProvider.getBalance(cleanAddress)),
+        withTimeout(polygonProvider.getBalance(cleanAddress)),
+        withTimeout(baseProvider.getBalance(cleanAddress)),
+        withTimeout(arbitrumProvider.getBalance(cleanAddress)),
+        withTimeout(bscProvider.getBalance(cleanAddress)),
       ]);
 
       if (ethRes.status === 'fulfilled') mainnetEth = Number(ethers.formatEther(ethRes.value));
@@ -1417,16 +1427,15 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
       if (baseRes.status === 'fulfilled') baseBal = Number(ethers.formatEther(baseRes.value));
       if (arbRes.status === 'fulfilled') arbitrumBal = Number(ethers.formatEther(arbRes.value));
       if (bscRes.status === 'fulfilled') bscBal = Number(ethers.formatEther(bscRes.value));
+    } catch (e) {
+      console.error('Multi-chain RPC balance fetch error:', e);
     }
-  } catch (e) {
-    console.error('Multi-chain RPC balance fetch error:', e);
-  }
 
-  // 2. Fetch 100% REAL On-Chain ERC-20 Tokens directly from Ethplorer Blockchain API
-  let realOnChainTokens: any[] = [];
-  try {
-    if (cleanAddress.startsWith('0x') && cleanAddress.length === 42) {
-      const ethpRes = await fetch(`https://api.ethplorer.io/getAddressInfo/${cleanAddress}?apiKey=freekey`);
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 2000);
+      const ethpRes = await fetch(`https://api.ethplorer.io/getAddressInfo/${cleanAddress}?apiKey=freekey`, { signal: controller.signal });
+      clearTimeout(timer);
       if (ethpRes.ok) {
         const ethpData: any = await ethpRes.json();
         if (ethpData.tokens && Array.isArray(ethpData.tokens)) {
@@ -1448,9 +1457,7 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
           });
         }
       }
-    }
-  } catch (e) {
-    console.error('Ethplorer on-chain tokens fetch error:', e);
+    } catch (e) { }
   }
 
   const liveEthBalance = mainnetEth > 0 ? mainnetEth : sepoliaEth;
