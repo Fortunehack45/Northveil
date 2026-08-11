@@ -276,7 +276,7 @@ export const SUPPORTED_CHAINS: ChainInfo[] = [
   {
     id: 'sepolia',
     name: 'Ethereum Sepolia (Testnet)',
-    symbol: 'ETH (Sepolia)',
+    symbol: 'SepoliaETH',
     icon: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png',
     color: '#9b51e0',
     rpcLatency: 22,
@@ -1014,20 +1014,6 @@ export const INITIAL_ASSETS: CryptoAsset[] = [
     bio: 'XRP is a digital asset built for cross-border global payments on the XRP Ledger.',
   },
   // NATIVE TESTNET ASSETS
-  {
-    id: 'native-sepolia',
-    symbol: 'ETH (Sepolia)',
-    name: 'Ethereum Sepolia Testnet',
-    network: 'sepolia',
-    balance: 0,
-    priceUsd: 0.00,
-    change24h: 0.00,
-    icon: 'https://iili.io/CgBPBHv.jpg',
-    contractAddress: '0x0000000000000000000000000000000000000000',
-    marketCapUsd: 0,
-    isFavorite: false,
-    bio: 'Ethereum Sepolia Testnet native testing token.',
-  },
   {
     id: 'native-bsc_testnet',
     symbol: 'tBNB',

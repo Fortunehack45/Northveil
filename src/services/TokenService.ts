@@ -109,9 +109,10 @@ export class TokenService {
         } else {
           // EVM Chain
           if (walletAddress) {
-            const isNative = !asset.contractAddress || 
-                             asset.contractAddress === '0x0000000000000000000000000000000000000000' || 
-                             asset.contractAddress === '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c';
+            const isNative = asset.id?.startsWith('native-') || 
+                             asset.id?.endsWith('-native') || 
+                             asset.id?.endsWith('-main') || 
+                             (!asset.contractAddress && ['ETH', 'SEPOLIAETH', 'ETH (BASE)', 'ETH (OP)', 'ETH (LINEA)', 'ETH (SCROLL)', 'ETH (ZKSYNC)', 'POL', 'BNB', 'AVAX', 'MNT', 'CELO'].includes((asset.symbol || '').toUpperCase()));
                              
             if (isNative) {
               try {
