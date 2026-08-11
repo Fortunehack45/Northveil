@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SupabaseService } from '../services/SupabaseService';
 import {
   Bot,
@@ -55,9 +55,33 @@ export const DeveloperHubView: React.FC = () => {
   const { assets, activeChain, activeSubWallet } = useWallet();
   const selectedChain = SUPPORTED_CHAINS.find((c) => c.id === activeChain) || SUPPORTED_CHAINS[0];
 
+  const [mcpOnline, setMcpOnline] = useState<boolean>(true);
+  const [mcpLatency, setMcpLatency] = useState<number>(12);
+
   const [activeTab, setActiveTab] = useState<
     'aiChat' | 'apiKeys' | 'mcpServer' | 'sdks' | 'docs' | 'webhooks' | 'plugins' | 'contractApis'
   >('aiChat');
+
+  useEffect(() => {
+    const pingMcp = async () => {
+      const t0 = performance.now();
+      try {
+        const res = await fetch('http://localhost:3001/health').catch(() => null);
+        const elapsed = Math.round(performance.now() - t0);
+        if (res && res.ok) {
+          setMcpOnline(true);
+          setMcpLatency(elapsed);
+        } else {
+          setMcpOnline(false);
+        }
+      } catch (e) {
+        setMcpOnline(false);
+      }
+    };
+    pingMcp();
+    const intv = setInterval(pingMcp, 5000);
+    return () => clearInterval(intv);
+  }, []);
 
   // AI Chat State
   const [inputMessage, setInputMessage] = useState('');
@@ -588,8 +612,9 @@ export const DeveloperHubView: React.FC = () => {
                 <p className="text-xs text-slate-300 mt-1">DYNAMICALLY BOUND TO YOUR LOGGED-IN WALLET & ACTIVE API KEY.</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-3 py-1 bg-[#ccff00] text-black text-xs font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000] flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-black animate-pulse" /> SERVER ONLINE (PORT 3001)
+                <span className={`px-3 py-1 text-xs font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000] flex items-center gap-1.5 ${mcpOnline ? 'bg-[#ccff00] text-black' : 'bg-red-500 text-white'}`}>
+                  <span className={`w-2 h-2 rounded-full ${mcpOnline ? 'bg-black animate-pulse' : 'bg-white'}`} /> 
+                  {mcpOnline ? `SERVER ONLINE (PORT 3001 • ${mcpLatency}ms)` : 'SERVER DISCONNECTED (PORT 3001)'}
                 </span>
                 <span className="px-2.5 py-1 bg-[#00f0ff] text-black text-[10px] font-black uppercase border border-black">
                   BOUND WALLET: {activeAddress.slice(0, 6)}...{activeAddress.slice(-4)}

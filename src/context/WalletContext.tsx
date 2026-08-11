@@ -292,11 +292,26 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         } catch (e) {}
       }
 
-      setAssets(baseAssets);
+      const deduplicateAssets = (list: CryptoAsset[]): CryptoAsset[] => {
+        const map = new Map<string, CryptoAsset>();
+        list.forEach(a => {
+          const key = `${a.network}_${a.symbol}`.toLowerCase();
+          if (!map.has(key) || (a.balance > (map.get(key)?.balance || 0))) {
+            map.set(key, a);
+          }
+        });
+        return Array.from(map.values());
+      };
+
+      const dedupedBase = deduplicateAssets(baseAssets);
+      setAssets(dedupedBase);
+
+      const solAddress = activeSubWallet.solanaAddress || '';
+      const btcAddress = activeSubWallet.bitcoinAddress || '';
 
       // ALWAYS Trigger background live multi-chain RPC balance update
-      TokenService.fetchLiveBalancesAndPrices(baseAssets, activeSubWallet.address, '', '').then((live) => {
-        if (live && live.length > 0) setAssets(live);
+      TokenService.fetchLiveBalancesAndPrices(dedupedBase, activeSubWallet.address, solAddress, btcAddress).then((live) => {
+        if (live && live.length > 0) setAssets(deduplicateAssets(live));
       }).catch((e) => console.warn('[MultiChain Balance Sync Note]:', e));
     }
   }, [activeSubWallet?.address]);
@@ -706,7 +721,15 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
 
       const liveAssets = await TokenService.fetchLiveBalancesAndPrices(baseAssets, activeSubWallet.address, solanaAddress, bitcoinAddress);
-      setAssets(liveAssets);
+      const uniqueMap = new Map<string, CryptoAsset>();
+      liveAssets.forEach(a => {
+        const key = `${a.network}_${a.symbol}`.toLowerCase();
+        if (!uniqueMap.has(key) || (a.balance > (uniqueMap.get(key)?.balance || 0))) {
+          uniqueMap.set(key, a);
+        }
+      });
+      const dedupedLive = Array.from(uniqueMap.values());
+      setAssets(dedupedLive);
       
       // Generate a realistic 30-day portfolio history chart anchored to their ACTUAL current USD balance
       const currentTotalUsd = liveAssets.reduce((sum, asset) => sum + asset.balance * asset.priceUsd, 0);

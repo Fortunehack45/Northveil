@@ -29,8 +29,19 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
   const asset = assets.find((a) => a.id === selectedAssetId) || assets[0];
   const numAmount = parseFloat(amount) || 0;
 
+  const getActiveDisplayAddress = (): string => {
+    const net = asset?.network || '';
+    if (net === 'solana' || net === 'solana_devnet') {
+      return activeSubWallet?.solanaAddress || activeSubWallet?.address || '';
+    }
+    if (net === 'bitcoin') {
+      return activeSubWallet?.bitcoinAddress || activeSubWallet?.address || '';
+    }
+    return activeSubWallet?.address || hardwareWallet.address || 'No address derived';
+  };
+
   const handleCopyAddress = () => {
-    const addr = activeSubWallet?.address || hardwareWallet.address || 'No address derived';
+    const addr = getActiveDisplayAddress();
     navigator.clipboard.writeText(addr);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -147,16 +158,16 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
             {/* Generated QR Code placeholder */}
             <div className="bg-white p-4 w-48 h-48 mx-auto flex items-center justify-center border-4 border-black shadow-[4px_4px_0px_0px_#000]">
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${activeSubWallet?.address || 'no-address'}`}
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${getActiveDisplayAddress()}`}
                 alt="Deposit QR Code"
                 className="w-full h-full object-contain"
               />
             </div>
 
             <div className="space-y-1">
-              <span className="text-[10px] font-mono text-slate-300 font-black uppercase tracking-wider">YOUR DEPOSIT ADDRESS ({asset.network})</span>
+              <span className="text-[10px] font-mono text-slate-300 font-black uppercase tracking-wider">YOUR DEPOSIT ADDRESS ({asset.network.toUpperCase()})</span>
               <div className="bg-[#0a0a0c] p-3 border-2 border-white text-xs font-mono text-[#00f0ff] font-bold break-all select-all shadow-[2px_2px_0px_0px_#000]">
-                {activeSubWallet?.address || 'No address derived'}
+                {getActiveDisplayAddress()}
               </div>
             </div>
 

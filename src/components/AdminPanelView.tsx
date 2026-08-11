@@ -31,6 +31,42 @@ export const AdminPanelView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'rpcNodes' | 'keys' | 'vaults' | 'governance'>('overview');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [mcpHealth, setMcpHealth] = useState<{ online: boolean; uptime: number; memoryMb: number; toolsCount: number; latencyMs: number }>({
+    online: true,
+    uptime: 12400,
+    memoryMb: 42,
+    toolsCount: 22,
+    latencyMs: 14,
+  });
+
+  const checkMcpServerHealth = async () => {
+    const t0 = performance.now();
+    try {
+      const res = await fetch('http://localhost:3001/health').catch(() => null);
+      const elapsed = Math.round(performance.now() - t0);
+      if (res && res.ok) {
+        const data = await res.json();
+        setMcpHealth({
+          online: true,
+          uptime: data.uptimeSeconds || 0,
+          memoryMb: data.memoryUsageMb || 45,
+          toolsCount: data.supportedToolsCount || 22,
+          latencyMs: elapsed,
+        });
+      } else {
+        setMcpHealth(prev => ({ ...prev, online: false, latencyMs: elapsed }));
+      }
+    } catch (e) {
+      setMcpHealth(prev => ({ ...prev, online: false }));
+    }
+  };
+
+  useEffect(() => {
+    checkMcpServerHealth();
+    const interval = setInterval(checkMcpServerHealth, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const [supabaseConnected, setSupabaseConnected] = useState<boolean>(true);
   const [apiKeys, setApiKeys] = useState<{ id: string; name: string; key: string; created: string; rateLimit: string }[]>([
     { id: '1', name: 'Primary Web App Key', key: 'nv_live_9f82a17b09c82415d8a9', created: '2026-08-01', rateLimit: '100 req/min' },
@@ -129,8 +165,12 @@ export const AdminPanelView: React.FC = () => {
 
           <div className="bg-[#0a0a0c] border-2 border-white p-4 shadow-[4px_4px_0px_0px_#ffe600]">
             <span className="text-[10px] font-black text-slate-400 uppercase">MCP SERVER (PORT 3001)</span>
-            <div className="text-2xl font-black text-[#ffe600] mt-1">ONLINE</div>
-            <span className="text-[9px] text-[#ccff00] font-bold">SSE & JSON-RPC ACTIVE</span>
+            <div className={`text-2xl font-black mt-1 ${mcpHealth.online ? 'text-[#ffe600]' : 'text-red-500'}`}>
+              {mcpHealth.online ? 'ONLINE' : 'OFFLINE'}
+            </div>
+            <span className="text-[9px] text-[#ccff00] font-bold">
+              {mcpHealth.online ? `${mcpHealth.latencyMs}ms LATENCY • ${mcpHealth.toolsCount} TOOLS` : 'SERVER DISCONNECTED'}
+            </span>
           </div>
         </div>
 
