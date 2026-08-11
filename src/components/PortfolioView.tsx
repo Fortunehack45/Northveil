@@ -209,8 +209,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
       // Rule 1: Always include main coins from the primary blockchains even if balance is 0
       if (isMainNative) return true;
 
-      // Rule 2: Include tokens if they have any balance > 0
-      return asset.balance > 0.000001;
+      // Rule 2: Include ANY token with positive balance > 0 (including micro-balances < 0.000000000001)
+      return asset.balance > 0;
     });
   }, [assets, showZeroBalances, MAIN_NATIVE_SYMBOLS]);
 
@@ -981,7 +981,9 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                       ${usdVal > 0 && usdVal < 0.01 ? usdVal.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : usdVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     <span className="text-[10px] text-slate-300 font-bold block">
-                      {asset.balance.toLocaleString(undefined, { maximumFractionDigits: 8 })} {asset.symbol}
+                      {asset.balance > 0 && asset.balance < 0.00001 
+                        ? asset.balance.toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 14 })
+                        : asset.balance.toLocaleString(undefined, { maximumFractionDigits: 8 })} {asset.symbol}
                     </span>
                   </div>
                 </div>
@@ -1063,7 +1065,9 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                     </td>
 
                     <td className="py-4 text-right font-mono text-slate-200 font-bold">
-                      {asset.balance.toLocaleString(undefined, { maximumFractionDigits: 8 })} {asset.symbol}
+                      {asset.balance > 0 && asset.balance < 0.00001 
+                        ? asset.balance.toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 14 })
+                        : asset.balance.toLocaleString(undefined, { maximumFractionDigits: 8 })} {asset.symbol}
                     </td>
 
                     <td className="py-4 text-right font-mono font-black text-[#ccff00]">

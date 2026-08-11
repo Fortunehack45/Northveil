@@ -271,29 +271,30 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (activeSubWallet?.address) {
       const key = `northveil_v3_assets_${activeSubWallet.address.toLowerCase()}`;
       const saved = localStorage.getItem(key);
+      let baseAssets = INITIAL_ASSETS.map(a => ({ ...a, balance: 0 }));
+
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // Force reset all default assets to zero balance on initial load until live RPC / indexer returns real balance
             const cleanedAssets = parsed.map((a: any) => {
-              // If asset balance was hardcoded mock (e.g., > 0 without real onchain indexer update), reset to 0
               if (a.balance === 1.45 || a.balance === 1250 || a.balance === 6.8 || a.balance === 3.4 || a.balance === 0.05) {
                 return { ...a, balance: 0 };
               }
               return a;
             });
-            setAssets(cleanedAssets);
-            return;
+            // Merge any missing native assets from INITIAL_ASSETS (such as Base ETH, Polygon POL, OP ETH) into parsed list
+            const existingIds = new Set(cleanedAssets.map((a: any) => a.id));
+            const missingNatives = INITIAL_ASSETS.filter(a => !existingIds.has(a.id));
+            baseAssets = [...cleanedAssets, ...missingNatives];
           }
         } catch (e) {}
       }
-      // Default to clean zero-balance INITIAL_ASSETS
-      const zeroAssets = INITIAL_ASSETS.map(a => ({ ...a, balance: 0 }));
-      setAssets(zeroAssets);
 
-      // Trigger background live multi-chain RPC balance update
-      TokenService.fetchLiveBalancesAndPrices(INITIAL_ASSETS, activeSubWallet.address, '', '').then((live) => {
+      setAssets(baseAssets);
+
+      // ALWAYS Trigger background live multi-chain RPC balance update
+      TokenService.fetchLiveBalancesAndPrices(baseAssets, activeSubWallet.address, '', '').then((live) => {
         if (live && live.length > 0) setAssets(live);
       }).catch((e) => console.warn('[MultiChain Balance Sync Note]:', e));
     }

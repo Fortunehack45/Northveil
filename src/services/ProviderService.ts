@@ -45,7 +45,13 @@ export class ProviderService {
         rpcUrls.push('https://api.avax.network/ext/bc/C/rpc', 'https://rpc.ankr.com/avalanche');
         break;
       case 'base':
-        rpcUrls.push('https://mainnet.base.org', 'https://developer-access-mainnet.base.org');
+        rpcUrls.push(
+          'https://mainnet.base.org',
+          'https://base.llamarpc.com',
+          'https://1rpc.io/base',
+          'https://base.drpc.org',
+          'https://developer-access-mainnet.base.org'
+        );
         break;
       case 'abstract':
         rpcUrls.push('https://api.mainnet.abs.xyz', 'https://abstract.rpc.subquery.network/public');
