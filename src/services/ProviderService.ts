@@ -96,12 +96,14 @@ export class ProviderService {
         rpcUrls.push('https://eth.llamarpc.com');
     }
 
-    // Create FallbackProvider using ethers v6 FallbackProvider syntax
-    const providers = rpcUrls.map(url => new JsonRpcProvider(url));
-    const fallbackProvider = new FallbackProvider(providers);
-    
-    this.evmProviders.set(network, fallbackProvider);
-    return fallbackProvider;
+    // Use primary high-reliability RPC provider with fallback URL support
+    const primaryUrl = rpcUrls[0] || 'https://eth.llamarpc.com';
+    const cacheKey = `${network}_${primaryUrl}`;
+
+    if (!this.evmProviders.has(cacheKey)) {
+      this.evmProviders.set(cacheKey, new JsonRpcProvider(primaryUrl));
+    }
+    return this.evmProviders.get(cacheKey)!;
   }
 
   static getEVMWebSocketProvider(network: string): WebSocketProvider | null {

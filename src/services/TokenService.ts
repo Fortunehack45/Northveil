@@ -109,20 +109,49 @@ export class TokenService {
         } else {
           // EVM Chain
           if (walletAddress) {
-            const provider = ProviderService.getEVMProvider(asset.network);
             const isNative = !asset.contractAddress || 
                              asset.contractAddress === '0x0000000000000000000000000000000000000000' || 
                              asset.contractAddress === '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c';
                              
             if (isNative) {
-              const bal = await withTimeout(provider.getBalance(walletAddress));
-              liveBalance = Number(ethers.formatEther(bal));
+              try {
+                const provider = ProviderService.getEVMProvider(asset.network);
+                const bal = await withTimeout(provider.getBalance(walletAddress), 3000);
+                liveBalance = Number(ethers.formatEther(bal));
+              } catch (primaryErr) {
+                // Secondary RPC failover pool
+                const rpcPool: Record<string, string[]> = {
+                  base: ['https://mainnet.base.org', 'https://base.llamarpc.com', 'https://1rpc.io/base'],
+                  ethereum: ['https://eth.llamarpc.com', 'https://cloudflare-eth.com'],
+                  sepolia: ['https://ethereum-sepolia-rpc.publicnode.com', 'https://1rpc.io/sepolia'],
+                  polygon: ['https://polygon-rpc.com', 'https://rpc-mainnet.maticvigil.com'],
+                  arbitrum: ['https://arb1.arbitrum.io/rpc', 'https://rpc.ankr.com/arbitrum'],
+                  bsc: ['https://bsc-dataseed.binance.org', 'https://bsc-dataseed1.defibit.io'],
+                  avalanche: ['https://api.avax.network/ext/bc/C/rpc'],
+                  optimism: ['https://mainnet.optimism.io'],
+                  linea: ['https://rpc.linea.build'],
+                  scroll: ['https://rpc.scroll.io'],
+                  celo: ['https://forno.celo.org'],
+                };
+                const urls = rpcPool[asset.network] || ['https://eth.llamarpc.com'];
+                for (const u of urls) {
+                  try {
+                    const altProv = new ethers.JsonRpcProvider(u);
+                    const bal = await withTimeout(altProv.getBalance(walletAddress), 2500);
+                    liveBalance = Number(ethers.formatEther(bal));
+                    break;
+                  } catch (altErr) { }
+                }
+              }
             } else {
               // ERC20
-              const contract = new ethers.Contract(asset.contractAddress, ERC20_ABI, provider);
-              const bal = await withTimeout(contract.balanceOf(walletAddress));
-              const decimals = await contract.decimals().catch(() => 18);
-              liveBalance = Number(ethers.formatUnits(bal, decimals));
+              try {
+                const provider = ProviderService.getEVMProvider(asset.network);
+                const contract = new ethers.Contract(asset.contractAddress, ERC20_ABI, provider);
+                const bal = await withTimeout(contract.balanceOf(walletAddress), 3000);
+                const decimals = await contract.decimals().catch(() => 18);
+                liveBalance = Number(ethers.formatUnits(bal, decimals));
+              } catch (ercErr) { }
             }
           }
         }
