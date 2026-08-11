@@ -44,9 +44,12 @@ export class IndexerService {
     try {
       const domainMap: Record<string, string> = {
         eth: 'eth.blockscout.com',
+        ethereum: 'eth.blockscout.com',
+        sepolia: 'eth-sepolia.blockscout.com',
         polygon: 'polygon.blockscout.com',
         arbitrum: 'arbitrum.blockscout.com',
         base: 'base.blockscout.com',
+        optimism: 'optimism.blockscout.com',
       };
       const domain = domainMap[chainId];
       if (domain) {
@@ -444,7 +447,9 @@ export class IndexerService {
       'avalanche': 'avalanche',
       '0xa86a': 'avalanche',
       'base': 'base',
-      '0x2105': 'base'
+      '0x2105': 'base',
+      'sepolia': 'sepolia',
+      '0xaa36a7': 'sepolia'
     };
     return map[chainId] || 'ethereum';
   }
