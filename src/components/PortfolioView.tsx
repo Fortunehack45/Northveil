@@ -191,6 +191,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
 
   const MAIN_NATIVE_SYMBOLS = useMemo(() => new Set([
     'ETH', 'SOL', 'BTC', 'BNB', 'POL', 'MATIC', 'AVAX', 'ARB',
+    'ETH (BASE)', 'ETH (OP)', 'ETH (LINEA)', 'ETH (SCROLL)', 'ETH (ZKSYNC)', 'MNT', 'CELO', 'SEPOLIAETH',
     'ETH (SEPOLIA)', 'TBNB', 'POL (AMOY)', 'SOL (DEVNET)'
   ]), []);
 
@@ -198,22 +199,18 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
     if (showZeroBalances) return assets;
 
     return assets.filter(asset => {
-      const usdVal = asset.balance * asset.priceUsd;
       const symUpper = asset.symbol?.toUpperCase() || '';
       const isMainNative = MAIN_NATIVE_SYMBOLS.has(symUpper) || 
                            asset.id?.startsWith('native-') || 
                            asset.id?.endsWith('-native') || 
                            asset.id?.endsWith('-main') ||
-                           asset.network === 'sepolia' ||
-                           asset.network === 'bsc_testnet' ||
-                           asset.network === 'polygon_amoy' ||
-                           asset.network === 'solana_devnet';
+                           !asset.contractAddress;
 
       // Rule 1: Always include main coins from the primary blockchains even if balance is 0
       if (isMainNative) return true;
 
-      // Rule 2: Include tokens if they have any balance > 0 (including testnets with $0 price) OR usdVal >= 0.0001
-      return asset.balance > 0.000001 || usdVal >= 0.0001;
+      // Rule 2: Include tokens if they have any balance > 0
+      return asset.balance > 0.000001;
     });
   }, [assets, showZeroBalances, MAIN_NATIVE_SYMBOLS]);
 
