@@ -3841,15 +3841,16 @@ ${nfts.map(n => `| **${n.collection}** | ${n.name} | #${n.tokenId} | ${n.standar
 
       const mdRows = prices.map(p => {
         const change = typeof p.change24h === 'number' ? (p.change24h >= 0 ? `🟢 +${p.change24h.toFixed(2)}%` : `🔴 ${p.change24h.toFixed(2)}%`) : 'N/A';
-        return `| **${p.symbol}** | ${p.name || ''} | ${formatUsdValue(p.priceUsd)} | ${change} | ${formatUsdValue(p.volume24h || 0)} | ${p.source} |`;
+        const addrDisplay = p.contractAddress ? `\`${p.contractAddress}\`` : 'Native Coin';
+        return `| **${p.symbol}** | ${p.name || ''} | ${addrDisplay} | ${formatUsdValue(p.priceUsd)} | ${change} | ${formatUsdValue(p.volume24h || 0)} | ${p.chain || p.source} |`;
       }).join('\n');
 
       return {
         formattedMarkdown: `
 ### 📊 REAL-TIME MARKET PRICES
 
-| Symbol | Name | Price (USD) | 24h Change | 24h Volume | Source |
-| :--- | :--- | ---: | ---: | ---: | :--- |
+| Symbol | Name | Contract Address | Price (USD) | 24h Change | 24h Volume | Chain / Source |
+| :--- | :--- | :--- | ---: | ---: | ---: | :--- |
 ${mdRows}
 
 > **Data Sources**: CoinPaprika Live Tickers, CoinGecko API, DexScreener DEX Aggregator
@@ -3988,15 +3989,15 @@ ${mdRows}
       const trendMdRows = finalTokens.map((t, i) => {
         const scoreEmoji = !t.audit ? '⚪' : t.audit.riskScore >= 80 ? '🟢' : t.audit.riskScore >= 50 ? '🟡' : '🔴';
         const ch24 = t.change24h >= 0 ? `+${t.change24h.toFixed(1)}%` : `${t.change24h.toFixed(1)}%`;
-        return `| ${i + 1} | **${t.symbol}** | ${t.name.slice(0, 20)} | ${formatUsdValue(t.priceUsd)} | ${ch24} | ${formatUsdValue(t.liquidity)} | ${formatUsdValue(t.volume24h)} | ${scoreEmoji} ${t.audit?.riskScore ?? 'N/A'}/100 | ${t.chain} |`;
+        return `| ${i + 1} | **${t.symbol}** | ${t.name.slice(0, 20)} | \`${t.contractAddress}\` | ${formatUsdValue(t.priceUsd)} | ${ch24} | ${formatUsdValue(t.liquidity)} | ${formatUsdValue(t.volume24h)} | ${scoreEmoji} ${t.audit?.riskScore ?? 'N/A'}/100 | ${t.chain} |`;
       }).join('\n');
 
       return {
         formattedMarkdown: `
 ### 🔥 TRENDING MEME COINS (${chainFilter.toUpperCase()})
 
-| # | Symbol | Name | Price | 24h Δ | Liquidity | Volume 24h | Safety | Chain |
-| :--- | :--- | :--- | ---: | ---: | ---: | ---: | :---: | :--- |
+| # | Symbol | Name | Contract Address | Price | 24h Δ | Liquidity | Volume 24h | Safety | Chain |
+| :--- | :--- | :--- | :--- | ---: | ---: | ---: | ---: | :---: | :--- |
 ${trendMdRows}
 
 > **Safety Legend**: 🟢 80-100 (Low Risk) | 🟡 50-79 (Medium Risk) | 🔴 0-49 (High Risk) | ⚪ Not Audited
@@ -4014,10 +4015,33 @@ ${trendMdRows}
     // DEEP TOKEN SECURITY AUDIT (GoPlus Security API)
     // ═══════════════════════════════════════════════════════════════════
     case 'audit_token': {
-      const contractAddr = (args.contractAddress || args.address || args.contract || '').toLowerCase();
-      const chain = (args.chain || 'ethereum').toLowerCase();
-      if (!contractAddr) throw new Error('Missing required parameter: contractAddress');
+      let contractAddr = (args.contractAddress || args.address || args.contract || args.symbol || args.token || '').trim();
+      let chain = (args.chain || 'ethereum').toLowerCase();
+      if (!contractAddr) throw new Error('Missing required parameter: contractAddress or symbol');
 
+      // Auto-resolve symbol or token name to contract address via DexScreener if not a full address
+      const isEvmAddr = contractAddr.startsWith('0x') && contractAddr.length === 42;
+      const isSolAddr = !contractAddr.startsWith('0x') && contractAddr.length >= 32 && contractAddr.length <= 44;
+
+      if (!isEvmAddr && !isSolAddr) {
+        try {
+          const searchRes = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(contractAddr)}`);
+          if (searchRes.ok) {
+            const searchJson: any = await searchRes.json();
+            if (searchJson.pairs?.length > 0) {
+              const topPair = searchJson.pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+              if (topPair.baseToken?.address) {
+                contractAddr = topPair.baseToken.address;
+                if (topPair.chainId) chain = topPair.chainId;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[DexScreener Search Resolution]:', e);
+        }
+      }
+
+      contractAddr = contractAddr.toLowerCase();
       const goplusChainId = GOPLUS_CHAIN_IDS[chain] || '1';
       let auditResult: any = {};
       let tokenName = '';
