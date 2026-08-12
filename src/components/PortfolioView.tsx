@@ -272,7 +272,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
               </button>
             </div>
             <p className="text-[10px] text-slate-400 truncate mt-0.5 font-mono">
-              <span className="hidden xs:inline">{activeSubWallet?.derivationPath || "m/44'/60'/0'/0/0"} • </span>
+              <span className="hidden xs:inline">HD Wallet • </span>
               <span className="text-[#d4ff00] font-bold">
                 {activeSubWallet?.address ? (
                   activeSubWallet.address.length > 10 ? `${activeSubWallet.address.slice(0, 8)}...${activeSubWallet.address.slice(-6)}` : activeSubWallet.address
@@ -1204,7 +1204,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                   autoFocus
                 />
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Derives next HD wallet key at BIP-44 path: <span className="text-[#00f0ff]">m/44'/60'/0'/0/{subWallets.length}</span>
+                  Derives next HD wallet key securely from your master seed. <span className="text-[#00f0ff]">Sub-Account #{subWallets.length + 1}</span>
                 </p>
               </div>
 

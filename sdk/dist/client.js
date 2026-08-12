@@ -28,89 +28,125 @@ class NorthveilClient {
         }
         return res.json();
     }
-    /**
-     * Get connected wallet address and details
-     */
-    async getWalletAddress() {
+    mcpCall(toolName, args = {}) {
         return this.request('/mcp', {
             method: 'POST',
             body: JSON.stringify({
                 jsonrpc: '2.0',
                 method: 'tools/call',
-                params: { name: 'get_wallet_address', arguments: {} },
-                id: Date.now()
-            })
+                params: { name: toolName, arguments: args },
+                id: Date.now(),
+            }),
         });
     }
-    /**
-     * Get live native token balance for a wallet across EVM or 30+ blockchains
-     */
-    async getBalance(chain = 'ethereum') {
-        return this.request('/mcp', {
-            method: 'POST',
-            body: JSON.stringify({
-                jsonrpc: '2.0',
-                method: 'tools/call',
-                params: { name: 'get_wallet_balance', arguments: { chain, address: this.walletAddress } },
-                id: Date.now()
-            })
-        });
+    // ═══════════════════════════════════════════════════════
+    // WALLET & PORTFOLIO
+    // ═══════════════════════════════════════════════════════
+    /** Get connected wallet address and details */
+    async getWalletInfo(chain) {
+        return this.mcpCall('get_wallet_info', { chain });
     }
-    /**
-     * Get all ERC-20 token balances for a wallet
-     */
-    async getTokenBalances(chain = 'ethereum') {
-        return this.request('/mcp', {
-            method: 'POST',
-            body: JSON.stringify({
-                jsonrpc: '2.0',
-                method: 'tools/call',
-                params: { name: 'get_token_balances', arguments: { chain, address: this.walletAddress } },
-                id: Date.now()
-            })
-        });
+    /** Get full portfolio with balances and USD valuations */
+    async getPortfolio(hideZeroBalances = false) {
+        return this.mcpCall('get_portfolio', { hideZeroBalances });
     }
-    /**
-     * Get NFT balances across 30+ blockchains
-     */
-    async getNFTs(chain = 'ethereum') {
-        return this.request('/mcp', {
-            method: 'POST',
-            body: JSON.stringify({
-                jsonrpc: '2.0',
-                method: 'tools/call',
-                params: { name: 'get_nft_balances', arguments: { chain, address: this.walletAddress } },
-                id: Date.now()
-            })
-        });
+    /** Get balance for a specific token */
+    async getTokenBalance(symbol) {
+        return this.mcpCall('get_token_balance', { symbol });
     }
-    /**
-     * Execute token swap via DEX router
-     */
+    /** Get NFT gallery across 36+ blockchains */
+    async getNFTs(chain = 'all') {
+        return this.mcpCall('get_nft_gallery', { chain });
+    }
+    /** Get transaction history */
+    async getTransactionHistory(limit = 20, type) {
+        return this.mcpCall('get_transaction_history', { limit, type });
+    }
+    /** Get gas estimates across all chains */
+    async getGasEstimate(chain) {
+        return this.mcpCall('get_gas_estimate', { chain });
+    }
+    // ═══════════════════════════════════════════════════════
+    // TRADING (Buy, Sell, Swap, Transfer)
+    // ═══════════════════════════════════════════════════════
+    /** Execute a token swap via DEX aggregator */
     async swapTokens(params) {
-        return this.request('/mcp', {
-            method: 'POST',
-            body: JSON.stringify({
-                jsonrpc: '2.0',
-                method: 'tools/call',
-                params: { name: 'swap_tokens', arguments: params },
-                id: Date.now()
-            })
+        return this.mcpCall('execute_swap', params);
+    }
+    /** Buy tokens on DEX */
+    async buyTokens(token, amount, fromToken = 'ETH') {
+        return this.mcpCall('buy_tokens', { token, amount, fromToken });
+    }
+    /** Sell tokens on DEX */
+    async sellTokens(token, amount, toToken = 'ETH') {
+        return this.mcpCall('sell_tokens', { token, amount, toToken });
+    }
+    /** Send a crypto transfer */
+    async sendTransfer(params) {
+        return this.mcpCall('send_transfer', params);
+    }
+    // ═══════════════════════════════════════════════════════
+    // REAL-TIME PRICING
+    // ═══════════════════════════════════════════════════════
+    /** Get real-time prices for tokens (by symbol or contract address) */
+    async getRealtimePrices(symbols, contractAddresses, chain) {
+        return this.mcpCall('get_realtime_prices', {
+            symbols: symbols?.join(','),
+            contractAddresses: contractAddresses?.join(','),
+            chain,
         });
     }
-    /**
-     * Compile and deploy a Smart Contract with optional socials
-     */
+    // ═══════════════════════════════════════════════════════
+    // MEME COIN INTELLIGENCE
+    // ═══════════════════════════════════════════════════════
+    /** Discover trending meme coins with safety audit scores */
+    async getTrendingMemecoins(chain = 'all', limit = 20, minLiquidity = 10000) {
+        return this.mcpCall('get_trending_memecoins', { chain, limit, minLiquidity });
+    }
+    /** Deep security audit of a token contract */
+    async auditToken(contractAddress, chain = 'ethereum') {
+        return this.mcpCall('audit_token', { contractAddress, chain });
+    }
+    // ═══════════════════════════════════════════════════════
+    // TRADE ORDERS (Stop-Loss / Take-Profit)
+    // ═══════════════════════════════════════════════════════
+    /** Set a stop-loss or take-profit order */
+    async setTradeOrder(params) {
+        return this.mcpCall('set_trade_order', params);
+    }
+    /** List active trade orders */
+    async getActiveOrders(status = 'ACTIVE') {
+        return this.mcpCall('get_active_orders', { status });
+    }
+    /** Cancel a trade order by ID */
+    async cancelTradeOrder(orderId) {
+        return this.mcpCall('cancel_trade_order', { orderId });
+    }
+    // ═══════════════════════════════════════════════════════
+    // WALLET HEALTH & SECURITY
+    // ═══════════════════════════════════════════════════════
+    /** Comprehensive wallet health check (balances, gas, diversity) */
+    async checkWalletHealth(walletAddress) {
+        return this.mcpCall('check_wallet_health', { walletAddress });
+    }
+    /** Deep security scan (phishing, approvals, leaked data) */
+    async scanWalletSecurity(walletAddress, deepScan = true) {
+        return this.mcpCall('scan_wallet_security', { walletAddress, deepScan });
+    }
+    // ═══════════════════════════════════════════════════════
+    // SMART CONTRACTS
+    // ═══════════════════════════════════════════════════════
+    /** Deploy a smart contract */
     async deploySmartContract(params) {
-        return this.request('/mcp', {
-            method: 'POST',
-            body: JSON.stringify({
-                jsonrpc: '2.0',
-                method: 'tools/call',
-                params: { name: 'deploy_smart_contract', arguments: params },
-                id: Date.now()
-            })
-        });
+        return this.mcpCall('deploy_smart_contract', params);
+    }
+    /** Audit smart contract source code */
+    async auditSmartContract(code) {
+        return this.mcpCall('audit_smart_contract', { code });
+    }
+    /** Verify and publish smart contract source code on block explorer */
+    async verifySmartContract(params) {
+        return this.mcpCall('verify_smart_contract', params);
     }
 }
 exports.NorthveilClient = NorthveilClient;

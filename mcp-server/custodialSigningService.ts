@@ -215,8 +215,23 @@ export async function createTransactionRequest(input: CreateTxRequestInput) {
   const userId = input.userId || 'default_user';
   const network = input.network || 'sepolia';
 
-  // 1. Verify wallet exists in Supabase
-  const { data: walletRecord } = await supabase.from('wallets').select('*').eq('address', address).maybeSingle();
+  // 1. Verify wallet exists in Supabase, or auto-create wallet record if missing
+  let { data: walletRecord } = await supabase.from('wallets').select('*').eq('address', address).maybeSingle();
+
+  if (!walletRecord && address.startsWith('0x') && address.length === 42) {
+    try {
+      const { data: newW } = await supabase.from('wallets').upsert([{
+        user_id: userId,
+        address,
+        chain_id: 'ethereum',
+        name: 'Northveil Custodial Vault Wallet',
+        wallet_status: 'active',
+      }], { onConflict: 'address' }).select('*').single();
+      walletRecord = newW;
+    } catch (e) {
+      console.warn('[Auto-create Wallet Record]:', e);
+    }
+  }
 
   const provider = getProviderForNetwork(network);
   let estimatedFeeUsd = 0.42;

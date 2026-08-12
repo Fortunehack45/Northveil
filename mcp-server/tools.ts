@@ -959,4 +959,179 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       },
     },
   },
+  {
+    name: 'get_realtime_prices',
+    description: 'Fetches real-time live market prices, 24h/7d price changes, market cap, and 24h volume for any cryptocurrency token or meme coin across ALL blockchains (Ethereum, Solana, BSC, Polygon, Base, Arbitrum, etc). Accepts token symbols or contract addresses. Data sourced from CoinPaprika, CoinGecko, and DexScreener live feeds.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        symbols: { type: 'string', description: 'Comma-separated token symbols (e.g. "ETH,BTC,SOL,PEPE,DOGE,SHIB,WIF,BONK")' },
+        contractAddresses: { type: 'string', description: 'Comma-separated contract addresses to look up on DexScreener (e.g. "0x6982508145454Ce325dDbE47a25d4ec3d2311933")' },
+        chain: { type: 'string', description: 'Optional chain filter (ethereum, solana, bsc, polygon, base, arbitrum, avalanche, all). Default: all' },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        symbols: { type: 'string', description: 'Comma-separated token symbols' },
+        contractAddresses: { type: 'string', description: 'Comma-separated contract addresses' },
+        chain: { type: 'string', description: 'Optional chain filter' },
+      },
+    },
+  },
+  {
+    name: 'get_trending_memecoins',
+    description: 'Discovers and lists currently trending meme coins across multiple blockchains (Ethereum, Solana, BSC, Base, Arbitrum) with real-time prices, liquidity, volume, price changes (5m/1h/6h/24h), and automated GoPlus security audit scores (honeypot detection, rug-pull risk, tax analysis). Returns top trending tokens sorted by momentum.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        chain: { type: 'string', description: 'Filter by blockchain: ethereum, solana, bsc, base, arbitrum, polygon, or "all" (default: all)' },
+        limit: { type: 'number', description: 'Max number of trending tokens to return (default: 20, max: 50)' },
+        minLiquidity: { type: 'number', description: 'Minimum USD liquidity threshold to filter out micro-caps (default: 10000)' },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        chain: { type: 'string', description: 'Filter by blockchain' },
+        limit: { type: 'number', description: 'Max results' },
+        minLiquidity: { type: 'number', description: 'Min USD liquidity' },
+      },
+    },
+  },
+  {
+    name: 'audit_token',
+    description: 'Performs a deep on-chain security audit of any token contract address using GoPlus Security API. Returns: honeypot status, buy/sell tax rates, hidden owner detection, proxy contract check, mint function risk, blacklist capability, LP lock status, holder concentration, and overall risk score. Works on Ethereum, BSC, Polygon, Base, Arbitrum, Solana.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        contractAddress: { type: 'string', description: 'Token contract address to audit (e.g. 0x6982508145454Ce325dDbE47a25d4ec3d2311933 for PEPE)' },
+        chain: { type: 'string', description: 'Blockchain network: ethereum (default), bsc, polygon, base, arbitrum, solana, avalanche' },
+      },
+      required: ['contractAddress'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        contractAddress: { type: 'string', description: 'Token contract address to audit' },
+        chain: { type: 'string', description: 'Blockchain network' },
+      },
+      required: ['contractAddress'],
+    },
+  },
+  {
+    name: 'set_trade_order',
+    description: 'Sets a stop-loss or take-profit price trigger order on a token. When the real-time market price crosses the trigger threshold, the order auto-executes a swap on-chain via DEX aggregator. Monitors prices every 30 seconds. Works on EVM chains and Solana.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', description: 'Token symbol or contract address (e.g. ETH, PEPE, 0x6982...)' },
+        orderType: { type: 'string', description: 'Order type: "stop_loss" (sell when price drops to target) or "take_profit" (sell when price rises to target)', enum: ['stop_loss', 'take_profit'] },
+        triggerPrice: { type: 'number', description: 'USD price that triggers the order execution' },
+        amount: { type: 'number', description: 'Amount of tokens to sell when triggered' },
+        chain: { type: 'string', description: 'Blockchain: ethereum, solana, bsc, polygon, base, arbitrum (default: ethereum)' },
+      },
+      required: ['token', 'orderType', 'triggerPrice', 'amount'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', description: 'Token symbol or contract address' },
+        orderType: { type: 'string', description: 'stop_loss or take_profit', enum: ['stop_loss', 'take_profit'] },
+        triggerPrice: { type: 'number', description: 'USD trigger price' },
+        amount: { type: 'number', description: 'Token amount to trade' },
+        chain: { type: 'string', description: 'Blockchain network' },
+      },
+      required: ['token', 'orderType', 'triggerPrice', 'amount'],
+    },
+  },
+  {
+    name: 'get_active_orders',
+    description: 'Lists all active stop-loss and take-profit trade orders for the wallet, including current price vs trigger price, order status, and estimated P&L.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'Filter by status: ACTIVE, EXECUTED, CANCELLED, FAILED, or "all" (default: ACTIVE)' },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'Filter by order status' },
+      },
+    },
+  },
+  {
+    name: 'cancel_trade_order',
+    description: 'Cancels an active stop-loss or take-profit trade order by its order ID. The order will stop monitoring prices and will NOT execute.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        orderId: { type: 'string', description: 'UUID of the trade order to cancel' },
+      },
+      required: ['orderId'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: { type: 'string', description: 'UUID of the trade order to cancel' },
+      },
+      required: ['orderId'],
+    },
+  },
+  {
+    name: 'check_wallet_health',
+    description: 'Performs a comprehensive wallet health check: multi-chain balance overview, gas reserve warnings, token diversity score, dust token detection, portfolio concentration risk, and overall health score (0-100). Scans EVM chains + Solana.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        walletAddress: { type: 'string', description: 'Optional wallet address to check (defaults to connected wallet)' },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        walletAddress: { type: 'string', description: 'Optional wallet address' },
+      },
+    },
+  },
+  {
+    name: 'verify_smart_contract',
+    description: 'Verifies and publishes smart contract source code on block explorers (Etherscan, Sepolia Etherscan, Basescan, Polygonscan, Arbiscan, Bscscan, Sourcify, and Blockscout). Submits verified source code, compiler settings, constructor arguments, and generates official green checkmark verified badge on block explorers.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        contractAddress: { type: 'string', description: '0x-prefixed contract address to verify (e.g. 0xdAC17F958D2ee523a2206206994597C13D831ec7)' },
+        contractName: { type: 'string', description: 'Name of the smart contract (e.g. WorkBaseToken, GalacticNFT)' },
+        sourceCode: { type: 'string', description: 'Solidity smart contract source code string. If omitted, Northveil automatically retrieves source code from the database.' },
+        network: { type: 'string', description: 'Blockchain network: sepolia (default), ethereum, base, polygon, arbitrum, bsc' },
+        compilerVersion: { type: 'string', description: 'Solidity compiler version (default: v0.8.24+commit.e11b9ed9)' },
+        optimizationUsed: { type: 'boolean', description: 'Whether compiler optimization was enabled (default: true)' },
+        runs: { type: 'number', description: 'Optimization runs count (default: 200)' },
+      },
+      required: ['contractAddress', 'contractName'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        contractAddress: { type: 'string', description: 'Contract address to verify' },
+        contractName: { type: 'string', description: 'Contract name' },
+        sourceCode: { type: 'string', description: 'Solidity source code string' },
+        network: { type: 'string', description: 'Target network' },
+        compilerVersion: { type: 'string', description: 'Solidity compiler version' },
+        optimizationUsed: { type: 'boolean', description: 'Compiler optimization enabled' },
+        runs: { type: 'number', description: 'Optimization runs count' },
+      },
+      required: ['contractAddress', 'contractName'],
+    },
+  },
 ];
+

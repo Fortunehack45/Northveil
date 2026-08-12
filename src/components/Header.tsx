@@ -79,7 +79,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
     {
       id: '5',
       title: 'HD WALLET CREATED',
-      desc: 'Sub-account #2 created on derivation path m/44\'/60\'/0\'/0/1.',
+      desc: 'Sub-account #2 created successfully. HD wallet derived and ready.',
       time: '5h ago',
       type: 'info',
       read: true,
@@ -310,7 +310,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
 
               {/* Sub-Wallets List */}
               <div className="max-h-48 overflow-y-auto no-scrollbar space-y-1.5">
-                {(subWallets || []).map((w) => {
+                {(subWallets || []).map((w, idx) => {
                   if (!w) return null;
                   const isActive = w.id === activeWalletId;
                   const addrStr = w.address || '';
@@ -337,7 +337,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, onNavigateNet
                         <div className="truncate">
                           <div className="truncate font-black text-[11px]">{w.name || 'Sub Wallet'}</div>
                           <div className={`text-[9px] ${isActive ? 'text-black/70' : 'text-slate-400'}`}>
-                            {w.derivationPath || "m/44'/60'/0'/0/0"} • {shortAddr}
+                            HD Wallet #{idx + 1} • {shortAddr}
                           </div>
                         </div>
                       </div>
