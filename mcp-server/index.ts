@@ -1,11 +1,21 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Load .env from multiple locations: local dir first, then parent (project root)
+const __filename_local = fileURLToPath(import.meta.url);
+const __dirname_local = path.dirname(__filename_local);
+dotenv.config({ path: path.resolve(__dirname_local, '.env') });
+if (!process.env.SUPABASE_URL) {
+  dotenv.config({ path: path.resolve(__dirname_local, '..', '.env') });
+}
+
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { rateLimit } from 'express-rate-limit';
 import { createClient } from '@supabase/supabase-js';
 import { ethers } from 'ethers';
 import fs from 'fs';
-import path from 'path';
 import os from 'os';
 import solc from 'solc';
 import { MCP_TOOLS } from './tools.js';
@@ -39,7 +49,8 @@ import {
   importCustodialSeedPhrase,
   createTransactionRequest,
   approveAndExecuteTransaction,
-  rejectTransactionRequest
+  rejectTransactionRequest,
+  initSupabase
 } from './custodialSigningService.js';
 import { encryptCredential, decryptCredential } from './encryptionService.js';
 
@@ -47,13 +58,17 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Supabase Database Connection Credentials
-const DEFAULT_SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://YOUR_SUPABASE_PROJECT_ID.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY_HERE';
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('[FATAL] SUPABASE_URL and SUPABASE_ANON_KEY environment variables are REQUIRED. Set them in your .env file.');
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Share Supabase client with custodialSigningService so it uses the same authenticated connection
+initSupabase(supabase);
 
 // Real Multi-Chain On-Chain RPC Providers
 const ETH_RPC_URL = process.env.ETH_RPC_URL || 'https://cloudflare-eth.com';
@@ -2273,179 +2288,12 @@ ${solCode}
       };
     }
 
-    case 'create_wallet': {
-      const walletName = args.name || args.walletName || 'Northveil Wallet';
-      const chain = args.chain || 'ethereum';
+    // NOTE: create_wallet is handled above (line ~1636) via createCustodialWallet() with AES-256-GCM encryption
 
-      // Generate a REAL Ethereum wallet with ethers.js
-      const newWallet = ethers.Wallet.createRandom();
-      const newAddress = newWallet.address.toLowerCase();
-      const newPrivateKey = newWallet.privateKey;
-      const newSeedPhrase = newWallet.mnemonic?.phrase || '';
 
-      // Store in Supabase with private_key and seed_phrase
-      let dbRecordId: string | null = null;
-      try {
-        const { data: dbData, error: dbErr } = await supabase
-          .from('wallets')
-          .upsert([{
-            address: newAddress,
-            name: walletName,
-            chain_id: chain,
-            private_key: newPrivateKey,
-            seed_phrase: newSeedPhrase,
-          }], { onConflict: 'address' })
-          .select('id');
+    // NOTE: import_wallet is handled above (line ~1660) via custodialSigningService with AES-256-GCM encryption
 
-        if (!dbErr && dbData?.[0]?.id) {
-          dbRecordId = dbData[0].id;
-        }
-        if (dbErr) console.error('[CreateWallet] Supabase save error:', dbErr);
-      } catch (e) {
-        console.error('[CreateWallet] DB error:', e);
-      }
 
-      // Get initial balance from Sepolia
-      let initialBalance = '0';
-      try {
-        const bal = await sepoliaProvider.getBalance(newAddress);
-        initialBalance = ethers.formatEther(bal);
-      } catch { }
-
-      const formattedMarkdown = `
-### NEW WALLET CREATED SUCCESSFULLY
-
-> **Wallet Address**: \`${newAddress}\`
-> **Wallet Name**: \`${walletName}\`
-> **Primary Chain**: \`${chain}\`
-> **Initial Balance**: \`${initialBalance} ETH\`
-> **Database Record**: ${dbRecordId ? `Saved (ID: \`${dbRecordId}\`)` : 'Saved'}
-
----
-
-#### IMPORTANT - BACKUP YOUR CREDENTIALS
-
-> **Private Key**: \`${newPrivateKey}\`
-> **Seed Phrase**: \`${newSeedPhrase}\`
-
-**WARNING**: Save your seed phrase and private key securely. If you lose them, you will lose access to this wallet forever. Never share them with anyone.
-
----
-
-This wallet is now stored in Northveil's database. All MCP tools (send_transfer, deploy_smart_contract, execute_swap) will automatically use this wallet's private key for on-chain signing.
-`;
-
-      return {
-        formattedMarkdown,
-        address: newAddress,
-        privateKey: newPrivateKey,
-        seedPhrase: newSeedPhrase,
-        name: walletName,
-        chain,
-        balance: initialBalance,
-        dbRecordId,
-        status: 'CREATED',
-      };
-    }
-
-    case 'import_wallet': {
-      const walletName = args.name || args.walletName || 'Imported Wallet';
-      const chain = args.chain || 'ethereum';
-      const inputKey = args.privateKey || args.private_key || args.secretKey || args.walletSecret;
-      const inputSeed = args.seedPhrase || args.seed_phrase || args.mnemonic;
-
-      if (!inputKey && !inputSeed) {
-        return {
-          formattedMarkdown: '### IMPORT FAILED\n\n> **Error**: You must provide either a `privateKey` (0x...) or a `seedPhrase` (12/24 words) to import a wallet.',
-          status: 'ERROR',
-          error: 'No privateKey or seedPhrase provided',
-        };
-      }
-
-      let importedWallet: ethers.Wallet | ethers.HDNodeWallet;
-      let resolvedPrivateKey: string;
-      let resolvedSeedPhrase: string = inputSeed || '';
-
-      try {
-        if (inputSeed) {
-          importedWallet = ethers.Wallet.fromPhrase(inputSeed);
-          resolvedPrivateKey = importedWallet.privateKey;
-          resolvedSeedPhrase = inputSeed;
-        } else {
-          const cleanKey = inputKey.startsWith('0x') ? inputKey : `0x${inputKey}`;
-          importedWallet = new ethers.Wallet(cleanKey);
-          resolvedPrivateKey = cleanKey;
-        }
-      } catch (e: any) {
-        return {
-          formattedMarkdown: `### IMPORT FAILED\n\n> **Error**: Invalid private key or seed phrase provided.\n> **Details**: ${e.message || 'Could not derive wallet from provided credentials.'}`,
-          status: 'ERROR',
-          error: e.message || 'Invalid credentials',
-        };
-      }
-
-      const importedAddress = importedWallet.address.toLowerCase();
-
-      // Store in Supabase with private_key and seed_phrase
-      let dbRecordId: string | null = null;
-      try {
-        const { data: dbData, error: dbErr } = await supabase
-          .from('wallets')
-          .upsert([{
-            address: importedAddress,
-            name: walletName,
-            chain_id: chain,
-            private_key: resolvedPrivateKey,
-            seed_phrase: resolvedSeedPhrase || null,
-          }], { onConflict: 'address' })
-          .select('id');
-
-        if (!dbErr && dbData?.[0]?.id) {
-          dbRecordId = dbData[0].id;
-        }
-        if (dbErr) console.error('[ImportWallet] Supabase save error:', dbErr);
-      } catch (e) {
-        console.error('[ImportWallet] DB error:', e);
-      }
-
-      // Get balance from Sepolia + Mainnet
-      let sepoliaBalance = '0';
-      let mainnetBalance = '0';
-      try {
-        const [sepBal, ethBal] = await Promise.allSettled([
-          sepoliaProvider.getBalance(importedAddress),
-          ethProvider.getBalance(importedAddress),
-        ]);
-        if (sepBal.status === 'fulfilled') sepoliaBalance = ethers.formatEther(sepBal.value);
-        if (ethBal.status === 'fulfilled') mainnetBalance = ethers.formatEther(ethBal.value);
-      } catch { }
-
-      const formattedMarkdown = `
-### WALLET IMPORTED SUCCESSFULLY
-
-> **Wallet Address**: \`${importedAddress}\`
-> **Wallet Name**: \`${walletName}\`
-> **Primary Chain**: \`${chain}\`
-> **Mainnet Balance**: \`${mainnetBalance} ETH\`
-> **Sepolia Balance**: \`${sepoliaBalance} SepoliaETH\`
-> **Database Record**: ${dbRecordId ? `Saved (ID: \`${dbRecordId}\`)` : 'Saved'}
-
----
-
-This wallet's private key is now stored in Northveil's database. All MCP tools (send_transfer, deploy_smart_contract, execute_swap) will automatically use this wallet's private key for real on-chain signing and broadcasting.
-`;
-
-      return {
-        formattedMarkdown,
-        address: importedAddress,
-        name: walletName,
-        chain,
-        sepoliaBalance,
-        mainnetBalance,
-        dbRecordId,
-        status: 'IMPORTED',
-      };
-    }
 
     case 'get_wallet_info': {
       const activeChain = dbWallet?.chain || args?.chain || 'ethereum';

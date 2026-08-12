@@ -1,12 +1,33 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __fn = fileURLToPath(import.meta.url);
+const __dn = path.dirname(__fn);
+dotenv.config({ path: path.resolve(__dn, '.env') });
+if (!process.env.SUPABASE_URL) {
+  dotenv.config({ path: path.resolve(__dn, '..', '.env') });
+}
 import { ethers } from 'ethers';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { encryptCredential, decryptCredential } from './encryptionService.js';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://YOUR_SUPABASE_PROJECT_ID.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY_HERE';
+// Shared Supabase client — initialized either from index.ts or fallback to env vars
+let supabase: SupabaseClient;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+
+if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} else {
+  // Will be set by initSupabase() from index.ts
+  supabase = null as any;
+}
+
+/** Called from index.ts to inject the shared, already-authenticated Supabase client */
+export function initSupabase(client: SupabaseClient) {
+  supabase = client;
+}
 
 const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
 const ETH_RPC_URL = process.env.ETH_RPC_URL || 'https://cloudflare-eth.com';
