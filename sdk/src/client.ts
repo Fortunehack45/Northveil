@@ -222,5 +222,12 @@ export class NorthveilClient {
   async listReservations(params: { walletAddress?: string; category?: string } = {}): Promise<ListReservationsResult> {
     return this.mcpCall<ListReservationsResult>('list_reservations', params);
   }
+
+  /** Get full OpenAPI 3.0.3 schema for ChatGPT & REST Action integration */
+  async getOpenApiSchema(): Promise<any> {
+    const res = await fetch(`${this.baseUrl}/openapi.json`);
+    return res.json();
+  }
 }
+
 

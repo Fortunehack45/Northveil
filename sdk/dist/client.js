@@ -164,6 +164,11 @@ class NorthveilClient {
     async listReservations(params = {}) {
         return this.mcpCall('list_reservations', params);
     }
+    /** Get full OpenAPI 3.0.3 schema for ChatGPT & REST Action integration */
+    async getOpenApiSchema() {
+        const res = await fetch(`${this.baseUrl}/openapi.json`);
+        return res.json();
+    }
 }
 exports.NorthveilClient = NorthveilClient;
 //# sourceMappingURL=client.js.map

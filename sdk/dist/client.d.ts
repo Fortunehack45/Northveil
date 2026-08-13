@@ -77,5 +77,7 @@ export declare class NorthveilClient {
         walletAddress?: string;
         category?: string;
     }): Promise<ListReservationsResult>;
+    /** Get full OpenAPI 3.0.3 schema for ChatGPT & REST Action integration */
+    getOpenApiSchema(): Promise<any>;
 }
 //# sourceMappingURL=client.d.ts.map
