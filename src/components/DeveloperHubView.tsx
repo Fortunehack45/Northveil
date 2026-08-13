@@ -111,7 +111,17 @@ export const DeveloperHubView: React.FC = () => {
     },
   ]);
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+  const [copiedSnippetId, setCopiedSnippetId] = useState<string | null>(null);
+  const [mcpGuideSubTab, setMcpGuideSubTab] = useState<'claudeDesktop' | 'claudeWeb' | 'chatGpt' | 'cursorIde' | 'restCurl' | 'sdk'>('claudeDesktop');
+  const [toolSearchQuery, setToolSearchQuery] = useState('');
+  const [selectedToolCategory, setSelectedToolCategory] = useState<'all' | 'trading' | 'contracts' | 'ticketing' | 'security' | 'wallets'>('all');
   const [mcpApprovalMode, setMcpApprovalMode] = useState<'auto' | 'manual'>('auto');
+
+  const copySnippet = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedSnippetId(id);
+    setTimeout(() => setCopiedSnippetId(null), 2500);
+  };
 
   // Webhooks State
   const [webhooks, setWebhooks] = useState<WebhookSub[]>([
@@ -589,8 +599,6 @@ export const DeveloperHubView: React.FC = () => {
         </div>
       )}      {/* TAB 3: MCP SERVER */}
       {activeTab === 'mcpServer' && (() => {
-        const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-        const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
         const activeKey = apiKeys[0]?.key || 'nv_live_9f82a17b09c82415d8a9';
         const activeAddress = activeSubWallet?.address || '0x71c8891575b50d22e032d847847c234a413d4cc8';
 
@@ -599,292 +607,546 @@ export const DeveloperHubView: React.FC = () => {
         const localSseUrl = `${baseUrl}/sse?wallet_address=${activeAddress}`;
         const localMcpUrl = `${baseUrl}/mcp?wallet_address=${activeAddress}`;
         const openApiUrl = `${baseUrl}/openapi.json?wallet_address=${activeAddress}`;
-        const tunnelBaseUrl = baseUrl;
-        const uniqueSseUrl = `${baseUrl}/sse?wallet_address=${activeAddress}`;
+        const openApiCleanUrl = `${baseUrl}/openapi.json`;
+        const restToolsUrl = `${baseUrl}/api/v1/tools`;
+
+        const claudeDesktopConfig = JSON.stringify({
+          mcpServers: {
+            "northveil-wallet": {
+              command: "node",
+              args: [localMcpUrl],
+              env: {
+                NORTHVEIL_API_KEY: activeKey,
+                NORTHVEIL_WALLET_ADDRESS: activeAddress
+              }
+            }
+          }
+        }, null, 2);
+
+        const cursorConfig = JSON.stringify({
+          mcpServers: {
+            "northveil": {
+              url: localSseUrl,
+              headers: {
+                "Authorization": `Bearer ${activeKey}`,
+                "x-wallet-address": activeAddress
+              }
+            }
+          }
+        }, null, 2);
+
+        const curlExampleReservation = `curl -X POST "${restToolsUrl}/make_reservation" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${activeKey}" \\
+  -H "x-wallet-address: ${activeAddress}" \\
+  -d '{
+    "category": "flight",
+    "title": "Flight BA-204: London -> New York",
+    "bookingDate": "2026-09-20",
+    "priceAmount": "0.05",
+    "currency": "ETH",
+    "customerName": "Alex Mercer"
+  }'`;
+
+        const curlExampleTransfer = `curl -X POST "${restToolsUrl}/send_transfer" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${activeKey}" \\
+  -d '{
+    "token": "ETH",
+    "amount": 0.05,
+    "recipientAddress": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+    "network": "sepolia"
+  }'`;
+
+        const sdkExample = `import { NorthveilClient } from '@northveil/sdk';
+
+const client = new NorthveilClient({
+  baseUrl: '${baseUrl}',
+  apiKey: '${activeKey}',
+  walletAddress: '${activeAddress}'
+});
+
+// 1. Make a real Web3 reservation (Flight, Hotel, Movie ticket, Event)
+const ticket = await client.makeReservation({
+  category: 'flight',
+  title: 'Flight BA-204: LHR -> JFK',
+  bookingDate: '2026-09-20',
+  priceAmount: '0.05',
+  currency: 'ETH',
+  customerName: 'Alex Mercer'
+});
+
+// 2. Mint tokens from an ERC-20 contract
+const mintTx = await client.mintTokens({
+  contractAddress: '0x3456...7890',
+  amount: '1000',
+  recipientAddress: '${activeAddress}',
+  network: 'sepolia'
+});
+
+console.log('Reservation reference:', ticket.bookingReference);`;
+
+        const allToolsCatalog = [
+          { name: 'make_reservation', category: 'ticketing', desc: 'Create web3 ticket & booking reservation (flights, movies, hotels, events)', sample: '{"category":"flight","title":"Flight BA-204","bookingDate":"2026-09-20","priceAmount":"0.05"}' },
+          { name: 'list_reservations', category: 'ticketing', desc: 'List active digital ticket passes, flight boarding passes & bookings', sample: '{"walletAddress":"' + activeAddress + '"}' },
+          { name: 'reserve_tokens', category: 'ticketing', desc: 'Escrow tokens with time-locked unlock release schedule', sample: '{"contractAddress":"0x...","recipientAddress":"0x...","amount":"1000","unlockDate":"2026-12-31"}' },
+          { name: 'mint_tokens', category: 'contracts', desc: 'Mint new tokens from deployed ERC-20 contract via custodial signer', sample: '{"contractAddress":"0x...","amount":"50000","network":"sepolia"}' },
+          { name: 'deploy_smart_contract', category: 'contracts', desc: 'Compile & deploy ERC-20/721/1155/Staking contracts to 6+ blockchains', sample: '{"contractType":"erc20","contractName":"AlphaToken","symbol":"ALPHA","totalSupply":1000000}' },
+          { name: 'verify_smart_contract', category: 'contracts', desc: 'Verify and publish Solidity source code on Etherscan/BscScan block explorer', sample: '{"contractAddress":"0x...","contractName":"AlphaToken","network":"sepolia"}' },
+          { name: 'audit_smart_contract', category: 'contracts', desc: 'Static security vulnerability and backdoor audit on Solidity source', sample: '{"code":"// SPDX-License-Identifier: MIT..."}' },
+          { name: 'send_transfer', category: 'trading', desc: 'Broadcast native or ERC-20 asset transfer across 6+ chains', sample: '{"token":"ETH","amount":0.1,"recipientAddress":"0x...","network":"sepolia"}' },
+          { name: 'execute_dex_swap', category: 'trading', desc: 'Execute multi-hop DEX swap via 1inch/Uniswap router with slippage protection', sample: '{"fromToken":"ETH","toToken":"USDC","amount":"0.5"}' },
+          { name: 'set_trade_order', category: 'trading', desc: 'Set automated limit, stop-loss or take-profit trade orders', sample: '{"token":"ETH","orderType":"stop_loss","triggerPrice":3200,"amount":0.5}' },
+          { name: 'get_portfolio', category: 'wallets', desc: 'Fetch multi-chain token balances, NFTs, and USD valuations', sample: '{"walletAddress":"' + activeAddress + '"}' },
+          { name: 'create_wallet', category: 'wallets', desc: 'Generate a new HD sub-wallet with private key stored in secure vault', sample: '{"walletName":"Trading Treasury"}' },
+          { name: 'check_wallet_health', category: 'security', desc: 'Analyze portfolio diversification, dust risk, and gas health score', sample: '{"walletAddress":"' + activeAddress + '"}' },
+          { name: 'scan_wallet_security', category: 'security', desc: 'Scan for unlimited token approvals, phishing contracts, and security threats', sample: '{"walletAddress":"' + activeAddress + '"}' },
+          { name: 'get_realtime_prices', category: 'trading', desc: 'Fetch live market prices and 24h volume from real exchange tickers', sample: '{"symbols":["ETH","BTC","SOL"]}' },
+          { name: 'get_trending_memecoins', category: 'trading', desc: 'Scan top trending tokens with instant honeypot and rugpull audit scores', sample: '{"chain":"ethereum","limit":10}' },
+        ];
+
+        const filteredTools = allToolsCatalog.filter(t => {
+          const matchesCategory = selectedToolCategory === 'all' || t.category === selectedToolCategory;
+          const matchesSearch = !toolSearchQuery.trim() || t.name.toLowerCase().includes(toolSearchQuery.toLowerCase()) || t.desc.toLowerCase().includes(toolSearchQuery.toLowerCase());
+          return matchesCategory && matchesSearch;
+        });
 
         return (
           <div className="bg-[#141419] border-2 border-white p-6 shadow-[6px_6px_0px_0px_#00f0ff] space-y-6 font-mono">
-            <div className="flex items-center justify-between border-b-2 border-white pb-3 flex-wrap gap-3">
+            {/* Server Status Header */}
+            <div className="flex items-center justify-between border-b-2 border-white pb-4 flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-white uppercase flex items-center gap-2">
-                  <Boxes className="w-5 h-5 text-[#00f0ff]" /> DYNAMIC AI ASSISTANT CONNECT HUB
+                  <Boxes className="w-5 h-5 text-[#00f0ff]" /> UNIVERSAL MCP & CHATGPT ACTION CONNECT HUB
                 </h3>
-                <p className="text-xs text-slate-300 mt-1">DYNAMICALLY BOUND TO YOUR LOGGED-IN WALLET & ACTIVE API KEY.</p>
+                <p className="text-xs text-slate-300 mt-1">CONNECT CLAUDE DESKTOP, CLAUDE WEB, CHATGPT ACTIONS, CURSOR IDE, OR REST APIS IN 1 CLICK.</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className={`px-3 py-1 text-xs font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000] flex items-center gap-1.5 ${mcpOnline ? 'bg-[#ccff00] text-black' : 'bg-red-500 text-white'}`}>
-                  <span className={`w-2 h-2 rounded-full ${mcpOnline ? 'bg-black animate-pulse' : 'bg-white'}`} /> 
-                  {mcpOnline ? `SERVER ONLINE (PORT 3001 • ${mcpLatency}ms)` : 'SERVER DISCONNECTED (PORT 3001)'}
+                <span className={`px-3 py-1.5 text-xs font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000] flex items-center gap-2 ${mcpOnline ? 'bg-[#ccff00] text-black' : 'bg-red-500 text-white'}`}>
+                  <span className={`w-2.5 h-2.5 rounded-full ${mcpOnline ? 'bg-black animate-pulse' : 'bg-white'}`} /> 
+                  {mcpOnline ? `ONLINE (PORT 3001 • ${mcpLatency}ms)` : 'OFFLINE (PORT 3001)'}
                 </span>
-                <span className="px-2.5 py-1 bg-[#00f0ff] text-black text-[10px] font-black uppercase border border-black">
-                  BOUND WALLET: {activeAddress.slice(0, 6)}...{activeAddress.slice(-4)}
+                <span className="px-3 py-1.5 bg-[#00f0ff] text-black text-xs font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000]">
+                  WALLET: {activeAddress.slice(0, 6)}...{activeAddress.slice(-4)}
                 </span>
               </div>
             </div>
 
-            {/* ════════ EASY DYNAMIC COPY BOXES ════════ */}
-            <div className="p-6 bg-[#0a0a0c] border-2 border-[#ccff00] space-y-5 shadow-[6px_6px_0px_0px_#ccff00]">
-              <div className="flex items-center justify-between border-b border-white/20 pb-3 flex-wrap gap-2">
-                <h4 className="text-sm font-black text-[#ccff00] uppercase flex items-center gap-2">
-                  DYNAMIC CONNECTOR SETTINGS (AUTO-BOUND TO {activeAddress.slice(0, 6)}...{activeAddress.slice(-4)})
-                </h4>
-                <div className="flex items-center gap-2 flex-wrap">
+            {/* Subtab Switcher */}
+            <div className="flex flex-wrap gap-2 border-b border-white/20 pb-3">
+              {[
+                { id: 'claudeDesktop', label: '1. CLAUDE DESKTOP APP', icon: Bot },
+                { id: 'claudeWeb', label: '2. CLAUDE WEB CONNECTORS', icon: Globe },
+                { id: 'chatGpt', label: '3. CHATGPT CUSTOM ACTIONS', icon: Zap },
+                { id: 'cursorIde', label: '4. CURSOR & WINDSURF IDE', icon: Code },
+                { id: 'restCurl', label: '5. REST API & CURL', icon: Terminal },
+                { id: 'sdk', label: '6. TYPESCRIPT SDK', icon: BookOpen },
+              ].map(sub => {
+                const Icon = sub.icon;
+                return (
                   <button
-                    onClick={async () => {
-                      await SupabaseService.bindApiKeyToWallet(activeKey, activeAddress, 'Northveil Primary Wallet');
-                      alert(`SUCCESS! API Key ${activeKey} is now bound directly to your logged-in wallet address:\n${activeAddress}`);
-                    }}
-                    className="px-3 py-1.5 bg-[#00f0ff] text-black font-black text-xs uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#33f3ff] transition-all flex items-center gap-1.5"
+                    key={sub.id}
+                    onClick={() => setMcpGuideSubTab(sub.id as any)}
+                    className={`px-3.5 py-2 text-xs font-black uppercase border-2 shadow-[2px_2px_0px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-all ${
+                      mcpGuideSubTab === sub.id
+                        ? 'bg-[#ccff00] text-black border-black transform -translate-y-0.5'
+                        : 'bg-[#0a0a0c] text-white border-white/30 hover:border-white'
+                    }`}
                   >
-                    LINK KEY TO MY WALLET
+                    <Icon className="w-3.5 h-3.5 stroke-[2.5]" /> {sub.label}
                   </button>
-                  <button
-                    onClick={() => {
-                      const configStr = JSON.stringify({
-                        mcpServers: {
-                          "northveil-wallet": {
-                            command: "node",
-                            args: [localMcpUrl],
-                            env: { NORTHVEIL_API_KEY: activeKey }
-                          }
-                        }
-                      }, null, 2);
-                      const blob = new Blob([configStr], { type: 'application/json' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = 'claude_desktop_config.json';
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    }}
-                    className="px-3 py-1.5 bg-[#ccff00] text-black font-black text-xs uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#d8ff33] transition-all flex items-center gap-1.5"
-                  >
-                    📥 DOWNLOAD CLAUDE AUTO-CONFIG
-                  </button>
-                </div>
-              </div>
+                );
+              })}
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Field 1: Local SSE URL */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-black text-slate-300 uppercase flex items-center justify-between">
-                    <span>1. LOCAL DESKTOP URL (CLAUDE DESKTOP & CURSOR):</span>
-                    <span className="text-[10px] text-[#00f0ff]">SSE STREAM</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={localSseUrl}
-                      className="flex-1 bg-[#141419] border-2 border-white p-3 text-xs font-black text-white"
-                    />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(localSseUrl);
-                        alert('Local SSE Stream URL copied!');
-                      }}
-                      className="px-4 py-3 bg-[#00f0ff] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#33f3ff]"
-                    >
-                      COPY
-                    </button>
-                  </div>
-                </div>
-
-                {/* Field 2: Remote MCP Server URL with UNIQUE Wallet Address */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-black text-slate-300 uppercase flex items-center justify-between">
-                    <span>2. YOUR UNIQUE PERSONAL WALLET URL (FOR CLAUDE):</span>
-                    <span className="text-[10px] text-[#ccff00]">UNIQUE TO YOUR WALLET</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={`${tunnelBaseUrl}/sse?wallet_address=${activeAddress}`}
-                      className="flex-1 bg-[#141419] border-2 border-[#ccff00] p-3 text-xs font-black text-[#ccff00]"
-                    />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${tunnelBaseUrl}/sse?wallet_address=${activeAddress}`);
-                        alert(`Your unique wallet connection URL copied!\nBound to: ${activeAddress}`);
-                      }}
-                      className="px-4 py-3 bg-[#ccff00] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#d8ff33]"
-                    >
-                      COPY UNIQUE URL
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Step-by-Step Instructions for Claude Web Modal */}
-              <div className="p-4 bg-[#141419] border-2 border-white space-y-3">
-                <div className="text-xs font-black text-white uppercase border-b border-white/20 pb-2 flex items-center justify-between">
-                  <span>📖 YOUR UNIQUE VALUES FOR CLAUDE'S "ADD CUSTOM CONNECTOR" MODAL</span>
-                  <span className="text-[10px] text-[#00f0ff]">100% PERSONAL & ISOLATED</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                  {/* Basic Fields */}
-                  <div className="p-3 bg-[#0a0a0c] border border-[#ccff00] space-y-1.5">
-                    <div className="font-black text-[#ccff00]">MAIN FIELDS (WITH YOUR WALLET ID)</div>
-                    <div className="text-[11px] text-slate-300 space-y-1">
-                      <div><b>Name</b>: <code>Northveil ({activeAddress.slice(0, 6)}...{activeAddress.slice(-4)})</code></div>
-                      <div><b>Remote MCP server URL</b>: <code className="text-[#ccff00] break-all">{tunnelBaseUrl}/sse?wallet_address={activeAddress}</code></div>
+            {/* ════════ SUBTAB 1: CLAUDE DESKTOP ════════ */}
+            {mcpGuideSubTab === 'claudeDesktop' && (
+              <div className="space-y-4 animate-fade-in-up">
+                <div className="p-5 bg-[#0a0a0c] border-2 border-[#ccff00] space-y-4 shadow-[6px_6px_0px_0px_#ccff00]">
+                  <div className="flex items-center justify-between border-b border-white/20 pb-3 flex-wrap gap-2">
+                    <div>
+                      <h4 className="text-sm font-black text-[#ccff00] uppercase flex items-center gap-2">
+                        <Bot className="w-4 h-4" /> CLAUDE DESKTOP CONFIGURATION (`claude_desktop_config.json`)
+                      </h4>
+                      <p className="text-xs text-slate-300 mt-0.5">Place this configuration in your Claude Desktop settings directory.</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => copySnippet(claudeDesktopConfig, 'claude_config')}
+                        className={`px-3.5 py-1.5 text-xs font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer transition-all flex items-center gap-1.5 ${
+                          copiedSnippetId === 'claude_config' ? 'bg-[#ccff00] text-black' : 'bg-[#00f0ff] text-black hover:bg-[#33f3ff]'
+                        }`}
+                      >
+                        {copiedSnippetId === 'claude_config' ? <><Check className="w-3.5 h-3.5" /> COPIED JSON!</> : <><Copy className="w-3.5 h-3.5" /> COPY JSON CONFIG</>}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const blob = new Blob([claudeDesktopConfig], { type: 'application/json' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = 'claude_desktop_config.json';
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        className="px-3.5 py-1.5 bg-[#ccff00] text-black font-black text-xs uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#d8ff33] flex items-center gap-1.5"
+                      >
+                        📥 DOWNLOAD CONFIG FILE
+                      </button>
                     </div>
                   </div>
 
-                  {/* Advanced Settings */}
-                  <div className="p-3 bg-[#0a0a0c] border border-[#ff007f] space-y-1.5">
-                    <div className="font-black text-[#ff007f]">YOUR PERSONAL API KEY (ALTERNATIVE)</div>
-                    <div className="text-[11px] text-slate-300 space-y-1">
-                      <div><b>Unique API Key URL</b>: <code className="text-[#ff007f] break-all">{tunnelBaseUrl}/sse?api_key={activeKey}</code></div>
-                      <div><b>OAuth Client ID</b>: <code>northveil_ai_client</code></div>
+                  <div className="relative">
+                    <pre className="p-4 bg-[#141419] border border-white/20 text-[#ccff00] text-xs font-mono overflow-x-auto rounded">
+                      {claudeDesktopConfig}
+                    </pre>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div className="p-3 bg-[#141419] border border-white/20 space-y-1">
+                      <div className="text-white font-black">📁 WINDOWS FILE PATH:</div>
+                      <code className="text-[#00f0ff] text-[11px] break-all">%APPDATA%\Claude\claude_desktop_config.json</code>
+                      <button
+                        onClick={() => copySnippet('%APPDATA%\\Claude\\claude_desktop_config.json', 'win_path')}
+                        className="mt-1 px-2 py-0.5 bg-[#1f2430] border border-white/30 text-[10px] text-white hover:text-[#ccff00] flex items-center gap-1 cursor-pointer"
+                      >
+                        {copiedSnippetId === 'win_path' ? '✓ COPIED PATH' : 'COPY PATH'}
+                      </button>
+                    </div>
+                    <div className="p-3 bg-[#141419] border border-white/20 space-y-1">
+                      <div className="text-white font-black">📁 MACOS FILE PATH:</div>
+                      <code className="text-[#00f0ff] text-[11px] break-all">~/Library/Application Support/Claude/claude_desktop_config.json</code>
+                      <button
+                        onClick={() => copySnippet('~/Library/Application Support/Claude/claude_desktop_config.json', 'mac_path')}
+                        className="mt-1 px-2 py-0.5 bg-[#1f2430] border border-white/30 text-[10px] text-white hover:text-[#ccff00] flex items-center gap-1 cursor-pointer"
+                      >
+                        {copiedSnippetId === 'mac_path' ? '✓ COPIED PATH' : 'COPY PATH'}
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Test Live Ping */}
-            <div className="p-4 bg-[#0a0a0c] border-2 border-white flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-2 text-xs">
-                <span className="w-3 h-3 rounded-full bg-[#ccff00] animate-ping" />
-                <span className="font-black text-white uppercase">MCP SERVER STATUS: <span className="text-[#ccff00]">🟢 CONNECTED & ONLINE</span> ({getMcpServerUrl()})</span>
-              </div>
-              <button
-                onClick={async () => {
-                  try {
-                    const serverUrl = getMcpServerUrl();
-                    const res = await fetch(`${serverUrl}/health`).catch(() => null);
-                    if (res && res.ok) {
-                      const data = await res.json().catch(() => ({}));
-                      alert(`✅ MCP SERVER CONNECTION SUCCESSFUL!\n\nTarget Endpoint: ${serverUrl}\nBound Wallet: ${activeAddress}\nServer: ${data.server || 'Northveil MCP Engine'}\nStatus: 🟢 ONLINE & CONNECTED`);
-                    } else {
-                      alert(`✅ MCP SERVER CONNECTION ACTIVE!\n\nTarget Endpoint: ${serverUrl}\nBound Wallet Address: ${activeAddress}\nStatus: 🟢 CONNECTED & READY`);
-                    }
-                  } catch (e: any) {
-                    alert(`✅ MCP SERVER CONNECTION ACTIVE!\n\nTarget Endpoint: ${getMcpServerUrl()}\nBound Wallet Address: ${activeAddress}\nStatus: 🟢 CONNECTED & READY`);
-                  }
-                }}
-                className="px-4 py-2 bg-[#ff007f] text-white font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#ff3399]"
-              >
-                TEST CONNECTION NOW
-              </button>
-            </div>
-
-            {/* Supported MCP Tools List */}
-            <div className="p-4 bg-[#0a0a0c] border-2 border-white space-y-3">
-              <span className="text-xs font-black text-white uppercase block border-b border-white/20 pb-2">AVAILABLE ACTIONS FOR AI AGENTS:</span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                {[
-                  { name: 'get_portfolio', desc: 'Fetch multi-chain holdings & TVL' },
-                  { name: 'send_transfer', desc: 'Execute on-chain EIP-1193 transfer' },
-                  { name: 'get_contract_metadata', desc: 'Read token/NFT metadata & images' },
-                  { name: 'create_payment_request', desc: 'Generate payment request QR cards' },
-                  { name: 'get_transaction_receipt', desc: 'Fetch block explorer receipt' },
-                  { name: 'execute_dex_swap', desc: 'Optimal 1inch/Uniswap DEX route' },
-                  { name: 'compile_smart_contract', desc: 'Compile Solidity with Solc' },
-                  { name: 'audit_smart_contract', desc: 'Security static vulnerability audit' },
-                ].map((tool) => (
-                  <div key={tool.name} className="p-3 bg-[#141419] border border-white/20 space-y-1">
-                    <code className="text-[#ccff00] font-black text-xs block">{tool.name}</code>
-                    <p className="text-[10px] text-slate-400">{tool.desc}</p>
+            {/* ════════ SUBTAB 2: CLAUDE WEB ════════ */}
+            {mcpGuideSubTab === 'claudeWeb' && (
+              <div className="space-y-4 animate-fade-in-up">
+                <div className="p-5 bg-[#0a0a0c] border-2 border-[#00f0ff] space-y-4 shadow-[6px_6px_0px_0px_#00f0ff]">
+                  <div className="border-b border-white/20 pb-3">
+                    <h4 className="text-sm font-black text-[#00f0ff] uppercase flex items-center gap-2">
+                      <Globe className="w-4 h-4" /> CLAUDE WEB CUSTOM CONNECTOR SETUP (NO JSON FILE REQUIRED)
+                    </h4>
+                    <p className="text-xs text-slate-300 mt-0.5">Use Claude Web's "Add Custom Connector" dialog to connect directly via SSE stream.</p>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* ════════ DETAILED STEP-BY-STEP CLAUDE & CHATGPT SETUP GUIDE ════════ */}
-            <div className="p-6 bg-[#0a0a0c] border-3 border-[#00f0ff] space-y-6 shadow-[8px_8px_0px_0px_#00f0ff]">
-              <div className="flex items-center justify-between border-b-2 border-white pb-3 flex-wrap gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                    <div className="p-4 bg-[#141419] border-2 border-white space-y-2">
+                      <span className="w-6 h-6 rounded-full bg-[#00f0ff] text-black font-black flex items-center justify-center text-xs">1</span>
+                      <p className="font-black text-white uppercase">Open Settings</p>
+                      <p className="text-[11px] text-slate-300">In Claude.ai, open Settings ➔ Connectors ➔ Click <b>"Add Custom Connector"</b>.</p>
+                    </div>
+                    <div className="p-4 bg-[#141419] border-2 border-white space-y-2">
+                      <span className="w-6 h-6 rounded-full bg-[#ccff00] text-black font-black flex items-center justify-center text-xs">2</span>
+                      <p className="font-black text-white uppercase">Paste Remote URL</p>
+                      <p className="text-[11px] text-slate-300">Paste your unique personal wallet SSE URL provided below.</p>
+                    </div>
+                    <div className="p-4 bg-[#141419] border-2 border-white space-y-2">
+                      <span className="w-6 h-6 rounded-full bg-[#ff007f] text-white font-black flex items-center justify-center text-xs">3</span>
+                      <p className="font-black text-white uppercase">Connect & Authorize</p>
+                      <p className="text-[11px] text-slate-300">Click <b>Save</b>. Your wallet commands, reservations, and trades are now ready!</p>
+                    </div>
+                  </div>
+
+                  {/* Copy Box */}
+                  <div className="p-4 bg-[#141419] border border-white/20 space-y-2">
+                    <label className="text-xs font-black text-slate-300 uppercase flex items-center justify-between">
+                      <span className="text-[#00f0ff]">YOUR PERSONAL CLAUDE SSE REMOTE URL:</span>
+                      <span className="text-[10px] text-slate-400">BOUND TO {activeAddress.slice(0, 6)}...{activeAddress.slice(-4)}</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={localSseUrl}
+                        className="flex-1 bg-[#0a0a0c] border border-white/40 p-3 text-xs font-bold text-[#ccff00]"
+                      />
+                      <button
+                        onClick={() => copySnippet(localSseUrl, 'claude_web_url')}
+                        className={`px-4 py-3 text-xs font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer transition-all ${
+                          copiedSnippetId === 'claude_web_url' ? 'bg-[#ccff00] text-black' : 'bg-[#00f0ff] text-black hover:bg-[#33f3ff]'
+                        }`}
+                      >
+                        {copiedSnippetId === 'claude_web_url' ? '✓ COPIED' : 'COPY URL'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ════════ SUBTAB 3: CHATGPT ACTIONS ════════ */}
+            {mcpGuideSubTab === 'chatGpt' && (
+              <div className="space-y-4 animate-fade-in-up">
+                <div className="p-5 bg-[#0a0a0c] border-2 border-[#ff007f] space-y-4 shadow-[6px_6px_0px_0px_#ff007f]">
+                  <div className="border-b border-white/20 pb-3">
+                    <h4 className="text-sm font-black text-[#ff007f] uppercase flex items-center gap-2">
+                      <Zap className="w-4 h-4" /> CHATGPT CUSTOM GPTS & ACTIONS (OPENAPI 3.0.3 COMPATIBLE)
+                    </h4>
+                    <p className="text-xs text-slate-300 mt-0.5">Integrate Northveil directly into any Custom GPT using standard OpenAPI 3.0 Actions.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                    <div className="p-4 bg-[#141419] border-2 border-white space-y-2">
+                      <span className="w-6 h-6 rounded-full bg-[#ff007f] text-white font-black flex items-center justify-center text-xs">1</span>
+                      <p className="font-black text-white uppercase">Add Action in GPT Builder</p>
+                      <p className="text-[11px] text-slate-300">In ChatGPT, go to <b>My GPTs</b> ➔ <b>Create a GPT</b> ➔ <b>Configure</b> ➔ scroll down to <b>Add Actions</b>.</p>
+                    </div>
+                    <div className="p-4 bg-[#141419] border-2 border-white space-y-2">
+                      <span className="w-6 h-6 rounded-full bg-[#00f0ff] text-black font-black flex items-center justify-center text-xs">2</span>
+                      <p className="font-black text-white uppercase">Import OpenAPI Schema</p>
+                      <p className="text-[11px] text-slate-300">Click <b>Import from URL</b> and paste the OpenAPI JSON schema URL below.</p>
+                    </div>
+                    <div className="p-4 bg-[#141419] border-2 border-white space-y-2">
+                      <span className="w-6 h-6 rounded-full bg-[#ccff00] text-black font-black flex items-center justify-center text-xs">3</span>
+                      <p className="font-black text-white uppercase">Set Authentication</p>
+                      <p className="text-[11px] text-slate-300">Set Auth to <b>API Key</b>, Auth Type: <b>Bearer</b>, and paste your Northveil Key.</p>
+                    </div>
+                  </div>
+
+                  {/* OpenAPI Schema URL Copy Box */}
+                  <div className="p-4 bg-[#141419] border border-white/20 space-y-2">
+                    <label className="text-xs font-black text-slate-300 uppercase flex items-center justify-between">
+                      <span className="text-[#ff007f]">OPENAPI 3.0 SCHEMA URL (PASTE INTO CHATGPT "IMPORT FROM URL"):</span>
+                      <span className="text-[10px] text-[#ccff00]">34 TOOLS INCLUDED</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={openApiCleanUrl}
+                        className="flex-1 bg-[#0a0a0c] border border-white/40 p-3 text-xs font-bold text-[#ff007f]"
+                      />
+                      <button
+                        onClick={() => copySnippet(openApiCleanUrl, 'openapi_url')}
+                        className={`px-4 py-3 text-xs font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer transition-all ${
+                          copiedSnippetId === 'openapi_url' ? 'bg-[#ccff00] text-black' : 'bg-[#ff007f] text-white hover:bg-[#ff3399]'
+                        }`}
+                      >
+                        {copiedSnippetId === 'openapi_url' ? '✓ COPIED' : 'COPY URL'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Bearer Key Copy Box */}
+                  <div className="p-4 bg-[#141419] border border-white/20 space-y-2">
+                    <label className="text-xs font-black text-slate-300 uppercase flex items-center justify-between">
+                      <span className="text-[#00f0ff]">YOUR BEARER API KEY:</span>
+                      <span className="text-[10px] text-slate-400">ACTIVE PRODUCTION KEY</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={activeKey}
+                        className="flex-1 bg-[#0a0a0c] border border-white/40 p-3 text-xs font-bold text-[#ccff00]"
+                      />
+                      <button
+                        onClick={() => copySnippet(activeKey, 'bearer_key')}
+                        className={`px-4 py-3 text-xs font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer transition-all ${
+                          copiedSnippetId === 'bearer_key' ? 'bg-[#ccff00] text-black' : 'bg-[#00f0ff] text-black hover:bg-[#33f3ff]'
+                        }`}
+                      >
+                        {copiedSnippetId === 'bearer_key' ? '✓ COPIED' : 'COPY KEY'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ════════ SUBTAB 4: CURSOR & WINDSURF IDE ════════ */}
+            {mcpGuideSubTab === 'cursorIde' && (
+              <div className="space-y-4 animate-fade-in-up">
+                <div className="p-5 bg-[#0a0a0c] border-2 border-[#ccff00] space-y-4 shadow-[6px_6px_0px_0px_#ccff00]">
+                  <div className="flex items-center justify-between border-b border-white/20 pb-3 flex-wrap gap-2">
+                    <div>
+                      <h4 className="text-sm font-black text-[#ccff00] uppercase flex items-center gap-2">
+                        <Code className="w-4 h-4" /> CURSOR IDE & WINDSURF MCP CONFIGURATION
+                      </h4>
+                      <p className="text-xs text-slate-300 mt-0.5">Add to Cursor Settings ➔ Features ➔ MCP Servers (or in .cursor/mcp.json).</p>
+                    </div>
+                    <button
+                      onClick={() => copySnippet(cursorConfig, 'cursor_config')}
+                      className={`px-3.5 py-1.5 text-xs font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer transition-all ${
+                        copiedSnippetId === 'cursor_config' ? 'bg-[#ccff00] text-black' : 'bg-[#00f0ff] text-black hover:bg-[#33f3ff]'
+                      }`}
+                    >
+                      {copiedSnippetId === 'cursor_config' ? '✓ COPIED CONFIG' : 'COPY CONFIG JSON'}
+                    </button>
+                  </div>
+
+                  <pre className="p-4 bg-[#141419] border border-white/20 text-[#ccff00] text-xs font-mono overflow-x-auto rounded">
+                    {cursorConfig}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* ════════ SUBTAB 5: REST API & CURL ════════ */}
+            {mcpGuideSubTab === 'restCurl' && (
+              <div className="space-y-4 animate-fade-in-up">
+                <div className="p-5 bg-[#0a0a0c] border-2 border-[#00f0ff] space-y-4 shadow-[6px_6px_0px_0px_#00f0ff]">
+                  <div className="border-b border-white/20 pb-3">
+                    <h4 className="text-sm font-black text-[#00f0ff] uppercase flex items-center gap-2">
+                      <Terminal className="w-4 h-4" /> DIRECT REST API ENDPOINTS (`POST /api/v1/tools/:toolName`)
+                    </h4>
+                    <p className="text-xs text-slate-300 mt-0.5">Call any tool directly using standard HTTP POST requests with JSON body.</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="p-4 bg-[#141419] border border-white/20 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-black">
+                        <span className="text-[#ccff00]">1. MAKE WEB3 RESERVATION (FLIGHTS, HOTELS, MOVIES, CONCERTS):</span>
+                        <button
+                          onClick={() => copySnippet(curlExampleReservation, 'curl_res')}
+                          className={`px-2.5 py-1 text-[11px] font-black uppercase border border-black cursor-pointer ${
+                            copiedSnippetId === 'curl_res' ? 'bg-[#ccff00] text-black' : 'bg-[#00f0ff] text-black'
+                          }`}
+                        >
+                          {copiedSnippetId === 'curl_res' ? '✓ COPIED' : 'COPY CURL'}
+                        </button>
+                      </div>
+                      <pre className="p-3 bg-[#0a0a0c] text-slate-200 text-xs overflow-x-auto font-mono">
+                        {curlExampleReservation}
+                      </pre>
+                    </div>
+
+                    <div className="p-4 bg-[#141419] border border-white/20 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-black">
+                        <span className="text-[#00f0ff]">2. EXECUTE CRYPTO TRANSFER:</span>
+                        <button
+                          onClick={() => copySnippet(curlExampleTransfer, 'curl_tx')}
+                          className={`px-2.5 py-1 text-[11px] font-black uppercase border border-black cursor-pointer ${
+                            copiedSnippetId === 'curl_tx' ? 'bg-[#ccff00] text-black' : 'bg-[#00f0ff] text-black'
+                          }`}
+                        >
+                          {copiedSnippetId === 'curl_tx' ? '✓ COPIED' : 'COPY CURL'}
+                        </button>
+                      </div>
+                      <pre className="p-3 bg-[#0a0a0c] text-slate-200 text-xs overflow-x-auto font-mono">
+                        {curlExampleTransfer}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ════════ SUBTAB 6: TYPESCRIPT SDK ════════ */}
+            {mcpGuideSubTab === 'sdk' && (
+              <div className="space-y-4 animate-fade-in-up">
+                <div className="p-5 bg-[#0a0a0c] border-2 border-[#ccff00] space-y-4 shadow-[6px_6px_0px_0px_#ccff00]">
+                  <div className="flex items-center justify-between border-b border-white/20 pb-3 flex-wrap gap-2">
+                    <div>
+                      <h4 className="text-sm font-black text-[#ccff00] uppercase flex items-center gap-2">
+                        <BookOpen className="w-4 h-4" /> OFFICIAL TYPESCRIPT / JAVASCRIPT SDK (`@northveil/sdk`)
+                      </h4>
+                      <p className="text-xs text-slate-300 mt-0.5">Full programmatic access with TypeScript types and real-time execution.</p>
+                    </div>
+                    <button
+                      onClick={() => copySnippet(sdkExample, 'sdk_code')}
+                      className={`px-3.5 py-1.5 text-xs font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer transition-all ${
+                        copiedSnippetId === 'sdk_code' ? 'bg-[#ccff00] text-black' : 'bg-[#00f0ff] text-black hover:bg-[#33f3ff]'
+                      }`}
+                    >
+                      {copiedSnippetId === 'sdk_code' ? '✓ COPIED CODE' : 'COPY CODE'}
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-[#141419] border border-white/20 text-[#00f0ff] text-xs flex items-center justify-between">
+                    <code>npm install @northveil/sdk</code>
+                    <button
+                      onClick={() => copySnippet('npm install @northveil/sdk', 'npm_install')}
+                      className="px-2 py-0.5 bg-[#00f0ff] text-black text-[10px] font-black uppercase border border-black cursor-pointer"
+                    >
+                      {copiedSnippetId === 'npm_install' ? '✓' : 'COPY'}
+                    </button>
+                  </div>
+
+                  <pre className="p-4 bg-[#141419] border border-white/20 text-[#ccff00] text-xs font-mono overflow-x-auto rounded">
+                    {sdkExample}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* ════════ FILTERABLE LIVE TOOL CATALOG (34 TOOLS) ════════ */}
+            <div className="p-5 bg-[#0a0a0c] border-2 border-white space-y-4 shadow-[4px_4px_0px_0px_#000]">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/20 pb-3">
                 <div>
-                  <h4 className="text-base font-black text-[#00f0ff] uppercase flex items-center gap-2">
-                    <BookOpen className="w-5 h-5" /> DETAILED CONNECTION GUIDE: CLAUDE DESKTOP & CHATGPT
-                  </h4>
-                  <p className="text-xs text-slate-300 mt-0.5">CONNECT YOUR AI AGENT TO NORTHVEIL MULTI-CHAIN RPC ENGINE IN 4 SIMPLE STEPS</p>
+                  <span className="text-xs font-black text-white uppercase block">
+                    EXPLORE ALL 34 REGISTERED MCP ACTIONS & TOOLS
+                  </span>
+                  <span className="text-[11px] text-slate-400">Click on any tool to copy its sample payload.</span>
                 </div>
-                <span className="px-3 py-1 bg-[#00f0ff] text-black text-xs font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000]">
-                  OFFICIAL INTEGRATION GUIDE
-                </span>
-              </div>
-
-              {/* CLAUDE & CURSOR DIRECT URL CONNECTOR GUIDE */}
-              <div className="space-y-4">
-                <h5 className="text-xs font-black text-[#ccff00] uppercase flex items-center gap-2 border-b border-white/20 pb-2">
-                  <Bot className="w-4 h-4 text-[#ccff00]" /> OPTION A: CLAUDE & CURSOR DIRECT SSE REMOTE CONNECTOR (ZERO JSON FILE NEEDED)
-                </h5>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3.5 bg-[#141419] border-2 border-white space-y-1.5">
-                    <span className="w-6 h-6 rounded-full bg-[#ccff00] text-black font-black flex items-center justify-center text-xs">1</span>
-                    <p className="font-black text-white uppercase">Click "Add Custom Connector"</p>
-                    <p className="text-[10px] text-slate-400">In Claude (or Cursor / Windsurf Settings ➔ MCP), click "Add Custom Connector" or "Add Remote MCP Server".</p>
-                  </div>
-
-                  <div className="p-3.5 bg-[#141419] border-2 border-white space-y-1.5">
-                    <span className="w-6 h-6 rounded-full bg-[#00f0ff] text-black font-black flex items-center justify-center text-xs">2</span>
-                    <p className="font-black text-white uppercase">Paste Direct SSE Server URL</p>
-                    <p className="text-[10px] text-slate-400">Copy & paste your personal wallet connection URL below. No JSON file editing required!</p>
-                  </div>
-
-                  <div className="p-3.5 bg-[#141419] border-2 border-white space-y-1.5">
-                    <span className="w-6 h-6 rounded-full bg-[#ff007f] text-white font-black flex items-center justify-center text-xs">3</span>
-                    <p className="font-black text-white uppercase">Click Connect & Done!</p>
-                    <p className="text-[10px] text-slate-400">Click Save / Connect. Your wallet is bound automatically to your AI assistant session!</p>
-                  </div>
-                </div>
-
-                {/* Direct Remote URL Copy Box */}
-                <div className="bg-[#141419] p-4 border-2 border-[#ccff00] space-y-3 shadow-[4px_4px_0px_0px_#ccff00]">
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-300">
-                    <span className="text-[#ccff00] font-black uppercase">🔗 YOUR DIRECT REMOTE MCP SSE URL (PASTE DIRECTLY INTO CLAUDE / CURSOR):</span>
-                    <button
-                      onClick={() => {
-                        const directUrl = `${getMcpServerUrl()}/sse?wallet_address=${activeAddress}`;
-                        navigator.clipboard.writeText(directUrl);
-                        alert(`Direct MCP SSE URL copied!\n\n${directUrl}`);
-                      }}
-                      className="px-3.5 py-1.5 bg-[#ccff00] text-black font-black text-xs uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#d8ff33]"
-                    >
-                      COPY DIRECT REMOTE URL
-                    </button>
-                  </div>
+                <div className="w-full sm:w-64">
                   <input
                     type="text"
-                    readOnly
-                    value={`${getMcpServerUrl()}/sse?wallet_address=${activeAddress}`}
-                    className="w-full bg-[#0a0a0c] border-2 border-white p-3 text-xs font-mono font-black text-[#ccff00]"
+                    placeholder="Search tools (e.g. reserve, mint, swap)..."
+                    value={toolSearchQuery}
+                    onChange={(e) => setToolSearchQuery(e.target.value)}
+                    className="w-full bg-[#141419] border border-white/40 p-2 text-xs text-white focus:outline-none focus:border-[#ccff00]"
                   />
-                  <p className="text-[10px] text-slate-400">
-                    <b>No JSON config files needed</b>. Just paste this URL directly into Claude's Custom Connector field or Cursor IDE's MCP Server URL settings.
-                  </p>
                 </div>
               </div>
 
-              {/* CHATGPT CUSTOM ACTIONS GUIDE */}
-              <div className="space-y-4 pt-2">
-                <h5 className="text-xs font-black text-[#00f0ff] uppercase flex items-center gap-2 border-b border-white/20 pb-2">
-                  <Zap className="w-4 h-4 text-[#00f0ff]" /> OPTION B: CHATGPT CUSTOM ACTIONS & GPT STORE
-                </h5>
+              {/* Category Filter Pills */}
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: 'all', label: 'ALL TOOLS (34)' },
+                  { id: 'ticketing', label: '🎟️ RESERVATIONS & TICKETS' },
+                  { id: 'contracts', label: '📜 CONTRACTS & MINTING' },
+                  { id: 'trading', label: '🚀 TRADING & SWAPS' },
+                  { id: 'wallets', label: '💼 WALLETS & BALANCES' },
+                  { id: 'security', label: '🛡️ SECURITY & AUDITING' },
+                ].map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedToolCategory(cat.id as any)}
+                    className={`px-2.5 py-1 text-[10px] font-black uppercase border cursor-pointer ${
+                      selectedToolCategory === cat.id
+                        ? 'bg-[#00f0ff] text-black border-black font-bold'
+                        : 'bg-[#141419] text-slate-300 border-white/20 hover:border-white'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3.5 bg-[#141419] border-2 border-white space-y-1.5">
-                    <span className="w-6 h-6 rounded-full bg-[#00f0ff] text-black font-black flex items-center justify-center text-xs">1</span>
-                    <p className="font-black text-white uppercase">Create Custom GPT</p>
-                    <p className="text-[10px] text-slate-400">In ChatGPT, click "My GPTs" ➔ "Create a GPT" ➔ "Configure" tab ➔ "Add Action".</p>
+              {/* Tools Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                {filteredTools.map((tool) => (
+                  <div key={tool.name} className="p-3.5 bg-[#141419] border border-white/20 space-y-2 flex flex-col justify-between hover:border-[#ccff00] transition-colors">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <code className="text-[#ccff00] font-black text-xs block">{tool.name}</code>
+                        <span className="text-[9px] uppercase px-1.5 py-0.5 bg-[#0a0a0c] text-[#00f0ff] border border-white/10 font-bold">
+                          {tool.category}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">{tool.desc}</p>
+                    </div>
+                    <button
+                      onClick={() => copySnippet(tool.sample, `tool_${tool.name}`)}
+                      className={`w-full py-1 text-[10px] font-black uppercase border border-black cursor-pointer transition-all flex items-center justify-center gap-1 ${
+                        copiedSnippetId === `tool_${tool.name}` ? 'bg-[#ccff00] text-black' : 'bg-[#1f2430] text-slate-200 hover:text-white'
+                      }`}
+                    >
+                      {copiedSnippetId === `tool_${tool.name}` ? <><Check className="w-3 h-3" /> COPIED JSON</> : <><Copy className="w-3 h-3" /> COPY PAYLOAD</>}
+                    </button>
                   </div>
-
-                  <div className="p-3.5 bg-[#141419] border-2 border-white space-y-1.5">
-                    <span className="w-6 h-6 rounded-full bg-[#ff007f] text-white font-black flex items-center justify-center text-xs">2</span>
-                    <p className="font-black text-white uppercase">Paste Schema URL</p>
-                    <p className="text-[10px] text-slate-400">Click "Import from URL" and paste: <code>{getMcpServerUrl()}/openapi.json?wallet_address={activeAddress}</code>.</p>
-                  </div>
-
-                  <div className="p-3.5 bg-[#141419] border-2 border-white space-y-1.5">
-                    <span className="w-6 h-6 rounded-full bg-[#ccff00] text-black font-black flex items-center justify-center text-xs">3</span>
-                    <p className="font-black text-white uppercase">Set Bearer Auth</p>
-                    <p className="text-[10px] text-slate-400">Set Authentication to "API Key", Type: "Bearer", Key: <code>{activeKey}</code>.</p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
