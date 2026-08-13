@@ -19,6 +19,9 @@ import {
   MintTokensResult,
   ReserveTokensParams,
   ReserveTokensResult,
+  MakeReservationParams,
+  MakeReservationResult,
+  ListReservationsResult,
 } from './types.js';
 
 export class NorthveilClient {
@@ -208,6 +211,16 @@ export class NorthveilClient {
   /** Create a time-locked token reservation */
   async reserveTokens(params: ReserveTokensParams): Promise<ReserveTokensResult> {
     return this.mcpCall<ReserveTokensResult>('reserve_tokens', params);
+  }
+
+  /** Create a web3 booking reservation & digital ticket pass (flight, movie, hotel, event, dining) */
+  async makeReservation(params: MakeReservationParams): Promise<MakeReservationResult> {
+    return this.mcpCall<MakeReservationResult>('make_reservation', params);
+  }
+
+  /** List active web3 reservations, flight boarding passes, and bookings */
+  async listReservations(params: { walletAddress?: string; category?: string } = {}): Promise<ListReservationsResult> {
+    return this.mcpCall<ListReservationsResult>('list_reservations', params);
   }
 }
 

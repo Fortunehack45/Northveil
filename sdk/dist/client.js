@@ -156,6 +156,14 @@ class NorthveilClient {
     async reserveTokens(params) {
         return this.mcpCall('reserve_tokens', params);
     }
+    /** Create a web3 booking reservation & digital ticket pass (flight, movie, hotel, event, dining) */
+    async makeReservation(params) {
+        return this.mcpCall('make_reservation', params);
+    }
+    /** List active web3 reservations, flight boarding passes, and bookings */
+    async listReservations(params = {}) {
+        return this.mcpCall('list_reservations', params);
+    }
 }
 exports.NorthveilClient = NorthveilClient;
 //# sourceMappingURL=client.js.map

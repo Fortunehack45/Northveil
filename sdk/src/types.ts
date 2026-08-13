@@ -219,3 +219,36 @@ export interface ReserveTokensResult {
   status: string;
   daysUntilUnlock: number;
 }
+export interface MakeReservationParams {
+  category: 'flight' | 'movie' | 'hotel' | 'event' | 'dining' | 'rental' | 'custom';
+  title: string;
+  bookingDate: string;
+  bookingTime?: string;
+  quantity?: number;
+  seatDetails?: string;
+  priceAmount: string;
+  currency?: string;
+  customerName?: string;
+  network?: string;
+}
+
+export interface MakeReservationResult {
+  bookingReference: string;
+  reservationId: string;
+  category: string;
+  title: string;
+  customerName: string;
+  bookingDate: string;
+  bookingTime: string;
+  quantity: number;
+  seatDetails: string;
+  priceAmount: string;
+  currency: string;
+  network: string;
+  status: string;
+}
+
+export interface ListReservationsResult {
+  count: number;
+  reservations: MakeReservationResult[];
+}
