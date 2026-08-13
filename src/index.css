@@ -254,3 +254,144 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #ff007f;
 }
+
+/* ═══════════════════════════════════════════════════ */
+/* PREMIUM UI — Glassmorphism, Animations, Refinements */
+/* ═══════════════════════════════════════════════════ */
+
+/* Glassmorphism Card */
+.glass-card {
+  background: rgba(18, 20, 26, 0.65);
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow:
+    0 4px 30px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 40px rgba(212, 255, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-color: rgba(212, 255, 0, 0.2);
+}
+
+/* Ambient Glow Accents */
+.glow-lime {
+  box-shadow: 0 0 20px rgba(212, 255, 0, 0.15), 0 0 60px rgba(212, 255, 0, 0.05);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.15), 0 0 60px rgba(0, 240, 255, 0.05);
+}
+
+.glow-pink {
+  box-shadow: 0 0 20px rgba(255, 0, 127, 0.15), 0 0 60px rgba(255, 0, 127, 0.05);
+}
+
+/* Pulse Glow Animation (for status indicators) */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px currentColor; }
+  50% { opacity: 0.6; box-shadow: 0 0 12px currentColor, 0 0 24px currentColor; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Shimmer Loading Effect */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Fade In Up */
+@keyframes fade-in-up {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out forwards;
+}
+
+/* Scale Bounce In */
+@keyframes scale-bounce-in {
+  0% { opacity: 0; transform: scale(0.92); }
+  60% { transform: scale(1.02); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-scale-bounce-in {
+  animation: scale-bounce-in 0.35s ease-out forwards;
+}
+
+/* Counter Animate (for balance numbers) */
+@keyframes counter-glow {
+  0% { text-shadow: 0 0 0 transparent; }
+  50% { text-shadow: 0 0 8px rgba(212, 255, 0, 0.4); }
+  100% { text-shadow: 0 0 0 transparent; }
+}
+
+.balance-glow-pulse {
+  animation: counter-glow 3s ease-in-out infinite;
+}
+
+/* Gradient Text Utility */
+.gradient-text-lime {
+  background: linear-gradient(135deg, #d4ff00, #a0ff00, #00f0ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-sunset {
+  background: linear-gradient(135deg, #ff007f, #ff6b35, #ffe600);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Premium Input Focus Ring */
+.brutal-input:focus {
+  outline: none;
+  border-color: #d4ff00 !important;
+  box-shadow: 0 0 0 2px rgba(212, 255, 0, 0.25), 4px 4px 0 0 #d4ff00 !important;
+}
+
+/* Token Row Hover */
+.token-row {
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.token-row:hover {
+  background-color: rgba(212, 255, 0, 0.04);
+  transform: translateX(2px);
+}
+
+/* Active Nav Item Indicator */
+.nav-active-indicator {
+  position: relative;
+}
+
+.nav-active-indicator::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  background: #d4ff00;
+  border-radius: 2px;
+}

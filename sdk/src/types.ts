@@ -178,4 +178,44 @@ export interface ContractVerificationResult {
   statusMessage: string;
 }
 
+export interface MintTokensParams {
+  contractAddress: string;
+  amount: string;
+  recipientAddress?: string;
+  network?: string;
+}
 
+export interface MintTokensResult {
+  txHash: string;
+  tokenName: string;
+  tokenSymbol: string;
+  amount: string;
+  recipientAddress: string;
+  contractAddress: string;
+  network: string;
+  explorerUrl: string;
+}
+
+export interface ReserveTokensParams {
+  contractAddress: string;
+  recipientAddress: string;
+  amount: string;
+  unlockDate: string;
+  label?: string;
+  network?: string;
+}
+
+export interface ReserveTokensResult {
+  reservationId: string;
+  contractAddress: string;
+  tokenName: string;
+  tokenSymbol: string;
+  amount: string;
+  recipientAddress: string;
+  senderAddress: string;
+  unlockDate: string;
+  label: string;
+  network: string;
+  status: string;
+  daysUntilUnlock: number;
+}

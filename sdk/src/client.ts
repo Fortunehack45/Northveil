@@ -15,6 +15,10 @@ import {
   SecurityScanResult,
   SendTransferParams,
   GasEstimate,
+  MintTokensParams,
+  MintTokensResult,
+  ReserveTokensParams,
+  ReserveTokensResult,
 } from './types.js';
 
 export class NorthveilClient {
@@ -194,6 +198,16 @@ export class NorthveilClient {
   /** Verify and publish smart contract source code on block explorer */
   async verifySmartContract(params: { contractAddress: string; contractName: string; sourceCode?: string; network?: string; compilerVersion?: string }): Promise<any> {
     return this.mcpCall('verify_smart_contract', params);
+  }
+
+  /** Mint new tokens from an ERC-20 contract */
+  async mintTokens(params: MintTokensParams): Promise<MintTokensResult> {
+    return this.mcpCall<MintTokensResult>('mint_tokens', params);
+  }
+
+  /** Create a time-locked token reservation */
+  async reserveTokens(params: ReserveTokensParams): Promise<ReserveTokensResult> {
+    return this.mcpCall<ReserveTokensResult>('reserve_tokens', params);
   }
 }
 

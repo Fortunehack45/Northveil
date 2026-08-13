@@ -148,6 +148,14 @@ class NorthveilClient {
     async verifySmartContract(params) {
         return this.mcpCall('verify_smart_contract', params);
     }
+    /** Mint new tokens from an ERC-20 contract */
+    async mintTokens(params) {
+        return this.mcpCall('mint_tokens', params);
+    }
+    /** Create a time-locked token reservation */
+    async reserveTokens(params) {
+        return this.mcpCall('reserve_tokens', params);
+    }
 }
 exports.NorthveilClient = NorthveilClient;
 //# sourceMappingURL=client.js.map

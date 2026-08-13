@@ -1,4 +1,4 @@
-import { NorthveilConfig, SwapParams, DeployContractParams, TransactionResult, TokenPrice, TrendingMemecoin, TokenAuditResult, TradeOrderParams, TradeOrder, WalletHealthResult, SecurityScanResult, SendTransferParams } from './types.js';
+import { NorthveilConfig, SwapParams, DeployContractParams, TransactionResult, TokenPrice, TrendingMemecoin, TokenAuditResult, TradeOrderParams, TradeOrder, WalletHealthResult, SecurityScanResult, SendTransferParams, MintTokensParams, MintTokensResult, ReserveTokensParams, ReserveTokensResult } from './types.js';
 export declare class NorthveilClient {
     private baseUrl;
     private apiKey;
@@ -66,5 +66,9 @@ export declare class NorthveilClient {
         network?: string;
         compilerVersion?: string;
     }): Promise<any>;
+    /** Mint new tokens from an ERC-20 contract */
+    mintTokens(params: MintTokensParams): Promise<MintTokensResult>;
+    /** Create a time-locked token reservation */
+    reserveTokens(params: ReserveTokensParams): Promise<ReserveTokensResult>;
 }
 //# sourceMappingURL=client.d.ts.map
