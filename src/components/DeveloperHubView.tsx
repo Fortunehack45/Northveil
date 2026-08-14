@@ -21,6 +21,7 @@ import {
   Shield,
   Layers,
   BookOpen,
+  Globe,
 } from 'lucide-react';
 import { getMcpServerUrl, getMcpSseUrl } from '../config/endpointConfig';
 import { useWallet } from '../context/WalletContext';
