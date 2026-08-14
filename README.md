@@ -1,68 +1,75 @@
-# Northveil Protocol — Autonomous Web3, AI MCP & Global Crypto Travel Suite
+# Northveil — Autonomous Web3, AI MCP & Decentralized Travel Ecosystem
 
-[![NPM SDK](https://img.shields.io/npm/v/northveil-sdk.svg?style=flat-square&color=blue)](https://www.npmjs.com/package/northveil-sdk)
-[![CLI Tool](https://img.shields.io/npm/v/northveil-cli.svg?style=flat-square&color=emerald)](https://www.npmjs.com/package/northveil-cli)
-[![MCP Protocol](https://img.shields.io/badge/MCP-38%20Tools-blueviolet.svg?style=flat-square)](https://modelcontextprotocol.io/)
-[![Blockchains](https://img.shields.io/badge/Blockchains-36%2B%20Supported-purple.svg?style=flat-square)](https://ethereum.org/)
+[![Live dApp](https://img.shields.io/badge/Live%20dApp-northveil.xyz-blue.svg?style=flat-square)](https://northveil.xyz)
+[![MCP Server](https://img.shields.io/badge/MCP%20Gateway-mcp.northveil.xyz-purple.svg?style=flat-square)](https://mcp.northveil.xyz)
+[![npm SDK](https://img.shields.io/npm/v/northveil-sdk.svg?style=flat-square&color=blue)](https://www.npmjs.com/package/northveil-sdk)
+[![Developer CLI](https://img.shields.io/npm/v/northveil-cli.svg?style=flat-square&color=emerald)](https://www.npmjs.com/package/northveil-cli)
+[![Python SDK](https://img.shields.io/badge/Python-northveil-yellow.svg?style=flat-square)](https://pypi.org/project/northveil/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
-> **Northveil is an enterprise Web3 platform, Model Context Protocol (MCP) AI ecosystem, and autonomous travel protocol enabling AI agents and developers to execute real on-chain transactions, search and book airline flights in cryptocurrency, audit smart contracts, and manage multi-chain custodial wallets across 36+ blockchains.**
+Northveil is a next-generation decentralized ecosystem combining an **AI-powered Multi-Chain Web3 dApp**, a **Universal 38-Tool Model Context Protocol (MCP) Server**, an **Autonomous Travel & Airline Ticketing Protocol**, and an enterprise developer toolchain across **TypeScript, Python, and CLI**.
 
 ---
 
-## 📑 Ecosystem Components
+## 🏛️ Ecosystem Monorepo Architecture
 
-| Component | Location | Description | Links |
-|---|---|---|---|
-| **Web3 dApp & AI Wallet** | `src/` | Interactive Vite + React dApp with AI Agent Chat & Visualizer | [Live dApp](https://northveil.xyz) |
-| **Model Context Protocol Server** | `mcp-server/` | Universal 38-tool MCP Gateway (HTTP, SSE & OpenAPI 3.0) | [Northveil-MCP](https://github.com/Fortunehack45/Northveil-MCP) |
-| **Serverless API Gateway** | `api/` | Zero-dependency Serverless REST Tool Gateway | [Vercel API](https://northveil-mcp.vercel.app) |
-| **TypeScript / JavaScript SDK** | `sdk/` | Official client library for Node.js, Web, and Agent builders | [npm: northveil-sdk](https://www.npmjs.com/package/northveil-sdk) |
-| **Python SDK Package** | `python-sdk/` | Native Python integration package (`import northveil`) | [Python Guide](sdk/README.md#2-python-38) |
-| **Developer CLI Tool** | `cli/` | Multi-modular CLI with flight search, contract deploy & login | [npm: northveil-cli](https://www.npmjs.com/package/northveil-cli) |
-
----
-
-## 🚀 Quick Installation
-
-### Global Developer CLI
-```bash
-npx northveil-cli --help
-# or install globally
-npm install -g northveil-cli
 ```
-
-### TypeScript / JavaScript SDK
-```bash
-npm install northveil-sdk
-```
-
-### Python Package
-```bash
-pip install northveil
+Northveil/
+├── src/                     # React 18 + Vite Web3 dApp & AI Wallet Interface
+│   ├── components/          # Cyberpunk Glassmorphic Views (Travel, Hub, Wallet, Auditor)
+│   ├── services/            # On-Chain RPCs, Ethers.js, Supabase, AIService
+│   └── data/                # Token standards & network registries
+├── mcp-server/              # Universal MCP Gateway (HTTP, SSE, OpenAPI 3.0)
+│   ├── index.ts             # 38-tool execution engine & multi-tenant auth
+│   ├── tools.ts             # Complete MCP tool schemas
+│   └── encryptionService.ts # AES-256-GCM hardware key encryption
+├── api/                     # Self-Contained Serverless REST Gateway for Vercel
+├── sdk/                     # Official TypeScript / JavaScript Client (npm: northveil-sdk)
+├── python-sdk/              # Official Python Client Package (pip: northveil)
+├── cli/                     # Official Developer Command-Line Tool (npm: northveil-cli)
+└── supabase/                # PostgreSQL Schema, RLS Policies, pg_cron Heartbeats
 ```
 
 ---
 
-## 🌐 Autonomous Travel & Dynamic Crypto Fares
+## ✈️ Autonomous Travel & Dynamic Crypto Fares
 
-Northveil features an **Autonomous Travel Engine** computing flight routes, airline schedules, and converting dynamic seat inventory directly into on-chain cryptocurrency fares (ETH, SOL, USDC, USDT) using live Coinpaprika market feeds:
-
-```bash
-# Search flights via CLI
-northveil flights --from LHR --to JFK --class business --currency ETH
-
-# Search hotels via CLI
-northveil hotels --city Tokyo --currency ETH
-```
+Northveil integrates an **Autonomous Travel Aggregation Engine**:
+1. **Real IATA Routing & Schedules**: Computes flight distances, airline carriers (BA, Virgin, Delta, Emirates, Singapore Airlines), and cabin multipliers (Economy, Business, First).
+2. **Live On-Chain Crypto Valuation**: Converts USD seat inventory into real-time crypto prices (ETH, SOL, USDC, USDT) via live Coinpaprika feeds.
+3. **On-Chain Booking & PNR Issuance**: Generates verifiable 6-character airline PNR passes, recorded to Supabase ledger and verified via `get_booking_status`.
 
 ---
 
-## 🔒 Multi-Tenant Security & Tenant Isolation
+## 🛡️ Smart Contract AST Auditor & Compiler
 
-- **Scoped API Keys**: Generated keys are bound to specific wallet addresses in Supabase DB.
-- **Strict 403 Forbidden Guard**: Attempting to read or mutate another user's wallet without ownership is rejected at the gateway level.
-- **Zero Credential Exposure**: Private keys and seed phrases are never returned in any response.
+- **In-Browser & Custodial Solidity Compilation**: Compiles Solc `^0.8.20` bytecode and ABIs for ERC-20, ERC-721, and Staking contracts.
+- **AST Static Vulnerability Scanner**: Analyzes Solidity contracts for reentrancy vectors, unvalidated external calls, unindexed events, and privilege escalation backdoors.
+- **Automated Gas Optimization**: Provides Slither-grade suggestions for storage packing and calldata efficiency.
+
+---
+
+## 🔒 Multi-Tenant Security & Supabase Architecture
+
+- **Scoped API Keys**: Verified against Supabase table `public.mcp_api_keys`.
+- **Tenant Isolation**: Strict cross-wallet protection rejecting unauthorized foreign queries with `403 Forbidden`.
+- **Zero Credential Exposure**: Private keys and seed phrases are never returned in responses.
+- **Automated Keep-Alive Heartbeat**: Uses `pg_cron` inside PostgreSQL to run a scheduled heartbeat every 3 days (`0 0 */3 * *`), guaranteeing the Supabase free database never pauses from inactivity.
+
+---
+
+## 🚀 Quick Commands
+
+```bash
+# Run local dApp
+npm run dev
+
+# Run CLI
+npx northveil-cli whoami
+
+# Run Python SDK
+python -c "import northveil; client = northveil.Northveil(); print(client.whoami())"
+```
 
 ---
 
