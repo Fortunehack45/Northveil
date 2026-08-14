@@ -68,6 +68,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
   const [renameInput, setRenameInput] = useState<string>('');
   const [quickWalletName, setQuickWalletName] = useState<string>('');
   const [showImportTokenModal, setShowImportTokenModal] = useState<boolean>(false);
+  const [isAddressCopied, setIsAddressCopied] = useState<boolean>(false);
 
   useEffect(() => {
     const handleCustomTokenOpen = (e: Event) => {
@@ -271,14 +272,36 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                 <span>RENAME</span>
               </button>
             </div>
-            <p className="text-[10px] text-slate-400 truncate mt-0.5 font-mono">
-              <span className="hidden xs:inline">HD Wallet • </span>
-              <span className="text-[#d4ff00] font-bold">
-                {activeSubWallet?.address ? (
-                  activeSubWallet.address.length > 10 ? `${activeSubWallet.address.slice(0, 8)}...${activeSubWallet.address.slice(-6)}` : activeSubWallet.address
-                ) : '0x...'}
-              </span>
-            </p>
+            <div className="flex items-center gap-2 mt-0.5 font-mono">
+              <span className="hidden xs:inline text-[10px] text-slate-400">HD Vault • </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeSubWallet?.address) {
+                    navigator.clipboard.writeText(activeSubWallet.address);
+                    setIsAddressCopied(true);
+                    setTimeout(() => setIsAddressCopied(false), 2000);
+                  }
+                }}
+                className="text-[#d4ff00] font-bold text-[10px] sm:text-[11px] hover:text-[#00f0ff] transition-colors flex items-center gap-1.5 cursor-pointer group"
+                title="Click to Copy HD Wallet Address"
+              >
+                <span>
+                  {activeSubWallet?.address ? (
+                    activeSubWallet.address.length > 12 ? `${activeSubWallet.address.slice(0, 8)}...${activeSubWallet.address.slice(-6)}` : activeSubWallet.address
+                  ) : '0x...'}
+                </span>
+                {isAddressCopied ? (
+                  <span className="px-1.5 py-0.2 bg-[#d4ff00] text-black text-[9px] font-black uppercase shadow-sm animate-pulse">
+                    ✓ COPIED
+                  </span>
+                ) : (
+                  <span className="text-[9px] text-slate-400 group-hover:text-white uppercase">
+                    [COPY]
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
