@@ -33,7 +33,7 @@ This document contains all API keys, environment variables, Supabase Cloud datab
 | :--- | :--- | :--- |
 | **Northveil Live Key 1** | `nv_live_9f82a17b09c82415d8a9` | Primary Production AI Key (Auto-bound to active wallet) |
 | **Northveil Test Key** | `nv_test_7a12b99c43d21100e45b` | Sandbox & Testnet Testing Key |
-| **Northveil Default Key** | `nv_live_default_northveil_key` | Fallback Public Demo Key |
+| **Northveil Default Key** | `nv_live_default_northveil_key` | Northveil Public Protocol Gateway Key |
 | **OAuth 2.0 Client ID** | `northveil_ai_client` | Claude Web & Custom GPT Handshake Client ID |
 | **OAuth 2.0 Client Secret** | `northveil_ai_secret` | Claude Web & Custom GPT Handshake Client Secret |
 

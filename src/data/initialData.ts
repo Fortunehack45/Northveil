@@ -1254,7 +1254,3 @@ export const DICTIONARY: Record<LanguageCode, Record<string, string>> = {
   },
 };
 
-export const MOCK_SEED_PHRASE = [
-  'nebula', 'orbit', 'quantum', 'cipher', 'horizon', 'pulse',
-  'galaxy', 'beacon', 'matrix', 'crystal', 'shield', 'velocity'
-];

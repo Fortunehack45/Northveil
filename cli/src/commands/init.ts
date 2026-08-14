@@ -42,7 +42,7 @@ NORTHVEIL_WALLET_ADDRESS=0xYourWalletAddressHere
 
 const client = new NorthveilClient({
   baseUrl: process.env.NORTHVEIL_API_URL || 'https://mcp.northveil.xyz',
-  apiKey: process.env.NORTHVEIL_API_KEY || 'nv_live_demo',
+  apiKey: process.env.NORTHVEIL_API_KEY || 'nv_live_default_northveil_key',
 });
 
 async function main() {

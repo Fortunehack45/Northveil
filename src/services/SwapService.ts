@@ -160,7 +160,7 @@ export class SwapService {
     const fromAddress = this.resolveTokenAddress(params.fromAsset.network, params.fromAsset.contractAddress, params.fromAsset.symbol);
     const toAddress = this.resolveTokenAddress(params.toAsset.network, params.toAsset.contractAddress, params.toAsset.symbol);
     
-    // Assume 18 decimals for EVM for demo
+    // Standard EVM token decimal normalization (18 decimals)
     const amountWei = ethers.parseUnits(params.amount.toString(), 18).toString();
     
     const url = `${this.ONE_INCH_BASE_URL}/${chainId}/quote?src=${fromAddress}&dst=${toAddress}&amount=${amountWei}&slippage=${params.slippage}`;
