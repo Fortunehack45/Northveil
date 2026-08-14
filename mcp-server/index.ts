@@ -543,6 +543,94 @@ app.get(['/api/v1/telemetry', '/telemetry'], async (req: Request, res: Response)
   }
 });
 
+// Webhook Management & Live Dispatch Engine (HMAC-SHA256 Signed Deliveries)
+app.post('/api/v1/webhooks/test', async (req: Request, res: Response) => {
+  try {
+    const { url, eventType, payload } = req.body || {};
+    if (!url) {
+      return res.status(400).json({ error: 'Missing target webhook URL in request body' });
+    }
+
+    const testEvent = {
+      id: `evt_test_${Date.now()}`,
+      object: 'event',
+      type: eventType || 'tx.confirmed',
+      created: Math.floor(Date.now() / 1000),
+      data: payload || {
+        transactionHash: '0x3f5c719e763b0185966a4f475b8e96f1b1a7d83457224219a16f8ef94a8678de',
+        network: 'sepolia',
+        from: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
+        to: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+        amount: '0.1587',
+        token: 'SepoliaETH',
+        status: 'CONFIRMED',
+        blockNumber: 6842109,
+        timestamp: new Date().toISOString()
+      }
+    };
+
+    const secret = process.env.WEBHOOK_SIGNING_SECRET || 'whsec_northveil_test_secret_998124';
+    const payloadString = JSON.stringify(testEvent);
+    const hmac = nodeCrypto.createHmac('sha256', secret);
+    const signature = 'sha256=' + hmac.update(payloadString).digest('hex');
+    const timestamp = Date.now().toString();
+
+    const startTime = Date.now();
+    let httpStatus = 200;
+    let deliverySuccess = true;
+    let responseText = '';
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Northveil-Signature': signature,
+          'X-Northveil-Timestamp': timestamp,
+          'User-Agent': 'Northveil-Webhook-Dispatcher/1.0.1'
+        },
+        body: payloadString
+      });
+      httpStatus = response.status;
+      deliverySuccess = response.ok;
+      responseText = await response.text();
+    } catch (deliveryErr: any) {
+      deliverySuccess = false;
+      responseText = deliveryErr.message || 'Connection failed or timeout';
+    }
+
+    const latencyMs = Date.now() - startTime;
+
+    return res.json({
+      success: deliverySuccess,
+      targetUrl: url,
+      httpStatus,
+      latencyMs,
+      signature,
+      timestamp,
+      event: testEvent,
+      receiverResponse: responseText.slice(0, 500)
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Webhook test dispatch failed' });
+  }
+});
+
+app.get('/api/v1/webhooks', async (req: Request, res: Response) => {
+  return res.json({
+    webhooks: [
+      {
+        id: 'wh_default_01',
+        url: 'https://api.northveil.xyz/webhook',
+        events: ['tx.confirmed', 'reservation.created', 'contract.deployed'],
+        status: 'ACTIVE',
+        created_at: '2026-08-01T00:00:00Z'
+      }
+    ]
+  });
+});
+
+
 // Standard Token / Contract Metadata Endpoint (Serves ERC-20 / ERC-721 JSON metadata from Supabase DB)
 app.get('/api/v1/contract-metadata/:id', async (req: Request, res: Response) => {
   try {
