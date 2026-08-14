@@ -861,7 +861,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({ onClos
                     <div className="p-3 bg-[#ff007f]/10 border-2 border-[#ff007f] text-xs text-[#ff007f] font-mono font-bold flex items-start gap-2">
                       <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                       <div>
-                        <div className="font-black uppercase">⚠️ SINGLE-ADDRESS LIMITATION WARNING</div>
+                        <div className="font-black uppercase">[NOTICE] SINGLE-ADDRESS LIMITATION WARNING</div>
                         <div className="text-[11px] text-slate-300 font-normal mt-0.5">
                           Importing a raw private key binds ONLY a single public address. Multi-account HD derivation, sub-wallets, and recovery backup require a 12 or 24-word BIP-39 seed phrase.
                         </div>

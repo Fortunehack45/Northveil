@@ -28,8 +28,8 @@ class NorthveilClient {
         }
         return res.json();
     }
-    mcpCall(toolName, args = {}) {
-        return this.request('/mcp', {
+    async mcpCall(toolName, args = {}) {
+        const raw = await this.request('/mcp', {
             method: 'POST',
             body: JSON.stringify({
                 jsonrpc: '2.0',
@@ -38,6 +38,10 @@ class NorthveilClient {
                 id: Date.now(),
             }),
         });
+        if (raw?.error) {
+            throw new Error(`MCP Tool Error (${toolName}): ${raw.error.message || JSON.stringify(raw.error)}`);
+        }
+        return (raw?.result !== undefined ? raw.result : raw);
     }
     // ═══════════════════════════════════════════════════════
     // WALLET & PORTFOLIO

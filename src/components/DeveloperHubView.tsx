@@ -792,7 +792,7 @@ console.log('Reservation reference:', ticket.bookingReference);`;
                         }}
                         className="px-3.5 py-1.5 bg-[#ccff00] text-black font-black text-xs uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#d8ff33] flex items-center gap-1.5"
                       >
-                        📥 DOWNLOAD CONFIG FILE
+                        DOWNLOAD CONFIG FILE
                       </button>
                     </div>
                   </div>
@@ -805,23 +805,23 @@ console.log('Reservation reference:', ticket.bookingReference);`;
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div className="p-3 bg-[#141419] border border-white/20 space-y-1">
-                      <div className="text-white font-black">📁 WINDOWS FILE PATH:</div>
+                      <div className="text-white font-black">WINDOWS CONFIG PATH:</div>
                       <code className="text-[#00f0ff] text-[11px] break-all">%APPDATA%\Claude\claude_desktop_config.json</code>
                       <button
                         onClick={() => copySnippet('%APPDATA%\\Claude\\claude_desktop_config.json', 'win_path')}
                         className="mt-1 px-2 py-0.5 bg-[#1f2430] border border-white/30 text-[10px] text-white hover:text-[#ccff00] flex items-center gap-1 cursor-pointer"
                       >
-                        {copiedSnippetId === 'win_path' ? '✓ COPIED PATH' : 'COPY PATH'}
+                        {copiedSnippetId === 'win_path' ? 'COPIED PATH' : 'COPY PATH'}
                       </button>
                     </div>
                     <div className="p-3 bg-[#141419] border border-white/20 space-y-1">
-                      <div className="text-white font-black">📁 MACOS FILE PATH:</div>
+                      <div className="text-white font-black">MACOS CONFIG PATH:</div>
                       <code className="text-[#00f0ff] text-[11px] break-all">~/Library/Application Support/Claude/claude_desktop_config.json</code>
                       <button
                         onClick={() => copySnippet('~/Library/Application Support/Claude/claude_desktop_config.json', 'mac_path')}
                         className="mt-1 px-2 py-0.5 bg-[#1f2430] border border-white/30 text-[10px] text-white hover:text-[#ccff00] flex items-center gap-1 cursor-pointer"
                       >
-                        {copiedSnippetId === 'mac_path' ? '✓ COPIED PATH' : 'COPY PATH'}
+                        {copiedSnippetId === 'mac_path' ? 'COPIED PATH' : 'COPY PATH'}
                       </button>
                     </div>
                   </div>
@@ -1105,11 +1105,11 @@ console.log('Reservation reference:', ticket.bookingReference);`;
               <div className="flex flex-wrap gap-1.5">
                 {[
                   { id: 'all', label: 'ALL TOOLS (34)' },
-                  { id: 'ticketing', label: '🎟️ RESERVATIONS & TICKETS' },
-                  { id: 'contracts', label: '📜 CONTRACTS & MINTING' },
-                  { id: 'trading', label: '🚀 TRADING & SWAPS' },
-                  { id: 'wallets', label: '💼 WALLETS & BALANCES' },
-                  { id: 'security', label: '🛡️ SECURITY & AUDITING' },
+                  { id: 'ticketing', label: 'RESERVATIONS & TICKETS' },
+                  { id: 'contracts', label: 'CONTRACTS & MINTING' },
+                  { id: 'trading', label: 'TRADING & SWAPS' },
+                  { id: 'wallets', label: 'WALLETS & BALANCES' },
+                  { id: 'security', label: 'SECURITY & AUDITING' },
                 ].map(cat => (
                   <button
                     key={cat.id}

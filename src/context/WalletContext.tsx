@@ -1516,7 +1516,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
             {/* Brutalist Touch / Scanner Visual */}
             <div className="mx-auto w-24 h-24 bg-[#0a0a0c] border-3 border-white shadow-[5px_5px_0px_0px_#00f0ff] flex flex-col items-center justify-center my-2 relative">
-              <span className="text-4xl">👆</span>
+              <Fingerprint className="w-10 h-10 text-[#00f0ff] stroke-[2]" />
               <span className="text-[9px] font-mono font-black text-[#ccff00] mt-1 tracking-widest uppercase">TOUCH ID</span>
             </div>
 

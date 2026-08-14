@@ -54,8 +54,8 @@ export class NorthveilClient {
     return res.json() as Promise<T>;
   }
 
-  private mcpCall<T>(toolName: string, args: Record<string, any> = {}): Promise<T> {
-    return this.request<T>('/mcp', {
+  private async mcpCall<T>(toolName: string, args: Record<string, any> = {}): Promise<T> {
+    const raw = await this.request<any>('/mcp', {
       method: 'POST',
       body: JSON.stringify({
         jsonrpc: '2.0',
@@ -64,6 +64,10 @@ export class NorthveilClient {
         id: Date.now(),
       }),
     });
+    if (raw?.error) {
+      throw new Error(`MCP Tool Error (${toolName}): ${raw.error.message || JSON.stringify(raw.error)}`);
+    }
+    return (raw?.result !== undefined ? raw.result : raw) as T;
   }
 
   // ═══════════════════════════════════════════════════════
