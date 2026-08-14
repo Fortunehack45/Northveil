@@ -168,6 +168,22 @@ class NorthveilClient {
     async listReservations(params = {}) {
         return this.mcpCall('list_reservations', params);
     }
+    /** Search live international flights with crypto pricing */
+    async searchFlights(params) {
+        return this.mcpCall('search_flights', params);
+    }
+    /** Search global hotel accommodations with crypto pricing */
+    async searchHotels(params) {
+        return this.mcpCall('search_hotels', params);
+    }
+    /** Search movies, IMAX screenings, concerts, and VIP events */
+    async searchEvents(params = {}) {
+        return this.mcpCall('search_events_and_movies', params);
+    }
+    /** Query booking confirmation status by official airline PNR or Northveil reference */
+    async getBookingStatus(bookingReferenceOrPnr) {
+        return this.mcpCall('get_booking_status', { bookingReference: bookingReferenceOrPnr });
+    }
     /** Get full OpenAPI 3.0.3 schema for ChatGPT & REST Action integration */
     async getOpenApiSchema() {
         const res = await fetch(`${this.baseUrl}/openapi.json`);

@@ -1,4 +1,4 @@
-import { NorthveilConfig, SwapParams, DeployContractParams, TransactionResult, TokenPrice, TrendingMemecoin, TokenAuditResult, TradeOrderParams, TradeOrder, WalletHealthResult, SecurityScanResult, SendTransferParams, MintTokensParams, MintTokensResult, ReserveTokensParams, ReserveTokensResult, MakeReservationParams, MakeReservationResult, ListReservationsResult } from './types.js';
+import { NorthveilConfig, SwapParams, DeployContractParams, TransactionResult, TokenPrice, TrendingMemecoin, TokenAuditResult, TradeOrderParams, TradeOrder, WalletHealthResult, SecurityScanResult, SendTransferParams, MintTokensParams, MintTokensResult, ReserveTokensParams, ReserveTokensResult, MakeReservationParams, MakeReservationResult, ListReservationsResult, FlightSearchParams, FlightSearchResult, HotelSearchParams, HotelSearchResult, EventSearchParams, EventSearchResult, BookingStatusResult } from './types.js';
 export declare class NorthveilClient {
     private baseUrl;
     private apiKey;
@@ -77,6 +77,14 @@ export declare class NorthveilClient {
         walletAddress?: string;
         category?: string;
     }): Promise<ListReservationsResult>;
+    /** Search live international flights with crypto pricing */
+    searchFlights(params: FlightSearchParams): Promise<FlightSearchResult>;
+    /** Search global hotel accommodations with crypto pricing */
+    searchHotels(params: HotelSearchParams): Promise<HotelSearchResult>;
+    /** Search movies, IMAX screenings, concerts, and VIP events */
+    searchEvents(params?: EventSearchParams): Promise<EventSearchResult>;
+    /** Query booking confirmation status by official airline PNR or Northveil reference */
+    getBookingStatus(bookingReferenceOrPnr: string): Promise<BookingStatusResult>;
     /** Get full OpenAPI 3.0.3 schema for ChatGPT & REST Action integration */
     getOpenApiSchema(): Promise<any>;
 }

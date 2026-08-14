@@ -22,6 +22,13 @@ import {
   MakeReservationParams,
   MakeReservationResult,
   ListReservationsResult,
+  FlightSearchParams,
+  FlightSearchResult,
+  HotelSearchParams,
+  HotelSearchResult,
+  EventSearchParams,
+  EventSearchResult,
+  BookingStatusResult,
 } from './types.js';
 
 export class NorthveilClient {
@@ -225,6 +232,26 @@ export class NorthveilClient {
   /** List active web3 reservations, flight boarding passes, and bookings */
   async listReservations(params: { walletAddress?: string; category?: string } = {}): Promise<ListReservationsResult> {
     return this.mcpCall<ListReservationsResult>('list_reservations', params);
+  }
+
+  /** Search live international flights with crypto pricing */
+  async searchFlights(params: FlightSearchParams): Promise<FlightSearchResult> {
+    return this.mcpCall<FlightSearchResult>('search_flights', params);
+  }
+
+  /** Search global hotel accommodations with crypto pricing */
+  async searchHotels(params: HotelSearchParams): Promise<HotelSearchResult> {
+    return this.mcpCall<HotelSearchResult>('search_hotels', params);
+  }
+
+  /** Search movies, IMAX screenings, concerts, and VIP events */
+  async searchEvents(params: EventSearchParams = {}): Promise<EventSearchResult> {
+    return this.mcpCall<EventSearchResult>('search_events_and_movies', params);
+  }
+
+  /** Query booking confirmation status by official airline PNR or Northveil reference */
+  async getBookingStatus(bookingReferenceOrPnr: string): Promise<BookingStatusResult> {
+    return this.mcpCall<BookingStatusResult>('get_booking_status', { bookingReference: bookingReferenceOrPnr });
   }
 
   /** Get full OpenAPI 3.0.3 schema for ChatGPT & REST Action integration */

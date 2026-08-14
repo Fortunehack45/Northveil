@@ -249,6 +249,115 @@ export interface MakeReservationResult {
 }
 
 export interface ListReservationsResult {
+  formattedMarkdown: string;
   count: number;
   reservations: MakeReservationResult[];
+}
+
+export interface FlightSearchParams {
+  origin: string;
+  destination: string;
+  departureDate: string;
+  returnDate?: string;
+  passengers?: number;
+  cabinClass?: 'economy' | 'premium_economy' | 'business' | 'first';
+  currency?: string;
+}
+
+export interface FlightOffer {
+  offerId: string;
+  airline: string;
+  airlineCode: string;
+  flightNumber: string;
+  origin: string;
+  destination: string;
+  departureTime: string;
+  arrivalTime: string;
+  duration: string;
+  stops: number;
+  cabinClass: string;
+  priceUsd: number;
+  priceCrypto: string;
+  currency: string;
+  seatsRemaining: number;
+}
+
+export interface FlightSearchResult {
+  formattedMarkdown: string;
+  route: string;
+  departureDate: string;
+  totalOffers: number;
+  offers: FlightOffer[];
+}
+
+export interface HotelSearchParams {
+  destination: string;
+  checkInDate: string;
+  checkOutDate: string;
+  guests?: number;
+  rooms?: number;
+  starRating?: number;
+  currency?: string;
+}
+
+export interface HotelOffer {
+  hotelId: string;
+  name: string;
+  location: string;
+  starRating: number;
+  roomType: string;
+  pricePerNightUsd: number;
+  totalPriceUsd: number;
+  totalPriceCrypto: string;
+  currency: string;
+  amenities: string[];
+  cancellationPolicy: string;
+}
+
+export interface HotelSearchResult {
+  formattedMarkdown: string;
+  destination: string;
+  checkInDate: string;
+  checkOutDate: string;
+  totalProperties: number;
+  hotels: HotelOffer[];
+}
+
+export interface EventSearchParams {
+  city?: string;
+  category?: 'movie' | 'concert' | 'sports' | 'conference' | 'theater';
+  query?: string;
+  currency?: string;
+}
+
+export interface EventOffer {
+  eventId: string;
+  title: string;
+  category: string;
+  venue: string;
+  city: string;
+  eventDate: string;
+  eventTime: string;
+  priceUsd: number;
+  priceCrypto: string;
+  currency: string;
+  availableSeats: string[];
+}
+
+export interface EventSearchResult {
+  formattedMarkdown: string;
+  totalEvents: number;
+  events: EventOffer[];
+}
+
+export interface BookingStatusResult {
+  formattedMarkdown: string;
+  found: boolean;
+  bookingReference: string;
+  pnr?: string;
+  category: string;
+  title: string;
+  customerName: string;
+  status: string;
+  details: Record<string, any>;
 }

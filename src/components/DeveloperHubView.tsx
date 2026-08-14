@@ -688,9 +688,13 @@ const mintTx = await client.mintTokens({
 console.log('Reservation reference:', ticket.bookingReference);`;
 
         const allToolsCatalog = [
-          { name: 'make_reservation', category: 'ticketing', desc: 'Create web3 ticket & booking reservation (flights, movies, hotels, events)', sample: '{"category":"flight","title":"Flight BA-204","bookingDate":"2026-09-20","priceAmount":"0.05"}' },
-          { name: 'list_reservations', category: 'ticketing', desc: 'List active digital ticket passes, flight boarding passes & bookings', sample: '{"walletAddress":"' + activeAddress + '"}' },
-          { name: 'reserve_tokens', category: 'ticketing', desc: 'Escrow tokens with time-locked unlock release schedule', sample: '{"contractAddress":"0x...","recipientAddress":"0x...","amount":"1000","unlockDate":"2026-12-31"}' },
+          { name: 'search_flights', category: 'travel', desc: 'Search live international airline flights, routes, schedules, and crypto pricing (ETH/USDC/SOL)', sample: '{"origin":"LHR","destination":"JFK","departureDate":"2026-09-20","cabinClass":"economy"}' },
+          { name: 'search_hotels', category: 'travel', desc: 'Search global hotels, luxury resorts, room tiers, and live crypto pricing across 50+ cities', sample: '{"destination":"Tokyo","checkInDate":"2026-10-05","checkOutDate":"2026-10-08","guests":2}' },
+          { name: 'search_events_and_movies', category: 'travel', desc: 'Search cinema movie screenings (IMAX), concerts, and Web3 VIP events with live seating', sample: '{"city":"London","category":"movie","query":"Interstellar"}' },
+          { name: 'get_booking_status', category: 'travel', desc: 'Verify real-time confirmation status using official airline PNR code or Northveil reference', sample: '{"bookingReference":"7X9K2B"}' },
+          { name: 'make_reservation', category: 'travel', desc: 'Create web3 ticket & booking reservation (flights, movies, hotels, events) with PNR code', sample: '{"category":"flight","title":"Flight BA-204","bookingDate":"2026-09-20","priceAmount":"0.05"}' },
+          { name: 'list_reservations', category: 'travel', desc: 'List active digital ticket passes, flight boarding passes & bookings for connected wallet', sample: '{"walletAddress":"' + activeAddress + '"}' },
+          { name: 'reserve_tokens', category: 'contracts', desc: 'Escrow tokens with time-locked unlock release schedule', sample: '{"contractAddress":"0x...","recipientAddress":"0x...","amount":"1000","unlockDate":"2026-12-31"}' },
           { name: 'mint_tokens', category: 'contracts', desc: 'Mint new tokens from deployed ERC-20 contract via custodial signer', sample: '{"contractAddress":"0x...","amount":"50000","network":"sepolia"}' },
           { name: 'deploy_smart_contract', category: 'contracts', desc: 'Compile & deploy ERC-20/721/1155/Staking contracts to 6+ blockchains', sample: '{"contractType":"erc20","contractName":"AlphaToken","symbol":"ALPHA","totalSupply":1000000}' },
           { name: 'verify_smart_contract', category: 'contracts', desc: 'Verify and publish Solidity source code on Etherscan/BscScan block explorer', sample: '{"contractAddress":"0x...","contractName":"AlphaToken","network":"sepolia"}' },
@@ -1081,19 +1085,19 @@ console.log('Reservation reference:', ticket.bookingReference);`;
               </div>
             )}
 
-            {/* ════════ FILTERABLE LIVE TOOL CATALOG (34 TOOLS) ════════ */}
+            {/* ════════ FILTERABLE LIVE TOOL CATALOG (38 TOOLS) ════════ */}
             <div className="p-5 bg-[#0a0a0c] border-2 border-white space-y-4 shadow-[4px_4px_0px_0px_#000]">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/20 pb-3">
                 <div>
                   <span className="text-xs font-black text-white uppercase block">
-                    EXPLORE ALL 34 REGISTERED MCP ACTIONS & TOOLS
+                    EXPLORE ALL 38 REGISTERED MCP ACTIONS & TOOLS
                   </span>
                   <span className="text-[11px] text-slate-400">Click on any tool to copy its sample payload.</span>
                 </div>
                 <div className="w-full sm:w-64">
                   <input
                     type="text"
-                    placeholder="Search tools (e.g. reserve, mint, swap)..."
+                    placeholder="Search tools (e.g. flights, hotel, pnr, reserve, mint)..."
                     value={toolSearchQuery}
                     onChange={(e) => setToolSearchQuery(e.target.value)}
                     className="w-full bg-[#141419] border border-white/40 p-2 text-xs text-white focus:outline-none focus:border-[#ccff00]"
@@ -1104,8 +1108,8 @@ console.log('Reservation reference:', ticket.bookingReference);`;
               {/* Category Filter Pills */}
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  { id: 'all', label: 'ALL TOOLS (34)' },
-                  { id: 'ticketing', label: 'RESERVATIONS & TICKETS' },
+                  { id: 'all', label: 'ALL TOOLS (38)' },
+                  { id: 'travel', label: 'FLIGHTS, HOTELS & TICKETS' },
                   { id: 'contracts', label: 'CONTRACTS & MINTING' },
                   { id: 'trading', label: 'TRADING & SWAPS' },
                   { id: 'wallets', label: 'WALLETS & BALANCES' },
