@@ -58,6 +58,19 @@ Northveil integrates an **Autonomous Travel Aggregation Engine**:
 
 ---
 
+## 📚 Core Developer Documentation Suite
+
+New engineers and contributors joining Northveil should explore our in-depth architecture manuals in [`docs/`](docs/):
+
+- 📘 **[Core Engineering Master Guide & Developer Handbook](docs/CORE_ENGINEERING_MASTER_GUIDE.md)**: The 10-chapter technical encyclopedia detailing every layer of Northveil.
+- 🏗️ **[Architecture & System Design Manual](docs/ARCHITECTURE_AND_SYSTEM_DESIGN.md)**: System topography, monorepo layout, and execution pipelines.
+- ✈️ **[Autonomous Travel & Airline Ticketing Specification](docs/AUTONOMOUS_TRAVEL_ENGINE_SPEC.md)**: IATA routing algorithms, cabin multipliers, and live crypto pricing math.
+- 🛡️ **[Smart Contract Studio & AST Security Auditor](docs/SMART_CONTRACT_COMPILER_AND_AUDITOR.md)**: Solc compilation, AST vulnerability scanner rules, and honeypot detection.
+- 🔐 **[Custody, Key Derivation & Cryptography Manual](docs/CUSTODY_AND_CRYPTOGRAPHY_MANUAL.md)**: AES-256-GCM hardware key encryption, BIP-39/BIP-44 derivation, and tenant boundaries.
+- 🗄️ **[Database Schema & DevOps Manual](docs/DATABASE_SCHEMA_AND_DEV_OPERATIONS.md)**: PostgreSQL DDL schemas, Row-Level Security (RLS) policies, and `pg_cron` keepalive automation.
+
+---
+
 ## 🚀 Quick Commands
 
 ```bash
@@ -74,4 +87,5 @@ python -c "import northveil; client = northveil.Northveil(); print(client.whoami
 ---
 
 ## 📄 License
-MIT License © 2026 Northveil Protocol.
+MIT License © 2026 Northveil Protocol. Built with precision for autonomous intelligence and global Web3 infrastructure.
+
