@@ -1,5 +1,4 @@
 {
-  "$schema": "https://json.schemastore.org/package.json",
   "name": "northveil-sdk",
   "version": "1.0.1",
   "description": "Official TypeScript & JavaScript SDK for Northveil AI Wallet & Multi-Chain MCP Tools",
