@@ -66,21 +66,29 @@ export const DeveloperHubView: React.FC = () => {
   useEffect(() => {
     const pingMcp = async () => {
       const t0 = performance.now();
-      try {
-        const res = await fetch('http://localhost:3001/health').catch(() => null);
-        const elapsed = Math.round(performance.now() - t0);
-        if (res && res.ok) {
-          setMcpOnline(true);
-          setMcpLatency(elapsed);
-        } else {
-          setMcpOnline(false);
-        }
-      } catch (e) {
-        setMcpOnline(false);
+      const endpointsToTry = [
+        `${getMcpServerUrl()}/health`,
+        'http://localhost:3001/health',
+        'http://127.0.0.1:3001/health',
+      ];
+
+      for (const endpoint of endpointsToTry) {
+        try {
+          const res = await fetch(endpoint, { method: 'GET', mode: 'cors' }).catch(() => null);
+          if (res && res.ok) {
+            const elapsed = Math.round(performance.now() - t0);
+            setMcpOnline(true);
+            setMcpLatency(elapsed || 15);
+            return;
+          }
+        } catch (e) {}
       }
+
+      setMcpOnline(false);
     };
+
     pingMcp();
-    const intv = setInterval(pingMcp, 5000);
+    const intv = setInterval(pingMcp, 4000);
     return () => clearInterval(intv);
   }, []);
 
