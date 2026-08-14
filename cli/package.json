@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "northveil-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "The Official Northveil Developer CLI — Build decentralized applications, deploy smart contracts, interact with MCP AI servers, search global travel & flights, and manage multi-chain wallets.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

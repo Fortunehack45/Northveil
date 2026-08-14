@@ -50,7 +50,10 @@ export class NorthveilClient {
       ...(options.headers as Record<string, string> || {})
     };
 
-    if (this.apiKey) headers['Authorization'] = `Bearer ${this.apiKey}`;
+    if (this.apiKey) {
+      headers['Authorization'] = `Bearer ${this.apiKey}`;
+      headers['X-API-Key'] = this.apiKey;
+    }
     if (this.walletAddress) headers['x-wallet-address'] = this.walletAddress;
 
     const res = await fetch(url, { ...options, headers });
@@ -60,6 +63,33 @@ export class NorthveilClient {
     }
     return res.json() as Promise<T>;
   }
+
+  /** Authentication & Identity Scope Service */
+  public readonly auth = {
+    /** Get current authenticated developer/user profile, scopes, and allowed wallet addresses */
+    getMe: async (): Promise<{
+      authenticated: boolean;
+      keyName: string;
+      walletAddress: string;
+      allowedWallets: string[];
+      permissions: string[];
+      tier: string;
+      userId: string;
+      timestamp: string;
+    }> => {
+      return this.request('/api/v1/auth/me');
+    },
+
+    /** Dynamically update the active API Key */
+    setApiKey: (key: string) => {
+      this.apiKey = key;
+    },
+
+    /** Dynamically update the active target wallet */
+    setWalletAddress: (address: string) => {
+      this.walletAddress = address;
+    }
+  };
 
   private async mcpCall<T>(toolName: string, args: Record<string, any> = {}): Promise<T> {
     const raw = await this.request<any>('/mcp', {

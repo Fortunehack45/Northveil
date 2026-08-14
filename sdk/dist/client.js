@@ -17,8 +17,10 @@ class NorthveilClient {
             'Bypass-Tunnel-Reminder': 'true',
             ...(options.headers || {})
         };
-        if (this.apiKey)
+        if (this.apiKey) {
             headers['Authorization'] = `Bearer ${this.apiKey}`;
+            headers['X-API-Key'] = this.apiKey;
+        }
         if (this.walletAddress)
             headers['x-wallet-address'] = this.walletAddress;
         const res = await fetch(url, { ...options, headers });
@@ -28,6 +30,21 @@ class NorthveilClient {
         }
         return res.json();
     }
+    /** Authentication & Identity Scope Service */
+    auth = {
+        /** Get current authenticated developer/user profile, scopes, and allowed wallet addresses */
+        getMe: async () => {
+            return this.request('/api/v1/auth/me');
+        },
+        /** Dynamically update the active API Key */
+        setApiKey: (key) => {
+            this.apiKey = key;
+        },
+        /** Dynamically update the active target wallet */
+        setWalletAddress: (address) => {
+            this.walletAddress = address;
+        }
+    };
     async mcpCall(toolName, args = {}) {
         const raw = await this.request('/mcp', {
             method: 'POST',

@@ -5,6 +5,24 @@ export declare class NorthveilClient {
     private walletAddress;
     constructor(config?: NorthveilConfig);
     private request;
+    /** Authentication & Identity Scope Service */
+    readonly auth: {
+        /** Get current authenticated developer/user profile, scopes, and allowed wallet addresses */
+        getMe: () => Promise<{
+            authenticated: boolean;
+            keyName: string;
+            walletAddress: string;
+            allowedWallets: string[];
+            permissions: string[];
+            tier: string;
+            userId: string;
+            timestamp: string;
+        }>;
+        /** Dynamically update the active API Key */
+        setApiKey: (key: string) => void;
+        /** Dynamically update the active target wallet */
+        setWalletAddress: (address: string) => void;
+    };
     private mcpCall;
     /** Get connected wallet address and details */
     getWalletInfo(chain?: string): Promise<any>;

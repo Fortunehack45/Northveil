@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import { getCliConfig } from './config.js';
 
 export interface CliConfig {
   baseUrl: string;
@@ -6,10 +7,18 @@ export interface CliConfig {
   walletAddress: string;
 }
 
+export const API_BASE_CANDIDATES = [
+  'https://mcp.northveil.xyz',
+  'https://northveil-mcp.vercel.app',
+  'http://127.0.0.1:3001',
+  'http://localhost:3001',
+];
+
 export function getConfig(): CliConfig {
-  const baseUrl = process.env.NORTHVEIL_API_URL || process.env.VITE_MCP_SERVER_URL || 'https://mcp.northveil.xyz';
-  const apiKey = process.env.NORTHVEIL_API_KEY || 'nv_live_9f82a17b09c82415d8a9';
-  const walletAddress = process.env.NORTHVEIL_WALLET_ADDRESS || '0x87678de86804c6c3612d66cbd6e2857f1a7d8345';
+  const saved = getCliConfig();
+  const baseUrl = process.env.NORTHVEIL_API_URL || saved.apiUrl || process.env.VITE_MCP_SERVER_URL || 'https://mcp.northveil.xyz';
+  const apiKey = process.env.NORTHVEIL_API_KEY || saved.apiKey || 'nv_live_default_northveil_key';
+  const walletAddress = process.env.NORTHVEIL_WALLET_ADDRESS || saved.defaultWallet || '0x87678de86804c6c3612d66cbd6e2857f1a7d8345';
   return { baseUrl: baseUrl.replace(/\/$/, ''), apiKey, walletAddress };
 }
 
@@ -24,9 +33,10 @@ export function printBanner() {
 export async function postApi(endpoint: string, body: any): Promise<any> {
   const cfg = getConfig();
   const endpointsToTry = [
+    `${cfg.baseUrl}${endpoint}`,
     'http://127.0.0.1:3001' + endpoint,
     'http://localhost:3001' + endpoint,
-    `${cfg.baseUrl}${endpoint}`,
+    'https://northveil-mcp.vercel.app' + endpoint,
   ];
 
   let lastErrorMsg = '';
