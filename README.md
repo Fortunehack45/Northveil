@@ -89,3 +89,5 @@ python -c "import northveil; client = northveil.Northveil(); print(client.whoami
 ## 📄 License
 MIT License © 2026 Northveil Protocol. Built with precision for autonomous intelligence and global Web3 infrastructure.
 
+
+
