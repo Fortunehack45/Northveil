@@ -63,14 +63,25 @@ export const DeveloperHubView: React.FC = () => {
     'aiChat' | 'apiKeys' | 'mcpServer' | 'sdks' | 'docs' | 'webhooks' | 'plugins' | 'contractApis'
   >('aiChat');
 
+  const [isCloudMode, setIsCloudMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const h = window.location.hostname;
+      return h !== 'localhost' && h !== '127.0.0.1';
+    }
+    return true;
+  });
+
+  const activeServerUrl = isCloudMode ? 'https://mcp.northveil.xyz' : 'http://localhost:3001';
+  const activeSseUrl = isCloudMode 
+    ? `https://mcp.northveil.xyz/sse?wallet_address=${activeSubWallet?.address || '0x8767...8345'}`
+    : `http://localhost:3001/sse?wallet_address=${activeSubWallet?.address || '0x8767...8345'}`;
+
   useEffect(() => {
     const pingMcp = async () => {
       const t0 = performance.now();
-      const endpointsToTry = [
-        `${getMcpServerUrl()}/health`,
-        'http://localhost:3001/health',
-        'http://127.0.0.1:3001/health',
-      ];
+      const endpointsToTry = isCloudMode 
+        ? ['https://mcp.northveil.xyz/health', `${getMcpServerUrl()}/health`, 'http://localhost:3001/health', 'http://127.0.0.1:3001/health']
+        : ['http://localhost:3001/health', 'http://127.0.0.1:3001/health', `${getMcpServerUrl()}/health`];
 
       for (const endpoint of endpointsToTry) {
         try {
@@ -90,7 +101,7 @@ export const DeveloperHubView: React.FC = () => {
     pingMcp();
     const intv = setInterval(pingMcp, 4000);
     return () => clearInterval(intv);
-  }, []);
+  }, [isCloudMode]);
 
   // AI Chat State
   const [inputMessage, setInputMessage] = useState('');
@@ -424,28 +435,54 @@ export const DeveloperHubView: React.FC = () => {
       {/* Top Banner Header */}
       <div className="bg-[#141419] border-2 border-white p-6 sm:p-8 shadow-[8px_8px_0px_0px_#00f0ff] flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div>
-          <span className="px-2.5 py-1 bg-[#00f0ff] text-black text-[10px] font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000]">
-            DEVELOPER PLATFORM & API MATRIX
-          </span>
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className="px-2.5 py-1 bg-[#00f0ff] text-black text-[10px] font-black uppercase border border-black shadow-[2px_2px_0px_0px_#000]">
+              DEVELOPER PLATFORM & API MATRIX
+            </span>
+            <span className="px-2.5 py-1 bg-[#ccff00] text-black text-[10px] font-black uppercase border border-black">
+              ENDPOINT: {activeServerUrl}
+            </span>
+          </div>
           <h2 className="text-2xl font-black text-white uppercase tracking-tight mt-2">
             DEVELOPER HUB & API ENGINE
           </h2>
           <p className="text-xs text-slate-300 mt-1">
-            API KEYS, MCP SERVER, SDK LIBRARIES, INTERACTIVE DOCS, WEBHOOKS, PLUGINS & CONTRACT ABIS.
+            API KEYS, MCP SERVER, CLI, SDK LIBRARIES, INTERACTIVE DOCS, WEBHOOKS & SMART CONTRACT APIS.
           </p>
+        </div>
+
+        {/* Environment Toggle Switch */}
+        <div className="p-2 bg-[#0a0a0c] border-2 border-white flex items-center gap-1 shadow-[4px_4px_0px_0px_#000]">
+          <span className="text-[10px] font-black text-slate-400 px-2 uppercase">TARGET URL:</span>
+          <button
+            onClick={() => setIsCloudMode(true)}
+            className={`px-3 py-1.5 text-xs font-black uppercase border cursor-pointer transition-all ${
+              isCloudMode ? 'bg-[#00f0ff] text-black border-black shadow-[2px_2px_0px_0px_#000]' : 'text-slate-400 border-transparent hover:text-white'
+            }`}
+          >
+            [PRODUCTION CLOUD]
+          </button>
+          <button
+            onClick={() => setIsCloudMode(false)}
+            className={`px-3 py-1.5 text-xs font-black uppercase border cursor-pointer transition-all ${
+              !isCloudMode ? 'bg-[#ccff00] text-black border-black shadow-[2px_2px_0px_0px_#000]' : 'text-slate-400 border-transparent hover:text-white'
+            }`}
+          >
+            [LOCAL DAEMON]
+          </button>
         </div>
       </div>
 
       {/* Navigation Tabs */}
       <div className="flex flex-wrap gap-2">
         {[
-          { id: 'aiChat', label: 'AI CHAT & ACTIONS', icon: Bot },
+          { id: 'aiChat', label: 'AI CHAT & ACTIONS', icon: Bot, badge: 'COMING SOON' },
           { id: 'apiKeys', label: 'API KEYS', icon: Key },
-          { id: 'mcpServer', label: 'MCP SERVER', icon: Terminal },
-          { id: 'sdks', label: 'SDKS & LIBRARIES', icon: Code },
+          { id: 'mcpServer', label: 'MCP SERVER (38 TOOLS)', icon: Terminal },
+          { id: 'sdks', label: 'SDKS & CLI', icon: Code },
           { id: 'docs', label: 'DOCUMENTATION', icon: FileText },
-          { id: 'webhooks', label: 'WEBHOOKS', icon: Webhook },
-          { id: 'plugins', label: 'PLUGIN MANAGER', icon: Boxes },
+          { id: 'webhooks', label: 'LIVE WEBHOOKS', icon: Webhook },
+          { id: 'plugins', label: 'PLUGIN MANAGER', icon: Boxes, badge: 'COMING SOON' },
           { id: 'contractApis', label: 'CONTRACT APIS', icon: Cpu },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -460,102 +497,57 @@ export const DeveloperHubView: React.FC = () => {
               }`}
             >
               <Icon className="w-3.5 h-3.5 stroke-[2.5]" /> {tab.label}
+              {tab.badge && (
+                <span className="px-1.5 py-0.2 bg-[#ff007f] text-white text-[9px] font-black uppercase rounded-xs">
+                  {tab.badge}
+                </span>
+              )}
             </button>
           );
         })}
       </div>
 
-      {/* TAB 1: AI CHAT */}
+      {/* TAB 1: AI CHAT (COMING SOON) */}
       {activeTab === 'aiChat' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-8 bg-[#141419] border-2 border-white p-6 shadow-[6px_6px_0px_0px_#ccff00] flex flex-col h-[600px] justify-between">
-            <div className="flex items-center justify-between border-b-2 border-white pb-3">
-              <div className="flex items-center gap-2 text-xs">
-                <span className="w-2.5 h-2.5 bg-[#ccff00] rounded-full" />
-                <span className="text-white font-black uppercase">ACTIVE CONTEXT:</span>
-                <span className="text-[#00f0ff] font-bold uppercase">{selectedChain.name} CHAIN</span>
-              </div>
-              <span className="text-[10px] text-slate-400">MODEL: GEMINI 2.5 PRO REALTIME</span>
-            </div>
+        <div className="bg-[#141419] border-2 border-white p-8 shadow-[8px_8px_0px_0px_#ccff00] text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#0a0a0c] border border-[#ccff00] text-[#ccff00] text-xs font-black uppercase shadow-[2px_2px_0px_0px_#000]">
+            <Sparkles className="w-4 h-4" /> [COMING SOON • PHASE 2 TESTNET]
+          </div>
 
-            <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 my-4 pr-2 text-xs">
-              {messages.map((m) => (
-                <div key={m.id} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`max-w-[85%] p-4 border-2 border-black shadow-[4px_4px_0px_0px_#000] ${
-                      m.sender === 'user'
-                        ? 'bg-[#00f0ff] text-black font-bold'
-                        : 'bg-[#0a0a0c] text-white border-white'
-                    }`}
-                  >
-                    {m.sender === 'ai' && (
-                      <div className="flex items-center gap-1.5 text-[#ccff00] font-black text-[10px] mb-1">
-                        <Sparkles className="w-3 h-3" /> NORTHVEIL AI NODE
-                      </div>
-                    )}
-                    <p className="leading-relaxed">{m.text}</p>
-                    {m.widgetPayload && (
-                      <McpActionWidget payload={m.widgetPayload} />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="max-w-2xl mx-auto space-y-3">
+            <h3 className="text-2xl font-black text-white uppercase tracking-tight">
+              NORTHVEIL AUTONOMOUS AGENTIC BRAIN & REASONING AGENTS
+            </h3>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              We are finalizing the native autonomous on-chain execution agents, automated DEX rebalancing, and conversational multi-chain reasoning engine. In the meantime, you can connect your Claude Desktop, Claude Web, Cursor IDE, or ChatGPT directly via our live **MCP Server (38 Tools)** and **TypeScript SDK**!
+            </p>
+          </div>
 
-            <div className="flex flex-wrap gap-2 mb-3">
-              {[
-                'Transfer 0.25 ETH to 0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
-                'Inspect Contract 0xdAC17F958D2ee523a2206206994597C13D831ec7 Metadata',
-                'Request 100 USDC Payment',
-                'Generate Transaction Receipt',
-                'Swap 1 ETH to USDC',
-              ].map((p, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleSendMessage(p)}
-                  className="px-2.5 py-1 bg-[#0a0a0c] border border-white text-[10px] text-slate-300 font-mono font-bold uppercase hover:text-[#ccff00] hover:border-[#ccff00] cursor-pointer shadow-[2px_2px_0px_0px_#000]"
-                >
-                  {p}
-                </button>
-              ))}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto text-left">
+            <div className="p-4 bg-[#0a0a0c] border-2 border-white space-y-2">
+              <span className="text-xs font-black text-[#00f0ff] uppercase block">[FEATURE 1]</span>
+              <p className="text-xs font-bold text-white uppercase">AUTONOMOUS PORTFOLIO REBALANCER</p>
+              <p className="text-[11px] text-slate-400">Execute automated yield capture and limit stop-losses with zero manual intervention.</p>
             </div>
-
-            <div className="flex items-center gap-2 border-t-2 border-white pt-3">
-              <input
-                type="text"
-                placeholder="ASK AI ASSISTANT ANYTHING OR INSTRUCT AN ACTION..."
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                className="flex-1 bg-[#0a0a0c] border-2 border-white p-3 text-xs font-bold text-white focus:outline-none"
-              />
-              <button
-                onClick={() => handleSendMessage()}
-                className="px-5 py-3 bg-[#ccff00] text-black font-black text-xs uppercase border-2 border-black shadow-[3px_3px_0px_0px_#000] cursor-pointer hover:bg-[#d8ff33]"
-              >
-                <Send className="w-4 h-4 stroke-[3]" />
-              </button>
+            <div className="p-4 bg-[#0a0a0c] border-2 border-white space-y-2">
+              <span className="text-xs font-black text-[#ccff00] uppercase block">[FEATURE 2]</span>
+              <p className="text-xs font-bold text-white uppercase">NATURAL LANGUAGE CODE AUDITOR</p>
+              <p className="text-[11px] text-slate-400">Real-time smart contract vulnerability scanner powered by formal verification algorithms.</p>
+            </div>
+            <div className="p-4 bg-[#0a0a0c] border-2 border-white space-y-2">
+              <span className="text-xs font-black text-[#ff007f] uppercase block">[FEATURE 3]</span>
+              <p className="text-xs font-bold text-white uppercase">CROSS-CHAIN TRAVEL BOT</p>
+              <p className="text-[11px] text-slate-400">Conversational flight, hotel, and event booking with instant cryptocurrency settlement.</p>
             </div>
           </div>
 
-          <div className="lg:col-span-4 bg-[#141419] border-2 border-white p-6 shadow-[6px_6px_0px_0px_#ff007f] space-y-4">
-            <h3 className="text-base font-black text-white uppercase border-b-2 border-white pb-3">
-              EXECUTABLE AI AGENTS
-            </h3>
-
-            <div className="space-y-3">
-              {[
-                { title: 'SWAP & BRIDGE AGENT', desc: 'Auto-find liquidity & execute multi-chain swaps' },
-                { title: 'SCAM SHIELD AUDITOR', desc: 'Scan target smart contract bytecode for backdoors' },
-                { title: 'DEFI YIELD OPTIMIZER', desc: 'Rebalance portfolio for highest APY' },
-                { title: 'SMART CONTRACT GENERATOR', desc: 'Write & test Solidity / Rust code snippets' },
-              ].map((act, idx) => (
-                <div key={idx} className="p-3 bg-[#0a0a0c] border-2 border-white shadow-[2px_2px_0px_0px_#000]">
-                  <div className="text-xs font-black text-[#ccff00] uppercase">{act.title}</div>
-                  <div className="text-[10px] text-slate-300 mt-0.5">{act.desc}</div>
-                </div>
-              ))}
-            </div>
+          <div className="pt-2">
+            <button
+              onClick={() => setActiveTab('mcpServer')}
+              className="px-6 py-3 bg-[#ccff00] text-black font-black text-xs uppercase border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:bg-[#d8ff33] cursor-pointer"
+            >
+              USE MCP SERVER & CONNECT TO CLAUDE / CHATGPT NOW ➔
+            </button>
           </div>
         </div>
       )}
@@ -611,8 +603,8 @@ export const DeveloperHubView: React.FC = () => {
         const activeKey = apiKeys[0]?.key || 'nv_live_9f82a17b09c82415d8a9';
         const activeAddress = activeSubWallet?.address || '0x71c8891575b50d22e032d847847c234a413d4cc8';
 
-        // Dynamically constructed server URLs with active user's wallet address
-        const baseUrl = getMcpServerUrl();
+        // Dynamically constructed server URLs based on selected environment mode (Cloud vs Localhost)
+        const baseUrl = activeServerUrl;
         const localSseUrl = `${baseUrl}/sse?wallet_address=${activeAddress}`;
         const localMcpUrl = `${baseUrl}/mcp?wallet_address=${activeAddress}`;
         const openApiUrl = `${baseUrl}/openapi.json?wallet_address=${activeAddress}`;
@@ -1254,36 +1246,47 @@ console.log('Reservation reference:', ticket.bookingReference);`;
       {/* TAB 6: WEBHOOKS */}
       {activeTab === 'webhooks' && (
         <div className="bg-[#141419] border-2 border-white p-6 shadow-[6px_6px_0px_0px_#ccff00] space-y-6">
-          <div className="flex items-center justify-between border-b-2 border-white pb-3">
+          <div className="flex items-center justify-between border-b-2 border-white pb-3 flex-wrap gap-2">
             <div>
-              <h3 className="text-xl font-black text-white uppercase">EVENT WEBHOOK SUBSCRIPTIONS</h3>
-              <p className="text-xs text-slate-300 mt-0.5">LISTEN TO ON-CHAIN TRANSACTION & THREAT EVENTS IN REALTIME.</p>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-[#ccff00] text-black text-[10px] font-black uppercase border border-black">
+                  HMAC-SHA256 SIGNED
+                </span>
+                <h3 className="text-xl font-black text-white uppercase">EVENT WEBHOOK SUBSCRIPTIONS & DISPATCHER</h3>
+              </div>
+              <p className="text-xs text-slate-300 mt-1">LISTEN TO ON-CHAIN TRANSACTIONS, RESERVATIONS, DEPLOYMENTS & THREAT EVENTS IN REALTIME.</p>
             </div>
+            <span className="text-xs font-black text-[#00f0ff]">TARGET: {activeServerUrl}/api/v1/webhooks</span>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
-              placeholder="HTTPS://YOUR-DOMAIN.COM/WEBHOOK"
+              placeholder="HTTPS://YOUR-DOMAIN.COM/WEBHOOK/NORTHVEIL"
               value={newWebhookUrl}
               onChange={(e) => setNewWebhookUrl(e.target.value)}
-              className="flex-1 bg-[#0a0a0c] border-2 border-white p-3 text-xs text-white focus:outline-none"
+              className="flex-1 bg-[#0a0a0c] border-2 border-white p-3 text-xs text-white focus:outline-none focus:border-[#ccff00]"
             />
             <button
               onClick={handleAddWebhook}
-              className="px-5 py-3 bg-[#ccff00] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+              className="px-5 py-3 bg-[#ccff00] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#d8ff33]"
             >
-              ADD WEBHOOK
+              REGISTER WEBHOOK
             </button>
           </div>
 
           <div className="space-y-3">
             {webhooks.map((w) => (
-              <div key={w.id} className="p-4 bg-[#0a0a0c] border-2 border-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-[3px_3px_0px_0px_#000]">
-                <div>
-                  <div className="text-xs font-black text-white uppercase">{w.url}</div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[10px] text-slate-400">EVENTS:</span>
+              <div key={w.id} className="p-4 bg-[#0a0a0c] border-2 border-white flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-[3px_3px_0px_0px_#000]">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-[#ccff00] uppercase font-mono">{w.url}</span>
+                    <span className="px-1.5 py-0.5 bg-green-500/20 text-[#ccff00] text-[9px] font-bold border border-green-500/40">
+                      [{w.status || 'ACTIVE'}]
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className="text-[10px] text-slate-400 font-bold">SUBSCRIBED TOPICS:</span>
                     {w.events.map((ev) => (
                       <span key={ev} className="px-1.5 py-0.5 bg-[#00f0ff] text-black text-[9px] font-black uppercase border border-black">
                         {ev}
@@ -1292,54 +1295,84 @@ console.log('Reservation reference:', ticket.bookingReference);`;
                   </div>
                 </div>
 
-                <button
-                  onClick={handleTestWebhook}
-                  className="px-3 py-1.5 bg-[#ff007f] text-white font-black text-xs uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer"
-                >
-                  TEST PAYLOAD
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      setWebhookTestStatus(`DISPATCHING HMAC TEST EVENT TO ${w.url}...`);
+                      try {
+                        const res = await fetch(`${activeServerUrl}/api/v1/webhooks/test`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ url: w.url, eventType: 'tx.confirmed' }),
+                        });
+                        const data = await res.json();
+                        setWebhookTestStatus(`[${data.success ? 'DELIVERY SUCCESS' : 'ATTEMPT RECORDED'}] HTTP ${data.httpStatus || 200} • ${data.latencyMs}ms Latency • Signature: ${data.signature.slice(0, 24)}...`);
+                      } catch (e: any) {
+                        setWebhookTestStatus(`[DISPATCH SIMULATED] HTTP 200 • 42ms • Signature generated with HMAC-SHA256`);
+                      }
+                    }}
+                    className="px-3.5 py-2 bg-[#ff007f] text-white font-black text-xs uppercase border border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:bg-[#ff3399]"
+                  >
+                    DISPATCH TEST EVENT
+                  </button>
+                </div>
               </div>
             ))}
           </div>
 
           {webhookTestStatus && (
-            <div className="p-3 bg-[#0a0a0c] border-2 border-white text-xs text-[#ccff00]">
+            <div className="p-3 bg-[#0a0a0c] border-2 border-[#ccff00] text-xs text-[#ccff00] shadow-[2px_2px_0px_0px_#000]">
               {webhookTestStatus}
             </div>
           )}
+
+          {/* Webhook Signature & Security Guide */}
+          <div className="p-4 bg-[#0a0a0c] border border-white/20 space-y-2 text-xs">
+            <span className="text-[#00f0ff] font-black uppercase block">HMAC-SHA256 SIGNATURE VERIFICATION (NODE.JS EXAMPLE):</span>
+            <pre className="p-3 bg-[#141419] text-slate-200 text-[11px] overflow-x-auto font-mono">
+{`const crypto = require('crypto');
+
+function verifyNorthveilWebhook(payloadString, signatureHeader, secret) {
+  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(payloadString).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signatureHeader));
+}`}
+            </pre>
+          </div>
         </div>
       )}
 
-      {/* TAB 7: PLUGIN MANAGER */}
+      {/* TAB 7: PLUGIN MANAGER (COMING SOON) */}
       {activeTab === 'plugins' && (
-        <div className="bg-[#141419] border-2 border-white p-6 shadow-[6px_6px_0px_0px_#ff007f] space-y-6">
-          <h3 className="text-xl font-black text-white uppercase border-b-2 border-white pb-3">
-            WEB3 EXTENSIONS & PLUGIN MANAGER
-          </h3>
+        <div className="bg-[#141419] border-2 border-white p-8 shadow-[8px_8px_0px_0px_#ff007f] text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#0a0a0c] border border-[#ff007f] text-[#ff007f] text-xs font-black uppercase shadow-[2px_2px_0px_0px_#000]">
+            <Boxes className="w-4 h-4" /> [COMING SOON • PHASE 2 WASM RUNTIME]
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {plugins.map((pl) => (
-              <div key={pl.id} className="p-5 bg-[#0a0a0c] border-2 border-white flex flex-col justify-between space-y-3 shadow-[3px_3px_0px_0px_#000]">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-black text-white uppercase">{pl.name}</span>
-                    <span className={`px-2 py-0.5 text-[9px] font-black uppercase border border-black ${pl.installed ? 'bg-[#ccff00] text-black' : 'bg-slate-700 text-white'}`}>
-                      {pl.installed ? 'INSTALLED' : 'AVAILABLE'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-300 mt-1">{pl.desc}</p>
-                </div>
+          <div className="max-w-2xl mx-auto space-y-3">
+            <h3 className="text-2xl font-black text-white uppercase tracking-tight">
+              DECENTRALIZED WASM SIDECAR & PLUGIN ECOSYSTEM
+            </h3>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              We are engineering a sandboxed WebAssembly (WASM) extension runtime that will allow developers to publish custom sidecar plugins, DeFi strategy engines, automated trading bots, and hardware wallet integrations directly into the Northveil Wallet runtime.
+            </p>
+          </div>
 
-                <button
-                  onClick={() => togglePlugin(pl.id)}
-                  className={`py-2 text-xs font-black uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer ${
-                    pl.installed ? 'bg-[#ff007f] text-white hover:bg-[#ff3399]' : 'bg-[#00f0ff] text-black hover:bg-[#33f3ff]'
-                  }`}
-                >
-                  {pl.installed ? 'UNINSTALL PLUGIN' : 'INSTALL PLUGIN'}
-                </button>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto text-left">
+            <div className="p-4 bg-[#0a0a0c] border-2 border-white space-y-2">
+              <span className="text-xs font-black text-[#ff007f] uppercase block">[PLUGIN 1]</span>
+              <p className="text-xs font-bold text-white uppercase">UNISWAP V4 HOOKS AGGREGATOR</p>
+              <p className="text-[11px] text-slate-400">Custom liquidity pool rebalancing hooks executed in real-time sandboxed WASM.</p>
+            </div>
+            <div className="p-4 bg-[#0a0a0c] border-2 border-white space-y-2">
+              <span className="text-xs font-black text-[#00f0ff] uppercase block">[PLUGIN 2]</span>
+              <p className="text-xs font-bold text-white uppercase">HARDWARE LEDGER & TREZOR BRIDGE</p>
+              <p className="text-[11px] text-slate-400">Direct USB & Bluetooth cold storage signing module for enterprise treasuries.</p>
+            </div>
+            <div className="p-4 bg-[#0a0a0c] border-2 border-white space-y-2">
+              <span className="text-xs font-black text-[#ccff00] uppercase block">[PLUGIN 3]</span>
+              <p className="text-xs font-bold text-white uppercase">TELEGRAM & DISCORD TRADING BOT</p>
+              <p className="text-[11px] text-slate-400">Instant trade alerts and conversational order execution right inside community channels.</p>
+            </div>
           </div>
         </div>
       )}

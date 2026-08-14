@@ -1,0 +1,36 @@
+{
+  "name": "@northveil/cli",
+  "version": "1.0.0",
+  "description": "The Official Northveil Developer CLI — Build decentralized applications, deploy smart contracts, interact with MCP AI servers, search global travel & flights, and manage multi-chain wallets.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "northveil": "./bin/northveil.js"
+  },
+  "scripts": {
+    "build": "npx tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "northveil",
+    "web3",
+    "cli",
+    "mcp",
+    "travel",
+    "ethereum",
+    "solidity",
+    "blockchain",
+    "ai"
+  ],
+  "author": "Northveil Protocol <dev@northveil.xyz>",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "@types/node-fetch": "^2.6.11",
+    "typescript": "^5.5.2"
+  }
+}
