@@ -214,7 +214,18 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Multi-Wallet Sub-Account State
   const [subWallets, setSubWallets] = useState<SubWalletAccount[]>(() => {
     const saved = localStorage.getItem('northveil_v3_subwallets');
-    return saved ? JSON.parse(saved) : DEFAULT_SUB_WALLETS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.map(w => {
+            const { privateKey, ...safeWallet } = w;
+            return safeWallet;
+          });
+        }
+      } catch {}
+    }
+    return DEFAULT_SUB_WALLETS;
   });
 
   const [activeWalletId, setActiveWalletIdState] = useState<string>(() => {
@@ -223,7 +234,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   });
 
   useEffect(() => {
-    localStorage.setItem('northveil_v3_subwallets', JSON.stringify(subWallets));
+    // Strictly sanitize subWallets before persisting: NEVER write plaintext privateKey to localStorage
+    const sanitized = subWallets.map(w => {
+      const { privateKey, ...safeWallet } = w;
+      return safeWallet;
+    });
+    localStorage.setItem('northveil_v3_subwallets', JSON.stringify(sanitized));
   }, [subWallets]);
 
   useEffect(() => {
@@ -234,18 +250,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return subWallets.find((w) => w.id === activeWalletId) || subWallets[0] || DEFAULT_SUB_WALLETS[0];
   }, [subWallets, activeWalletId]);
 
-  // Auto-sync active wallet to Supabase Cloud DB & bind default MCP keys
+  // Auto-sync active wallet to Supabase Cloud DB with AES-256-GCM encryption
   useEffect(() => {
     if (activeSubWallet?.address) {
       const addr = activeSubWallet.address.toLowerCase();
-      const pk = activeSubWallet.privateKey || localStorage.getItem(`northveil_pk_${addr}`) || localStorage.getItem('northveil_vault_pk') || undefined;
-      const seed = (seedPhrase && seedPhrase.length > 0) ? seedPhrase.join(' ') : (localStorage.getItem('northveil_vault_mnemonic') || undefined);
-      SupabaseService.syncWallet(addr, activeSubWallet.name || 'Active Northveil Wallet', activeChain, pk, seed);
-      SupabaseService.bindApiKeyToWallet('nv_live_9f82a17b09c82415d8a9', addr, 'Northveil Production Key');
-      SupabaseService.bindApiKeyToWallet('nv_test_7a12b99c43d21100e45b', addr, 'Northveil Test Key');
-      SupabaseService.bindApiKeyToWallet('nv_live_default_northveil_key', addr, 'Northveil Default Key');
+      const seed = (seedPhrase && seedPhrase.length > 0) ? seedPhrase.join(' ') : undefined;
+      SupabaseService.syncWallet(addr, activeSubWallet.name || 'Active Northveil Wallet', activeChain, undefined, seed);
     }
-  }, [activeSubWallet?.address, activeChain, activeSubWallet?.privateKey, seedPhrase]);
+  }, [activeSubWallet?.address, activeChain, seedPhrase]);
 
   // Sync transactions state with activeSubWallet address
   useEffect(() => {
@@ -351,7 +363,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       balanceMultiplier: 1.0,
     };
 
-    SupabaseService.syncWallet(address.toLowerCase(), newWallet.name, activeChain, privateKey, seedPhrase.join(' '));
+    SupabaseService.syncWallet(address.toLowerCase(), newWallet.name, activeChain, undefined, seedPhrase.join(' '));
 
     setSubWallets((prev) => [...prev, newWallet]);
     setActiveWalletIdState(newWallet.id);
@@ -1339,8 +1351,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const { address, privateKey, path } = WalletService.deriveEVMAddress(words, 0);
       const solana = WalletService.deriveSolanaAddress(words, 0);
 
-      // Auto-sync address AND private key to Supabase for MCP tools
-      SupabaseService.syncWallet(address.toLowerCase(), 'Main Trading Vault', 'ethereum', privateKey, words.join(' '));
+      // Auto-sync address to Supabase with AES-256-GCM encrypted seed phrase
+      SupabaseService.syncWallet(address.toLowerCase(), 'Main Trading Vault', 'ethereum', undefined, words.join(' '));
 
       const mainWallet: SubWalletAccount = {
         id: 'acc-0',
