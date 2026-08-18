@@ -872,14 +872,54 @@ export interface AuthResult {
   userId: string;
 }
 
-// Authentication & Wallet Binding Handler (Multi-Tenant Scoped Authorization Engine)
+// In-Memory OAuth Token Registry for ephemeral tokens & rapid token validation
+export interface OAuthTokenRecord {
+  token: string;
+  clientId: string;
+  walletAddress: string;
+  permissions: string[];
+  expiresAt: number;
+  scope: string;
+}
+export const inMemoryOAuthTokens = new Map<string, OAuthTokenRecord>();
+export const inMemoryAuthCodes = new Map<string, { code: string; clientId: string; redirectUri: string; expiresAt: number }>();
+export const inMemoryOAuthClients = new Map<string, { clientId: string; clientSecret: string; redirectUris: string[]; name: string }>();
+
+// Authentication & Wallet Binding Handler (Strict Multi-Tenant Scoped Authorization Engine)
 async function authenticateClient(apiKey?: string, requestedAddress?: string): Promise<AuthResult> {
   const DEFAULT_PUBLIC_WALLET = '0x87678de86804c6c3612d66cbd6e2857f1a7d8345';
 
   const cleanKey = apiKey ? apiKey.trim().replace(/^Bearer\s+/i, '') : '';
 
-  // 1. If API Key or Bearer Token is provided, verify against Supabase DB
+  // 1. If API Key or Bearer Token is provided, verify against OAuth cache and Supabase DB
   if (cleanKey) {
+    // 1a. Check in-memory OAuth tokens
+    const oauthToken = inMemoryOAuthTokens.get(cleanKey);
+    if (oauthToken) {
+      if (Date.now() > oauthToken.expiresAt) {
+        inMemoryOAuthTokens.delete(cleanKey);
+        return {
+          valid: false,
+          walletAddress: '',
+          keyName: 'Expired OAuth Token',
+          permissions: [],
+          allowedWallets: [],
+          tier: 'expired',
+          userId: oauthToken.clientId,
+        };
+      }
+      return {
+        valid: true,
+        walletAddress: oauthToken.walletAddress,
+        keyName: `OAuth Token (${oauthToken.clientId})`,
+        permissions: oauthToken.permissions,
+        allowedWallets: [oauthToken.walletAddress],
+        tier: 'oauth_client',
+        userId: oauthToken.clientId,
+      };
+    }
+
+    // 1b. Verify against Supabase mcp_api_keys table
     try {
       const { data } = await supabase
         .from('mcp_api_keys')
@@ -914,56 +954,32 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
           tier: data.tier || 'developer',
           userId: data.user_id || 'dev_user',
         };
-      } else {
-        // Auto-register newly generated developer key
-        const newBoundAddress = (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42)
-          ? requestedAddress.toLowerCase()
-          : DEFAULT_PUBLIC_WALLET;
-
-        await supabase.from('mcp_api_keys').upsert([{
-          api_key: cleanKey,
-          key_name: 'Developer API Key',
-          wallet_address: newBoundAddress,
-          permissions: ['*'],
-          is_active: true,
-          tier: 'developer',
-        }], { onConflict: 'api_key' }).then();
-
-        return {
-          valid: true,
-          walletAddress: newBoundAddress,
-          keyName: 'Developer API Key',
-          permissions: ['*'],
-          allowedWallets: [newBoundAddress],
-          tier: 'developer',
-          userId: 'dev_user',
-        };
       }
     } catch (e) {
-      console.warn('[Auth] Supabase key resolution note:', e);
+      console.warn('[Auth] Supabase key resolution notice:', e);
     }
-  }
 
-  // 2. If explicit valid wallet address is provided without API key
-  if (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42) {
+    // Key provided but not found in any authorized registry: REJECT
     return {
-      valid: true,
-      walletAddress: requestedAddress.toLowerCase(),
-      keyName: 'Scoped Wallet Session',
-      permissions: ['*'],
-      allowedWallets: [requestedAddress.toLowerCase()],
-      tier: 'standard',
-      userId: 'wallet_user',
+      valid: false,
+      walletAddress: '',
+      keyName: 'Invalid API Key',
+      permissions: [],
+      allowedWallets: [],
+      tier: 'unauthorized',
+      userId: '',
     };
   }
 
-  // 3. Public Guest Fallback for unauthenticated discovery tools
+  // 2. Unauthenticated Public Guest (Allows only safe discovery tools like flights, gas, prices)
   return {
     valid: true,
-    walletAddress: DEFAULT_PUBLIC_WALLET,
+    walletAddress: (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42)
+      ? requestedAddress.toLowerCase()
+      : DEFAULT_PUBLIC_WALLET,
     keyName: 'Public Discovery Guest',
     permissions: ['read_public'],
-    allowedWallets: [DEFAULT_PUBLIC_WALLET],
+    allowedWallets: [],
     tier: 'public_guest',
     userId: 'guest',
   };
@@ -1324,40 +1340,143 @@ app.get(['/.well-known/oauth-authorization-server', '/.well-known/openid-configu
   });
 });
 
+const handleRegister = (req: Request, res: Response) => {
+  const clientName = req.body?.client_name || 'Northveil Connected Application';
+  const redirectUris = Array.isArray(req.body?.redirect_uris) && req.body.redirect_uris.length > 0
+    ? req.body.redirect_uris
+    : ['https://claude.ai/api/connectors/oauth/callback'];
+
+  const clientId = 'nv_cli_' + crypto.randomBytes(16).toString('hex');
+  const clientSecret = 'nv_sec_' + crypto.randomBytes(24).toString('hex');
+
+  inMemoryOAuthClients.set(clientId, {
+    clientId,
+    clientSecret,
+    redirectUris,
+    name: clientName,
+  });
+
+  return res.status(201).json({
+    client_id: clientId,
+    client_secret: clientSecret,
+    client_name: clientName,
+    client_id_issued_at: Math.floor(Date.now() / 1000),
+    client_secret_expires_at: 0,
+    redirect_uris: redirectUris,
+    grant_types: ['authorization_code', 'refresh_token', 'client_credentials'],
+    response_types: ['code'],
+    token_endpoint_auth_method: 'client_secret_post'
+  });
+};
+
 const handleAuthorize = (req: Request, res: Response) => {
+  const clientId = (req.query.client_id as string) || '';
   const redirectUri = (req.query.redirect_uri as string) || '';
   const state = (req.query.state as string) || '';
-  const code = 'nv_code_' + Math.random().toString(36).substring(2, 12);
+
+  // Validate client if provided
+  const client = inMemoryOAuthClients.get(clientId);
+  if (clientId && !client && clientId !== 'northveil_ai_client') {
+    return res.status(400).json({ error: 'unauthorized_client', error_description: 'Unknown client_id.' });
+  }
+
+  const code = 'nv_code_' + crypto.randomBytes(16).toString('hex');
+  inMemoryAuthCodes.set(code, {
+    code,
+    clientId: clientId || 'default_client',
+    redirectUri,
+    expiresAt: Date.now() + 5 * 60 * 1000, // 5 minute single-use expiry
+  });
 
   if (redirectUri) {
     const separator = redirectUri.includes('?') ? '&' : '?';
     return res.redirect(`${redirectUri}${separator}code=${code}&state=${encodeURIComponent(state)}`);
   }
-  res.json({ status: 'AUTHORIZED', code, state, message: 'Northveil OAuth Authorization Granted' });
+  return res.json({ status: 'AUTHORIZED', code, state, message: 'Northveil OAuth Authorization Code Issued (Valid for 5 minutes).' });
 };
 
-const handleToken = (req: Request, res: Response) => {
-  res.json({
-    access_token: 'nv_live_9f82a17b09c82415d8a9',
-    token_type: 'Bearer',
-    expires_in: 31536000,
-    refresh_token: 'nv_refresh_9f82a17b09c82415d8a9',
-    scope: 'read:balance write:tx mcp:admin',
-  });
-};
+const handleToken = async (req: Request, res: Response) => {
+  const grantType = req.body?.grant_type || req.query?.grant_type || 'authorization_code';
+  const clientId = req.body?.client_id || req.query?.client_id || '';
+  const clientSecret = req.body?.client_secret || req.query?.client_secret || '';
+  const code = req.body?.code || req.query?.code || '';
 
-const handleRegister = (req: Request, res: Response) => {
-  const redirectUris = req.body?.redirect_uris || ['https://claude.ai/api/connectors/oauth/callback'];
-  res.status(201).json({
-    client_id: 'northveil_ai_client',
-    client_secret: 'northveil_ai_secret',
-    client_id_issued_at: Math.floor(Date.now() / 1000),
-    client_secret_expires_at: 0,
-    redirect_uris: redirectUris,
-    grant_types: ['authorization_code', 'refresh_token'],
-    response_types: ['code'],
-    token_endpoint_auth_method: 'client_secret_post'
-  });
+  // 1. Authorization Code Grant
+  if (grantType === 'authorization_code') {
+    if (!code) {
+      return res.status(400).json({ error: 'invalid_request', error_description: 'Missing authorization code parameter.' });
+    }
+
+    const authCodeRecord = inMemoryAuthCodes.get(code);
+    if (!authCodeRecord) {
+      return res.status(400).json({ error: 'invalid_grant', error_description: 'Invalid, used, or expired authorization code.' });
+    }
+
+    if (Date.now() > authCodeRecord.expiresAt) {
+      inMemoryAuthCodes.delete(code);
+      return res.status(400).json({ error: 'invalid_grant', error_description: 'Authorization code has expired.' });
+    }
+
+    // Invalidate code immediately (single-use RFC 6749 rule)
+    inMemoryAuthCodes.delete(code);
+
+    const token = 'nv_oauth_' + crypto.randomBytes(24).toString('hex');
+    const refreshToken = 'nv_ref_' + crypto.randomBytes(24).toString('hex');
+    const expiresIn = 3600; // 1 hour
+
+    const tokenRecord: OAuthTokenRecord = {
+      token,
+      clientId: authCodeRecord.clientId,
+      walletAddress: '0x87678de86804c6c3612d66cbd6e2857f1a7d8345',
+      permissions: ['read', 'write', 'transfer_enabled', 'contract_deploy_enabled'],
+      expiresAt: Date.now() + expiresIn * 1000,
+      scope: 'read write mcp:tools',
+    };
+
+    inMemoryOAuthTokens.set(token, tokenRecord);
+
+    return res.json({
+      access_token: token,
+      token_type: 'Bearer',
+      expires_in: expiresIn,
+      refresh_token: refreshToken,
+      scope: 'read write mcp:tools',
+    });
+  }
+
+  // 2. Client Credentials Grant
+  if (grantType === 'client_credentials') {
+    const client = inMemoryOAuthClients.get(clientId);
+    const isValid = (client && client.clientSecret === clientSecret) ||
+      (process.env.OAUTH_CLIENT_ID && process.env.OAUTH_CLIENT_ID === clientId && process.env.OAUTH_CLIENT_SECRET === clientSecret);
+
+    if (!isValid) {
+      return res.status(401).json({ error: 'invalid_client', error_description: 'Invalid OAuth client_id or client_secret.' });
+    }
+
+    const token = 'nv_oauth_' + crypto.randomBytes(24).toString('hex');
+    const expiresIn = 3600;
+
+    const tokenRecord: OAuthTokenRecord = {
+      token,
+      clientId,
+      walletAddress: '0x87678de86804c6c3612d66cbd6e2857f1a7d8345',
+      permissions: ['read', 'write', 'transfer_enabled', 'contract_deploy_enabled'],
+      expiresAt: Date.now() + expiresIn * 1000,
+      scope: 'read write mcp:tools',
+    };
+
+    inMemoryOAuthTokens.set(token, tokenRecord);
+
+    return res.json({
+      access_token: token,
+      token_type: 'Bearer',
+      expires_in: expiresIn,
+      scope: 'read write mcp:tools',
+    });
+  }
+
+  return res.status(400).json({ error: 'unsupported_grant_type', error_description: `Grant type '${grantType}' is not supported.` });
 };
 
 app.get(['/authorize', '/oauth/authorize', '/oauth2/authorize', '/auth/authorize'], handleAuthorize);
