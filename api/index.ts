@@ -51,7 +51,8 @@ import {
   createTransactionRequest,
   approveAndExecuteTransaction,
   rejectTransactionRequest,
-  initSupabase
+  initSupabase,
+  executeWithRpcFailover
 } from './custodialSigningService.js';
 import { encryptCredential, decryptCredential } from './encryptionService.js';
 
@@ -2010,21 +2011,14 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
   let realOnChainTokens: any[] = [];
 
   if (isBalanceQueryTool && cleanAddress.startsWith('0x') && cleanAddress.length === 42) {
-    const withTimeout = <T>(promise: Promise<T>, ms = 2500): Promise<T> => {
-      return Promise.race([
-        promise,
-        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('RPC Timeout')), ms))
-      ]);
-    };
-
     try {
       const [ethRes, sepRes, polyRes, baseRes, arbRes, bscRes] = await Promise.allSettled([
-        withTimeout(ethProvider.getBalance(cleanAddress)),
-        withTimeout(sepoliaProvider.getBalance(cleanAddress)),
-        withTimeout(polygonProvider.getBalance(cleanAddress)),
-        withTimeout(baseProvider.getBalance(cleanAddress)),
-        withTimeout(arbitrumProvider.getBalance(cleanAddress)),
-        withTimeout(bscProvider.getBalance(cleanAddress)),
+        executeWithRpcFailover('ethereum', (p) => p.getBalance(cleanAddress)),
+        executeWithRpcFailover('sepolia', (p) => p.getBalance(cleanAddress)),
+        executeWithRpcFailover('polygon', (p) => p.getBalance(cleanAddress)),
+        executeWithRpcFailover('base', (p) => p.getBalance(cleanAddress)),
+        executeWithRpcFailover('arbitrum', (p) => p.getBalance(cleanAddress)),
+        executeWithRpcFailover('bsc', (p) => p.getBalance(cleanAddress)),
       ]);
 
       if (ethRes.status === 'fulfilled') mainnetEth = Number(ethers.formatEther(ethRes.value));
@@ -2538,13 +2532,23 @@ contract ${nameStr} {
       const signer = new ethers.Wallet(privateKey, targetProvider);
       const actualSignerAddress = signer.address.toLowerCase();
 
+      let onChainBytecodeVerified = false;
       try {
         const factory = new ethers.ContractFactory(compiledAbi, compiledBytecode, signer);
         const deployTx = await factory.deploy();
         await deployTx.waitForDeployment();
         realTxHash = deployTx.deploymentTransaction()?.hash || '';
         realContractAddress = await deployTx.getAddress();
-        if (realTxHash && realContractAddress) isOnChainBroadcasted = true;
+        if (realTxHash && realContractAddress) {
+          isOnChainBroadcasted = true;
+          // Actively verify bytecode exists on-chain
+          try {
+            const deployedCode = await targetProvider.getCode(realContractAddress);
+            if (deployedCode && deployedCode !== '0x' && deployedCode.length > 2) {
+              onChainBytecodeVerified = true;
+            }
+          } catch {}
+        }
       } catch (deployErr: any) {
         deployErrorMsg = deployErr?.reason || deployErr?.message || 'On-chain RPC deployment failed.';
         console.error('[Deploy On-Chain Error]:', deployErr);
