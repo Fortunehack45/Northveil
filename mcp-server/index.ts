@@ -1012,8 +1012,9 @@ function checkToolPermission(toolName: string, permissions: string[]): { allowed
 
 /**
  * Server-Side Confirmation & Approval Gate
- * If a tool has `confirmationRequired: true`, enforces that the caller supplies a valid
- * approvalToken or confirmed: true before executing on-chain state changes.
+ * If a tool has `confirmationRequired: true`, strictly enforces a genuine two-step cryptographic flow.
+ * The operation MUST first be staged and approved with a valid single-use `approvalToken`.
+ * Arbitrary boolean parameters (`confirmed: true`) are rejected as bypass attempts.
  */
 async function enforceConfirmationGate(
   tool: any,
@@ -1026,9 +1027,8 @@ async function enforceConfirmationGate(
   }
 
   const approvalToken = (toolArgs?.approvalToken || toolArgs?.token || toolArgs?.confirmationToken || '').toString().trim();
-  const isExplicitlyConfirmed = toolArgs?.confirmed === true || toolArgs?.confirm === true || toolArgs?.skipConfirmation === true;
 
-  // 1. If a valid approvalToken is supplied, validate from in-memory/DB registry
+  // 1. If an approvalToken is supplied, strictly validate from in-memory/DB registry
   if (approvalToken) {
     let reqRecord = inMemoryTxRequests.get(approvalToken);
     if (!reqRecord) {
@@ -1043,16 +1043,16 @@ async function enforceConfirmationGate(
     }
 
     if (!reqRecord) {
-      return { canProceed: false, error: 'SECURITY ERROR: Invalid or missing approval token for confirmed execution.' };
+      return { canProceed: false, error: 'SECURITY ERROR: Invalid or unrecognized approval token. Please stage a new transaction request.' };
     }
     if (reqRecord.token_used) {
-      return { canProceed: false, error: 'SECURITY ERROR: Approval token has already been used. Replay rejected.' };
+      return { canProceed: false, error: 'SECURITY ERROR: Single-use approval token has already been used. Replay rejected.' };
     }
     if (new Date() > new Date(reqRecord.expires_at)) {
       return { canProceed: false, error: 'SECURITY ERROR: Approval token has expired (10-minute validity deadline exceeded).' };
     }
 
-    // Token is valid - consume it
+    // Token is valid - consume it immediately to prevent concurrent replay
     reqRecord.token_used = true;
     reqRecord.status = 'approved';
     try {
@@ -1062,12 +1062,7 @@ async function enforceConfirmationGate(
     return { canProceed: true };
   }
 
-  // 2. If caller passed confirmed: true, proceed directly
-  if (isExplicitlyConfirmed) {
-    return { canProceed: true };
-  }
-
-  // 3. Staging flow: Neither approvalToken nor confirmed flag was provided
+  // 2. No approvalToken provided: Always stage the transaction and require approval token
   const staged = await createTransactionRequest({
     walletAddress,
     recipient: toolArgs?.recipient || toolArgs?.to || '0x0000000000000000000000000000000000000000',
@@ -1087,7 +1082,7 @@ async function enforceConfirmationGate(
       requestId: staged.requestId,
       approvalToken: staged.approvalToken,
       expiresAt: staged.expiresAt,
-      message: `Confirmation Required: Tool '${tool.name}' is marked as destructive/state-changing. Staged with approval token '${staged.approvalToken}'. Please review and approve with approve_transaction(approvalToken="${staged.approvalToken}") or pass confirmed=true.`,
+      message: `Confirmation Required: Tool '${tool.name}' requires explicit user confirmation. Staged with single-use approval token '${staged.approvalToken}'. Please review the transaction details and execute by supplying approvalToken="${staged.approvalToken}" or calling approve_transaction.`,
       formattedMarkdown: staged.summaryMarkdown,
       stagedRequest: staged,
     }
@@ -5147,7 +5142,7 @@ contract ${contractName} is ERC20, ERC20Burnable, Ownable {
       // Network explorer API routing
       let apiUrl = 'https://api-sepolia.etherscan.io/api';
       let explorerBase = 'https://sepolia.etherscan.io';
-      let apiKey = process.env.ETHERSCAN_API_KEY || 'DJ7JC4XJD6KKZW7X5FST8CUAV4X7ZHIHW8';
+      let apiKey = process.env.ETHERSCAN_API_KEY || '';
       let chainName = 'Ethereum Sepolia Testnet';
 
       if (network === 'ethereum' || network === 'mainnet') {
@@ -5162,6 +5157,31 @@ contract ${contractName} is ERC20, ERC20Burnable, Ownable {
         apiUrl = 'https://api.arbiscan.io/api'; explorerBase = 'https://arbiscan.io'; apiKey = process.env.ARBISCAN_API_KEY || apiKey; chainName = 'Arbitrum One Mainnet';
       } else if (network === 'bsc' || network === 'binance') {
         apiUrl = 'https://api.bscscan.com/api'; explorerBase = 'https://bscscan.com'; apiKey = process.env.BSCSCAN_API_KEY || apiKey; chainName = 'BNB Smart Chain Mainnet';
+      }
+
+      if (!apiKey) {
+        return {
+          formattedMarkdown: `
+### ℹ️ BLOCK EXPLORER VERIFICATION NOTICE
+
+> **Contract Address**: [\`${contractAddress}\`](${explorerBase}/address/${contractAddress}#code)  
+> **Network**: \`${chainName}\`  
+> **On-Chain Bytecode**: 🟢 **VERIFIED (Active on blockchain)**  
+> **Source Verification Status**: ⚠️ **ETHERSCAN_API_KEY (or network explorer key) required in environment variables for automated Etherscan source-code publication.**  
+
+---
+
+#### 💡 How to Publish Source Code to ${chainName}:
+1. Set \`ETHERSCAN_API_KEY\` in your \`.env\` file.
+2. Alternatively, visit [${explorerBase}/verifyContract?a=${contractAddress}](${explorerBase}/verifyContract?a=${contractAddress}) to submit single-file Solidity source code directly.
+`,
+          status: 'NOTICE',
+          verified: false,
+          reason: 'EXPLORER_API_KEY_REQUIRED',
+          contractAddress,
+          network: chainName,
+          explorerUrl: `${explorerBase}/address/${contractAddress}#code`,
+        };
       }
 
       let isVerified = false;
