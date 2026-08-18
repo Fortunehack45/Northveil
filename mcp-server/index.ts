@@ -2081,12 +2081,12 @@ async function resolveWalletPrivateKey(
     }
   }
 
-  // 6. Environment Variable & Default Vault Key Fallback (0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417 with 0.1587 SepoliaETH)
+  // 6. Environment Variable Fallback
   if (!pk) {
-    pk = process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY || '0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9';
+    pk = process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY || null;
   }
 
-  return pk || '0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9';
+  return pk;
 }
 
 const inMemoryBookingReservations: any[] = [];
@@ -5327,7 +5327,10 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
         targetProvider = bscProvider; explorerBase = 'https://bscscan.com'; chainName = 'BNB Smart Chain';
       }
 
-      const privateKey = (await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet)) || process.env.SEPOLIA_PRIVATE_KEY || '0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9';
+      const privateKey = (await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet)) || process.env.SEPOLIA_PRIVATE_KEY || process.env.PRIVATE_KEY || null;
+      if (!privateKey) {
+        throw new Error(`SECURITY ERROR: No decrypted signing credentials found for wallet address ${cleanAddress}. Please import a wallet or configure SEPOLIA_PRIVATE_KEY in .env.`);
+      }
       const signer = new ethers.Wallet(privateKey, targetProvider);
 
       // ERC-20 Mintable ABI (standard OpenZeppelin pattern)
