@@ -18,7 +18,10 @@ async function encryptCredentialClient(plaintext: string): Promise<{ ciphertext:
     throw new Error('Web Crypto API (crypto.subtle) is required for secure client-side vault encryption.');
   }
 
-  const masterSecret = import.meta.env?.VITE_ENCRYPTION_KEY || import.meta.env?.VITE_SUPABASE_ANON_KEY || 'northveil_client_secure_vault_entropy';
+  const masterSecret = import.meta.env?.VITE_ENCRYPTION_KEY || import.meta.env?.VITE_SUPABASE_ANON_KEY;
+  if (!masterSecret || masterSecret.trim().length < 16) {
+    throw new Error('FATAL SECURITY CONFIGURATION: No client vault key found. Please define VITE_ENCRYPTION_KEY or VITE_SUPABASE_ANON_KEY with at least 16 characters of entropy.');
+  }
   const encoder = new TextEncoder();
 
   // Generate random 16-byte salt
