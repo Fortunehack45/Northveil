@@ -52,7 +52,8 @@ import {
   approveAndExecuteTransaction,
   rejectTransactionRequest,
   initSupabase,
-  executeWithRpcFailover
+  executeWithRpcFailover,
+  inMemoryTxRequests
 } from './custodialSigningService.js';
 import { encryptCredential, decryptCredential } from './encryptionService.js';
 
@@ -1009,6 +1010,90 @@ function checkToolPermission(toolName: string, permissions: string[]): { allowed
   return { allowed: false, requiredPermission: 'authentication_required' };
 }
 
+/**
+ * Server-Side Confirmation & Approval Gate
+ * If a tool has `confirmationRequired: true`, enforces that the caller supplies a valid
+ * approvalToken or confirmed: true before executing on-chain state changes.
+ */
+async function enforceConfirmationGate(
+  tool: any,
+  toolArgs: any,
+  walletAddress: string
+): Promise<{ canProceed: boolean; stagingResult?: any; error?: string }> {
+  // If tool does not require confirmation or is an approval/rejection tool itself, proceed directly
+  if (!tool?.annotations?.confirmationRequired || tool?.name === 'approve_transaction' || tool?.name === 'reject_transaction' || tool?.name === 'create_transaction_request') {
+    return { canProceed: true };
+  }
+
+  const approvalToken = (toolArgs?.approvalToken || toolArgs?.token || toolArgs?.confirmationToken || '').toString().trim();
+  const isExplicitlyConfirmed = toolArgs?.confirmed === true || toolArgs?.confirm === true || toolArgs?.skipConfirmation === true;
+
+  // 1. If a valid approvalToken is supplied, validate from in-memory/DB registry
+  if (approvalToken) {
+    let reqRecord = inMemoryTxRequests.get(approvalToken);
+    if (!reqRecord) {
+      try {
+        const { data } = await supabase
+          .from('transaction_requests')
+          .select('*')
+          .eq('approval_token', approvalToken)
+          .maybeSingle();
+        reqRecord = data;
+      } catch (e) {}
+    }
+
+    if (!reqRecord) {
+      return { canProceed: false, error: 'SECURITY ERROR: Invalid or missing approval token for confirmed execution.' };
+    }
+    if (reqRecord.token_used) {
+      return { canProceed: false, error: 'SECURITY ERROR: Approval token has already been used. Replay rejected.' };
+    }
+    if (new Date() > new Date(reqRecord.expires_at)) {
+      return { canProceed: false, error: 'SECURITY ERROR: Approval token has expired (10-minute validity deadline exceeded).' };
+    }
+
+    // Token is valid - consume it
+    reqRecord.token_used = true;
+    reqRecord.status = 'approved';
+    try {
+      await supabase.from('transaction_requests').update({ status: 'approved', token_used: true }).eq('approval_token', approvalToken);
+    } catch (e) {}
+
+    return { canProceed: true };
+  }
+
+  // 2. If caller passed confirmed: true, proceed directly
+  if (isExplicitlyConfirmed) {
+    return { canProceed: true };
+  }
+
+  // 3. Staging flow: Neither approvalToken nor confirmed flag was provided
+  const staged = await createTransactionRequest({
+    walletAddress,
+    recipient: toolArgs?.recipient || toolArgs?.to || '0x0000000000000000000000000000000000000000',
+    amount: toolArgs?.amount || toolArgs?.value || 0,
+    asset: toolArgs?.asset || toolArgs?.symbol || 'ETH',
+    network: toolArgs?.network || toolArgs?.chain || 'sepolia',
+    contractSummary: `Staged confirmation for ${tool.name} (${toolArgs?.contractName || toolArgs?.symbol || 'On-Chain Operation'})`,
+    unsignedPayload: toolArgs,
+  });
+
+  return {
+    canProceed: false,
+    stagingResult: {
+      status: 'PENDING_CONFIRMATION',
+      confirmationRequired: true,
+      tool: tool.name,
+      requestId: staged.requestId,
+      approvalToken: staged.approvalToken,
+      expiresAt: staged.expiresAt,
+      message: `Confirmation Required: Tool '${tool.name}' is marked as destructive/state-changing. Staged with approval token '${staged.approvalToken}'. Please review and approve with approve_transaction(approvalToken="${staged.approvalToken}") or pass confirmed=true.`,
+      formattedMarkdown: staged.summaryMarkdown,
+      stagedRequest: staged,
+    }
+  };
+}
+
 // ═════════════════════════════════════════════════════════════
 // AUTH PROFILE VERIFICATION ENDPOINT (/api/v1/auth/me)
 // ═════════════════════════════════════════════════════════════
@@ -1380,6 +1465,21 @@ app.all(['/api/v1/tools/:toolName', '/api/v1/:toolName'], async (req: Request, r
 
   try {
     const toolArgs = { ...req.query, ...(req.body || {}) };
+
+    // Server-side Confirmation Gate Check
+    const gateCheck = await enforceConfirmationGate(tool, toolArgs, auth.walletAddress);
+    if (!gateCheck.canProceed) {
+      if (gateCheck.error) {
+        return res.status(403).json({ success: false, error: gateCheck.error });
+      }
+      return res.json({
+        success: true,
+        authenticatedWallet: auth.walletAddress,
+        permissions: auth.permissions,
+        ...gateCheck.stagingResult,
+      });
+    }
+
     const result = await executeRealTool(toolName, toolArgs, auth.walletAddress, req);
 
     try {
@@ -1496,28 +1596,55 @@ app.post('/messages', async (req: Request, res: Response) => {
       };
     } else {
       try {
-        const result = await executeRealTool(name, toolArgs, walletAddress, req);
+        const tool = MCP_TOOLS.find((t) => t.name === name);
+        const gateCheck = await enforceConfirmationGate(tool, toolArgs, walletAddress);
 
-        await supabase.from('mcp_activity_logs').insert([{
-          api_key: apiKey,
-          tool_name: name,
-          status: 'SUCCESS',
-          parameters: { ...toolArgs, walletAddress },
-          response: result,
-        }]);
-
-        responsePayload = {
-          jsonrpc: '2.0',
-          result: {
-            content: [
-              {
-                type: 'text',
-                text: result?.formattedMarkdown || (typeof result === 'string' ? result : JSON.stringify(result, null, 2)),
+        if (!gateCheck.canProceed) {
+          if (gateCheck.error) {
+            responsePayload = {
+              jsonrpc: '2.0',
+              error: { code: -32002, message: gateCheck.error },
+              id,
+            };
+          } else {
+            responsePayload = {
+              jsonrpc: '2.0',
+              result: {
+                content: [
+                  {
+                    type: 'text',
+                    text: gateCheck.stagingResult.formattedMarkdown,
+                  },
+                ],
+                ...gateCheck.stagingResult,
               },
-            ],
-          },
-          id,
-        };
+              id,
+            };
+          }
+        } else {
+          const result = await executeRealTool(name, toolArgs, walletAddress, req);
+
+          await supabase.from('mcp_activity_logs').insert([{
+            api_key: apiKey,
+            tool_name: name,
+            status: 'SUCCESS',
+            parameters: { ...toolArgs, walletAddress },
+            response: result,
+          }]);
+
+          responsePayload = {
+            jsonrpc: '2.0',
+            result: {
+              content: [
+                {
+                  type: 'text',
+                  text: result?.formattedMarkdown || (typeof result === 'string' ? result : JSON.stringify(result, null, 2)),
+                },
+              ],
+            },
+            id,
+          };
+        }
       } catch (err: any) {
         responsePayload = {
           jsonrpc: '2.0',
@@ -1608,6 +1735,33 @@ app.post('/mcp', async (req: Request, res: Response) => {
     }
 
     try {
+      const gateCheck = await enforceConfirmationGate(tool, toolArgs, auth.walletAddress);
+
+      if (!gateCheck.canProceed) {
+        if (gateCheck.error) {
+          return res.status(403).json({
+            jsonrpc: '2.0',
+            error: { code: -32002, message: gateCheck.error },
+            id,
+          });
+        }
+        return res.json({
+          jsonrpc: '2.0',
+          result: {
+            content: [
+              {
+                type: 'text',
+                text: gateCheck.stagingResult.formattedMarkdown,
+              },
+            ],
+            authenticatedWallet: auth.walletAddress,
+            permissions: auth.permissions,
+            ...gateCheck.stagingResult,
+          },
+          id,
+        });
+      }
+
       const result = await executeRealTool(name, toolArgs, auth.walletAddress, req);
 
       await supabase.from('mcp_activity_logs').insert([{

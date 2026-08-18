@@ -32,6 +32,7 @@ export interface InMemWalletRecord {
   derivation_path?: string;
   iv: string;
   auth_tag: string;
+  salt?: string;
   wallet_status: string;
 }
 
@@ -113,7 +114,7 @@ export function getProviderForNetwork(networkName: string): ethers.JsonRpcProvid
   return new ethers.JsonRpcProvider(primaryUrl, chainId, { staticNetwork: ethers.Network.from(chainId) });
 }
 
-/** Executes an on-chain action with automatic RPC failover to prevent timeouts and silent errors */
+/** Executes an on-chain action with automatic RPC failover and comprehensive diagnostic categorization */
 export async function executeWithRpcFailover<T>(
   networkName: string,
   operation: (provider: ethers.JsonRpcProvider) => Promise<T>
@@ -132,15 +133,24 @@ export async function executeWithRpcFailover<T>(
       const p = new ethers.JsonRpcProvider(url);
       const res = await Promise.race([
         operation(p),
-        new Promise((_, reject) => setTimeout(() => reject(new Error(`RPC timeout for ${url}`)), 5000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`RPC timeout (5000ms) for endpoint ${url}`)), 5000))
       ]) as T;
       return res;
     } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      if (errMsg.includes('401') || errMsg.includes('unauthorized') || errMsg.includes('Invalid API key')) {
+        console.warn(`[RPC Auth Warning] Node endpoint ${url} returned 401 Unauthorized / Invalid API Key.`);
+      }
       lastError = err;
       continue;
     }
   }
-  throw lastError || new Error(`All RPC endpoints failed for network ${networkName}`);
+
+  const detailedMsg = lastError?.message || 'All RPC endpoints timed out or rejected request';
+  if (detailedMsg.includes('401') || detailedMsg.includes('unauthorized') || detailedMsg.includes('Invalid API key')) {
+    throw new Error(`UPSTREAM RPC AUTH FAILURE: Upstream RPC node returned 401 Unauthorized / Invalid API key. (Network: ${networkName.toUpperCase()}). Please verify provider RPC credentials.`);
+  }
+  throw new Error(`RPC EXECUTION FAILURE on ${networkName.toUpperCase()}: ${detailedMsg}`);
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -175,19 +185,19 @@ export async function logWalletAudit(
 }
 
 // ═════════════════════════════════════════════════════════════
-// WALLET CREATION & IMPORT FLOWS WITH PER-WALLET KEY ISOLATION
+// WALLET CREATION & IMPORT FLOWS WITH RANDOM SECRET SALTS
 // ═════════════════════════════════════════════════════════════
 
 /**
- * Creates a new random wallet, encrypts the seed phrase with per-wallet key derivation, erases plaintext
+ * Creates a new random wallet, encrypts the seed phrase with a random secret salt, erases plaintext
  */
 export async function createCustodialWallet(userId: string = 'default_user', walletName: string = 'Northveil Vault Wallet') {
   const randomWallet = ethers.Wallet.createRandom();
   let plaintextMnemonic: string | null = randomWallet.mnemonic?.phrase || '';
   const address = randomWallet.address.toLowerCase();
 
-  // Encrypt seed phrase with per-wallet salt derivation
-  const encrypted = encryptCredential(plaintextMnemonic, address);
+  // Encrypt seed phrase with a newly generated random 16-byte secret salt
+  const encrypted = encryptCredential(plaintextMnemonic);
 
   let dbRecordId: string | null = `mem_${Date.now()}_${address.slice(0, 8)}`;
   inMemoryWallets.set(address, {
@@ -201,6 +211,7 @@ export async function createCustodialWallet(userId: string = 'default_user', wal
     derivation_path: "m/44'/60'/0'/0/0",
     iv: encrypted.iv,
     auth_tag: encrypted.authTag,
+    salt: encrypted.salt,
     wallet_status: 'active',
   });
 
@@ -237,12 +248,12 @@ export async function createCustodialWallet(userId: string = 'default_user', wal
     address,
     name: walletName,
     backupSeedPhrase: backupMnemonic,
-    message: 'Wallet created successfully. Seed phrase encrypted with AES-256-GCM and per-wallet key isolation.'
+    message: 'Wallet created successfully. Seed phrase encrypted with AES-256-GCM and unique random secret salt.'
   };
 }
 
 /**
- * Imports a wallet using a Private Key with per-wallet key derivation
+ * Imports a wallet using a Private Key with unique random secret salt
  */
 export async function importCustodialPrivateKey(privateKeyInput: string, userId: string = 'default_user', walletName: string = 'Imported Private Key Wallet') {
   let cleanKey: string | null = privateKeyInput.trim();
@@ -251,8 +262,7 @@ export async function importCustodialPrivateKey(privateKeyInput: string, userId:
   const wallet = new ethers.Wallet(cleanKey);
   const address = wallet.address.toLowerCase();
 
-  // Encrypt private key with per-wallet salt derivation
-  const encrypted = encryptCredential(cleanKey, address);
+  const encrypted = encryptCredential(cleanKey);
   cleanKey = null;
 
   let dbRecordId: string | null = `mem_${Date.now()}_${address.slice(0, 8)}`;
@@ -266,6 +276,7 @@ export async function importCustodialPrivateKey(privateKeyInput: string, userId:
     credential_type: 'private_key',
     iv: encrypted.iv,
     auth_tag: encrypted.authTag,
+    salt: encrypted.salt,
     wallet_status: 'active',
   });
 
@@ -297,7 +308,7 @@ export async function importCustodialPrivateKey(privateKeyInput: string, userId:
     walletId: dbRecordId,
     address,
     name: walletName,
-    message: 'Private key imported and encrypted with AES-256-GCM and per-wallet key isolation.'
+    message: 'Private key imported and encrypted with AES-256-GCM and unique random secret salt.'
   };
 }
 
@@ -311,7 +322,7 @@ export async function importCustodialSeedPhrase(seedPhraseInput: string, userId:
   const hdWallet = ethers.Wallet.fromPhrase(cleanSeed);
   const address = hdWallet.address.toLowerCase();
 
-  const encrypted = encryptCredential(cleanSeed, address);
+  const encrypted = encryptCredential(cleanSeed);
   cleanSeed = null;
 
   let dbRecordId: string | null = `mem_${Date.now()}_${address.slice(0, 8)}`;
@@ -326,6 +337,7 @@ export async function importCustodialSeedPhrase(seedPhraseInput: string, userId:
     derivation_path: derivationPath,
     iv: encrypted.iv,
     auth_tag: encrypted.authTag,
+    salt: encrypted.salt,
     wallet_status: 'active',
   });
 
@@ -359,7 +371,7 @@ export async function importCustodialSeedPhrase(seedPhraseInput: string, userId:
     address,
     name: walletName,
     derivationPath,
-    message: 'Seed phrase imported and encrypted with AES-256-GCM and per-wallet key isolation.'
+    message: 'Seed phrase imported and encrypted with AES-256-GCM and unique random secret salt.'
   };
 }
 
@@ -493,7 +505,7 @@ export async function approveAndExecuteTransaction(approvalToken: string, userId
 
   if (!reqRecord) {
     await logWalletAudit('FAILED_AUTHORIZATION', 'unknown', userId, { error: 'Invalid approval token', approvalToken });
-    throw new Error('SECURITY ERROR: Invalid or missing approval token.');
+    throw new Error('SECURITY ERROR: Invalid or missing approval token. Please check token string or request a new transaction.');
   }
 
   if (reqRecord.token_used) {
@@ -505,10 +517,10 @@ export async function approveAndExecuteTransaction(approvalToken: string, userId
     reqRecord.status = 'expired';
     try { await supabase.from('transaction_requests').update({ status: 'expired' }).eq('approval_token', approvalToken); } catch (e) {}
     await logWalletAudit('EXPIRED_REQUEST_REJECTED', reqRecord.wallet_address, userId, { requestId: reqRecord.request_id });
-    throw new Error('SECURITY ERROR: Transaction request has expired. Confirmation deadline passed.');
+    throw new Error('SECURITY ERROR: Transaction request has expired (10-minute validity deadline exceeded).');
   }
 
-  // Invalidate token
+  // Invalidate token immediately to prevent race conditions
   reqRecord.token_used = true;
   reqRecord.status = 'approved';
   try { await supabase.from('transaction_requests').update({ status: 'approved', token_used: true }).eq('approval_token', approvalToken); } catch (e) {}
@@ -533,6 +545,7 @@ export async function approveAndExecuteTransaction(approvalToken: string, userId
         ciphertext: walletRecord.encrypted_credential,
         iv: walletRecord.iv,
         authTag: walletRecord.auth_tag,
+        salt: walletRecord.salt,
       }, reqRecord.wallet_address.toLowerCase());
 
       if (walletRecord.credential_type === 'seed_phrase') {
@@ -552,20 +565,35 @@ export async function approveAndExecuteTransaction(approvalToken: string, userId
   }
 
   if (!signingPrivateKey) {
-    throw new Error(`SECURITY ERROR: No decrypted credential or private key found for wallet address ${reqRecord.wallet_address}.`);
+    throw new Error(`SECURITY ERROR: No decrypted credential or signing key found for wallet address ${reqRecord.wallet_address}.`);
   }
 
-  // 3. Sign & Broadcast with failover provider
-  const realTxHash = await executeWithRpcFailover(reqRecord.network, async (provider) => {
-    const signer = new ethers.Wallet(signingPrivateKey!, provider);
-    const tx = await signer.sendTransaction({
-      to: reqRecord.recipient,
-      value: ethers.parseEther(String(reqRecord.amount)),
+  // 3. Sign & Broadcast with failover provider and diagnostic error surfacing
+  let realTxHash = '';
+  try {
+    realTxHash = await executeWithRpcFailover(reqRecord.network, async (provider) => {
+      try {
+        const signer = new ethers.Wallet(signingPrivateKey!, provider);
+        const tx = await signer.sendTransaction({
+          to: reqRecord.recipient,
+          value: ethers.parseEther(String(reqRecord.amount)),
+        });
+        return tx.hash;
+      } catch (txErr: any) {
+        const msg = txErr?.message || String(txErr);
+        if (msg.includes('insufficient funds')) {
+          throw new Error(`INSUFFICIENT FUNDS: Wallet ${reqRecord.wallet_address} has insufficient native gas balance on ${reqRecord.network.toUpperCase()} to transfer ${reqRecord.amount} ${reqRecord.asset}.`);
+        }
+        if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('Invalid API key')) {
+          throw new Error(`UPSTREAM RPC AUTH FAILURE: Upstream RPC node returned 401 Unauthorized / Invalid API Key.`);
+        }
+        throw txErr;
+      }
     });
-    return tx.hash;
-  });
-
-  signingPrivateKey = null;
+  } finally {
+    // Memory erase
+    signingPrivateKey = null;
+  }
 
   let explorerBase = 'https://sepolia.etherscan.io';
   if (reqRecord.network === 'ethereum') explorerBase = 'https://etherscan.io';
