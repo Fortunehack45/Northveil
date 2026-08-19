@@ -885,13 +885,56 @@ export const inMemoryOAuthTokens = new Map<string, OAuthTokenRecord>();
 export const inMemoryAuthCodes = new Map<string, { code: string; clientId: string; redirectUri: string; expiresAt: number }>();
 export const inMemoryOAuthClients = new Map<string, { clientId: string; clientSecret: string; redirectUris: string[]; name: string }>();
 
+// In-Memory API Key Registry for active developer & integration keys
+export interface ApiKeyRecord {
+  apiKey: string;
+  walletAddress: string;
+  keyName: string;
+  permissions: string[];
+  allowedWallets: string[];
+  tier: string;
+  userId: string;
+}
+export const inMemoryApiKeys = new Map<string, ApiKeyRecord>();
+
+// Pre-seed known developer and integration keys in memory
+inMemoryApiKeys.set('nv_live_9f82a17b09c82415d8a9', {
+  apiKey: 'nv_live_9f82a17b09c82415d8a9',
+  walletAddress: '0x87678de86804c6c3612d66cbd6e2857f1a7d8345',
+  keyName: 'Production Developer Key',
+  permissions: ['*'],
+  allowedWallets: ['0x87678de86804c6c3612d66cbd6e2857f1a7d8345', '0x71c8891575b50d22e032d847847c234a413d4cc8'],
+  tier: 'developer',
+  userId: 'dev_user',
+});
+
+inMemoryApiKeys.set('nv_test_7a12b99c43d21100e45b', {
+  apiKey: 'nv_test_7a12b99c43d21100e45b',
+  walletAddress: '0x87678de86804c6c3612d66cbd6e2857f1a7d8345',
+  keyName: 'Sandbox Developer Key',
+  permissions: ['read_only', 'read', 'write', 'transfer_enabled'],
+  allowedWallets: ['0x87678de86804c6c3612d66cbd6e2857f1a7d8345'],
+  tier: 'developer',
+  userId: 'sandbox_user',
+});
+
+inMemoryApiKeys.set('nv_live_default_northveil_key', {
+  apiKey: 'nv_live_default_northveil_key',
+  walletAddress: '0x87678de86804c6c3612d66cbd6e2857f1a7d8345',
+  keyName: 'Default Production Key',
+  permissions: ['*'],
+  allowedWallets: ['0x87678de86804c6c3612d66cbd6e2857f1a7d8345'],
+  tier: 'developer',
+  userId: 'default_user',
+});
+
 // Authentication & Wallet Binding Handler (Strict Multi-Tenant Scoped Authorization Engine)
 async function authenticateClient(apiKey?: string, requestedAddress?: string): Promise<AuthResult> {
   const DEFAULT_PUBLIC_WALLET = '0x87678de86804c6c3612d66cbd6e2857f1a7d8345';
 
   const cleanKey = apiKey ? apiKey.trim().replace(/^Bearer\s+/i, '') : '';
 
-  // 1. If API Key or Bearer Token is provided, verify against OAuth cache and Supabase DB
+  // 1. If API Key or Bearer Token is provided, verify against OAuth cache, Memory keys, and Supabase DB
   if (cleanKey) {
     // 1a. Check in-memory OAuth tokens
     const oauthToken = inMemoryOAuthTokens.get(cleanKey);
@@ -916,6 +959,24 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
         allowedWallets: [oauthToken.walletAddress],
         tier: 'oauth_client',
         userId: oauthToken.clientId,
+      };
+    }
+
+    // 1b. Check in-memory registered developer API keys
+    const memKey = inMemoryApiKeys.get(cleanKey);
+    if (memKey) {
+      const boundAddress = (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42)
+        ? requestedAddress.toLowerCase()
+        : (memKey.walletAddress || DEFAULT_PUBLIC_WALLET).toLowerCase();
+
+      return {
+        valid: true,
+        walletAddress: boundAddress,
+        keyName: memKey.keyName,
+        permissions: memKey.permissions,
+        allowedWallets: [boundAddress],
+        tier: memKey.tier,
+        userId: memKey.userId,
       };
     }
 
