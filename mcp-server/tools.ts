@@ -1135,27 +1135,31 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'mint_tokens',
-    description: 'Mints new tokens from a deployed ERC-20 contract where the connected wallet is the contract owner or has minter role. Calls the contract\'s mint(address,uint256) function on-chain. Signs and broadcasts via Northveil custodial signer.',
+    description: 'Mints new tokens from a deployed ERC-20 fungible token contract or ERC-721 NFT collection contract where the connected wallet is the contract owner or has minter permissions. Automatically invokes mint(address,uint256) for ERC-20 or safeMint(address,string) for ERC-721 NFTs. Signs and broadcasts via Northveil custodial signer.',
     annotations: { readOnly: false, destructive: true, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
-        contractAddress: { type: 'string', description: '0x-prefixed address of the deployed ERC-20 contract with a mint function' },
+        contractAddress: { type: 'string', description: '0x-prefixed address of the deployed ERC-20 or ERC-721 contract with a mint function' },
         recipientAddress: { type: 'string', description: '0x-prefixed address to receive the minted tokens (defaults to wallet address if omitted)' },
-        amount: { type: 'string', description: 'Amount of tokens to mint (in human-readable units, e.g. "1000000" for 1M tokens)' },
+        amount: { type: 'string', description: 'Amount of tokens to mint (human-readable units for ERC-20, e.g. "1000000"; defaults to "1" for ERC-721 NFTs)' },
+        tokenURI: { type: 'string', description: 'Optional metadata URI / image URL for ERC-721 NFT minting' },
+        contractType: { type: 'string', description: 'Optional standard override: "erc20" or "erc721" (auto-detected if omitted)' },
         network: { type: 'string', description: 'Target blockchain: sepolia (default), ethereum, base, polygon, arbitrum, bsc' },
       },
-      required: ['contractAddress', 'amount'],
+      required: ['contractAddress'],
     },
     parameters: {
       type: 'object',
       properties: {
-        contractAddress: { type: 'string', description: 'ERC-20 contract address' },
+        contractAddress: { type: 'string', description: 'Contract address' },
         recipientAddress: { type: 'string', description: 'Recipient address for minted tokens' },
-        amount: { type: 'string', description: 'Amount to mint in human-readable units' },
+        amount: { type: 'string', description: 'Amount to mint' },
+        tokenURI: { type: 'string', description: 'NFT metadata URI' },
+        contractType: { type: 'string', description: 'Contract standard (erc20/erc721)' },
         network: { type: 'string', description: 'Target network' },
       },
-      required: ['contractAddress', 'amount'],
+      required: ['contractAddress'],
     },
   },
   {

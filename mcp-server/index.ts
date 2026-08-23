@@ -161,6 +161,40 @@ async function waitForReceiptWithStatus(
   }
 }
 
+/**
+ * Resilient nonce lookup utility for all on-chain transactions.
+ * Attempts 'pending' nonce first, then falls back to 'latest' if the upstream RPC node
+ * rate-limits or fails with code -32046 ("Cannot fulfill request").
+ */
+async function getResilientNonce(signer: ethers.Wallet, provider: ethers.Provider): Promise<number> {
+  const address = await signer.getAddress();
+  // 1. Try 'pending'
+  try {
+    const nonce = await provider.getTransactionCount(address, 'pending');
+    return nonce;
+  } catch (e1: any) {
+    const msg = e1?.message || String(e1);
+    if (msg.includes('-32046') || msg.includes('Cannot fulfill request') || msg.includes('timeout')) {
+      console.warn(`[Nonce Diagnostic] 'pending' nonce query rejected by RPC node (${msg.slice(0, 80)}). Falling back to 'latest'...`);
+    }
+  }
+
+  // 2. Fallback to 'latest'
+  try {
+    const nonce = await provider.getTransactionCount(address, 'latest');
+    return nonce;
+  } catch (e2: any) {
+    console.warn(`[Nonce Diagnostic] 'latest' nonce query failed: ${e2?.message || e2}`);
+  }
+
+  // 3. Fallback to signer getNonce with retry
+  try {
+    return await signer.getNonce('latest');
+  } catch {
+    return 0;
+  }
+}
+
 // Precision crypto & fiat formatters (supports micro-balances like 0.0000002 or 0.00000004)
 function formatCryptoAmount(num: number | string): string {
   const val = typeof num === 'string' ? parseFloat(num) : num;
@@ -176,6 +210,7 @@ function formatUsdValue(num: number): string {
   if (num < 0.01) return `$${num.toFixed(8).replace(/0+$/, '')}`;
   return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`;
 }
+
 /**
  * Builds a clean markdown UI card that renders perfectly in Claude Desktop, Claude Web, and ChatGPT.
  * Uses standard markdown tables and emoji indicators instead of SVG data URIs (which are stripped by LLM chat renderers).
@@ -203,8 +238,8 @@ function buildMcpUiCardMarkdown(payload: {
   actionUrl?: string;
   explorerUrl?: string;
 }): string {
-  const localAppUrl = process.env.PUBLIC_APP_URL || 'http://localhost:3000';
-  const actionLink = payload.actionUrl || `${localAppUrl}/?action=${payload.type}&amount=${encodeURIComponent(String(payload.amount || payload.fromAmount || ''))}&symbol=${encodeURIComponent(payload.symbol || payload.fromSymbol || '')}&recipient=${encodeURIComponent(payload.recipient || '')}&address=${encodeURIComponent(payload.contractAddress || '')}`;
+  const productionAppUrl = process.env.PUBLIC_APP_URL || 'https://northveil.vercel.app';
+  const actionLink = payload.actionUrl || `${productionAppUrl}/?action=${payload.type}&amount=${encodeURIComponent(String(payload.amount || payload.fromAmount || ''))}&symbol=${encodeURIComponent(payload.symbol || payload.fromSymbol || '')}&recipient=${encodeURIComponent(payload.recipient || '')}&address=${encodeURIComponent(payload.contractAddress || '')}`;
 
   const truncAddr = (addr: string) => addr ? `\`${addr.slice(0, 6)}...${addr.slice(-4)}\`` : '—';
   const truncHash = (h: string) => h ? `\`${h.slice(0, 10)}...${h.slice(-6)}\`` : '—';
@@ -241,7 +276,9 @@ function buildMcpUiCardMarkdown(payload: {
     markdown += `| **Token Name** | ${payload.name || 'Contract'} |\n`;
     markdown += `| **Symbol** | \`$${payload.symbol || 'TKN'}\` |\n`;
     markdown += `| **Standard** | ${payload.tokenType || 'ERC-20'} |\n`;
-    markdown += `| **Total Supply** | ${payload.totalSupply || '1,000,000,000'} |\n`;
+    if (payload.totalSupply && payload.totalSupply !== 'N/A') {
+      markdown += `| **Total Supply** | ${payload.totalSupply} |\n`;
+    }
     markdown += `| **Network** | ${payload.network || 'Ethereum'} |\n`;
   } else if (payload.type === 'request') {
     markdown += `| Field | Value |\n|:---|:---|\n`;
@@ -3015,8 +3052,9 @@ contract ${nameStr} {
 
       let onChainBytecodeVerified = false;
       try {
+        const deployNonce = await getResilientNonce(signer, targetProvider);
         const factory = new ethers.ContractFactory(compiledAbi, compiledBytecode, signer);
-        const deployTx = await factory.deploy();
+        const deployTx = await factory.deploy({ nonce: deployNonce });
         const deploymentTx = deployTx.deploymentTransaction();
         realTxHash = deploymentTx?.hash || '';
 
@@ -3074,12 +3112,13 @@ contract ${nameStr} {
         };
       }
 
-      // Save contract metadata to Supabase DB
+      // Save contract metadata to Supabase DB (storing both contract_address and predicted_address)
       let supabaseDbSaved = false;
       let dbRecordId: string | null = null;
       try {
         const { data: dbData, error: dbErr } = await supabase.from('contracts').insert([{
           wallet_address: actualSignerAddress,
+          contract_address: realContractAddress,
           contract_name: nameStr,
           symbol: symbolStr,
           contract_type: isNft ? 'ERC-721' : 'ERC-20',
@@ -3519,10 +3558,12 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
       const actualSignerAddress = signer.address.toLowerCase();
 
       try {
+        const transferNonce = await getResilientNonce(signer, targetProvider);
         const valueWei = ethers.parseEther(amountStr);
         const txResponse = await signer.sendTransaction({
           to: recipient,
           value: valueWei,
+          nonce: transferNonce,
         });
         const transferReceiptResult = await waitForReceiptWithStatus(txResponse, 8000);
         realTxHash = txResponse.hash;
@@ -5647,7 +5688,7 @@ ${threatRows}` : '#### ✅ No Threats Detected\n\nNo phishing approvals, malicio
     // ═══════════════════════════════════════════════════════════════════
     case 'verify_smart_contract': {
       const contractAddress = (args.contractAddress || args.address || '').toLowerCase();
-      const contractName = (args.contractName || args.name || 'SmartContract').replace(/[^a-zA-Z0-9_]/g, '');
+      let contractName = (args.contractName || args.name || '').replace(/[^a-zA-Z0-9_]/g, '');
       let sourceCode = args.sourceCode || args.code || args.solidityCode || '';
       const network = (args.network || args.chain || 'sepolia').toLowerCase();
       const compilerVersion = args.compilerVersion || 'v0.8.24+commit.e11b9ed9';
@@ -5658,36 +5699,29 @@ ${threatRows}` : '#### ✅ No Threats Detected\n\nNo phishing approvals, malicio
         throw new Error('Missing or invalid 0x contractAddress argument.');
       }
 
-      // If sourceCode is missing, retrieve from Supabase contracts DB
-      if (!sourceCode) {
-        try {
-          const { data: dbContract } = await supabase
-            .from('contracts')
-            .select('*')
-            .or(`contract_address.ilike.${contractAddress},id.eq.${contractAddress}`)
-            .maybeSingle();
-
-          if (dbContract?.solidity_code) {
-            sourceCode = dbContract.solidity_code;
-          }
-        } catch (e) { console.warn('[Supabase Contract Retrieval]:', e); }
+      // 1. Retrieve contract metadata & exact deployment source code from Supabase
+      let dbContract: any = null;
+      try {
+        const { data } = await supabase
+          .from('contracts')
+          .select('*')
+          .or(`contract_address.ilike.${contractAddress},predicted_address.ilike.${contractAddress},id.eq.${contractAddress}`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (data) dbContract = data;
+      } catch (e) {
+        console.warn('[Supabase Contract Retrieval Note]:', e);
       }
 
-      if (!sourceCode) {
-        // Fallback default ERC-20 source code template for auto-generated contracts
-        sourceCode = `// SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
-
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-
-contract ${contractName} is ERC20, ERC20Burnable, Ownable {
-    constructor() ERC20("${contractName}", "${contractName.slice(0, 4).toUpperCase()}") Ownable(msg.sender) {
-        _mint(msg.sender, 1000000000 * 10**decimals());
-    }
-}`;
+      if (!sourceCode && dbContract?.solidity_code) {
+        sourceCode = dbContract.solidity_code;
       }
+      if (!contractName) {
+        contractName = dbContract?.contract_name || 'SmartContract';
+      }
+      const tokenSymbol = dbContract?.symbol || contractName.slice(0, 4).toUpperCase();
+      const totalSupplyStr = dbContract?.total_supply ? Number(dbContract.total_supply).toLocaleString() : 'N/A';
 
       // Network explorer API routing
       let apiUrl = 'https://api-sepolia.etherscan.io/api';
@@ -5709,12 +5743,39 @@ contract ${contractName} is ERC20, ERC20Burnable, Ownable {
         apiUrl = 'https://api.bscscan.com/api'; explorerBase = 'https://bscscan.com'; apiKey = process.env.BSCSCAN_API_KEY || apiKey; chainName = 'BNB Smart Chain Mainnet';
       }
 
+      const contractExplorerUrl = `${explorerBase}/address/${contractAddress}#code`;
+
+      // Honest failure: if source code was never provided and not found in deployment records, NEVER substitute fake templates!
+      if (!sourceCode) {
+        return {
+          formattedMarkdown: `
+### ❌ SMART CONTRACT VERIFICATION ERROR: NO SOURCE CODE FOUND
+
+> **Contract Address**: [\`${contractAddress}\`](${contractExplorerUrl})  
+> **Target Network**: \`${chainName}\`  
+> **Failure Reason**: **No Solidity source code was provided in tool arguments, and no matching deployment record was found in the database.**  
+
+---
+
+#### 💡 How to Verify:
+1. Pass the Solidity source code directly in the \`sourceCode\` parameter when calling \`verify_smart_contract\`.
+2. Or deploy the contract using Northveil's \`deploy_smart_contract\` tool, which automatically persists the source code for verification.
+`,
+          verified: false,
+          status: 'NO_SOURCE_CODE',
+          error: 'Solidity source code was not provided and was not found in deployment database.',
+          contractAddress,
+          network: chainName,
+          explorerUrl: contractExplorerUrl,
+        };
+      }
+
       if (!apiKey) {
         return {
           formattedMarkdown: `
 ### ℹ️ BLOCK EXPLORER VERIFICATION NOTICE
 
-> **Contract Address**: [\`${contractAddress}\`](${explorerBase}/address/${contractAddress}#code)  
+> **Contract Address**: [\`${contractAddress}\`](${contractExplorerUrl})  
 > **Network**: \`${chainName}\`  
 > **On-Chain Bytecode**: 🟢 **VERIFIED (Active on blockchain)**  
 > **Source Verification Status**: ⚠️ **ETHERSCAN_API_KEY (or network explorer key) required in environment variables for automated Etherscan source-code publication.**  
@@ -5730,15 +5791,16 @@ contract ${contractName} is ERC20, ERC20Burnable, Ownable {
           reason: 'EXPLORER_API_KEY_REQUIRED',
           contractAddress,
           network: chainName,
-          explorerUrl: `${explorerBase}/address/${contractAddress}#code`,
+          explorerUrl: contractExplorerUrl,
         };
       }
 
       let isVerified = false;
+      let verificationStatus = 'PENDING';
       let verificationStatusMsg = '';
       let guid = '';
 
-      // 1. Submit source code verification request to Block Explorer API
+      // 2. Submit source code verification request to Block Explorer API
       try {
         const bodyParams = new URLSearchParams({
           apikey: apiKey,
@@ -5762,25 +5824,60 @@ contract ${contractName} is ERC20, ERC20Burnable, Ownable {
 
         if (vRes.ok) {
           const vData: any = await vRes.json();
-          if (vData.status === '1' || vData.result?.includes('GUID') || vData.message === 'OK') {
+          if (vData.result?.toLowerCase().includes('already verified')) {
             isVerified = true;
-            guid = vData.result || 'GUID_SUCCESS';
-            verificationStatusMsg = 'Source code successfully submitted & verified on Block Explorer!';
-          } else if (vData.result?.toLowerCase().includes('already verified')) {
-            isVerified = true;
+            verificationStatus = 'VERIFIED';
             verificationStatusMsg = 'Contract source code is ALREADY VERIFIED on Block Explorer!';
+          } else if (vData.status === '1' && vData.result) {
+            guid = vData.result;
+            verificationStatusMsg = `Verification submitted (GUID: ${guid}). Polling explorer verification compiler...`;
+
+            // Poll checkverifystatus up to 5 times (2s interval)
+            for (let i = 0; i < 5; i++) {
+              await new Promise(r => setTimeout(r, 2000));
+              try {
+                const pollRes = await fetch(`${apiUrl}?module=contract&action=checkverifystatus&guid=${encodeURIComponent(guid)}&apikey=${encodeURIComponent(apiKey)}`);
+                if (pollRes.ok) {
+                  const pollData: any = await pollRes.json();
+                  const pollResultStr = (pollData.result || '').toLowerCase();
+                  if (pollData.status === '1' || pollResultStr.includes('pass') || pollResultStr.includes('verified')) {
+                    isVerified = true;
+                    verificationStatus = 'VERIFIED';
+                    verificationStatusMsg = 'Source code successfully verified & published on Block Explorer!';
+                    break;
+                  } else if (pollResultStr.includes('fail') || pollResultStr.includes('unable') || pollResultStr.includes('error')) {
+                    isVerified = false;
+                    verificationStatus = 'FAILED';
+                    verificationStatusMsg = pollData.result || 'Explorer compiler returned verification failure';
+                    break;
+                  } else if (pollResultStr.includes('pending') || pollResultStr.includes('queue')) {
+                    verificationStatus = 'PENDING';
+                    verificationStatusMsg = 'Verification is currently queued/processing by block explorer compiler.';
+                  }
+                }
+              } catch (pollErr) {
+                console.warn('[Etherscan Poll Note]:', pollErr);
+              }
+            }
           } else {
-            verificationStatusMsg = vData.result || vData.message || 'Source code submitted to compiler verification queue.';
-            isVerified = true; // Mark submitted
+            // Submission failed
+            isVerified = false;
+            verificationStatus = 'FAILED';
+            verificationStatusMsg = vData.result || vData.message || 'Explorer API rejected verification submission.';
           }
+        } else {
+          isVerified = false;
+          verificationStatus = 'FAILED';
+          verificationStatusMsg = `Explorer HTTP returned status ${vRes.status}`;
         }
       } catch (e: any) {
-        console.warn('[Etherscan Verification Note]:', e);
-        verificationStatusMsg = `Verification submitted via Northveil Multi-Compiler (Sourcify/Blockscout fallback).`;
-        isVerified = true;
+        console.warn('[Etherscan Verification Exception]:', e);
+        isVerified = false;
+        verificationStatus = 'FAILED';
+        verificationStatusMsg = e?.message || 'Verification network request failed.';
       }
 
-      // 2. Submit to Sourcify multi-chain verification API
+      // 3. Fallback submit to Sourcify multi-chain verification API
       try {
         await fetch('https://sourcify.dev/server/verify', {
           method: 'POST',
@@ -5793,52 +5890,83 @@ contract ${contractName} is ERC20, ERC20Burnable, Ownable {
         }).catch(() => { });
       } catch (e) { }
 
-      // 3. Update Supabase database record with verified status & checkmark badge
-      const contractExplorerUrl = `${explorerBase}/address/${contractAddress}#code`;
-      try {
-        await supabase.from('contracts').update({
-          verified_on_explorer: true,
-          verification_guid: guid || undefined,
-          explorer_verification_url: contractExplorerUrl,
-          compiler_version: compilerVersion,
-          solidity_code: sourceCode,
-          updated_at: new Date().toISOString(),
-        }).eq('contract_address', contractAddress).then();
-      } catch (e) { }
+      // 4. Update Supabase database record only if verified
+      if (isVerified) {
+        try {
+          await supabase.from('contracts').update({
+            verified_on_explorer: true,
+            verification_guid: guid || undefined,
+            explorer_verification_url: contractExplorerUrl,
+            compiler_version: compilerVersion,
+            solidity_code: sourceCode,
+            updated_at: new Date().toISOString(),
+          }).or(`contract_address.ilike.${contractAddress},predicted_address.ilike.${contractAddress}`);
+        } catch (e) { }
+      }
 
       const uiCardMarkdown = buildMcpUiCardMarkdown({
         type: 'contract_metadata',
-        title: 'VERIFIED SMART CONTRACT SOURCE CODE',
+        title: isVerified ? 'VERIFIED SMART CONTRACT SOURCE CODE' : verificationStatus === 'PENDING' ? 'CONTRACT VERIFICATION IN QUEUE' : 'CONTRACT VERIFICATION FAILED',
         contractAddress,
         name: contractName,
-        symbol: contractName.slice(0, 4).toUpperCase(),
+        symbol: tokenSymbol,
+        totalSupply: totalSupplyStr,
         network: chainName,
         explorerUrl: contractExplorerUrl,
       });
+
+      let statusMarkdown = '';
+      if (isVerified) {
+        statusMarkdown = `
+### 🟢 SMART CONTRACT SOURCE CODE VERIFIED & PUBLISHED
+
+> **Contract Name**: \`${contractName}\` (\`$${tokenSymbol}\`)  
+> **Contract Address**: [\`${contractAddress}\`](${contractExplorerUrl})  
+> **Target Network**: **${chainName}**  
+> **Compiler**: \`${compilerVersion}\` (Optimization: ${optimizationUsed ? 'Enabled (' + runs + ' runs)' : 'Disabled'})  
+> **Verification Status**: 🟢 **OFFICIALLY VERIFIED & PUBLISHED**  
+> **Explorer Badge**: **GREEN CHECKMARK ACTIVE**  
+`;
+      } else if (verificationStatus === 'PENDING') {
+        statusMarkdown = `
+### ⏳ SMART CONTRACT VERIFICATION IN QUEUE
+
+> **Contract Name**: \`${contractName}\` (\`$${tokenSymbol}\`)  
+> **Contract Address**: [\`${contractAddress}\`](${contractExplorerUrl})  
+> **Target Network**: **${chainName}**  
+> **Submission GUID**: \`${guid || 'SUBMITTED'}\`  
+> **Verification Status**: ⏳ **SUBMITTED — PROCESSING IN COMPILER QUEUE**  
+> **Status Details**: \`${verificationStatusMsg}\`  
+`;
+      } else {
+        statusMarkdown = `
+### ❌ SMART CONTRACT VERIFICATION FAILED ON EXPLORER
+
+> **Contract Name**: \`${contractName}\` (\`$${tokenSymbol}\`)  
+> **Contract Address**: [\`${contractAddress}\`](${contractExplorerUrl})  
+> **Target Network**: **${chainName}**  
+> **Verification Status**: ❌ **VERIFICATION FAILED / REJECTED**  
+> **Failure Reason**: \`${verificationStatusMsg}\`  
+`;
+      }
 
       return {
         formattedMarkdown: `
 ${uiCardMarkdown}
 
-### 🟢 SMART CONTRACT SOURCE CODE VERIFIED & PUBLISHED
-
-> **Contract Name**: \`${contractName}\`  
-> **Contract Address**: [\`${contractAddress}\`](${contractExplorerUrl})  
-> **Target Network**: **${chainName}**  
-> **Compiler**: \`${compilerVersion}\` (Optimization: ${optimizationUsed ? 'Enabled (' + runs + ' runs)' : 'Disabled'})  
-> **Verification Status**: 🟢 **OFFICIALLY VERIFIED & PUBLISHED**  
-> **Explorer Badge**: **GREEN CHECKMARK BINDING ACTIVE**  
+${statusMarkdown}
 
 ---
 
-#### 📄 Verified Source Code Preview:
+#### 📄 Source Code Preview:
 \`\`\`solidity
-${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Code Published on Explorer]' : ''}
+${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Code Available on Explorer]' : ''}
 \`\`\`
 
-🔗 **[VIEW VERIFIED CODE & INTERACT ON BLOCK EXPLORER](${contractExplorerUrl})**
+🔗 **[VIEW CONTRACT ON BLOCK EXPLORER](${contractExplorerUrl})**
 `,
         verified: isVerified,
+        status: verificationStatus,
         contractAddress,
         contractName,
         network: chainName,
@@ -5854,7 +5982,8 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
     case 'mint_tokens': {
       const contractAddress = (args.contractAddress || args.contract || args.tokenAddress || args.token || '').trim();
       const recipientAddress = (args.recipientAddress || args.recipient || args.to || args.toAddress || cleanAddress || '').trim().toLowerCase();
-      const amountStr = String(args.amount || args.tokenAmount || args.value || '0');
+      const amountStr = String(args.amount || args.tokenAmount || args.value || '1');
+      const tokenUriInput = String(args.tokenURI || args.uri || args.metadataUrl || '');
       const network = (args.network || args.chain || 'sepolia').toLowerCase();
 
       if (!contractAddress || !contractAddress.startsWith('0x')) {
@@ -5887,37 +6016,113 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
       }
       const signer = new ethers.Wallet(privateKey, targetProvider);
 
-      // ERC-20 Mintable ABI (standard OpenZeppelin pattern)
-      const mintAbi = [
-        'function mint(address to, uint256 amount) external',
-        'function decimals() view returns (uint8)',
-        'function name() view returns (string)',
-        'function symbol() view returns (string)',
-        'function totalSupply() view returns (uint256)',
-      ];
-
-      const contract = new ethers.Contract(contractAddress, mintAbi, signer);
-
-      let decimals = 18;
-      let tokenName = 'Token';
-      let tokenSymbol = 'TKN';
-      try { decimals = Number(await contract.decimals()); } catch (e) {}
-      try { tokenName = await contract.name(); } catch (e) {}
-      try { tokenSymbol = await contract.symbol(); } catch (e) {}
-
-      const mintAmount = ethers.parseUnits(amountStr, decimals);
-
-      // Gas estimation with 1.3x safety buffer to prevent out-of-gas reverts
-      let gasOpts: any = {};
+      // 1. Check Supabase contracts registry for contract type & metadata
+      let dbContract: any = null;
       try {
-        const gasEstimate = await contract.mint.estimateGas(recipientAddress, mintAmount);
-        gasOpts.gasLimit = gasEstimate * 13n / 10n;
+        const { data } = await supabase
+          .from('contracts')
+          .select('*')
+          .or(`contract_address.ilike.${contractAddress},predicted_address.ilike.${contractAddress},id.eq.${contractAddress}`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (data) dbContract = data;
       } catch (e) {
-        // Fall back to generous default if estimation fails
-        gasOpts.gasLimit = 500000n;
+        console.warn('[Mint Supabase Contract Lookup Note]:', e);
       }
 
-      const tx = await contract.mint(recipientAddress, mintAmount, gasOpts);
+      let isNft = (args.contractType || '').toLowerCase().includes('721') ||
+                  (args.contractType || '').toLowerCase().includes('nft') ||
+                  dbContract?.contract_type === 'ERC-721';
+
+      // Verify interface standard on-chain if not already determined
+      if (!isNft) {
+        try {
+          const erc165 = new ethers.Contract(contractAddress, ['function supportsInterface(bytes4 interfaceId) view returns (bool)'], targetProvider);
+          isNft = await erc165.supportsInterface('0x80ac58cd'); // ERC-721 interface ID
+        } catch (e) {}
+      }
+
+      // 2. Resolve token name, symbol, decimals with multi-source fallback (on-chain -> database -> clean label)
+      let tokenName = dbContract?.contract_name || '';
+      let tokenSymbol = dbContract?.symbol || '';
+      let decimals = 18;
+
+      try {
+        const metaContract = new ethers.Contract(contractAddress, [
+          'function name() view returns (string)',
+          'function symbol() view returns (string)',
+          'function decimals() view returns (uint8)',
+        ], targetProvider);
+        if (!tokenName) {
+          try { tokenName = await metaContract.name(); } catch {}
+        }
+        if (!tokenSymbol) {
+          try { tokenSymbol = await metaContract.symbol(); } catch {}
+        }
+        if (!isNft) {
+          try { decimals = Number(await metaContract.decimals()); } catch { decimals = 18; }
+        }
+      } catch (e) {}
+
+      if (!tokenName) tokenName = isNft ? 'NFT Collection' : 'Fungible Token';
+      if (!tokenSymbol) tokenSymbol = isNft ? 'NFT' : 'TOKEN';
+
+      // 3. Prepare transaction with resilient nonce
+      const mintNonce = await getResilientNonce(signer, targetProvider);
+      let tx: any;
+      let mintAmountFormatted = amountStr;
+
+      if (isNft) {
+        // ERC-721 NFT Minting Flow (safeMint)
+        const nftAbi = [
+          'function safeMint(address to, string uri) public returns (uint256)',
+          'function safeMint(address to) public returns (uint256)',
+          'function mint(address to) public returns (uint256)',
+        ];
+        const nftContract = new ethers.Contract(contractAddress, nftAbi, signer);
+        const nftUri = tokenUriInput || dbContract?.image_url || '';
+        mintAmountFormatted = '1 NFT';
+
+        let gasOpts: any = { nonce: mintNonce };
+        try {
+          const gasEstimate = await nftContract.safeMint.estimateGas(recipientAddress, nftUri);
+          gasOpts.gasLimit = (gasEstimate * 13n) / 10n;
+        } catch {
+          gasOpts.gasLimit = 600000n;
+        }
+
+        try {
+          tx = await nftContract.safeMint(recipientAddress, nftUri, gasOpts);
+        } catch (safeMintErr: any) {
+          // Fallback to safeMint(to) or mint(to) if without URI
+          try {
+            tx = await nftContract.safeMint(recipientAddress, gasOpts);
+          } catch {
+            tx = await nftContract.mint(recipientAddress, gasOpts);
+          }
+        }
+      } else {
+        // ERC-20 Fungible Token Minting Flow
+        const erc20Abi = [
+          'function mint(address to, uint256 amount) external',
+          'function decimals() view returns (uint8)',
+        ];
+        const erc20Contract = new ethers.Contract(contractAddress, erc20Abi, signer);
+        const mintAmount = ethers.parseUnits(amountStr, decimals);
+        mintAmountFormatted = `${Number(amountStr).toLocaleString()} ${tokenSymbol}`;
+
+        let gasOpts: any = { nonce: mintNonce };
+        try {
+          const gasEstimate = await erc20Contract.mint.estimateGas(recipientAddress, mintAmount);
+          gasOpts.gasLimit = (gasEstimate * 13n) / 10n;
+        } catch {
+          gasOpts.gasLimit = 500000n;
+        }
+
+        tx = await erc20Contract.mint(recipientAddress, mintAmount, gasOpts);
+      }
+
       const { receipt, status: txStatus, error: txError } = await waitForReceiptWithStatus(tx, 8000);
 
       const txHash = receipt?.hash || tx.hash;
@@ -5929,7 +6134,7 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
           api_key: 'system',
           tool_name: 'mint_tokens',
           status: txStatus,
-          parameters: { contractAddress, recipientAddress, amount: amountStr, network },
+          parameters: { contractAddress, recipientAddress, amount: amountStr, standard: isNft ? 'ERC-721' : 'ERC-20', network },
           response: { txHash, tokenName, tokenSymbol, error: txError || null },
         }]);
       } catch (e) {}
@@ -5942,8 +6147,9 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
 
 | Field | Value |
 |:---|:---|
-| **Token** | ${tokenName} (\`$${tokenSymbol}\`) |
-| **Amount Attempted** | \`${Number(amountStr).toLocaleString()} ${tokenSymbol}\` |
+| **Token Standard** | \`${isNft ? 'ERC-721 NFT Collection' : 'ERC-20 Fungible Token'}\` |
+| **Token Name** | ${tokenName} (\`$${tokenSymbol}\`) |
+| **Amount Attempted** | \`${mintAmountFormatted}\` |
 | **Recipient** | \`${recipientAddress}\` |
 | **Contract** | \`${contractAddress}\` |
 | **Network** | ${chainName} |
@@ -5951,13 +6157,14 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
 | **Tx Hash** | [\`${txHash}\`](${txUrl}) |
 | **Failure Reason** | \`${txError || 'Transaction reverted — check gas limit and contract permissions'}\` |
 
-> **Troubleshooting**: Ensure the signer is the contract owner with mint permissions, and that sufficient gas was provided.
+> **Troubleshooting**: Ensure the signer wallet is the contract owner with mint permissions, and that max collection supply has not been exceeded.
 
 [VIEW FAILED TX ON BLOCK EXPLORER](${txUrl})
 `,
           txHash,
           status: 'FAILED',
           error: txError,
+          standard: isNft ? 'ERC-721' : 'ERC-20',
           tokenName,
           tokenSymbol,
           amount: amountStr,
@@ -5978,8 +6185,9 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
 
 | Field | Value |
 |:---|:---|
-| **Token** | ${tokenName} (\`$${tokenSymbol}\`) |
-| **Amount Minted** | \`${Number(amountStr).toLocaleString()} ${tokenSymbol}\` |
+| **Token Standard** | \`${isNft ? 'ERC-721 NFT Collection' : 'ERC-20 Fungible Token'}\` |
+| **Token Name** | ${tokenName} (\`$${tokenSymbol}\`) |
+| **Amount Minted** | \`${mintAmountFormatted}\` |
 | **Recipient** | \`${recipientAddress}\` |
 | **Contract** | \`${contractAddress}\` |
 | **Network** | ${chainName} |
@@ -5990,6 +6198,7 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
 `,
         txHash,
         status: txStatus,
+        standard: isNft ? 'ERC-721' : 'ERC-20',
         tokenName,
         tokenSymbol,
         amount: amountStr,
