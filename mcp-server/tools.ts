@@ -1160,7 +1160,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'reserve_tokens',
-    description: 'Creates a time-locked token reservation. Transfers tokens from the wallet into escrow and records a reservation in Northveil\'s database with an unlock date. Tokens can be claimed by the recipient after the unlock date. Useful for vesting schedules, team allocations, and investor lockups.',
+    description: 'Records a database vesting schedule and reminder for token releases with an unlock date. Note: This creates a database record/schedule; manual on-chain transfer to an escrow contract is required if programmatic locking is desired.',
     annotations: { readOnly: false, destructive: true, confirmationRequired: false },
     inputSchema: {
       type: 'object',
@@ -1189,8 +1189,8 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'make_reservation',
-    description: 'Creates a real-world web3 reservation & booking ticket for flights, movie tickets, hotel rooms, concert/event passes, dining, or rentals paid with crypto. Generates an official digital booking pass, ticket ID, confirmation QR code payload, and settles payment via connected wallet.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
+    description: 'Creates a simulated web3 travel/event booking pass (flight, cinema, hotel, concert, dining) for UI demonstration and testing. Note: Travel booking features are simulated demonstration passes and do not book live airline GDS or hotel inventory.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {

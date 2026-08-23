@@ -134,6 +134,33 @@ const DEXSCREENER_CHAINS: Record<string, string> = {
   solana: 'solana', sol: 'solana',
 };
 
+// 1inch v6 Router Address — wrapped in getAddress() for compile-time EIP-55 checksum validation
+const ONEINCH_ROUTER_V6 = ethers.getAddress('0x1111111254eeb25477b68fb85ed929f73a960382');
+
+/**
+ * Shared receipt status checker for ALL on-chain write operations.
+ * Waits for a transaction receipt and explicitly checks receipt.status.
+ * Returns 'CONFIRMED' only if status === 1, 'FAILED' if status === 0 (revert),
+ * and 'PENDING' if the receipt wasn't available within the timeout window.
+ */
+async function waitForReceiptWithStatus(
+  tx: ethers.TransactionResponse,
+  timeoutMs: number = 8000
+): Promise<{ receipt: ethers.TransactionReceipt | null; status: 'CONFIRMED' | 'FAILED' | 'PENDING'; error?: string }> {
+  try {
+    const receipt = await Promise.race([
+      tx.wait(1),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs))
+    ]);
+    if (!receipt) return { receipt: null, status: 'PENDING' };
+    if (receipt.status === 1) return { receipt, status: 'CONFIRMED' };
+    return { receipt, status: 'FAILED', error: `Transaction reverted on-chain (receipt.status=0). Tx: ${tx.hash}` };
+  } catch (err: any) {
+    // ethers throws if tx reverts in some cases
+    return { receipt: null, status: 'FAILED', error: err?.reason || err?.message || 'Transaction execution failed' };
+  }
+}
+
 // Precision crypto & fiat formatters (supports micro-balances like 0.0000002 or 0.00000004)
 function formatCryptoAmount(num: number | string): string {
   const val = typeof num === 'string' ? parseFloat(num) : num;
@@ -2993,30 +3020,30 @@ contract ${nameStr} {
         const deploymentTx = deployTx.deploymentTransaction();
         realTxHash = deploymentTx?.hash || '';
 
-        // Wait up to 4 seconds for fast on-chain confirmation, otherwise derive deterministic address
-        try {
-          await Promise.race([
-            deployTx.waitForDeployment(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000))
-          ]);
-          realContractAddress = await deployTx.getAddress();
-        } catch {
-          // If block mining takes longer than 4s, derive deterministic contract address from signer + nonce
-          try {
-            realContractAddress = await deployTx.getAddress();
-          } catch {
-            if (deploymentTx?.nonce !== undefined) {
-              realContractAddress = ethers.getCreateAddress({ from: signer.address, nonce: deploymentTx.nonce });
+        if (deploymentTx) {
+          const deployReceiptResult = await waitForReceiptWithStatus(deploymentTx, 8000);
+          if (deployReceiptResult.status === 'FAILED') {
+            deployErrorMsg = deployReceiptResult.error || 'Contract deployment reverted on-chain.';
+          } else if (deployReceiptResult.status === 'CONFIRMED') {
+            try {
+              realContractAddress = await deployTx.getAddress();
+            } catch {
+              if (deploymentTx.nonce !== undefined) {
+                realContractAddress = ethers.getCreateAddress({ from: signer.address, nonce: deploymentTx.nonce });
+              }
             }
+            isOnChainBroadcasted = true;
+          } else {
+            // PENDING - mempool broadcast succeeded
+            try {
+              realContractAddress = await deployTx.getAddress();
+            } catch {
+              if (deploymentTx.nonce !== undefined) {
+                realContractAddress = ethers.getCreateAddress({ from: signer.address, nonce: deploymentTx.nonce });
+              }
+            }
+            isOnChainBroadcasted = true;
           }
-        }
-
-        if (!realContractAddress && deploymentTx?.nonce !== undefined) {
-          realContractAddress = ethers.getCreateAddress({ from: signer.address, nonce: deploymentTx.nonce });
-        }
-
-        if (realTxHash && realContractAddress) {
-          isOnChainBroadcasted = true;
         }
       } catch (deployErr: any) {
         deployErrorMsg = deployErr?.reason || deployErr?.message || 'On-chain RPC deployment failed.';
@@ -3497,9 +3524,16 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
           to: recipient,
           value: valueWei,
         });
-        await txResponse.wait(1);
+        const transferReceiptResult = await waitForReceiptWithStatus(txResponse, 8000);
         realTxHash = txResponse.hash;
-        if (realTxHash) isBroadcastedOnChain = true;
+        if (transferReceiptResult.status === 'CONFIRMED') {
+          isBroadcastedOnChain = true;
+        } else if (transferReceiptResult.status === 'FAILED') {
+          transferErrorMsg = transferReceiptResult.error || 'Transfer reverted on-chain (receipt.status=0)';
+        } else {
+          // PENDING - broadcasted to mempool
+          isBroadcastedOnChain = true;
+        }
       } catch (txErr: any) {
         transferErrorMsg = txErr?.reason || txErr?.message || 'On-chain transaction broadcast failed.';
         console.error('[SendTransfer On-Chain Error]:', txErr);
@@ -4004,13 +4038,17 @@ ${solCode}
         const signer = new ethers.Wallet(privateKey, ethProvider);
         const valueWei = ethers.parseEther(String(amountNum));
         const txResponse = await signer.sendTransaction({
-          to: '0x1111111254EEB25477B68fb85Ed929f73A960382', // 1inch Router V6 Address
+          to: ONEINCH_ROUTER_V6,
           value: fromSym === 'ETH' ? valueWei : 0n,
           data: '0x',
         });
-        await txResponse.wait(1);
+        const swapResult = await waitForReceiptWithStatus(txResponse, 8000);
         realTxHash = txResponse.hash;
-        if (realTxHash) isBroadcastedOnChain = true;
+        if (swapResult.status === 'CONFIRMED') {
+          isBroadcastedOnChain = true;
+        } else if (swapResult.status === 'FAILED') {
+          swapErrorMsg = swapResult.error || 'Swap transaction reverted on-chain';
+        }
       } catch (txErr: any) {
         swapErrorMsg = txErr?.reason || txErr?.message || 'DEX Router execution failed.';
         console.error('[Swap On-Chain Error]:', txErr);
@@ -4041,8 +4079,8 @@ ${solCode}
           type: 'SWAP',
           token_symbol: `${fromSym} -> ${toSym}`,
           amount: amountNum,
-          recipient: '0x1111111254EEB25477B68fb85Ed929f73A960382',
-          status: isBroadcastedOnChain ? 'CONFIRMED' : 'UNBROADCASTED_PAYLOAD_READY',
+          recipient: ONEINCH_ROUTER_V6,
+          status: isBroadcastedOnChain ? 'CONFIRMED' : swapErrorMsg ? 'FAILED' : 'UNBROADCASTED_PAYLOAD_READY',
           chain_id: 'Ethereum Mainnet',
           gas_fee_usd: 0.65,
         }]).select('*');
@@ -4090,7 +4128,7 @@ ${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](https://etherscan.io
         toAmount: Number(dstAmountFormatted),
         router: routerName,
         unsignedTxPayload: {
-          to: '0x1111111254EEB25477B68fb85Ed929f73A960382',
+          to: ONEINCH_ROUTER_V6,
           value: '0x' + ethers.parseEther(String(amountNum)).toString(16),
           data: '0x',
           chainId: 1
@@ -4146,6 +4184,11 @@ ${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](https://etherscan.io
             const isSend = targetAddresses.includes(tx.from?.toLowerCase());
             const ethVal = tx.value ? Number(ethers.formatEther(tx.value)) : 0;
             const dateStr = tx.timeStamp ? new Date(Number(tx.timeStamp) * 1000).toISOString() : tx.timestamp || '';
+            const txStatus = (tx.isError === '1' || tx.txreceipt_status === '0' || tx.status === 'error')
+              ? 'Failed'
+              : (tx.isError === '0' || tx.txreceipt_status === '1' || tx.status === 'ok')
+              ? 'Confirmed'
+              : 'Pending';
 
             return {
               hash: tx.hash,
@@ -4154,7 +4197,7 @@ ${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](https://etherscan.io
               to: tx.to || tx.contractAddress || '',
               value: ethVal,
               fee: tx.gasPrice && tx.gasUsed ? Number(ethers.formatEther(BigInt(tx.gasPrice) * BigInt(tx.gasUsed))) : 0,
-              status: tx.isError === '0' || tx.status === 'ok' ? 'Confirmed' : 'Pending',
+              status: txStatus,
               timestamp: dateStr,
               chain: chain.name,
               explorerUrl: `${chain.explorer}/tx/${tx.hash}`,
@@ -4174,7 +4217,7 @@ ${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](https://etherscan.io
         }
       }
 
-      // 2. Fetch locally recorded transactions from Supabase DB across all target addresses
+      // 2. Fetch locally recorded transactions from Supabase DB across all target addresses and reconcile pending statuses
       try {
         let { data: dbData } = await supabase
           .from('transactions')
@@ -4188,10 +4231,28 @@ ${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](https://etherscan.io
               seenHashes.add(t.tx_hash.toLowerCase());
               const chainName = t.chain_id || 'Sepolia Testnet';
               let explorerBase = 'https://sepolia.etherscan.io';
-              if (chainName.toLowerCase().includes('base')) explorerBase = 'https://basescan.org';
-              else if (chainName.toLowerCase().includes('polygon')) explorerBase = 'https://polygonscan.com';
-              else if (chainName.toLowerCase().includes('arbitrum')) explorerBase = 'https://arbiscan.io';
-              else if (chainName.toLowerCase().includes('ethereum') && !chainName.toLowerCase().includes('sepolia')) explorerBase = 'https://etherscan.io';
+              let prov = sepoliaProvider;
+              if (chainName.toLowerCase().includes('base')) { explorerBase = 'https://basescan.org'; prov = baseProvider; }
+              else if (chainName.toLowerCase().includes('polygon')) { explorerBase = 'https://polygonscan.com'; prov = polygonProvider; }
+              else if (chainName.toLowerCase().includes('arbitrum')) { explorerBase = 'https://arbiscan.io'; prov = arbitrumProvider; }
+              else if (chainName.toLowerCase().includes('ethereum') && !chainName.toLowerCase().includes('sepolia')) { explorerBase = 'https://etherscan.io'; prov = ethProvider; }
+
+              let txStatus = t.status === 'FAILED' ? 'Failed' : t.status === 'CONFIRMED' ? 'Confirmed' : 'Pending';
+
+              // If marked PENDING or SIGNABLE_PAYLOAD_READY, check on-chain receipt
+              if (txStatus === 'Pending' || t.status === 'SIGNABLE_PAYLOAD_READY') {
+                try {
+                  const receipt = await Promise.race([
+                    prov.getTransactionReceipt(t.tx_hash),
+                    new Promise<null>((res) => setTimeout(() => res(null), 1500))
+                  ]);
+                  if (receipt) {
+                    txStatus = receipt.status === 1 ? 'Confirmed' : 'Failed';
+                    // Update Supabase in background
+                    supabase.from('transactions').update({ status: txStatus === 'Confirmed' ? 'CONFIRMED' : 'FAILED' }).eq('tx_hash', t.tx_hash).then();
+                  }
+                } catch (e) {}
+              }
 
               allTxs.push({
                 hash: t.tx_hash,
@@ -4200,7 +4261,7 @@ ${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](https://etherscan.io
                 to: t.recipient || 'Contract Address',
                 value: t.amount || 0,
                 fee: t.gas_fee_usd || 0.42,
-                status: t.status || 'Confirmed',
+                status: txStatus,
                 timestamp: t.created_at || new Date().toISOString(),
                 chain: chainName,
                 explorerUrl: `${explorerBase}/tx/${t.tx_hash}`,
@@ -4683,7 +4744,10 @@ ${mdRows}
           const boosts: any[] = await boostRes.json();
           for (const b of boosts.slice(0, 40)) {
             if (chainFilter !== 'all' && b.chainId !== (DEXSCREENER_CHAINS[chainFilter] || chainFilter)) continue;
-            trendingTokens.push({ tokenAddress: b.tokenAddress, chain: b.chainId, url: b.url, description: b.description, icon: b.icon, source: 'boost' });
+            const addr = (b.tokenAddress || '').toLowerCase();
+            if (!trendingTokens.some(t => t.tokenAddress.toLowerCase() === addr)) {
+              trendingTokens.push({ tokenAddress: b.tokenAddress, chain: b.chainId, url: b.url, description: b.description, icon: b.icon, source: 'boost' });
+            }
           }
         }
       } catch (e) { console.warn('[DexScreener Boosts]:', e); }
@@ -4695,7 +4759,8 @@ ${mdRows}
           const profiles: any[] = await profRes.json();
           for (const p of profiles.slice(0, 30)) {
             if (chainFilter !== 'all' && p.chainId !== (DEXSCREENER_CHAINS[chainFilter] || chainFilter)) continue;
-            if (!trendingTokens.find(t => t.tokenAddress === p.tokenAddress)) {
+            const addr = (p.tokenAddress || '').toLowerCase();
+            if (!trendingTokens.some(t => t.tokenAddress.toLowerCase() === addr)) {
               trendingTokens.push({ tokenAddress: p.tokenAddress, chain: p.chainId, url: p.url, description: p.description, icon: p.icon, source: 'profile' });
             }
           }
@@ -4703,9 +4768,9 @@ ${mdRows}
       } catch (e) { console.warn('[DexScreener Profiles]:', e); }
 
       // 3. Fetch detailed pair data for each token
-      const detailedTokens: any[] = [];
+      const rawDetailedTokens: any[] = [];
       const batchSize = 8;
-      for (let i = 0; i < Math.min(trendingTokens.length, limit + 10); i += batchSize) {
+      for (let i = 0; i < Math.min(trendingTokens.length, limit + 15); i += batchSize) {
         const batch = trendingTokens.slice(i, i + batchSize);
         const results = await Promise.allSettled(batch.map(async (t: any) => {
           const pairRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${t.tokenAddress}`);
@@ -4734,9 +4799,19 @@ ${mdRows}
           };
         }));
         for (const r of results) {
-          if (r.status === 'fulfilled' && r.value) detailedTokens.push(r.value);
+          if (r.status === 'fulfilled' && r.value) rawDetailedTokens.push(r.value);
         }
       }
+
+      // Deduplicate detailed tokens by contract address (case-insensitive)
+      const dedupMap = new Map<string, any>();
+      for (const tok of rawDetailedTokens) {
+        const key = tok.contractAddress.toLowerCase();
+        if (!dedupMap.has(key)) {
+          dedupMap.set(key, tok);
+        }
+      }
+      const detailedTokens = Array.from(dedupMap.values());
 
       // 4. GoPlus security audit for top tokens
       for (const token of detailedTokens.slice(0, limit)) {
@@ -4846,10 +4921,51 @@ ${trendMdRows}
       }
 
       contractAddr = contractAddr.toLowerCase();
+      const isTestnetChain = chain.includes('sepolia') || chain.includes('amoy') || chain.includes('testnet');
       const goplusChainId = GOPLUS_CHAIN_IDS[chain] || '1';
       let auditResult: any = {};
       let tokenName = '';
       let tokenSymbol = '';
+
+      if (isTestnetChain) {
+        // Attempt basic ERC-20 on-chain query on Sepolia/testnet provider
+        try {
+          const testnetErc20 = new ethers.Contract(contractAddr, [
+            'function name() view returns (string)',
+            'function symbol() view returns (string)',
+            'function totalSupply() view returns (uint256)',
+            'function owner() view returns (address)',
+          ], sepoliaProvider);
+          tokenName = await testnetErc20.name();
+          tokenSymbol = await testnetErc20.symbol();
+        } catch (e) {}
+
+        return {
+          formattedMarkdown: `
+### ℹ️ TESTNET TOKEN SECURITY NOTICE (${chain.toUpperCase()})
+
+> **Token**: **${tokenName || 'Testnet Token'}** (${tokenSymbol || 'TEST'})
+> **Contract**: \`${contractAddr}\`
+> **Chain**: \`${chain.toUpperCase()}\` (Testnet)
+> **Security Audit Status**: ⚠️ **Testnet Network — GoPlus Security & DexScreener APIs index production mainnets only.**
+
+---
+
+#### 📋 Testnet Security Assessment
+- 🟢 **Contract Deployed**: On \`${chain}\` testnet
+- ⚠️ **External Audits**: Testnets do not have public security score indexers. To audit security mechanisms (mintable, owner permissions, honeypot mechanics), review the verified Solidity source code.
+- 💡 **Production Audit**: Once deployed to Ethereum, Base, Polygon, Arbitrum, BSC, or Solana, full automated security scanning is available.
+`,
+          score: null,
+          verdict: 'TESTNET_NOT_INDEXED',
+          tokenName: tokenName || 'Testnet Token',
+          tokenSymbol: tokenSymbol || 'TEST',
+          contractAddress: contractAddr,
+          chain,
+          isTestnet: true,
+          findings: ['Testnet tokens are not indexed by external security scanners (GoPlus / DexScreener).'],
+        };
+      }
 
       // 1. GoPlus Token Security
       try {
@@ -4878,6 +4994,35 @@ ${trendMdRows}
           }
         }
       } catch (e) { /* optional */ }
+
+      const hasAuditData = Object.keys(auditResult).length > 0;
+      const hasDexData = Object.keys(dexData).length > 0;
+
+      if (!hasAuditData && !hasDexData) {
+        return {
+          formattedMarkdown: `
+### ⚠️ TOKEN SECURITY RECORD NOT FOUND
+
+> **Contract Address**: \`${contractAddr}\`
+> **Target Chain**: \`${chain.toUpperCase()}\`
+> **Status**: **No on-chain security record or DEX trading pair found on this network.**
+
+---
+
+#### 💡 Recommendations:
+1. Verify the contract address is correct and deployed on **${chain.toUpperCase()}**.
+2. If this is a newly deployed token, security indexers may take a few minutes to index the contract.
+3. For custom tokens, call \`verify_smart_contract\` to publish source code for transparency.
+`,
+          score: null,
+          verdict: 'NOT_FOUND',
+          contractAddress: contractAddr,
+          chain,
+          tokenName: '',
+          tokenSymbol: '',
+          findings: ['Contract not found on GoPlus index or DEX liquidity pools for this network.'],
+        };
+      }
 
       const buyTax = Number(auditResult.buy_tax || 0) * 100;
       const sellTax = Number(auditResult.sell_tax || 0) * 100;
@@ -5231,24 +5376,54 @@ ${orderRows}
       // Diversity score
       const diversityScore = Math.min(100, activeChains * 15 + (totalUsd > 100 ? 20 : 0) + (totalUsd > 1000 ? 20 : 0));
 
-      // Token count from ethplorer
+      // Token count & discovery across multiple chains (Ethplorer + Blockscout + Northveil Supabase Contracts)
       let tokenCount = 0;
       let dustTokens = 0;
+      const discoveredTokens = new Set<string>();
+
+      // A. Ethplorer Mainnet tokens
       try {
         const epRes = await fetch(`https://api.ethplorer.io/getAddressInfo/${targetAddr}?apiKey=freekey`);
         if (epRes.ok) {
           const epData: any = await epRes.json();
           if (epData.tokens) {
-            tokenCount = epData.tokens.length;
-            dustTokens = epData.tokens.filter((t: any) => {
+            for (const t of epData.tokens) {
+              if (t.tokenInfo?.address) discoveredTokens.add(t.tokenInfo.address.toLowerCase());
               const dec = Number(t.tokenInfo?.decimals || 18);
               const bal = Number(t.balance || 0) / Math.pow(10, dec);
               const price = Number(t.tokenInfo?.price?.rate || 0);
-              return bal * price < 1;
-            }).length;
+              if (bal * price < 1) dustTokens++;
+            }
           }
         }
       } catch (e) { /* optional */ }
+
+      // B. Sepolia & Testnet tokens via Blockscout
+      try {
+        const bsRes = await fetch(`https://eth-sepolia.blockscout.com/api?module=account&action=tokenlist&address=${targetAddr}`, { signal: AbortSignal.timeout(3000) });
+        if (bsRes.ok) {
+          const bsData: any = await bsRes.json();
+          const items = Array.isArray(bsData.result) ? bsData.result : [];
+          for (const item of items) {
+            if (item.contractAddress) discoveredTokens.add(item.contractAddress.toLowerCase());
+          }
+        }
+      } catch (e) { /* optional */ }
+
+      // C. Northveil Deployed Contracts in Supabase
+      try {
+        const { data: nvContracts } = await supabase
+          .from('contracts')
+          .select('contract_address, symbol, contract_name')
+          .eq('wallet_address', targetAddr);
+        if (nvContracts && Array.isArray(nvContracts)) {
+          for (const c of nvContracts) {
+            if (c.contract_address) discoveredTokens.add(c.contract_address.toLowerCase());
+          }
+        }
+      } catch (e) { /* optional */ }
+
+      tokenCount = discoveredTokens.size;
 
       // Overall health
       let healthScore = 50;
@@ -5732,34 +5907,74 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
 
       const mintAmount = ethers.parseUnits(amountStr, decimals);
 
-      const tx = await contract.mint(recipientAddress, mintAmount);
-      let receipt: any = null;
+      // Gas estimation with 1.3x safety buffer to prevent out-of-gas reverts
+      let gasOpts: any = {};
       try {
-        receipt = await Promise.race([
-          tx.wait(1),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 4000))
-        ]);
+        const gasEstimate = await contract.mint.estimateGas(recipientAddress, mintAmount);
+        gasOpts.gasLimit = gasEstimate * 13n / 10n;
       } catch (e) {
-        // Fast mempool broadcast return to prevent serverless function timeouts
+        // Fall back to generous default if estimation fails
+        gasOpts.gasLimit = 500000n;
       }
+
+      const tx = await contract.mint(recipientAddress, mintAmount, gasOpts);
+      const { receipt, status: txStatus, error: txError } = await waitForReceiptWithStatus(tx, 8000);
 
       const txHash = receipt?.hash || tx.hash;
       const txUrl = `${explorerBase}/tx/${txHash}`;
 
-      // Log to Supabase
+      // Log actual status to Supabase
       try {
         await supabase.from('mcp_activity_logs').insert([{
           api_key: 'system',
           tool_name: 'mint_tokens',
-          status: 'SUCCESS',
+          status: txStatus,
           parameters: { contractAddress, recipientAddress, amount: amountStr, network },
-          response: { txHash, tokenName, tokenSymbol },
+          response: { txHash, tokenName, tokenSymbol, error: txError || null },
         }]);
       } catch (e) {}
 
+      // FAILED: receipt exists but status === 0 (reverted on-chain)
+      if (txStatus === 'FAILED') {
+        return {
+          formattedMarkdown: `
+### ❌ NORTHVEIL — TOKEN MINT FAILED ON-CHAIN
+
+| Field | Value |
+|:---|:---|
+| **Token** | ${tokenName} (\`$${tokenSymbol}\`) |
+| **Amount Attempted** | \`${Number(amountStr).toLocaleString()} ${tokenSymbol}\` |
+| **Recipient** | \`${recipientAddress}\` |
+| **Contract** | \`${contractAddress}\` |
+| **Network** | ${chainName} |
+| **Status** | ❌ **FAILED (REVERTED ON-CHAIN)** |
+| **Tx Hash** | [\`${txHash}\`](${txUrl}) |
+| **Failure Reason** | \`${txError || 'Transaction reverted — check gas limit and contract permissions'}\` |
+
+> **Troubleshooting**: Ensure the signer is the contract owner with mint permissions, and that sufficient gas was provided.
+
+[VIEW FAILED TX ON BLOCK EXPLORER](${txUrl})
+`,
+          txHash,
+          status: 'FAILED',
+          error: txError,
+          tokenName,
+          tokenSymbol,
+          amount: amountStr,
+          recipientAddress,
+          contractAddress,
+          network: chainName,
+          explorerUrl: txUrl,
+        };
+      }
+
+      // PENDING: broadcast succeeded but receipt not yet available
+      const statusLabel = txStatus === 'CONFIRMED' ? '🟢 **CONFIRMED ON-CHAIN**' : '🟡 **PENDING (BROADCASTED, AWAITING CONFIRMATION)**';
+      const statusEmoji = txStatus === 'CONFIRMED' ? '🟢' : '🟡';
+
       return {
         formattedMarkdown: `
-### 🟢 NORTHVEIL — TOKEN MINT EXECUTED
+### ${statusEmoji} NORTHVEIL — TOKEN MINT ${txStatus === 'CONFIRMED' ? 'CONFIRMED' : 'BROADCASTED'}
 
 | Field | Value |
 |:---|:---|
@@ -5768,12 +5983,13 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
 | **Recipient** | \`${recipientAddress}\` |
 | **Contract** | \`${contractAddress}\` |
 | **Network** | ${chainName} |
-| **Status** | **CONFIRMED ON-CHAIN** |
+| **Status** | ${statusLabel} |
 | **Tx Hash** | [\`${txHash}\`](${txUrl}) |
 
 [VIEW ON BLOCK EXPLORER](${txUrl})
 `,
         txHash,
+        status: txStatus,
         tokenName,
         tokenSymbol,
         amount: amountStr,
@@ -5852,7 +6068,7 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
           unlock_date: unlockTimestamp.toISOString(),
           label,
           network: chainName,
-          status: 'LOCKED',
+          status: 'SCHEDULED',
           created_at: new Date().toISOString(),
         }]);
         dbSaved = true;
@@ -5862,22 +6078,25 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
 
       return {
         formattedMarkdown: `
-### NORTHVEIL — TOKEN RESERVATION CREATED
+### NORTHVEIL — VESTING SCHEDULE RECORDED
+
+> ⚠️ **IMPORTANT**: This is a **database-only vesting schedule reminder**. **No tokens have been locked or transferred on-chain.** To enforce on-chain escrow, you must manually transfer tokens to a vesting contract.
 
 | Field | Value |
 |:---|:---|
 | **Reservation ID** | \`${reservationId}\` |
 | **Token** | ${tokenName} (\`$${tokenSymbol}\`) |
-| **Amount Reserved** | \`${Number(amountStr).toLocaleString()} ${tokenSymbol}\` |
+| **Scheduled Amount** | \`${Number(amountStr).toLocaleString()} ${tokenSymbol}\` |
 | **Recipient** | \`${recipientAddress.slice(0, 6)}...${recipientAddress.slice(-4)}\` |
 | **Sender** | \`${cleanAddress.slice(0, 6)}...${cleanAddress.slice(-4)}\` |
 | **Unlock Date** | \`${unlockTimestamp.toISOString().split('T')[0]}\` (~${daysUntilUnlock} days) |
 | **Label** | ${label} |
 | **Network** | ${chainName} |
-| **Status** | [LOCKED IN ESCROW] |
-| **Database** | ${dbSaved ? '[SYNCHRONIZED]' : '[IN-MEMORY ONLY]'} |
+| **On-Chain Status** | ⚠️ NO ON-CHAIN LOCK — Database record only |
+| **Transaction Hash** | ⚠️ None — no on-chain transaction was executed |
+| **Database** | ${dbSaved ? '[SAVED TO SUPABASE]' : '[IN-MEMORY ONLY]'} |
 
-> Tokens will become claimable by the recipient after **${unlockTimestamp.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}**.
+> Vesting schedule recorded. Tokens remain in the sender wallet until manually transferred. The recipient can be notified after **${unlockTimestamp.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}**.
 `,
         reservationId,
         contractAddress,
@@ -5889,7 +6108,9 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
         unlockDate: unlockTimestamp.toISOString(),
         label,
         network: chainName,
-        status: 'LOCKED',
+        status: 'SCHEDULED',
+        onChainLocked: false,
+        txHash: null,
         daysUntilUnlock,
       };
     }
@@ -6188,26 +6409,39 @@ Please verify your 6-character PNR (e.g. \`7X9K2B\`) or Northveil booking refere
       const curr = matchedRecord.currency || 'ETH';
       const net = matchedRecord.network || 'Ethereum Sepolia';
 
+      let codeLabel = 'Booking Reference Code';
+      if (cat === 'FLIGHT') codeLabel = 'Simulated Airline PNR';
+      else if (cat === 'MOVIE') codeLabel = 'Cinema Ticket Code';
+      else if (cat === 'HOTEL') codeLabel = 'Hotel Confirmation Code';
+      else if (cat === 'EVENT') codeLabel = 'VIP Event Pass Code';
+      else if (cat === 'DINING') codeLabel = 'Dining Reservation Code';
+
+      let categorySpecificRows = '';
+      if (cat === 'FLIGHT') {
+        categorySpecificRows = `| **Terminal & Gate** | Terminal 2, Gate B18 (Demo Schedule) |\n| **Baggage Allowance** | 2x Checked Bags (32kg each) + 1x Carry-on |\n`;
+      } else if (cat === 'HOTEL') {
+        categorySpecificRows = `| **Check-in Time** | 15:00 Check-in / 11:00 Check-out |\n| **Room Tier** | ${seats} |\n`;
+      }
+
       return {
         formattedMarkdown: `
-### NORTHVEIL — LIVE BOOKING VERIFICATION PASS
+### NORTHVEIL — DIGITAL BOOKING PASS
 
-| Field | Official GDS & Web3 Details |
+> ⚠️ **NOTICE**: This is a **simulated demonstration pass**. No real-world airline GDS, hotel inventory, or fiat ticket transaction occurred.
+
+| Field | Details |
 | :--- | :--- |
-| **Airline PNR Code** | **\`${pnrCode}\`** [IATA VERIFIED] |
+| **${codeLabel}** | **\`${pnrCode}\`** |
 | **Northveil Reference** | \`${ref}\` |
 | **Category** | [${cat}] |
 | **Booking Item / Route** | **${tit}** |
 | **Passenger / Guest** | **${guest}** |
 | **Date & Time** | \`${date}\` @ \`${time}\` |
 | **Seat / Room / Section** | \`${seats}\` |
-| **Settlement Amount** | **${price} ${curr}** |
+| **Simulated Price** | **${price} ${curr}** |
 | **Network** | ${net} |
-| **Status** | [CONFIRMED & GUARANTEED] |
-| **Terminal & Gate** | Terminal 2, Gate B18 (Check-in opens 2h prior) |
-| **Baggage Allowance** | 2x Checked Bags (32kg each) + 1x Carry-on (Included) |
-
-> **Official Check-In**: Present PNR **\`${pnrCode}\`** or reference **\`${ref}\`** directly at the airport desk or hotel reception.
+| **Status** | [SIMULATED DEMO — SAVED] |
+${categorySpecificRows}
 `,
         found: true,
         bookingReference: ref,
@@ -6215,7 +6449,7 @@ Please verify your 6-character PNR (e.g. \`7X9K2B\`) or Northveil booking refere
         category: cat,
         title: tit,
         customerName: guest,
-        status: 'CONFIRMED',
+        status: 'SIMULATED_CONFIRMED',
         details: matchedRecord,
       };
     }
@@ -6248,7 +6482,7 @@ Please verify your 6-character PNR (e.g. \`7X9K2B\`) or Northveil booking refere
       else if (network === 'arbitrum') chainName = 'Arbitrum One';
       else if (network === 'bsc' || network === 'binance') chainName = 'BNB Smart Chain';
 
-      // Generate category-specific cryptographic booking reference and official 6-character IATA PNR
+      // Generate category-specific cryptographic booking reference and demonstration code
       const prefixMap: Record<string, string> = {
         flight: 'FLT',
         movie: 'MOV',
@@ -6313,37 +6547,49 @@ Please verify your 6-character PNR (e.g. \`7X9K2B\`) or Northveil booking refere
         console.warn('[MakeReservation] Supabase insert notice:', e);
       }
 
-      let typeHeader = 'WEB3 RESERVATION & TICKET PASS';
-      if (category === 'flight') typeHeader = 'OFFICIAL AIRLINE BOARDING PASS';
-      else if (category === 'movie') typeHeader = 'CINEMA TICKET PASS';
-      else if (category === 'hotel') typeHeader = 'HOTEL BOOKING CONFIRMATION';
-      else if (category === 'event') typeHeader = 'VIP EVENT TICKET PASS';
-      else if (category === 'dining') typeHeader = 'DINING RESERVATION PASS';
-      else if (category === 'rental') typeHeader = 'RENTAL BOOKING CONFIRMATION';
+      let typeHeader = 'WEB3 RESERVATION PASS';
+      let codeLabel = 'Booking Reference Code';
+      if (category === 'flight') { typeHeader = 'SIMULATED AIRLINE BOARDING PASS'; codeLabel = 'Simulated Airline PNR'; }
+      else if (category === 'movie') { typeHeader = 'CINEMA TICKET PASS'; codeLabel = 'Cinema Ticket Code'; }
+      else if (category === 'hotel') { typeHeader = 'HOTEL BOOKING CONFIRMATION'; codeLabel = 'Hotel Confirmation Code'; }
+      else if (category === 'event') { typeHeader = 'VIP EVENT TICKET PASS'; codeLabel = 'Event Pass Code'; }
+      else if (category === 'dining') { typeHeader = 'DINING RESERVATION PASS'; codeLabel = 'Table Reservation Code'; }
+      else if (category === 'rental') { typeHeader = 'RENTAL BOOKING CONFIRMATION'; codeLabel = 'Rental Booking Code'; }
 
       const priceUsdApprox = (Number(priceAmount) * (currency === 'ETH' ? 3450 : currency === 'SOL' ? 148 : 1)).toFixed(2);
+
+      let checkInInstructions = `> **Pass Usage**: Present reference code **\`${bookingReference}\`** for your digital pass.`;
+      if (category === 'flight') {
+        checkInInstructions = `> **Flight Demo**: Present simulated PNR code **\`${pnr}\`** or Northveil reference **\`${bookingReference}\`**.`;
+      } else if (category === 'hotel') {
+        checkInInstructions = `> **Hotel Demo**: Present confirmation code **\`${bookingReference}\`** upon check-in.`;
+      } else if (category === 'movie') {
+        checkInInstructions = `> **Cinema Demo**: Present ticket code **\`${pnr}\`** at the theatre entrance.`;
+      }
 
       return {
         formattedMarkdown: `
 ### NORTHVEIL — ${typeHeader}
 
+> ⚠️ **NOTICE**: This is a **simulated demonstration pass**. No real-world payment was deducted from your wallet, and no live inventory was booked.
+
 | Field | Details |
 |:---|:---|
-| **Official Airline PNR** | **\`${pnr}\`** [IATA COMPLIANT] |
+| **${codeLabel}** | **\`${pnr}\`** |
 | **Booking Reference** | \`${bookingReference}\` |
-| **E-Ticket Number** | \`${eTicketNo}\` |
-| **Title / Route** | **${title}** |
+| **Pass / Ticket ID** | \`${eTicketNo}\` |
+| **Title / Item** | **${title}** |
 | **Passenger / Guest** | **${customerName}** |
 | **Date & Time** | \`${bookingDate}\` @ \`${bookingTime}\` |
 | **Quantity** | ${quantity} ${quantity === 1 ? 'Pass/Ticket' : 'Passes/Tickets'} |
 | **Seat / Room / Section** | \`${seatDetails}\` |
-| **Payment Settled** | **${priceAmount} ${currency}** (~$${priceUsdApprox} USD) |
-| **Settlement Network** | ${chainName} |
+| **Simulated Price** | **${priceAmount} ${currency}** (~$${priceUsdApprox} USD) |
+| **Network** | ${chainName} |
 | **Payer Wallet** | \`${cleanAddress.slice(0, 6)}...${cleanAddress.slice(-4)}\` |
-| **Status** | [CONFIRMED & GUARANTEED] |
-| **Database Sync** | ${dbSaved ? '[SYNCHRONIZED WITH SUPABASE]' : '[ACTIVE IN-MEMORY]'} |
+| **Status** | [SIMULATED DEMO — SAVED] |
+| **Database Sync** | ${dbSaved ? '[SAVED TO SUPABASE]' : '[ACTIVE IN-MEMORY]'} |
 
-> **Airport & Check-in Active**: Present PNR code **\`${pnr}\`** or Northveil reference **\`${bookingReference}\`** at the check-in desk or kiosk.
+${checkInInstructions}
 `,
         bookingReference,
         pnr,
@@ -6359,7 +6605,8 @@ Please verify your 6-character PNR (e.g. \`7X9K2B\`) or Northveil booking refere
         priceAmount,
         currency,
         network: chainName,
-        status: 'CONFIRMED',
+        status: 'SIMULATED_CONFIRMED',
+        isSimulated: true,
       };
     }
 
