@@ -165,7 +165,7 @@ const MainContent: React.FC = () => {
             onNavigateNetworkManager={() => setActiveTab('wallets')}
           />
 
-          <main ref={mainRef} className="flex-1 overflow-y-auto no-scrollbar p-4 sm:p-8 pb-24 sm:pb-8 max-w-[1600px] mx-auto w-full">
+          <main ref={mainRef} className="flex-1 overflow-y-auto no-scrollbar p-3.5 sm:p-6 md:p-8 pb-28 sm:pb-8 max-w-[1600px] mx-auto w-full">
             <div key={activeTab} className="mono-animate-in">
               {activeTab === 'overview' && (
                 <OverviewView

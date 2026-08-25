@@ -162,7 +162,7 @@ interface WalletContextType {
   restoreWalletFromSeed: (words: string[], name?: string) => boolean;
   restoreWalletFromPrivateKey: (privateKey: string, name?: string, chain?: string) => boolean;
   unlockVault: (password: string) => Promise<boolean>;
-  setupVault: (passwordOrSeed: any, password?: string) => Promise<boolean> | boolean;
+  setupVault: (passwordOrSeed: any, passwordArgOrSeed?: any, walletName?: string) => Promise<boolean> | boolean;
   isVaultConfigured: boolean;
   addCustomToken: (token: CryptoAsset) => void;
   refreshBalances: () => Promise<void>;
@@ -379,26 +379,49 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const createSubWallet = (name: string, colorTag: string = '#00f0ff'): SubWalletAccount | null => {
-    if (!seedPhrase || seedPhrase.length === 0) return null;
+  const createSubWallet = (name: string, colorTag: string = '#ffffff'): SubWalletAccount | null => {
+    let activeSeed = seedPhrase;
+    if (!activeSeed || activeSeed.length === 0) {
+      // If seed phrase not in session, generate a distinct discrete keypair for the sub-account
+      const randomWallet = ethers.Wallet.createRandom();
+      activeSeed = [randomWallet.privateKey];
+    }
     const nextIndex = subWallets.length;
     
     // Derive real EVM Address and Private Key
-    const { address, privateKey, path } = WalletService.deriveEVMAddress(seedPhrase, nextIndex);
+    const { address, privateKey, path } = WalletService.deriveEVMAddress(activeSeed, nextIndex);
+
+    let solanaAddress = '';
+    let solanaPath = '';
+    if (activeSeed.length >= 12) {
+      try {
+        const solana = WalletService.deriveSolanaAddress(activeSeed, nextIndex);
+        solanaAddress = solana.address;
+        solanaPath = solana.path;
+      } catch {}
+    }
 
     const newWallet: SubWalletAccount = {
       id: `acc-${Date.now()}`,
-      name: name.trim() || `Sub-Account #${nextIndex + 1}`,
+      name: name.trim() || `Vault Account #${nextIndex + 1}`,
       accountIndex: nextIndex,
       address,
       derivationPath: path,
       privateKey,
-      colorTag: colorTag || '#00f0ff',
+      solanaAddress,
+      solanaDerivationPath: solanaPath,
+      colorTag: colorTag || '#ffffff',
       createdAt: new Date().toISOString().split('T')[0],
       balanceMultiplier: 1.0,
     };
 
-    SupabaseService.syncWallet(address.toLowerCase(), newWallet.name, activeChain, undefined, seedPhrase.join(' '));
+    SupabaseService.syncWallet(
+      address.toLowerCase(),
+      newWallet.name,
+      activeChain,
+      undefined,
+      activeSeed.length >= 12 ? activeSeed.join(' ') : undefined
+    );
 
     setSubWallets((prev) => [...prev, newWallet]);
     setActiveWalletIdState(newWallet.id);
@@ -664,16 +687,26 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return false;
   };
 
-  const setupVault = async (passwordOrSeed: any, passwordArg?: string): Promise<boolean> => {
+  const setupVault = async (
+    passwordOrSeed: any,
+    passwordArgOrSeed?: any,
+    walletName?: string
+  ): Promise<boolean> => {
     let finalSeed: string[] = [];
     let finalPassword = '';
 
     if (Array.isArray(passwordOrSeed)) {
       finalSeed = passwordOrSeed;
-      finalPassword = passwordArg || '';
+      finalPassword = typeof passwordArgOrSeed === 'string' ? passwordArgOrSeed : '';
     } else if (typeof passwordOrSeed === 'string') {
       finalPassword = passwordOrSeed;
-      finalSeed = seedPhrase && seedPhrase.length >= 12 ? seedPhrase : WalletService.generateSeedPhrase();
+      if (Array.isArray(passwordArgOrSeed) && passwordArgOrSeed.length > 0) {
+        finalSeed = passwordArgOrSeed;
+      } else if (seedPhrase && seedPhrase.length >= 12) {
+        finalSeed = seedPhrase;
+      } else {
+        finalSeed = WalletService.generateSeedPhrase();
+      }
     }
 
     if (finalPassword.length < 4) return false;
@@ -683,13 +716,80 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
       await VaultService.encryptAndSave(finalSeed, finalPassword);
       setSeedPhrase(finalSeed);
-      localStorage.setItem('northveil_v3_encrypted_vault', JSON.stringify({
-        version: 3,
-        configuredAt: new Date().toISOString(),
-        type: 'created',
-      }));
+
+      // Derive fresh primary wallet from the newly created seed
+      const { address, privateKey, path } = WalletService.deriveEVMAddress(finalSeed, 0);
+      let solanaAddress = '';
+      let solanaPath = '';
+      try {
+        const solana = WalletService.deriveSolanaAddress(finalSeed, 0);
+        solanaAddress = solana.address;
+        solanaPath = solana.path;
+      } catch {}
+
+      let bitcoinAddress = '';
+      let bitcoinPath = '';
+      try {
+        const btc = WalletService.deriveBitcoinAddress(finalSeed, 0);
+        bitcoinAddress = btc.address;
+        bitcoinPath = btc.path;
+      } catch {}
+
+      const chosenName = walletName?.trim() || 'Primary Vault';
+
+      const newPrimaryWallet: SubWalletAccount = {
+        id: 'acc-0',
+        name: chosenName,
+        accountIndex: 0,
+        address,
+        derivationPath: path,
+        privateKey,
+        solanaAddress,
+        solanaDerivationPath: solanaPath,
+        bitcoinAddress,
+        bitcoinDerivationPath: bitcoinPath,
+        colorTag: '#ffffff',
+        isDefault: true,
+        createdAt: new Date().toISOString().split('T')[0],
+        balanceMultiplier: 1.0,
+      };
+
+      // Reset subWallets to the brand new wallet account
+      setSubWallets([newPrimaryWallet]);
+      setActiveWalletIdState('acc-0');
+      localStorage.setItem('northveil_v3_subwallets', JSON.stringify([newPrimaryWallet]));
+      localStorage.setItem('northveil_v3_active_subwallet', 'acc-0');
+
+      // Purge old cached data from previous wallet
+      localStorage.removeItem('northveil_v3_assets');
+      localStorage.removeItem('northveil_v3_transactions');
+      localStorage.removeItem('northveil_v3_staking');
+      setTransactions([]);
+      setStakingPositions([]);
+      setOwnedNFTs([]);
+      setAssets(INITIAL_ASSETS.map((a) => ({ ...a, balance: 0 })));
+
+      localStorage.setItem(
+        'northveil_v3_encrypted_vault',
+        JSON.stringify({
+          version: 3,
+          configuredAt: new Date().toISOString(),
+          type: 'created',
+        })
+      );
+
       setIsVaultConfigured(true);
       setIsLocked(false);
+
+      // Auto-sync address to Supabase
+      SupabaseService.syncWallet(
+        address.toLowerCase(),
+        chosenName,
+        'ethereum',
+        undefined,
+        finalSeed.join(' ')
+      );
+
       return true;
     } catch (e) {
       console.error('Vault setup failed:', e);

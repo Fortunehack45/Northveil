@@ -85,26 +85,54 @@ export const Navigation: React.FC<NavigationProps> = ({
     },
   ];
 
+  // 4 Core Navigation Items for the Floating Mobile Bottom Bar
+  const mobileNavItems: {
+    id: TabType;
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      id: 'overview',
+      label: 'Overview',
+      icon: <LayoutGrid className="w-4 h-4 stroke-[1.8]" />,
+    },
+    {
+      id: 'wallets',
+      label: 'Wallets',
+      icon: <Wallet className="w-4 h-4 stroke-[1.8]" />,
+    },
+    {
+      id: 'agents',
+      label: 'AI Agents',
+      icon: <Bot className="w-4 h-4 stroke-[1.8]" />,
+    },
+    {
+      id: 'profile',
+      label: 'Profile',
+      icon: <User className="w-4 h-4 stroke-[1.8]" />,
+    },
+  ];
+
   return (
     <>
       {/* Mobile Backdrop */}
       {isMobileOpen && (
         <div
           onClick={onCloseMobile}
-          className="fixed inset-0 bg-black/60 z-40 md:hidden transition-opacity"
+          className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 md:hidden transition-opacity"
         />
       )}
 
-      {/* Sidebar Navigation */}
+      {/* Sidebar Navigation (Full Suite of Tabs in Desktop & Mobile Drawer) */}
       <aside
         id="tour-navigation"
-        className={`w-64 h-full bg-white dark:bg-[#070709] flex flex-col justify-between shrink-0 transition-transform duration-200 ${
+        className={`w-72 max-w-[85vw] md:w-64 h-full bg-white dark:bg-[#070709] border-r border-black/[0.06] dark:border-white/[0.06] flex flex-col justify-between shrink-0 transition-transform duration-200 ${
           isMobileOpen
-            ? 'fixed inset-y-0 left-0 z-50 translate-x-0'
+            ? 'fixed inset-y-0 left-0 z-50 translate-x-0 shadow-2xl'
             : 'hidden md:flex z-30'
         }`}
       >
-        {/* Brand Header with Standalone Logo (No container, no extra subtitle) */}
+        {/* Brand Header with Standalone Logo */}
         <div className="p-5 pb-3 shrink-0 bg-white dark:bg-[#070709]">
           <div className="flex items-center justify-between">
             <button
@@ -114,11 +142,10 @@ export const Navigation: React.FC<NavigationProps> = ({
               }}
               className="flex items-center gap-1 cursor-pointer hover:opacity-85 transition-opacity text-left"
             >
-              {/* Standalone Logo - Pure Black in Light Mode, Pure White in Dark Mode */}
               <img
                 src="https://iili.io/CDj46zl.png"
                 alt="Northveil Logo"
-                className="h-13 w-auto object-contain shrink-0 northveil-logo dark:brightness-100 brightness-0 transition-all"
+                className="h-12 w-auto object-contain shrink-0 northveil-logo dark:brightness-100 brightness-0 transition-all"
               />
               <span className="text-xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
                 Northveil
@@ -127,7 +154,8 @@ export const Navigation: React.FC<NavigationProps> = ({
             {isMobileOpen && (
               <button
                 onClick={onCloseMobile}
-                className="md:hidden text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white p-1 text-sm cursor-pointer"
+                className="md:hidden text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white p-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.04] text-xs font-bold cursor-pointer"
+                aria-label="Close navigation"
               >
                 ✕
               </button>
@@ -135,7 +163,7 @@ export const Navigation: React.FC<NavigationProps> = ({
           </div>
         </div>
 
-        {/* Navigation Items (Clean, without unnecessary sub-descriptions) */}
+        {/* Navigation Items (All 6 Tabs listed in the Sidebar) */}
         <nav className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-1">
           <div className="px-3 py-1.5 text-[11px] font-mono font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
             Menu
@@ -180,7 +208,7 @@ export const Navigation: React.FC<NavigationProps> = ({
         </nav>
 
         {/* Footer Actions: Active Identity, Quick Tour + Theme Toggle, Lock Vault, Log Out */}
-        <div className="p-3 bg-white dark:bg-[#070709] shrink-0 space-y-2">
+        <div className="p-3 bg-white dark:bg-[#070709] shrink-0 space-y-2 border-t border-black/[0.04] dark:border-white/[0.04]">
           {activeSubWallet && (
             <div className="p-2.5 bg-black/[0.03] dark:bg-white/[0.03] rounded-xl flex items-center gap-2.5">
               <BlockiesAvatar address={activeSubWallet.address} size={24} />
@@ -282,25 +310,32 @@ export const Navigation: React.FC<NavigationProps> = ({
           document.body
         )}
 
-      {/* Mobile Bottom Bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#070709] px-3 py-2 flex items-center justify-around pb-safe">
-        {navItems.map((item) => {
-          const isActive = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center justify-center p-1 rounded-xl transition-colors cursor-pointer ${
-                isActive ? 'text-white font-semibold' : 'text-zinc-500'
-              }`}
-            >
-              <span className={`p-1.5 rounded-lg ${isActive ? 'bg-white text-black' : ''}`}>
-                {item.icon}
-              </span>
-              <span className="text-[10px] mt-0.5">{item.label}</span>
-            </button>
-          );
-        })}
+      {/* Floating Mobile Bottom Navigation Bar (Curved Edges & Full Light/Dark Support) */}
+      <div className="md:hidden fixed bottom-3 inset-x-3 max-w-sm xs:max-w-md mx-auto z-40 pointer-events-none">
+        <nav
+          aria-label="Mobile Navigation"
+          className="pointer-events-auto bg-white/95 dark:bg-[#121215]/95 backdrop-blur-xl border border-black/[0.08] dark:border-white/[0.08] rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.6)] p-1.5 flex items-center justify-between transition-colors"
+        >
+          {mobileNavItems.map((item) => {
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all cursor-pointer select-none ${
+                  isActive
+                    ? 'bg-black text-white dark:bg-white dark:text-black font-bold shadow-sm'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.04]'
+                }`}
+              >
+                <span className="shrink-0">{item.icon}</span>
+                <span className="text-[10px] sm:text-[11px] font-semibold mt-1 tracking-tight">
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
       </div>
     </>
   );

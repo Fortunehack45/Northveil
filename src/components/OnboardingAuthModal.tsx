@@ -115,7 +115,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
     setProcessingMsg('Encrypting Vault Keychain...');
     await new Promise((r) => setTimeout(r, 400));
 
-    await setupVault(vaultPassword, seedPhrase);
+    await setupVault(vaultPassword, seedPhrase, walletNameInput);
     if (onClose) onClose();
   };
 

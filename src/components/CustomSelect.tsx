@@ -49,24 +49,24 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between gap-2 text-xs transition-all cursor-pointer select-none ${
+        className={`w-full flex items-center justify-between gap-1.5 sm:gap-2 text-xs transition-all cursor-pointer select-none ${
           isFormVariant
             ? 'px-3 py-2.5 rounded-xl bg-black/[0.05] dark:bg-black text-zinc-900 dark:text-white border border-black/[0.08] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-zinc-900'
-            : 'px-3 py-2 rounded-full bg-black/[0.05] dark:bg-white/[0.05] hover:bg-black/[0.09] dark:hover:bg-white/[0.09] text-zinc-900 dark:text-white'
+            : 'px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-black/[0.05] dark:bg-white/[0.05] hover:bg-black/[0.09] dark:hover:bg-white/[0.09] text-zinc-900 dark:text-white border border-black/[0.04] dark:border-white/[0.04]'
         }`}
       >
-        <div className="flex items-center gap-2.5 truncate min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 truncate min-w-0">
           {selectedOption?.icon && (
             <span className="shrink-0 flex items-center justify-center">
               {selectedOption.icon}
             </span>
           )}
-          <span className="truncate font-medium text-xs">
+          <span className="truncate font-medium text-xs max-w-[70px] xs:max-w-[105px] sm:max-w-none">
             {selectedOption ? selectedOption.label : placeholder}
           </span>
         </div>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-zinc-400 shrink-0 transition-transform duration-200 ${
+          className={`w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-400 shrink-0 transition-transform duration-200 ${
             isOpen ? 'rotate-180 text-zinc-900 dark:text-white' : ''
           }`}
         />
