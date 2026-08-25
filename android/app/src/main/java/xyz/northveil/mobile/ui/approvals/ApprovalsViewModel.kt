@@ -109,6 +109,14 @@ class ApprovalsViewModel @Inject constructor(
         }
     }
 
+    fun submitDecision(recordId: String, approved: Boolean) {
+        _uiState.update { it.copy(actionProcessingId = recordId) }
+        viewModelScope.launch {
+            approvalsRepository.updateDecision(recordId, approved)
+            _uiState.update { it.copy(actionProcessingId = null) }
+        }
+    }
+
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
     }

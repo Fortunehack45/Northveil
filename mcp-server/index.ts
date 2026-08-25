@@ -689,7 +689,7 @@ const inMemoryWebhooks: Array<{
     events: ['tx.confirmed', 'reservation.created'],
     secret: 'whsec_' + nodeCrypto.randomBytes(16).toString('hex'),
     status: 'ACTIVE',
-    walletAddress: '0x87678de86804c6c3612d66cbd6e2857f1a7d8345',
+    walletAddress: '0x0000000000000000000000000000000000000001',
     createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
     lastDelivery: { status: 200, latencyMs: 84, timestamp: new Date().toISOString() },
   },
@@ -699,7 +699,7 @@ const inMemoryWebhooks: Array<{
     events: ['contract.deployed', 'token.minted'],
     secret: 'whsec_' + nodeCrypto.randomBytes(16).toString('hex'),
     status: 'ACTIVE',
-    walletAddress: '0x87678de86804c6c3612d66cbd6e2857f1a7d8345',
+    walletAddress: '0x0000000000000000000000000000000000000002',
     createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
     lastDelivery: { status: 200, latencyMs: 112, timestamp: new Date().toISOString() },
   },
@@ -787,8 +787,8 @@ app.post('/api/v1/webhooks/test', async (req: Request, res: Response) => {
     data: {
       transactionHash: '0x' + nodeCrypto.randomBytes(32).toString('hex'),
       network: 'Ethereum Sepolia',
-      from: '0x87678de86804c6c3612d66cbd6e2857f1a7d8345',
-      to: '0x71c8891575b50d22e032d847847c234a413d4cc8',
+      from: '0x0000000000000000000000000000000000000001',
+      to: '0x0000000000000000000000000000000000000002',
       amount: '0.05',
       symbol: 'ETH',
       status: 'CONFIRMED',
@@ -1380,7 +1380,7 @@ function getOpenApiSpec(baseUrl: string) {
 
 app.get('/ui/widget', async (req: Request, res: Response) => {
   const type = (req.query.type || 'portfolio').toString();
-  const wallet = (req.query.wallet || '0x71c8891575b50d22e032d847847c234a413d4cc8').toString();
+  const wallet = (req.query.wallet || '0x0000000000000000000000000000000000000000').toString();
 
   // Query Supabase DB for recent transactions
   const { data: txList } = await supabase
@@ -2395,7 +2395,7 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
   const explicitWallet = (args?.walletAddress || args?.userWallet || args?.ownerAddress || args?.fromAddress || '').toString().trim().toLowerCase();
   const cleanAddress = (explicitWallet && explicitWallet.startsWith('0x') && explicitWallet.length === 42)
     ? explicitWallet
-    : (walletAddress || '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417').toLowerCase();
+    : (walletAddress || '').toLowerCase();
 
   const WRITE_SENSITIVE_TOOLS = [
     'send_transfer', 'execute_swap', 'execute_dex_swap',
@@ -2404,9 +2404,21 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
     'approve_transaction', 'reject_transaction'
   ];
 
+  if (WRITE_SENSITIVE_TOOLS.includes(name) && !cleanAddress) {
+    throw new Error(`🔒 400 Bad Request: A valid sender wallet address (0x...) is required to execute write action '${name}'.`);
+  }
+
   const requestedTargetWallet = (args?.walletAddress || args?.userWallet || args?.ownerAddress || args?.fromAddress || '').toString().toLowerCase();
   if (WRITE_SENSITIVE_TOOLS.includes(name) && requestedTargetWallet && requestedTargetWallet.startsWith('0x') && requestedTargetWallet.length === 42) {
-    if (requestedTargetWallet !== cleanAddress && !['0x87678de86804c6c3612d66cbd6e2857f1a7d8345', '0x71c8891575b50d22e032d847847c234a413d4cc8'].includes(requestedTargetWallet)) {
+    const isDemoMode = process.env.NORTHVEIL_DEMO_MODE === 'true';
+    const demoAllowlist = (process.env.DEMO_SHARED_WALLETS || '')
+      .split(',')
+      .map(w => w.trim().toLowerCase())
+      .filter(Boolean);
+
+    const isAllowedInDemo = isDemoMode && demoAllowlist.includes(requestedTargetWallet);
+
+    if (requestedTargetWallet !== cleanAddress && !isAllowedInDemo) {
       throw new Error(`🔒 403 Forbidden: Unauthorized access. Your API Key is scoped to wallet ${cleanAddress} and cannot manipulate state for ${requestedTargetWallet}.`);
     }
   }

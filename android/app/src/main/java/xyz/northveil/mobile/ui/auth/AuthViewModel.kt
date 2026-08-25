@@ -12,6 +12,7 @@ import xyz.northveil.mobile.data.repository.WalletRepository
 import javax.inject.Inject
 
 data class AuthUiState(
+    val isLoading: Boolean = false,
     val isCreating: Boolean = false,
     val masterPassword: String = "",
     val confirmPassword: String = "",
@@ -34,17 +35,26 @@ class AuthViewModel @Inject constructor(
         _uiState.update { it.copy(generatedSeed = wordList.shuffled().joinToString(" ")) }
     }
 
-    fun completeCreation(password: String) {
+    fun createVault(password: String) {
         viewModelScope.launch {
             if (password.length < 6) {
                 _uiState.update { it.copy(error = "Password must be at least 6 characters") }
                 return@launch
             }
-            walletRepository.createInitialVault(
-                seedPhrase = _uiState.value.generatedSeed.ifBlank { "test seed phrase northveil multi chain custodial vault sample" },
-                masterPassword = password
-            )
-            _uiState.update { it.copy(isComplete = true) }
+            _uiState.update { it.copy(isLoading = true, isCreating = true, error = null) }
+            try {
+                walletRepository.createInitialVault(
+                    seedPhrase = _uiState.value.generatedSeed.ifBlank { "test seed phrase northveil multi chain custodial vault sample" },
+                    masterPassword = password
+                )
+                _uiState.update { it.copy(isLoading = false, isCreating = false, isComplete = true) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, isCreating = false, error = e.message ?: "Failed to create vault") }
+            }
         }
+    }
+
+    fun completeCreation(password: String) {
+        createVault(password)
     }
 }

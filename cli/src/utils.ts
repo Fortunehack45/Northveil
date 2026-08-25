@@ -18,7 +18,7 @@ export function getConfig(): CliConfig {
   const saved = getCliConfig();
   const baseUrl = process.env.NORTHVEIL_API_URL || saved.apiUrl || process.env.VITE_MCP_SERVER_URL || 'https://mcp.northveil.xyz';
   const apiKey = process.env.NORTHVEIL_API_KEY || saved.apiKey || 'nv_live_default_northveil_key';
-  const walletAddress = process.env.NORTHVEIL_WALLET_ADDRESS || saved.defaultWallet || '0x87678de86804c6c3612d66cbd6e2857f1a7d8345';
+  const walletAddress = process.env.NORTHVEIL_WALLET_ADDRESS || saved.defaultWallet || '';
   return { baseUrl: baseUrl.replace(/\/$/, ''), apiKey, walletAddress };
 }
 

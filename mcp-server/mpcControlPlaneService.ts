@@ -284,6 +284,22 @@ export const inMemoryKillSwitches = new Map<string, boolean>();
 // 1. NON-CUSTODIAL WALLET PROVISIONING (Zero Server-Side Private Key Storage)
 // ═════════════════════════════════════════════════════════════════════════════
 
+export function validateTurnkeyConfiguration(): { configured: boolean; isDemo: boolean } {
+  const isDemo = process.env.NORTHVEIL_DEMO_MODE === 'true';
+  const hasCreds = Boolean(
+    process.env.TURNKEY_API_PUBLIC_KEY &&
+    process.env.TURNKEY_API_PRIVATE_KEY &&
+    process.env.TURNKEY_ORGANIZATION_ID
+  );
+
+  if (!hasCreds && !isDemo) {
+    console.warn(
+      '⚠️ [Turnkey MPC Notice]: Live Turnkey credentials (TURNKEY_API_PUBLIC_KEY, TURNKEY_API_PRIVATE_KEY, TURNKEY_ORGANIZATION_ID) are unset and NORTHVEIL_DEMO_MODE is not enabled. Wallet creation and signing will throw TurnkeyEnclaveError.'
+    );
+  }
+  return { configured: hasCreds, isDemo };
+}
+
 export async function createMpcWallet(
   userId: string = 'default_user',
   walletName: string = 'Northveil Non-Custodial Vault'
@@ -295,11 +311,9 @@ export async function createMpcWallet(
   keyType: string;
   status: string;
 }> {
-  let mpcWalletId = '';
-  let mpcSubOrgId = '';
-  let address = '';
+  const isDemoMode = process.env.NORTHVEIL_DEMO_MODE === 'true';
 
-  // If real Turnkey credentials exist, invoke the hardware TEE API
+  // 1. If real Turnkey credentials exist, invoke the hardware TEE API
   if (TURNKEY_API_PUBLIC_KEY && TURNKEY_API_PRIVATE_KEY && TURNKEY_ORGANIZATION_ID) {
     const turnkey = getTurnkeyClient();
     try {
@@ -315,46 +329,23 @@ export async function createMpcWallet(
           },
         ],
       });
-      mpcWalletId = result.walletId || result.activity?.result?.createWalletResult?.walletId || `wlt_${Date.now()}`;
-      mpcSubOrgId = TURNKEY_ORGANIZATION_ID;
-      address = (result.addresses?.[0] || result.activity?.result?.createWalletResult?.addresses?.[0] || ethers.computeAddress(`0x04${crypto.randomBytes(64).toString('hex')}`)).toLowerCase();
-    } catch (turnkeyErr: any) {
-      console.warn('[Turnkey API Create Wallet Notice]:', turnkeyErr.message);
-      // Fallback for isolated development mode without network
-      mpcWalletId = `wlt_${crypto.randomBytes(16).toString('hex')}`;
-      mpcSubOrgId = TURNKEY_ORGANIZATION_ID;
-      const pubkeyEntropy = crypto.randomBytes(64).toString('hex');
-      address = ethers.computeAddress(`0x04${pubkeyEntropy}`).toLowerCase();
-    }
-  } else {
-    // Development / demo mode: generate isolated enclave ID and address without any raw private keys
-    mpcWalletId = `wlt_${crypto.randomBytes(16).toString('hex')}`;
-    mpcSubOrgId = `suborg_${crypto.randomBytes(12).toString('hex')}`;
-    const pubkeyEntropy = crypto.randomBytes(64).toString('hex');
-    address = ethers.computeAddress(`0x04${pubkeyEntropy}`).toLowerCase();
-  }
 
-  const walletRecord: NonCustodialWalletRecord = {
-    id: `mpc_${Date.now()}_${address.slice(0, 8)}`,
-    address,
-    user_id: userId,
-    chain_id: 'ethereum',
-    name: walletName,
-    mpc_provider: 'turnkey',
-    mpc_wallet_id: mpcWalletId,
-    mpc_sub_org_id: mpcSubOrgId,
-    key_type: 'ecdsa_secp256k1',
-    wallet_status: 'active',
-    created_at: new Date().toISOString(),
-  };
+      const mpcWalletId = result.walletId || result.activity?.result?.createWalletResult?.walletId;
+      const extractedAddress = result.addresses?.[0] || result.activity?.result?.createWalletResult?.addresses?.[0];
 
-  inMemoryMpcWallets.set(address, walletRecord);
+      if (!mpcWalletId || !extractedAddress) {
+        throw new TurnkeyEnclaveError(
+          `TurnkeyEnclaveError: Wallet creation response did not contain a valid wallet ID or address from Turnkey hardware TEE. Details: ${JSON.stringify(result)}`
+        );
+      }
 
-  try {
-    if (supabase && typeof supabase.from === 'function') {
-      await supabase.from('wallets').upsert([{
-        user_id: userId,
+      const address = extractedAddress.toLowerCase();
+      const mpcSubOrgId = TURNKEY_ORGANIZATION_ID;
+
+      const walletRecord: NonCustodialWalletRecord = {
+        id: `mpc_${Date.now()}_${address.slice(0, 8)}`,
         address,
+        user_id: userId,
         chain_id: 'ethereum',
         name: walletName,
         mpc_provider: 'turnkey',
@@ -362,29 +353,100 @@ export async function createMpcWallet(
         mpc_sub_org_id: mpcSubOrgId,
         key_type: 'ecdsa_secp256k1',
         wallet_status: 'active',
-        created_at: walletRecord.created_at,
-      }], { onConflict: 'address' });
+        created_at: new Date().toISOString(),
+      };
+
+      inMemoryMpcWallets.set(address, walletRecord);
+
+      try {
+        if (supabase && typeof supabase.from === 'function') {
+          await supabase.from('wallets').upsert([{
+            user_id: userId,
+            address,
+            chain_id: 'ethereum',
+            name: walletName,
+            mpc_provider: 'turnkey',
+            mpc_wallet_id: mpcWalletId,
+            mpc_sub_org_id: mpcSubOrgId,
+            key_type: 'ecdsa_secp256k1',
+            wallet_status: 'active',
+            created_at: walletRecord.created_at,
+          }], { onConflict: 'address' });
+        }
+      } catch (err: any) {
+        console.warn('[Supabase MPC Wallet Upsert Notice]:', err.message);
+      }
+
+      await logWalletAudit('MPC_WALLET_PROVISIONED', address, userId, {
+        mpcProvider: 'turnkey',
+        mpcWalletId,
+        mpcSubOrgId,
+        keyType: 'ecdsa_secp256k1',
+        custodyModel: 'non-custodial-tee-mpc',
+        status: 'active',
+      });
+
+      return {
+        address,
+        mpcWalletId,
+        mpcSubOrgId,
+        mpcProvider: 'turnkey',
+        keyType: 'ecdsa_secp256k1',
+        status: 'active',
+      };
+    } catch (turnkeyErr: any) {
+      console.error('[Turnkey API Create Wallet Failure]:', turnkeyErr.message);
+      throw new TurnkeyEnclaveError(
+        `TurnkeyEnclaveError: Wallet creation requires a live Turnkey connection; no wallet was created. Underlying error: ${turnkeyErr.message}`
+      );
     }
-  } catch (err: any) {
-    console.warn('[Supabase MPC Wallet Upsert Notice]:', err.message);
   }
 
-  await logWalletAudit('MPC_WALLET_PROVISIONED', address, userId, {
-    mpcProvider: 'turnkey',
-    mpcWalletId,
-    mpcSubOrgId,
-    keyType: 'ecdsa_secp256k1',
-    custodyModel: 'non-custodial-tee-mpc',
-  });
+  // 2. Explicit Opt-in Demo Mode (Strictly labeled as demo_unspendable)
+  if (isDemoMode) {
+    const mpcWalletId = `demo_wlt_${crypto.randomBytes(8).toString('hex')}`;
+    const mpcSubOrgId = `demo_suborg_${crypto.randomBytes(6).toString('hex')}`;
+    const entropy = crypto.randomBytes(20).toString('hex');
+    const address = `0x${entropy}`.toLowerCase();
 
-  return {
-    address,
-    mpcWalletId,
-    mpcSubOrgId,
-    mpcProvider: 'turnkey',
-    keyType: 'ecdsa_secp256k1',
-    status: 'active',
-  };
+    const walletRecord: NonCustodialWalletRecord = {
+      id: `mpc_${Date.now()}_${address.slice(0, 8)}`,
+      address,
+      user_id: userId,
+      chain_id: 'ethereum',
+      name: `[DEMO] ${walletName}`,
+      mpc_provider: 'turnkey',
+      mpc_wallet_id: mpcWalletId,
+      mpc_sub_org_id: mpcSubOrgId,
+      key_type: 'ecdsa_secp256k1',
+      wallet_status: 'locked',
+      created_at: new Date().toISOString(),
+    };
+
+    inMemoryMpcWallets.set(address, walletRecord);
+
+    await logWalletAudit('MPC_DEMO_WALLET_PROVISIONED', address, userId, {
+      mpcProvider: 'turnkey-demo',
+      mpcWalletId,
+      mpcSubOrgId,
+      wallet_status: 'demo_unspendable',
+      note: 'Demo mode wallet - unspendable with no live key material',
+    });
+
+    return {
+      address,
+      mpcWalletId,
+      mpcSubOrgId,
+      mpcProvider: 'turnkey-demo',
+      keyType: 'ecdsa_secp256k1',
+      status: 'demo_unspendable',
+    };
+  }
+
+  // 3. Fails loudly if Turnkey credentials are missing and not in explicit demo mode
+  throw new TurnkeyEnclaveError(
+    'TurnkeyEnclaveError: Wallet creation requires a live Turnkey connection; no wallet was created. TURNKEY_API_PUBLIC_KEY, TURNKEY_API_PRIVATE_KEY, and TURNKEY_ORGANIZATION_ID must be configured.'
+  );
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

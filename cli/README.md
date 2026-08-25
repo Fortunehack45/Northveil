@@ -36,8 +36,8 @@ northveil status 7X9K2B
 
 ### 5. Multi-Chain Portfolio & Health Audit
 ```bash
-northveil wallet 0x71c8891575b50d22e032d847847c234a413d4cc8
-northveil health 0x71c8891575b50d22e032d847847c234a413d4cc8
+northveil wallet 0x1111111111111111111111111111111111111111
+northveil health 0x1111111111111111111111111111111111111111
 ```
 
 ### 6. Smart Contract Deployment & Verification
