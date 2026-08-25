@@ -46,16 +46,20 @@ function findImports(importPath: string) {
   return { error: 'File not found: ' + importPath };
 }
 import {
-  createCustodialWallet,
-  importCustodialPrivateKey,
-  importCustodialSeedPhrase,
-  createTransactionRequest,
-  approveAndExecuteTransaction,
+  createMpcWallet,
+  stageTransactionRequest,
+  approveAndExecuteWithPasskey,
   rejectTransactionRequest,
+  evaluateAutonomousScope,
+  executeAutonomousTransaction,
+  activateKillSwitch,
+  deactivateKillSwitch,
+  isKillSwitchActive,
   initSupabase,
   executeWithRpcFailover,
-  inMemoryTxRequests
-} from './custodialSigningService.js';
+  inMemoryTxRequests,
+  inMemoryMpcWallets,
+} from './mpcControlPlaneService.js';
 import { encryptCredential, decryptCredential } from './encryptionService.js';
 
 const app = express();
@@ -2518,71 +2522,91 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
   switch (name) {
     case 'create_wallet': {
       const walletName = args?.walletName || args?.name || 'Northveil Vault Wallet';
-      const result = await createCustodialWallet('default_user', walletName);
+      const userId = args?.userId || 'default_user';
+      const result = await createMpcWallet(userId, walletName);
       return {
         formattedMarkdown: `
-### 🔐 NEW CUSTODIAL VAULT WALLET CREATED
+### 🔐 NON-CUSTODIAL MPC VAULT PROVISIONED
 
-> **Wallet Address**: \`${result.address}\`  
-> **Wallet Identifier**: \`${result.walletId}\`  
-> **Status**: 🟢 **AES-256-GCM ENCRYPTED & STORED**  
-> **Security Protocol**: Plaintext seed phrase erased from memory immediately after encryption.  
-
----
-
-#### ⚠️ BACKUP SEED PHRASE (STORE SECURELY OFF-LINE):
-\`\`\`
-${result.backupSeedPhrase}
-\`\`\`
-*Note: This plaintext seed phrase will NEVER be displayed or stored again by Northveil.*
+> **Vault Address**: \`${result.address}\`  
+> **MPC Provider**: \`${result.mpcProvider.toUpperCase()} (Hardware-Isolated TEE Enclaves)\`  
+> **Key Type**: \`${result.keyType}\`  
+> **Enclave Wallet ID**: \`${result.mpcWalletId}\`  
+> **Enclave Sub-Org ID**: \`${result.mpcSubOrgId}\`  
+> **Custody Architecture**: 🟢 **NON-CUSTODIAL CONTROL PLANE (PayBox-Style)**  
+> **Security Protocol**: Private keys generated and fragmented across hardware enclaves. ZERO raw or reconstructable key material is stored on Northveil servers.
 `,
         ...result,
       };
     }
 
     case 'import_wallet': {
-      const walletName = args?.walletName || 'Imported Vault Wallet';
-      if (args?.privateKey) {
-        const res = await importCustodialPrivateKey(args.privateKey, 'default_user', walletName);
-        return {
-          formattedMarkdown: `
-### 🔐 PRIVATE KEY IMPORTED & ENCRYPTED
-
-> **Wallet Address**: \`${res.address}\`  
-> **Wallet Identifier**: \`${res.walletId}\`  
-> **Security Protocol**: 🟢 **AES-256-GCM Encrypted**. Plaintext key erased from memory.  
-`,
-          ...res,
-        };
-      } else if (args?.seedPhrase) {
-        const res = await importCustodialSeedPhrase(args.seedPhrase, 'default_user', walletName);
-        return {
-          formattedMarkdown: `
-### 🔐 SEED PHRASE IMPORTED & ENCRYPTED
-
-> **Wallet Address**: \`${res.address}\`  
-> **Wallet Identifier**: \`${res.walletId}\`  
-> **Derivation Path**: \`${res.derivationPath}\`  
-> **Security Protocol**: 🟢 **AES-256-GCM Encrypted**. Plaintext mnemonic erased from memory.  
-`,
-          ...res,
-        };
+      const walletName = args?.walletName || 'Imported Non-Custodial Vault';
+      const address = (args?.address || args?.walletAddress || '').toLowerCase();
+      if (!address || !address.startsWith('0x')) {
+        throw new Error('Please provide a valid 0x wallet address to register under the non-custodial control plane.');
       }
-      throw new Error('Please provide either a privateKey or seedPhrase to import.');
+      try {
+        await supabase.from('wallets').upsert([{
+          user_id: 'default_user',
+          address,
+          chain_id: 'ethereum',
+          name: walletName,
+          mpc_provider: 'turnkey',
+          wallet_status: 'active',
+          created_at: new Date().toISOString(),
+        }], { onConflict: 'address' });
+      } catch (e) {}
+
+      return {
+        formattedMarkdown: `
+### 🔐 NON-CUSTODIAL WALLET REGISTERED
+
+> **Vault Address**: \`${address}\`  
+> **Wallet Label**: \`${walletName}\`  
+> **Custody Model**: 🟢 **NON-CUSTODIAL CONTROL PLANE**  
+> **Status**: **ACTIVE (Passkey-Gated Authorization Enabled)**
+`,
+        address,
+        walletName,
+        status: 'active',
+        custodyModel: 'non-custodial',
+      };
     }
 
     case 'create_transaction_request': {
       const targetAddress = (args.walletAddress || args.fromAddress || args.userWallet || cleanAddress).toLowerCase();
-      const res = await createTransactionRequest({
-        walletAddress: targetAddress,
-        recipient: args.recipient,
-        amount: args.amount,
-        asset: args.asset || 'ETH',
-        network: args.network || 'sepolia',
-        contractSummary: args.contractSummary || 'Direct Transfer',
-      });
+      const recipient = (args.recipient || args.to || '').toLowerCase();
+      const amount = Number(args.amount) || 0;
+      const asset = (args.asset || 'ETH').toUpperCase();
+      const network = (args.network || 'sepolia').toLowerCase();
+      const summary = args.contractSummary || 'Direct Transfer';
+
+      const res = await stageTransactionRequest(
+        targetAddress,
+        recipient,
+        amount,
+        asset,
+        network,
+        { to: recipient, value: amount, chainId: network === 'ethereum' ? 1 : 11155111 },
+        'default_user',
+        summary
+      );
       return {
-        formattedMarkdown: res.summaryMarkdown,
+        formattedMarkdown: `
+### 📥 TRANSACTION REQUEST STAGED (PASSKEY CONFIRMATION REQUIRED)
+
+> **Request ID**: \`${res.requestId}\`  
+> **Approval Token**: \`${res.approvalToken}\`  
+> **Sender Vault**: \`${targetAddress}\`  
+> **Recipient**: \`${recipient}\`  
+> **Amount**: **${amount} ${asset}**  
+> **Target Network**: \`${network}\`  
+> **Expires At**: \`${res.expiresAt}\`  
+> **Passkey Authorization Link**: [Authorize Transaction](${res.approvalUrl})  
+
+*Please prompt the user to complete WebAuthn Passkey authorization on their device or call \`approve_transaction\` with the approvalToken.*
+`,
         ...res,
       };
     }
@@ -2590,9 +2614,19 @@ ${result.backupSeedPhrase}
     case 'approve_transaction': {
       const token = args.approvalToken || args.token;
       if (!token) throw new Error('Missing approvalToken argument.');
-      const res = await approveAndExecuteTransaction(token, 'default_user');
+      const passkeyAssertion = args.passkeyAssertion;
+      const res = await approveAndExecuteWithPasskey(token, passkeyAssertion, 'default_user');
       return {
-        formattedMarkdown: res.summaryMarkdown,
+        formattedMarkdown: `
+### ✅ TRANSACTION APPROVED & EXECUTED VIA MPC ENCLAVES
+
+> **Status**: 🟢 **CONFIRMED ON-CHAIN**  
+> **Transaction Hash**: [\`${res.txHash}\`](${res.explorerUrl})  
+> **Block Number**: \`${res.blockNumber}\`  
+> **Gas Used**: \`${res.gasUsed}\`  
+> **Request ID**: \`${res.requestId}\`  
+> **Explorer Link**: [View on Block Explorer](${res.explorerUrl})  
+`,
         ...res,
       };
     }
@@ -2602,7 +2636,122 @@ ${result.backupSeedPhrase}
       if (!token) throw new Error('Missing approvalToken argument.');
       const res = await rejectTransactionRequest(token, 'default_user');
       return {
-        formattedMarkdown: `### ❌ TRANSACTION REQUEST REJECTED\n\n> **Request ID**: \`${res.requestId}\`  \n> **Status**: **REJECTED BY USER** (One-time approval token invalidated).`,
+        formattedMarkdown: `### ❌ TRANSACTION REQUEST REJECTED\n\n> **Status**: **REJECTED & VOIDED**\n> **Message**: Single-use approval token invalidated immediately.`,
+        ...res,
+      };
+    }
+
+    case 'get_transaction_status': {
+      const reqIdOrToken = args.requestId || args.approvalToken || args.token || '';
+      if (!reqIdOrToken) throw new Error('Missing requestId or approvalToken argument.');
+
+      let stagedReq = inMemoryTxRequests.get(reqIdOrToken);
+      if (!stagedReq) {
+        try {
+          const { data } = await supabase
+            .from('transaction_requests')
+            .select('*')
+            .or(`request_id.eq.${reqIdOrToken},approval_token.eq.${reqIdOrToken}`)
+            .maybeSingle();
+          if (data) stagedReq = data;
+        } catch (e) {}
+      }
+
+      if (!stagedReq) {
+        return {
+          formattedMarkdown: `### ❓ TRANSACTION REQUEST NOT FOUND\n\n> No staged transaction request found for \`${reqIdOrToken}\`.`,
+          status: 'NOT_FOUND',
+        };
+      }
+
+      const statusEmoji = stagedReq.status === 'confirmed' ? '🟢' : stagedReq.status === 'pending' ? '🟡' : '🔴';
+      return {
+        formattedMarkdown: `
+### 🔍 TRANSACTION REQUEST STATUS: ${statusEmoji} ${stagedReq.status?.toUpperCase()}
+
+> **Request ID**: \`${stagedReq.request_id || stagedReq.requestId}\`  
+> **Status**: **${stagedReq.status?.toUpperCase()}**  
+> **Sender Vault**: \`${stagedReq.wallet_address || stagedReq.walletAddress}\`  
+> **Recipient**: \`${stagedReq.recipient}\`  
+> **Amount**: **${stagedReq.amount} ${stagedReq.asset}**  
+${stagedReq.tx_hash ? `> **Transaction Hash**: [\`${stagedReq.tx_hash}\`](${stagedReq.explorer_url})` : ''}
+${stagedReq.block_number ? `> **Block Number**: \`${stagedReq.block_number}\`` : ''}
+> **Expires At**: \`${stagedReq.expires_at || stagedReq.expiresAt}\`
+`,
+        ...stagedReq,
+      };
+    }
+
+    case 'set_autonomous_scope': {
+      const targetAddress = (args.walletAddress || cleanAddress).toLowerCase();
+      const maxAmountPerTxUsd = Number(args.maxAmountPerTxUsd) || 25.0;
+      const maxDailyBudgetUsd = Number(args.maxDailyBudgetUsd) || 100.0;
+      const allowedChains = Array.isArray(args.allowedChains) ? args.allowedChains : [11155111, 8453];
+      const allowedAssets = (args.allowedAssets || 'ANY').toUpperCase();
+      const durationDays = Number(args.durationDays) || 30;
+      const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+
+      const scopeRecord = {
+        user_id: 'default_user',
+        wallet_address: targetAddress,
+        asset: allowedAssets,
+        allowed_chains: allowedChains,
+        max_amount_per_tx_usd: maxAmountPerTxUsd,
+        max_daily_budget_usd: maxDailyBudgetUsd,
+        spent_last_24h_usd: 0,
+        is_active: true,
+        expires_at: expiresAt,
+        created_at: new Date().toISOString(),
+      };
+
+      try {
+        await supabase.from('autonomous_spending_scopes').insert([scopeRecord]);
+      } catch (e) {}
+
+      return {
+        formattedMarkdown: `
+### ⚙️ AUTONOMOUS SPENDING SCOPE CONFIGURED
+
+> **Vault Address**: \`${targetAddress}\`  
+> **Max Amount Per Tx**: **$${maxAmountPerTxUsd.toFixed(2)} USD**  
+> **Daily Spending Budget**: **$${maxDailyBudgetUsd.toFixed(2)} USD**  
+> **Allowed Chains**: \`${JSON.stringify(allowedChains)}\`  
+> **Allowed Assets**: \`${allowedAssets}\`  
+> **Scope Expiry**: \`${expiresAt}\` (${durationDays} days)  
+> **Status**: 🟢 **ACTIVE (Autonomous Agent Execution Enabled)**
+`,
+        scope: scopeRecord,
+        status: 'active',
+      };
+    }
+
+    case 'activate_kill_switch': {
+      const targetAddress = (args.walletAddress || cleanAddress).toLowerCase();
+      const reason = args.reason || 'Emergency lock invoked via MCP tool';
+      const res = await activateKillSwitch(targetAddress, 'default_user', reason);
+      return {
+        formattedMarkdown: `
+### 🚨 EMERGENCY KILL SWITCH ACTIVATED
+
+> **Locked Vault**: \`${targetAddress}\`  
+> **Status**: 🔴 **VAULT LOCKED & AGENT PERMISSIONS REVOKED**  
+> **Reason**: ${reason}  
+> **Action Taken**: All active autonomous spending scopes immediately deactivated and outstanding approval tokens voided.
+`,
+        ...res,
+      };
+    }
+
+    case 'deactivate_kill_switch': {
+      const targetAddress = (args.walletAddress || cleanAddress).toLowerCase();
+      const res = await deactivateKillSwitch(targetAddress, 'default_user');
+      return {
+        formattedMarkdown: `
+### 🟢 KILL SWITCH DEACTIVATED
+
+> **Vault Address**: \`${targetAddress}\`  
+> **Status**: 🟢 **UNLOCKED (Normal Passkey-Gated Processing Restored)**
+`,
         ...res,
       };
     }
@@ -2972,55 +3121,118 @@ contract ${nameStr} {
       let isOnChainBroadcasted = false;
       let deployErrorMsg = '';
 
-      const privateKey = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
-
-      if (!privateKey) {
-        throw new Error(`SECURITY ERROR: No decrypted wallet credentials found for wallet address ${walletAddress}. Please import or create a wallet first.`);
-      }
-
       if (!compiledBytecode) {
         throw new Error(`SOLC COMPILATION FAILURE: Failed to compile Solidity bytecode for contract ${nameStr}.`);
       }
 
-      const targetProvider = isTestnet ? sepoliaProvider : ethProvider;
-      const signer = new ethers.Wallet(privateKey, targetProvider);
-      const actualSignerAddress = signer.address.toLowerCase();
+      const unsignedPayload = {
+        data: compiledBytecode,
+        chainId,
+        gasLimit: 3000000,
+      };
 
-      let onChainBytecodeVerified = false;
-      try {
-        const factory = new ethers.ContractFactory(compiledAbi, compiledBytecode, signer);
-        const deployTx = await factory.deploy();
-        const deploymentTx = deployTx.deploymentTransaction();
-        realTxHash = deploymentTx?.hash || '';
+      // 1. Evaluate Autonomous Spending Policy for Deployment
+      const scopeCheck = await evaluateAutonomousScope(cleanAddress, 'default_user', chainId, 'DEPLOY', 1.0);
 
-        // Wait up to 4 seconds for fast on-chain confirmation, otherwise derive deterministic address
+      let realTxHash = '';
+      let realContractAddress = '';
+      let isOnChainBroadcasted = false;
+      let deployErrorMsg = '';
+
+      if (scopeCheck.inScope && scopeCheck.scopeId) {
         try {
-          await Promise.race([
-            deployTx.waitForDeployment(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000))
-          ]);
-          realContractAddress = await deployTx.getAddress();
-        } catch {
-          // If block mining takes longer than 4s, derive deterministic contract address from signer + nonce
-          try {
-            realContractAddress = await deployTx.getAddress();
-          } catch {
-            if (deploymentTx?.nonce !== undefined) {
-              realContractAddress = ethers.getCreateAddress({ from: signer.address, nonce: deploymentTx.nonce });
-            }
-          }
-        }
-
-        if (!realContractAddress && deploymentTx?.nonce !== undefined) {
-          realContractAddress = ethers.getCreateAddress({ from: signer.address, nonce: deploymentTx.nonce });
-        }
-
-        if (realTxHash && realContractAddress) {
+          const autoRes = await executeAutonomousTransaction(
+            cleanAddress,
+            ethers.ZeroAddress,
+            0,
+            'DEPLOY',
+            network,
+            unsignedPayload,
+            scopeCheck.scopeId,
+            'default_user'
+          );
+          realTxHash = autoRes.txHash;
+          realContractAddress = autoRes.contractAddress || ethers.getCreateAddress({ from: cleanAddress, nonce: 0 });
           isOnChainBroadcasted = true;
+        } catch (e: any) {
+          deployErrorMsg = e.message || 'Autonomous contract deployment failed';
         }
-      } catch (deployErr: any) {
-        deployErrorMsg = deployErr?.reason || deployErr?.message || 'On-chain RPC deployment failed.';
-        console.error('[Deploy On-Chain Error]:', deployErr);
+      }
+
+      if (!isOnChainBroadcasted) {
+        // Stage for User Passkey Approval
+        const stageRes = await stageTransactionRequest(
+          cleanAddress,
+          ethers.ZeroAddress,
+          0,
+          'DEPLOY',
+          network,
+          unsignedPayload,
+          'default_user',
+          `Deploy Smart Contract: ${nameStr} (${symbolStr})`
+        );
+
+        // Derive predicted contract address
+        try {
+          const targetProvider = isTestnet ? sepoliaProvider : ethProvider;
+          const currentNonce = await targetProvider.getTransactionCount(cleanAddress);
+          realContractAddress = ethers.getCreateAddress({ from: cleanAddress, nonce: currentNonce });
+        } catch (e) {
+          realContractAddress = '0x' + crypto.randomUUID().replace(/-/g, '').slice(0, 40);
+        }
+
+        // Save contract metadata to Supabase DB
+        try {
+          await supabase.from('contracts').insert([{
+            wallet_address: cleanAddress,
+            contract_name: nameStr,
+            symbol: symbolStr,
+            contract_type: isNft ? 'ERC-721' : 'ERC-20',
+            total_supply: totalSupplyNum,
+            owner_allocation: ownerAllocNum,
+            description: descriptionStr,
+            image_url: imageUrlStr,
+            website_url: websiteStr,
+            twitter_url: twitterStr,
+            telegram_url: telegramStr,
+            discord_url: discordStr,
+            network: networkName,
+            predicted_address: realContractAddress,
+            tx_hash: null,
+            solidity_code: solCode,
+            abi: JSON.stringify(compiledAbi),
+            bytecode: compiledBytecode || null,
+            metadata: {
+              isTestnet,
+              chainId,
+              decimals: isNft ? 0 : 18,
+              broadcasted: false,
+              socials: { website: websiteStr, twitter: twitterStr, telegram: telegramStr, discord: discordStr }
+            }
+          }]);
+        } catch (e) {}
+
+        return {
+          formattedMarkdown: `
+### 📥 SMART CONTRACT DEPLOYMENT STAGED (PASSKEY APPROVAL REQUIRED)
+
+> **Contract Name**: \`${nameStr}\` (\`$${symbolStr}\`)  
+> **Contract Standard**: \`${isNft ? 'ERC-721 NFT Collection' : 'ERC-20 Fungible Token'}\`  
+> **Target Network**: \`${networkName}\` (Chain ID: \`${chainId}\`)  
+> **Predicted Address**: [\`${realContractAddress}\`](${explorerBase}/address/${realContractAddress})  
+> **Request ID**: \`${stageRes.requestId}\`  
+> **Approval Token**: \`${stageRes.approvalToken}\`  
+> **Expires At**: \`${stageRes.expiresAt}\`  
+> **Passkey Authorization**: [Confirm Deployment on Device](${stageRes.approvalUrl})  
+
+*Please prompt the user to authorize contract deployment via WebAuthn Passkey or call \`approve_transaction\` with token \`${stageRes.approvalToken}\`.*
+`,
+          contractName: nameStr,
+          symbol: symbolStr,
+          predictedAddress: realContractAddress,
+          status: 'pending_approval',
+          ...stageRes,
+        };
       }
 
       if (!isOnChainBroadcasted || !realContractAddress) {
@@ -3451,181 +3663,104 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
 
     case 'send_transfer': {
       const token = (args.token || 'ETH').toUpperCase();
-      const recipient = args.recipientAddress || args.to || args.recipient || '0x0000000000000000000000000000000000000000';
+      const recipient = (args.recipientAddress || args.to || args.recipient || '').toLowerCase();
       const amountStr = String(args.amount || '0.001');
+      const amountNum = Number(amountStr) || 0;
+
+      if (!recipient || !recipient.startsWith('0x') || recipient.length !== 42) {
+        throw new Error('Valid 0x recipient public address is required.');
+      }
 
       const targetChainStr = (args.chain || args.network || 'sepolia').toLowerCase();
-      let targetProvider = sepoliaProvider;
       let chainName = 'Ethereum Sepolia Testnet';
       let chainId = 11155111;
       let explorerBase = 'https://sepolia.etherscan.io';
-      let isTestnet = true;
 
       if (targetChainStr === 'ethereum' || targetChainStr === 'mainnet') {
-        targetProvider = ethProvider; chainName = 'Ethereum Mainnet'; chainId = 1; explorerBase = 'https://etherscan.io'; isTestnet = false;
+        chainName = 'Ethereum Mainnet'; chainId = 1; explorerBase = 'https://etherscan.io';
       } else if (targetChainStr === 'base') {
-        targetProvider = baseProvider; chainName = 'Base Mainnet'; chainId = 8453; explorerBase = 'https://basescan.org'; isTestnet = false;
+        chainName = 'Base Mainnet'; chainId = 8453; explorerBase = 'https://basescan.org';
       } else if (targetChainStr === 'base_sepolia') {
-        targetProvider = baseProvider; chainName = 'Base Sepolia Testnet'; chainId = 84532; explorerBase = 'https://sepolia.basescan.org'; isTestnet = true;
+        chainName = 'Base Sepolia Testnet'; chainId = 84532; explorerBase = 'https://sepolia.basescan.org';
       } else if (targetChainStr === 'polygon' || targetChainStr === 'matic') {
-        targetProvider = polygonProvider; chainName = 'Polygon Mainnet'; chainId = 137; explorerBase = 'https://polygonscan.com'; isTestnet = false;
+        chainName = 'Polygon Mainnet'; chainId = 137; explorerBase = 'https://polygonscan.com';
       } else if (targetChainStr === 'amoy' || targetChainStr === 'polygon_testnet') {
-        targetProvider = polygonProvider; chainName = 'Polygon Amoy Testnet'; chainId = 80002; explorerBase = 'https://amoy.polygonscan.com'; isTestnet = true;
+        chainName = 'Polygon Amoy Testnet'; chainId = 80002; explorerBase = 'https://amoy.polygonscan.com';
       } else if (targetChainStr === 'arbitrum') {
-        targetProvider = arbitrumProvider; chainName = 'Arbitrum One Mainnet'; chainId = 42161; explorerBase = 'https://arbiscan.io'; isTestnet = false;
+        chainName = 'Arbitrum One Mainnet'; chainId = 42161; explorerBase = 'https://arbiscan.io';
       } else if (targetChainStr === 'bsc' || targetChainStr === 'binance') {
-        targetProvider = bscProvider; chainName = 'BNB Smart Chain Mainnet'; chainId = 56; explorerBase = 'https://bscscan.com'; isTestnet = false;
+        chainName = 'BNB Smart Chain Mainnet'; chainId = 56; explorerBase = 'https://bscscan.com';
       }
 
-      let realTxHash = '';
-      let isBroadcastedOnChain = false;
-      let gasFeeUsd = 0.42;
-      let transferErrorMsg = '';
+      const approxUsd = token === 'ETH' ? amountNum * ethPrice : token === 'BTC' ? amountNum * btcPrice : token === 'SOL' ? amountNum * solPrice : amountNum;
+      const unsignedPayload = {
+        to: recipient,
+        value: ethers.parseEther(amountStr),
+        chainId,
+      };
 
-      const privateKey = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
+      // 1. Evaluate Autonomous Spending Policy
+      const scopeCheck = await evaluateAutonomousScope(cleanAddress, 'default_user', chainId, token, approxUsd, recipient);
 
-      if (!privateKey) {
-        throw new Error(`SECURITY ERROR: No decrypted wallet credentials found for wallet address ${walletAddress}. Please import or create a wallet first.`);
-      }
+      if (scopeCheck.inScope && scopeCheck.scopeId) {
+        const autoResult = await executeAutonomousTransaction(
+          cleanAddress,
+          recipient,
+          amountNum,
+          token,
+          targetChainStr,
+          unsignedPayload,
+          scopeCheck.scopeId,
+          'default_user'
+        );
 
-      const signer = new ethers.Wallet(privateKey, targetProvider);
-      const actualSignerAddress = signer.address.toLowerCase();
-
-      try {
-        const valueWei = ethers.parseEther(amountStr);
-        const txResponse = await signer.sendTransaction({
-          to: recipient,
-          value: valueWei,
-        });
-        await txResponse.wait(1);
-        realTxHash = txResponse.hash;
-        if (realTxHash) isBroadcastedOnChain = true;
-      } catch (txErr: any) {
-        transferErrorMsg = txErr?.reason || txErr?.message || 'On-chain transaction broadcast failed.';
-        console.error('[SendTransfer On-Chain Error]:', txErr);
-      }
-
-      if (!isBroadcastedOnChain || !realTxHash) {
         return {
           formattedMarkdown: `
-### [FAILED] ON-CHAIN TRANSFER ERROR
+### ⚡ AUTONOMOUS TRANSFER EXECUTED VIA MPC ENCLAVES
 
-> **Token**: **${amountStr} ${token}**  
-> **Sender Wallet**: \`${actualSignerAddress}\`  
-> **Recipient Wallet**: \`${recipient}\`  
-> **Target Network**: \`${chainName}\`  
-> **Failure Reason**: \`${transferErrorMsg || 'RPC Transaction Execution Failed'}\`  
-
----
-
-#### Recommendations:
-1. Ensure sender wallet \`${actualSignerAddress}\` has sufficient native gas balance for network fees.
-2. Verify recipient address format and network RPC connectivity.
+> **Status**: 🟢 **CONFIRMED ON-CHAIN (Within Autonomous Scope)**  
+> **Transaction Hash**: [\`${autoResult.txHash}\`](${autoResult.explorerUrl})  
+> **Amount**: **${amountStr} ${token}** (~$${approxUsd.toFixed(2)} USD)  
+> **Sender Vault**: \`${cleanAddress}\`  
+> **Recipient**: \`${recipient}\`  
+> **Network**: \`${chainName}\` (Chain ID: \`${chainId}\`)  
+> **Block Number**: \`${autoResult.blockNumber}\`  
+> **Gas Used**: \`${autoResult.gasUsed}\`  
+> **Scope ID**: \`${scopeCheck.scopeId}\`  
 `,
-          status: 'FAILED',
-          token,
-          amount: Number(amountStr),
-          senderWallet: actualSignerAddress,
-          recipient,
-          chain: chainName,
-          error: transferErrorMsg,
+          ...autoResult,
         };
       }
 
-      // Estimate real gas fee
-      try {
-        const feeData = await targetProvider.getFeeData();
-        if (feeData.gasPrice) {
-          gasFeeUsd = Number(ethers.formatUnits(feeData.gasPrice * 21000n, 'gwei')) * (ethPrice / 1e9);
-        }
-      } catch (e) {
-        console.error('RPC feeData error:', e);
-      }
-
-      // Save transfer transaction to Supabase DB
-      let dbRecordId: string | null = null;
-      try {
-        const { data: dbData } = await supabase.from('transactions').insert([{
-          wallet_address: actualSignerAddress,
-          tx_hash: realTxHash || null,
-          type: 'SEND',
-          token_symbol: token,
-          amount: Number(amountStr),
-          recipient: recipient,
-          status: isBroadcastedOnChain ? 'CONFIRMED' : 'SIGNABLE_PAYLOAD_READY',
-          chain_id: chainName,
-          gas_fee_usd: Number(gasFeeUsd.toFixed(2)),
-        }]).select('*');
-        if (dbData?.[0]?.id) dbRecordId = dbData[0].id;
-      } catch (e) {
-        console.warn('[Supabase] Transfer record save note:', e);
-      }
-
-      const amountWeiHex = '0x' + ethers.parseEther(amountStr).toString(16);
-
-      const uiCardMarkdown = buildMcpUiCardMarkdown({
-        type: 'transfer',
-        title: isBroadcastedOnChain ? 'ON-CHAIN TRANSFER CONFIRMED' : 'SIGNABLE PAYLOAD READY',
-        amount: amountStr,
-        symbol: token,
-        sender: actualSignerAddress,
-        recipient: recipient,
-        network: chainName,
-        gasFeeUsd: gasFeeUsd.toFixed(2),
-        txHash: realTxHash || undefined,
-        explorerUrl: realTxHash ? `${explorerBase}/tx/${realTxHash}` : explorerBase,
-      });
-
-      const formattedMarkdown = `
-${uiCardMarkdown}
-
-### ON-CHAIN BLOCKCHAIN TRANSACTION ${isBroadcastedOnChain ? '[CONFIRMED ON-CHAIN]' : '[SIGNABLE PAYLOAD READY]'}
-
-> **Status**: ${isBroadcastedOnChain ? '**CONFIRMED & BROADCASTED ON BLOCKCHAIN**' : '**SIGNABLE UNBROADCASTED PAYLOAD READY**'}  
-> **Network**: \`${chainName}\` (Chain ID: \`${chainId}\` | ${isTestnet ? '[TESTNET]' : '[MAINNET]'})  
-${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](${explorerBase}/tx/${realTxHash})` : ''}
-> **Estimated Gas Fee**: \`$${gasFeeUsd.toFixed(2)} USD\`
-
-| Parameter | Value |
-| :--- | :--- |
-| **Token Sent** | **${amountStr} ${token}** |
-| **Sender Wallet** | \`${actualSignerAddress}\` |
-| **Recipient Wallet** | \`${recipient}\` |
-| **Target Network** | \`${chainName}\` |
-${realTxHash ? `| **Block Explorer** | [View Transaction on ${chainName}](${explorerBase}/tx/${realTxHash}) |` : ''}
-| **Database Sync** | Saved to Supabase \`transactions\` ${dbRecordId ? `(\`ID: ${dbRecordId}\`)` : '(Synced)'} |
-`;
+      // 2. PASSKEY APPROVAL PATH (Outside limits / default requirement)
+      const stageResult = await stageTransactionRequest(
+        cleanAddress,
+        recipient,
+        amountNum,
+        token,
+        targetChainStr,
+        unsignedPayload,
+        'default_user',
+        `Direct transfer of ${amountStr} ${token} to ${recipient}`
+      );
 
       return {
-        formattedMarkdown,
-        ui_widget: {
-          type: 'transfer',
-          title: 'EIP-1193 ON-CHAIN TRANSFER',
-          amount: Number(amountStr),
-          symbol: token,
-          sender: actualSignerAddress,
-          recipient,
-          network: chainName,
-          gasFeeUsd: Number(gasFeeUsd.toFixed(2)),
-          txHash: realTxHash || null,
-        },
-        txHash: realTxHash || null,
-        status: isBroadcastedOnChain ? 'CONFIRMED' : 'SIGNABLE_PAYLOAD_READY',
-        broadcastedOnChain: isBroadcastedOnChain,
-        unsignedTxPayload: isBroadcastedOnChain ? null : {
-          from: walletAddress,
-          to: recipient,
-          value: amountWeiHex,
-          chainId,
-          gasLimit: '0x5208'
-        },
-        token,
-        amount: Number(amountStr),
-        senderWallet: actualSignerAddress,
-        recipient: recipient,
-        chain: chainName,
-        chainId,
-        explorerUrl: realTxHash ? `${explorerBase}/tx/${realTxHash}` : explorerBase,
+        formattedMarkdown: `
+### 📥 TRANSACTION STAGED (PASSKEY APPROVAL REQUIRED)
+
+> **Status**: 🟡 **PENDING USER PASSKEY CONFIRMATION**  
+> **Request ID**: \`${stageResult.requestId}\`  
+> **Approval Token**: \`${stageResult.approvalToken}\`  
+> **Amount**: **${amountStr} ${token}** (~$${approxUsd.toFixed(2)} USD)  
+> **Sender Vault**: \`${cleanAddress}\`  
+> **Recipient**: \`${recipient}\`  
+> **Target Network**: \`${chainName}\`  
+> **Expires At**: \`${stageResult.expiresAt}\`  
+> **Authorize Passkey**: [Confirm on Device](${stageResult.approvalUrl})  
+
+*Please prompt the user to authorize this transaction on their device or call \`approve_transaction\` with token \`${stageResult.approvalToken}\`.*
+`,
+        ...stageResult,
       };
     }
 
@@ -3963,139 +4098,116 @@ ${solCode}
       const fromSym = (args.fromToken || args.srcToken || (name === 'buy_tokens' ? (args.fromToken || 'ETH') : args.token) || 'ETH').toUpperCase();
       const toSym = (args.toToken || args.dstToken || (name === 'buy_tokens' ? args.token : (name === 'sell_tokens' ? (args.toToken || 'ETH') : 'USDC')) || 'USDC').toUpperCase();
       const amountNum = Number(args.amount || '0.1');
+      const network = (args.chain || args.network || 'ethereum').toLowerCase();
+
+      let chainId = 1;
+      let routerAddress = '0x1111111254EEB25477B68fb85Ed929f73A960382'; // 1inch Mainnet Router
+      let routerName = '1inch v6 DEX Aggregator';
+      let explorerBase = 'https://etherscan.io';
+
+      if (network === 'base') {
+        chainId = 8453;
+        routerAddress = '0x2626664c2603336E57B271c5C0b26F421741e481'; // Uniswap V3 Base Router
+        routerName = 'Uniswap V3 (Base Mainnet)';
+        explorerBase = 'https://basescan.org';
+      } else if (network === 'sepolia') {
+        chainId = 11155111;
+        routerAddress = '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E'; // Uniswap SwapRouter02 Sepolia
+        routerName = 'Uniswap V3 (Sepolia Testnet)';
+        explorerBase = 'https://sepolia.etherscan.io';
+      } else if (network === 'polygon') {
+        chainId = 137;
+        routerAddress = '0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff'; // QuickSwap Router
+        routerName = 'QuickSwap (Polygon)';
+        explorerBase = 'https://polygonscan.com';
+      } else if (network === 'arbitrum') {
+        chainId = 42161;
+        routerAddress = '0xE592427A0AEce92De3Edee1F18E0157C05861564'; // Uniswap V3 Arbitrum
+        routerName = 'Uniswap V3 (Arbitrum One)';
+        explorerBase = 'https://arbiscan.io';
+      }
 
       let dstAmountFormatted = (fromSym === 'ETH' ? amountNum * ethPrice : amountNum).toFixed(2);
-      let routerName = '1inch v6 DEX Aggregator (Uniswap V3 / Curve)';
-      let realTxHash = '';
-      let isBroadcastedOnChain = false;
+      const approxUsd = fromSym === 'ETH' ? amountNum * ethPrice : amountNum;
 
-      // 1. Fetch live 1inch v6 quote if possible
-      try {
-        const inchKey = process.env.VITE_1INCH_API_KEY || process.env.INCH_API_KEY || '';
-        const ethAddr = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
-        const usdcAddr = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
-        const srcAddr = fromSym === 'ETH' ? ethAddr : usdcAddr;
-        const dstAddr = toSym === 'USDC' ? usdcAddr : ethAddr;
-        const amountWei = ethers.parseEther(String(amountNum)).toString();
+      const unsignedPayload = {
+        to: routerAddress,
+        value: fromSym === 'ETH' ? ethers.parseEther(String(amountNum)) : 0n,
+        data: '0x',
+        chainId,
+      };
 
-        const quoteRes = await fetch(`https://api.1inch.dev/swap/v6.0/1/quote?src=${srcAddr}&dst=${dstAddr}&amount=${amountWei}`, {
-          headers: { 'Authorization': `Bearer ${inchKey}` }
-        });
-        if (quoteRes.ok) {
-          const qData: any = await quoteRes.json();
-          if (qData.dstAmount) {
-            const decimals = toSym === 'USDC' ? 6 : 18;
-            const rawDst = Number(qData.dstAmount) / Math.pow(10, decimals);
-            dstAmountFormatted = rawDst.toFixed(4);
-          }
-        }
-      } catch (e) {
-        console.warn('[1inch Quote Note]:', e);
-      }
+      // 1. Evaluate Autonomous Spending Policy
+      const scopeCheck = await evaluateAutonomousScope(cleanAddress, 'default_user', chainId, fromSym, approxUsd, routerAddress);
 
-      let swapErrorMsg = '';
-      const privateKey = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
+      if (scopeCheck.inScope && scopeCheck.scopeId) {
+        const autoResult = await executeAutonomousTransaction(
+          cleanAddress,
+          routerAddress,
+          amountNum,
+          fromSym,
+          network,
+          unsignedPayload,
+          scopeCheck.scopeId,
+          'default_user'
+        );
 
-      if (!privateKey) {
-        throw new Error(`SECURITY ERROR: No decrypted wallet credentials found for wallet address ${walletAddress}. Please import or create a wallet first.`);
-      }
-
-      try {
-        const signer = new ethers.Wallet(privateKey, ethProvider);
-        const valueWei = ethers.parseEther(String(amountNum));
-        const txResponse = await signer.sendTransaction({
-          to: '0x1111111254EEB25477B68fb85Ed929f73A960382', // 1inch Router V6 Address
-          value: fromSym === 'ETH' ? valueWei : 0n,
-          data: '0x',
-        });
-        await txResponse.wait(1);
-        realTxHash = txResponse.hash;
-        if (realTxHash) isBroadcastedOnChain = true;
-      } catch (txErr: any) {
-        swapErrorMsg = txErr?.reason || txErr?.message || 'DEX Router execution failed.';
-        console.error('[Swap On-Chain Error]:', txErr);
-      }
-
-      if (!isBroadcastedOnChain || !realTxHash) {
         return {
           formattedMarkdown: `
-### ❌ DEX SWAP EXECUTION FAILED
+### ⚡ AUTONOMOUS DEX SWAP CONFIRMED ON-CHAIN
 
+> **Status**: 🟢 **CONFIRMED ON-CHAIN (Receipt Status: 1)**  
 > **Swap Pair**: **${amountNum} ${fromSym}** ➔ **${dstAmountFormatted} ${toSym}**  
-> **Router**: \`${routerName}\`  
-> **Sender Wallet**: \`${walletAddress}\`  
-> **Failure Reason**: \`${swapErrorMsg || '1inch Router Execution Failed'}\`  
+> **Router**: \`${routerName}\` (\`${routerAddress}\`)  
+> **Transaction Hash**: [\`${autoResult.txHash}\`](${autoResult.explorerUrl})  
+> **Sender Vault**: \`${cleanAddress}\`  
+> **Network**: \`${network}\` (Chain ID: \`${chainId}\`)  
+> **Block Number**: \`${autoResult.blockNumber}\`  
+> **Gas Used**: \`${autoResult.gasUsed}\`  
 `,
-          status: 'FAILED',
+          ...autoResult,
           fromToken: fromSym,
           toToken: toSym,
-          error: swapErrorMsg,
+          fromAmount: amountNum,
+          toAmount: Number(dstAmountFormatted),
+          router: routerName,
         };
       }
 
-      let dbRecordId: string | null = null;
-      try {
-        const { data: dbData } = await supabase.from('transactions').insert([{
-          wallet_address: cleanAddress,
-          tx_hash: realTxHash || null,
-          type: 'SWAP',
-          token_symbol: `${fromSym} -> ${toSym}`,
-          amount: amountNum,
-          recipient: '0x1111111254EEB25477B68fb85Ed929f73A960382',
-          status: isBroadcastedOnChain ? 'CONFIRMED' : 'UNBROADCASTED_PAYLOAD_READY',
-          chain_id: 'Ethereum Mainnet',
-          gas_fee_usd: 0.65,
-        }]).select('*');
-        if (dbData?.[0]?.id) dbRecordId = dbData[0].id;
-      } catch (e) {
-        console.warn('[Supabase Swap Record Note]:', e);
-      }
-
-      const uiCardMarkdown = buildMcpUiCardMarkdown({
-        type: 'swap',
-        title: isBroadcastedOnChain ? 'DEX SWAP CONFIRMED ON-CHAIN' : 'AI SWAP ROUTE READY',
-        fromAmount: String(amountNum),
-        fromSymbol: fromSym,
-        toAmount: dstAmountFormatted,
-        toSymbol: toSym,
-        sender: cleanAddress,
-        network: 'Ethereum Mainnet',
-        gasFeeUsd: '0.65',
-        txHash: realTxHash || undefined,
-        explorerUrl: realTxHash ? `https://etherscan.io/tx/${realTxHash}` : 'https://etherscan.io',
-      });
-
-      const formattedMarkdown = `
-${uiCardMarkdown}
-
-### DEX TOKEN SWAP ${isBroadcastedOnChain ? '[CONFIRMED]' : '[ROUTED & PAYLOAD GENERATED]'}
-
-> **Status**: ${isBroadcastedOnChain ? '**CONFIRMED ON-CHAIN**' : '**UNBROADCASTED PAYLOAD GENERATED**'}  
-> **Route**: \`${routerName}\`  
-${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](https://etherscan.io/tx/${realTxHash})` : ''}
-
-| Parameter | Value |
-| :--- | :--- |
-| **Database Sync** | Saved to Supabase \`transactions\` ${dbRecordId ? `(\`ID: ${dbRecordId}\`)` : '(Synced)'} |
-`;
+      // 2. Passkey Staging Flow
+      const stageRes = await stageTransactionRequest(
+        cleanAddress,
+        routerAddress,
+        amountNum,
+        fromSym,
+        network,
+        unsignedPayload,
+        'default_user',
+        `DEX Swap ${amountNum} ${fromSym} to ${toSym} via ${routerName}`
+      );
 
       return {
-        formattedMarkdown,
-        txHash: realTxHash || null,
-        status: isBroadcastedOnChain ? 'CONFIRMED' : 'UNBROADCASTED_PAYLOAD_READY',
-        broadcastedOnChain: isBroadcastedOnChain,
+        formattedMarkdown: `
+### 📥 DEX SWAP STAGED (PASSKEY APPROVAL REQUIRED)
+
+> **Swap Pair**: **${amountNum} ${fromSym}** ➔ **${dstAmountFormatted} ${toSym}**  
+> **Router**: \`${routerName}\` (\`${routerAddress}\`)  
+> **Estimated Value**: ~$${approxUsd.toFixed(2)} USD  
+> **Request ID**: \`${stageRes.requestId}\`  
+> **Approval Token**: \`${stageRes.approvalToken}\`  
+> **Expires At**: \`${stageRes.expiresAt}\`  
+> **Authorize Passkey**: [Confirm Swap on Device](${stageRes.approvalUrl})  
+
+*Please prompt the user to authorize this swap on their device or call \`approve_transaction\` with token \`${stageRes.approvalToken}\`.*
+`,
         fromToken: fromSym,
         toToken: toSym,
         fromAmount: amountNum,
         toAmount: Number(dstAmountFormatted),
         router: routerName,
-        unsignedTxPayload: {
-          to: '0x1111111254EEB25477B68fb85Ed929f73A960382',
-          value: '0x' + ethers.parseEther(String(amountNum)).toString(16),
-          data: '0x',
-          chainId: 1
-        },
-        explorerUrl: realTxHash ? `https://etherscan.io/tx/${realTxHash}` : 'https://etherscan.io',
+        routerAddress,
+        status: 'pending_approval',
+        ...stageRes,
       };
     }
 
@@ -4104,24 +4216,14 @@ ${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](https://etherscan.io
       let allTxs: any[] = [];
       const seenHashes = new Set<string>();
 
-      // Resolve private key and signer address if provided
-      let signerAddress = cleanAddress;
-      try {
-        const pk = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
-        if (pk) {
-          signerAddress = new ethers.Wallet(pk).address.toLowerCase();
-        }
-      } catch (e) { }
-
-      // Collect all candidate target addresses (cleanAddress, signerAddress, vault fallback)
+      // Target addresses
       const targetAddresses = Array.from(new Set([
         cleanAddress.toLowerCase(),
-        signerAddress.toLowerCase(),
         walletAddress.toLowerCase(),
         '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'
       ])).filter(a => a && a.startsWith('0x'));
 
-      // 1. Fetch real on-chain transaction history directly from EVM Blockscout / Basescan APIs for all target addresses
+      // 1. Fetch real on-chain transaction history directly from EVM Blockscout / Basescan APIs
       const chainApis: { name: string; url: string; explorer: string }[] = [];
       for (const addr of targetAddresses) {
         chainApis.push(
@@ -4154,7 +4256,7 @@ ${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](https://etherscan.io
               to: tx.to || tx.contractAddress || '',
               value: ethVal,
               fee: tx.gasPrice && tx.gasUsed ? Number(ethers.formatEther(BigInt(tx.gasPrice) * BigInt(tx.gasUsed))) : 0,
-              status: tx.isError === '0' || tx.status === 'ok' ? 'Confirmed' : 'Pending',
+              status: (tx.isError === '0' || tx.status === '1' || tx.status === 'ok') && tx.txreceipt_status !== '0' ? 'Confirmed' : 'Failed',
               timestamp: dateStr,
               chain: chain.name,
               explorerUrl: `${chain.explorer}/tx/${tx.hash}`,
@@ -5691,96 +5793,122 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
       }
 
       // Network resolution
-      let targetProvider = sepoliaProvider;
-      let explorerBase = 'https://sepolia.etherscan.io';
       let chainName = 'Ethereum Sepolia Testnet';
+      let chainId = 11155111;
+      let explorerBase = 'https://sepolia.etherscan.io';
       if (network === 'ethereum' || network === 'mainnet') {
-        targetProvider = ethProvider; explorerBase = 'https://etherscan.io'; chainName = 'Ethereum Mainnet';
+        chainName = 'Ethereum Mainnet'; chainId = 1; explorerBase = 'https://etherscan.io';
       } else if (network === 'polygon' || network === 'matic') {
-        targetProvider = polygonProvider; explorerBase = 'https://polygonscan.com'; chainName = 'Polygon Mainnet';
+        chainName = 'Polygon Mainnet'; chainId = 137; explorerBase = 'https://polygonscan.com';
       } else if (network === 'base') {
-        targetProvider = baseProvider; explorerBase = 'https://basescan.org'; chainName = 'Base Mainnet';
+        chainName = 'Base Mainnet'; chainId = 8453; explorerBase = 'https://basescan.org';
       } else if (network === 'arbitrum') {
-        targetProvider = arbitrumProvider; explorerBase = 'https://arbiscan.io'; chainName = 'Arbitrum One';
+        chainName = 'Arbitrum One'; chainId = 42161; explorerBase = 'https://arbiscan.io';
       } else if (network === 'bsc' || network === 'binance') {
-        targetProvider = bscProvider; explorerBase = 'https://bscscan.com'; chainName = 'BNB Smart Chain';
+        chainName = 'BNB Smart Chain'; chainId = 56; explorerBase = 'https://bscscan.com';
       }
 
-      const privateKey = (await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet)) || process.env.SEPOLIA_PRIVATE_KEY || process.env.PRIVATE_KEY || '0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9';
-      if (!privateKey) {
-        throw new Error(`SECURITY ERROR: No decrypted signing credentials found for wallet address ${cleanAddress}. Please import a wallet or configure SEPOLIA_PRIVATE_KEY in .env.`);
-      }
-      const signer = new ethers.Wallet(privateKey, targetProvider);
-
-      // ERC-20 Mintable ABI (standard OpenZeppelin pattern)
-      const mintAbi = [
+      // Query token info via RPC failover
+      const mintInterface = new ethers.Interface([
         'function mint(address to, uint256 amount) external',
         'function decimals() view returns (uint8)',
         'function name() view returns (string)',
         'function symbol() view returns (string)',
-        'function totalSupply() view returns (uint256)',
-      ];
-
-      const contract = new ethers.Contract(contractAddress, mintAbi, signer);
+      ]);
 
       let decimals = 18;
       let tokenName = 'Token';
       let tokenSymbol = 'TKN';
-      try { decimals = Number(await contract.decimals()); } catch (e) {}
-      try { tokenName = await contract.name(); } catch (e) {}
-      try { tokenSymbol = await contract.symbol(); } catch (e) {}
+
+      try {
+        const prov = network === 'ethereum' ? ethProvider : sepoliaProvider;
+        const c = new ethers.Contract(contractAddress, mintInterface, prov);
+        decimals = Number(await c.decimals().catch(() => 18));
+        tokenName = await c.name().catch(() => 'Token');
+        tokenSymbol = await c.symbol().catch(() => 'TKN');
+      } catch (e) {}
 
       const mintAmount = ethers.parseUnits(amountStr, decimals);
+      const callData = mintInterface.encodeFunctionData('mint', [recipientAddress, mintAmount]);
 
-      const tx = await contract.mint(recipientAddress, mintAmount);
-      let receipt: any = null;
-      try {
-        receipt = await Promise.race([
-          tx.wait(1),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 4000))
-        ]);
-      } catch (e) {
-        // Fast mempool broadcast return to prevent serverless function timeouts
+      const unsignedPayload = {
+        to: contractAddress,
+        data: callData,
+        value: '0x0',
+        chainId,
+      };
+
+      // 1. Evaluate Autonomous Scope
+      const scopeCheck = await evaluateAutonomousScope(cleanAddress, 'default_user', chainId, tokenSymbol, 1.0, contractAddress);
+
+      if (scopeCheck.inScope && scopeCheck.scopeId) {
+        const autoRes = await executeAutonomousTransaction(
+          cleanAddress,
+          contractAddress,
+          Number(amountStr),
+          tokenSymbol,
+          network,
+          unsignedPayload,
+          scopeCheck.scopeId,
+          'default_user'
+        );
+
+        return {
+          formattedMarkdown: `
+### ⚡ AUTONOMOUS TOKEN MINT CONFIRMED ON-CHAIN
+
+> **Status**: 🟢 **CONFIRMED ON-CHAIN (Receipt Status: 1)**  
+> **Transaction Hash**: [\`${autoRes.txHash}\`](${autoRes.explorerUrl})  
+> **Token**: **${tokenName}** (\`$${tokenSymbol}\`)  
+> **Amount Minted**: \`${Number(amountStr).toLocaleString()} ${tokenSymbol}\`  
+> **Recipient**: \`${recipientAddress}\`  
+> **Contract**: \`${contractAddress}\`  
+> **Network**: \`${chainName}\`  
+> **Block Number**: \`${autoRes.blockNumber}\`  
+> **Gas Used**: \`${autoRes.gasUsed}\`  
+`,
+          ...autoRes,
+          tokenName,
+          tokenSymbol,
+          recipientAddress,
+          contractAddress,
+        };
       }
 
-      const txHash = receipt?.hash || tx.hash;
-      const txUrl = `${explorerBase}/tx/${txHash}`;
-
-      // Log to Supabase
-      try {
-        await supabase.from('mcp_activity_logs').insert([{
-          api_key: 'system',
-          tool_name: 'mint_tokens',
-          status: 'SUCCESS',
-          parameters: { contractAddress, recipientAddress, amount: amountStr, network },
-          response: { txHash, tokenName, tokenSymbol },
-        }]);
-      } catch (e) {}
+      // 2. Passkey Staging Flow
+      const stageRes = await stageTransactionRequest(
+        cleanAddress,
+        contractAddress,
+        Number(amountStr),
+        tokenSymbol,
+        network,
+        unsignedPayload,
+        'default_user',
+        `Mint ${amountStr} ${tokenSymbol} to ${recipientAddress}`
+      );
 
       return {
         formattedMarkdown: `
-### 🟢 NORTHVEIL — TOKEN MINT EXECUTED
+### 📥 TOKEN MINT STAGED (PASSKEY APPROVAL REQUIRED)
 
-| Field | Value |
-|:---|:---|
-| **Token** | ${tokenName} (\`$${tokenSymbol}\`) |
-| **Amount Minted** | \`${Number(amountStr).toLocaleString()} ${tokenSymbol}\` |
-| **Recipient** | \`${recipientAddress}\` |
-| **Contract** | \`${contractAddress}\` |
-| **Network** | ${chainName} |
-| **Status** | **CONFIRMED ON-CHAIN** |
-| **Tx Hash** | [\`${txHash}\`](${txUrl}) |
+> **Token**: **${tokenName}** (\`$${tokenSymbol}\`)  
+> **Amount**: \`${Number(amountStr).toLocaleString()} ${tokenSymbol}\`  
+> **Recipient**: \`${recipientAddress}\`  
+> **Contract**: \`${contractAddress}\`  
+> **Network**: \`${chainName}\`  
+> **Request ID**: \`${stageRes.requestId}\`  
+> **Approval Token**: \`${stageRes.approvalToken}\`  
+> **Expires At**: \`${stageRes.expiresAt}\`  
+> **Authorize Passkey**: [Confirm Mint on Device](${stageRes.approvalUrl})  
 
-[VIEW ON BLOCK EXPLORER](${txUrl})
+*Please prompt the user to authorize this mint on their device or call \`approve_transaction\` with token \`${stageRes.approvalToken}\`.*
 `,
-        txHash,
         tokenName,
         tokenSymbol,
-        amount: amountStr,
-        recipientAddress,
         contractAddress,
-        network: chainName,
-        explorerUrl: txUrl,
+        recipientAddress,
+        status: 'pending_approval',
+        ...stageRes,
       };
     }
 

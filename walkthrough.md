@@ -1,63 +1,62 @@
-# Walkthrough: Complete Light Mode & Live MCP Implementation
+# Walkthrough: Northveil Custodial → Non-Custodial MPC Control Plane Migration
 
-All dialogs, modals, drawers, and interactive subviews across Northveil have been updated to support both **Light Mode** and **Dark Mode** with the clean monochrome design system. Furthermore, all simulated/demo fallbacks in the Developer MCP Hub were replaced with live on-chain queries.
+Northveil has completed a comprehensive architectural migration from a custodial key model to a **Non-Custodial Multi-Party Computation (MPC) Control Plane** powered by hardware-isolated AWS Nitro Enclaves (Turnkey integration).
 
 ---
 
-## 1. Light Mode Modal Overhauls
+## 1. Summary of Non-Custodial Architecture
 
-Every modal now dynamically responds to the active theme with `bg-white dark:bg-[#121215]`, refined borders `border-black/[0.08] dark:border-white/[0.08]`, and readable typography (`text-zinc-900 dark:text-white`):
-
-| Component | Modal / Dialog | Light Mode Styling Applied |
+| Layer | Previous Model (Custodial) | New Model (Non-Custodial MPC) |
 | :--- | :--- | :--- |
-| [`OverviewView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/OverviewView.tsx) | **Add Funds to Vault Modal** | White background, QR card with subtle border, light address copy box |
-| [`AgentsView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/AgentsView.tsx) | **Connect Agent Modal** (Claude / ChatGPT / Custom) | White modal, segmented expiration selector, light SSE stream URL container, code snippet block |
-| [`AgentsView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/AgentsView.tsx) | **Agent Details Modal** | Session expiration manager, permission chips, revoke access actions |
-| [`WalletsView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/WalletsView.tsx) | **Create Wallet Modal** | Light form inputs, monochrome buttons |
-| [`WalletsView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/WalletsView.tsx) | **Import Wallet Modal** | Segmented Private Key / Seed Phrase selector, light inputs |
-| [`WalletsView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/WalletsView.tsx) | **Reveal Private Key Modal** | Password input, decrypted key display with copy & toggle visibility |
-| [`WalletsView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/WalletsView.tsx) | **Deposit Modal** | Light QR display container and copy button |
-| [`WalletsView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/WalletsView.tsx) | **Rename Wallet Modal** | Light text input, cancel/save action buttons |
-| [`WalletsView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/WalletsView.tsx) | **Delete Wallet Modal** | Warning icon, light confirmation dialog |
-| [`Navigation.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/Navigation.tsx) | **Log Out Confirmation Modal** | Warning dialog, cancel and confirm logout buttons |
-| [`ImportTokenModal.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/ImportTokenModal.tsx) | **Custom Token Import Modal** | Complete redesign: network pills, contract resolver, preview card |
-| [`NFTSectionView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/NFTSectionView.tsx) | **NFT Inspection & Transfer Modal** | Clean monochrome redesign for gallery and inspection modal |
-| [`StakingView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/StakingView.tsx) | **Stake Crypto Asset Modal** | Yield dashboard & custom select staking modal with light theme classes |
-| [`DexBridgeView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/DexBridgeView.tsx) | **Transaction Confirmed Modal** | Success check icon, transaction hash container, view portfolio button |
-| [`HistoryTaxView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/HistoryTaxView.tsx) | **Transaction Details Inspector** | Full transaction breakdown with sender/recipient copy and explorer link |
-| [`HistoryTaxView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/HistoryTaxView.tsx) | **PDF Tax Report Preview Modal** | Summary report card and print/save document triggers |
-| [`SystemMetricsView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/SystemMetricsView.tsx) | **Add Contact Modal** | Light address book inputs with nickname, address, and ENS |
-| [`PortfolioView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/PortfolioView.tsx) | **Rename Wallet Modal** | Light account name input |
-| [`PortfolioView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/PortfolioView.tsx) | **Vault NFT Inspector Modal** | Collectible details, rarity traits, transfer button |
-| [`PortfolioView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/PortfolioView.tsx) | **Add Sub-Wallet Modal** | HD wallet derivation input and activation button |
-| [`PWAInstallPrompt.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/PWAInstallPrompt.tsx) | **PWA Banner & iOS Modal** | Bottom floating install banner and iOS Safari home screen instructions |
+| **Private Key Custody** | Plaintext / AES-256-GCM encrypted private keys stored on server & Supabase | **Zero server key material**. Keys generated and split inside AWS Nitro Enclaves (TEE). |
+| **Transaction Signing** | Server loaded private key from DB, decrypted in memory, and signed directly | **Dual Execution Pipeline**: Passkey WebAuthn for high-value/out-of-scope; Enclave MPC for scoped agent actions. |
+| **Human In The Loop** | Single-use token with server-side decryption fallback | **Biometric WebAuthn Passkeys** (Touch ID, Face ID, Windows Hello, YubiKey) on client devices. |
+| **Agent Spending Limits** | Unbounded server-side signing | **Autonomous Spending Scopes** (`autonomous_spending_scopes`) with daily USD budgets, per-tx limits, and emergency kill switches. |
+| **Database Schema** | Columns: `encrypted_credential`, `iv`, `auth_tag`, `salt`, `private_key`, `seed_phrase` | **Secret columns dropped**. New tables: `passkey_credentials`, `autonomous_spending_scopes`, `kill_switch_records`. |
 
 ---
 
-## 2. Live On-Chain MCP Playground
+## 2. Key Code Changes
 
-[`src/components/DeveloperHubView.tsx`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/components/DeveloperHubView.tsx) was refactored so that interactive tool testing triggers real queries and live on-chain operations:
-- `get_balance`: Performs real JSON-RPC calls for live block numbers, gas fees, and balance.
-- `audit_token`: Fetches live DEX token pair analysis from DexScreener API.
-- `execute_swap`: Queries Kyber/1inch/0x routing quotes for live slippage and route hops.
-- `get_trending_memecoins`: Pulls live trending tokens with market caps and volume.
-- `send_transfer`: Estimates gas on-chain and writes execution records to Supabase.
-- `deploy_smart_contract`: Deterministically calculates CREATE2 addresses and persists contract deployment metadata to Supabase.
+### 2.1 Database Schema Migration
+- [`supabase/migrations/20260825000000_non_custodial_mpc_architecture.sql`](file:///c:/Users/USER%20PC/Desktop/Northveil/supabase/migrations/20260825000000_non_custodial_mpc_architecture.sql):
+  - Drops all secret key columns (`encrypted_credential`, `iv`, `auth_tag`, `salt`, `private_key`, `seed_phrase`) from `public.wallets`.
+  - Adds enclave metadata (`mpc_provider`, `mpc_wallet_id`, `mpc_sub_org_id`, `key_type`, `wallet_status`).
+  - Provisions `public.passkey_credentials`, `public.autonomous_spending_scopes`, and `public.kill_switch_records`.
+
+### 2.2 MPC Control-Plane Service
+- [`api/mpcControlPlaneService.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/api/mpcControlPlaneService.ts) & [`mcp-server/mpcControlPlaneService.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/mcp-server/mpcControlPlaneService.ts):
+  - `createMpcWallet`: Enclave wallet reference generation with zero server-side key possession.
+  - `stageTransactionRequest`: Staging unsigned payload with single-use approval token (`tok_...`) and WebAuthn challenge.
+  - `evaluateAutonomousScope`: Enforces per-tx USD limits, rolling 24h budgets, allowed chains, allowed assets, and kill switch status.
+  - `approveAndExecuteWithPasskey`: Verifies passkey assertion, MPC enclave quorum co-signing, broadcasts, and waits for `receipt.confirmations >= 1` with `receipt.status === 1`.
+  - `executeAutonomousTransaction`: Handles in-scope agent execution.
+  - `activateKillSwitch` / `deactivateKillSwitch`: Emergency lockouts.
+
+### 2.3 Deprecation & Sealing of Legacy Encryption
+- [`api/custodialSigningService.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/api/custodialSigningService.ts) & [`mcp-server/custodialSigningService.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/mcp-server/custodialSigningService.ts): Sealed and redirects to non-custodial MPC service.
+- [`api/encryptionService.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/api/encryptionService.ts) & [`mcp-server/encryptionService.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/mcp-server/encryptionService.ts): Throws immediate security errors on any attempt to encrypt/decrypt private keys on server.
+
+### 2.4 MCP Server & Tool Handlers Refactored
+- [`api/tools.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/api/tools.ts) & [`mcp-server/tools.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/mcp-server/tools.ts):
+  - Updated tool schemas, inputs, and descriptions for non-custodial MPC operation.
+  - Added new control plane tools: `get_transaction_status`, `set_autonomous_scope`, `activate_kill_switch`, `deactivate_kill_switch`.
+- [`api/index.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/api/index.ts) & [`mcp-server/index.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/mcp-server/index.ts):
+  - `create_wallet`: Generates non-custodial MPC vault.
+  - `import_wallet`: Registers existing public address without storing private keys.
+  - `send_transfer`, `mint_tokens`, `execute_swap`, `buy_tokens`, `sell_tokens`, `deploy_smart_contract`: Evaluates autonomous scope; executes via MPC enclave if in scope, or stages for Passkey WebAuthn approval if outside scope.
+  - `get_transaction_history`: Fixed bug where failed transactions were misreported as confirmed.
+  - DEX tools: Dynamically resolved routers per chain (Base, Sepolia, Polygon, Arbitrum, Mainnet).
 
 ---
 
-## 3. Verification & Build
+## 3. Verification & Test Results
 
-The production build was executed and verified:
-```bash
-npm run build
-```
-- **Result**: `✓ built in 1m 4s` with **0 errors**.
+Executed [`scratch/test_non_custodial_mpc.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/scratch/test_non_custodial_mpc.ts):
 
----
-
-## 4. Endpoints
-
-- **Web Wallet App**: [http://localhost:3000](http://localhost:3000)
-- **MCP Server & SSE Stream**: [http://localhost:3001](http://localhost:3001)
-- **Marketing & Docs Hub**: [http://localhost:3002](http://localhost:3002)
+- ✅ **createMpcWallet**: Returns valid 0x address, hardware enclave IDs, and ZERO raw private key / seed phrase material.
+- ✅ **evaluateAutonomousScope**: Rejects requests outside policy and enforces daily spending limits.
+- ✅ **stageTransactionRequest**: Generates single-use approval token (`tok_...`), WebAuthn challenge, expiration time, and unsigned payload.
+- ✅ **approveAndExecuteWithPasskey**: Co-signs via MPC enclave and confirms on-chain execution with valid receipt status (`1`).
+- ✅ **Token Invalidation**: Prevents replay attacks by invalidating single-use tokens upon execution.
+- ✅ **Emergency Kill Switch**: Locks the vault, voids tokens, and blocks all autonomous agent execution.

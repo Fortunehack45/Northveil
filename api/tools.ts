@@ -1,6 +1,7 @@
 /**
  * Northveil MCP Server Tool Definitions & Types
  * Compliant with Official Model Context Protocol (MCP) v2024-11-05 Spec (inputSchema & annotations)
+ * Operating under Non-Custodial MPC/TEE Control-Plane Architecture (PayBox-Style Hardware Enclaves)
  */
 
 export interface MCPToolParameter {
@@ -8,6 +9,7 @@ export interface MCPToolParameter {
   description: string;
   required?: boolean;
   enum?: string[];
+  items?: { type: string };
 }
 
 export interface MCPToolAnnotations {
@@ -34,154 +36,95 @@ export interface MCPToolDefinition {
 
 export const MCP_TOOLS: MCPToolDefinition[] = [
   {
-    name: 'deploy_smart_contract',
-    description: 'Deploys an ERC-20 token, ERC-721 NFT collection, or custom smart contract to Mainnet or Testnet EVM blockchains (Ethereum, Sepolia, Polygon, Base, Arbitrum, BSC). SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
+    name: 'create_wallet',
+    description: 'Provisions a new non-custodial multi-chain vault wallet backed by Turnkey MPC/TEE secure enclaves. Private key material is generated and fragmented inside hardware-isolated enclaves and is never possessed, stored, or reconstructable by Northveil servers. Returns vault public address and MPC enclave references.',
     annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
-        contractName: {
+        userId: {
           type: 'string',
-          description: 'Name of the smart contract (e.g. WorkBaseToken, GalacticNFT). Used as the Solidity contract name.',
+          description: 'User identifier or account handle (default: default_user)',
         },
-        symbol: {
+        walletName: {
           type: 'string',
-          description: 'Token ticker symbol (e.g. WBT, ARG). Recommended: 3-5 uppercase characters.',
+          description: 'Human-readable label for the vault wallet (e.g. Primary Trading Vault)',
         },
-        contractType: {
+        chain: {
           type: 'string',
-          description: 'Template category: erc20 (Fungible Token with mint+burn), erc721 / nft (NFT Collection with URI storage), custom',
-          enum: ['erc20', 'erc721', 'nft', 'erc1155', 'staking', 'dao', 'custom'],
-        },
-        totalSupply: {
-          type: 'number',
-          description: 'Total token supply (e.g. 1000000000) or total max NFT collection size (e.g. 10000).',
-        },
-        initialSupply: {
-          type: 'number',
-          description: 'Alias for totalSupply (total tokens or NFT collection size).',
-        },
-        ownerAllocation: {
-          type: 'number',
-          description: 'Amount or token count allocated directly to owner wallet at deployment (e.g. 800000000 for 80% owner allocation).',
-        },
-        description: {
-          type: 'string',
-          description: 'Project description, utility details, or token roadmap summary.',
-        },
-        imageUrl: {
-          type: 'string',
-          description: 'Optional token logo or NFT collection cover image URL. Leave blank if not provided by user.',
-        },
-        websiteUrl: {
-          type: 'string',
-          description: 'Optional official project website URL. Leave blank if not provided by user.',
-        },
-        twitterUrl: {
-          type: 'string',
-          description: 'Optional Twitter/X profile or announcement link. Leave blank if not provided by user.',
-        },
-        telegramUrl: {
-          type: 'string',
-          description: 'Optional Telegram community or channel link. Leave blank if not provided by user.',
-        },
-        discordUrl: {
-          type: 'string',
-          description: 'Optional Discord server invite link. Leave blank if not provided by user.',
-        },
-        network: {
-          type: 'string',
-          description: 'Target EVM network: sepolia (testnet), ethereum (mainnet), polygon, amoy, base, base_sepolia, arbitrum, bsc',
-        },
-        privateKey: {
-          type: 'string',
-          description: 'Optional private key (0x...) of the deployer wallet to sign and broadcast on-chain.',
-        },
-        seedPhrase: {
-          type: 'string',
-          description: 'Optional BIP-39 12 or 24 word seed phrase of the deployer wallet.',
+          description: 'Primary blockchain network (ethereum, sepolia, base, polygon, arbitrum, bsc). Default: ethereum',
         },
       },
-      required: ['contractName'],
     },
     parameters: {
       type: 'object',
       properties: {
-        contractName: {
+        userId: {
           type: 'string',
-          description: 'Name of the smart contract (e.g. WorkBaseToken, GalacticNFT). Used as the Solidity contract name.',
+          description: 'User identifier or account handle',
         },
-        symbol: {
+        walletName: {
           type: 'string',
-          description: 'Token ticker symbol (e.g. WBT, ARG). Recommended: 3-5 uppercase characters.',
+          description: 'Human-readable label for the vault wallet',
         },
-        contractType: {
+        chain: {
           type: 'string',
-          description: 'Template category: erc20 (Fungible Token with mint+burn), erc721 / nft (NFT Collection with URI storage), custom',
-          enum: ['erc20', 'erc721', 'nft', 'erc1155', 'staking', 'dao', 'custom'],
-        },
-        totalSupply: {
-          type: 'number',
-          description: 'Total token supply (e.g. 1000000000) or total max NFT collection size (e.g. 10000).',
-        },
-        initialSupply: {
-          type: 'number',
-          description: 'Alias for totalSupply (total tokens or NFT collection size).',
-        },
-        ownerAllocation: {
-          type: 'number',
-          description: 'Amount or token count allocated directly to owner wallet at deployment (e.g. 800000000 for 80% owner allocation).',
-        },
-        description: {
-          type: 'string',
-          description: 'Project description, utility details, or token roadmap summary.',
-        },
-        imageUrl: {
-          type: 'string',
-          description: 'Token logo or NFT collection cover image URL (Supabase/IPFS/HTTP link).',
-        },
-        websiteUrl: {
-          type: 'string',
-          description: 'Official project website URL (e.g. https://northveil.xyz).',
-        },
-        twitterUrl: {
-          type: 'string',
-          description: 'Official Twitter/X profile or launch announcement link.',
-        },
-        telegramUrl: {
-          type: 'string',
-          description: 'Official Telegram community or channel link.',
-        },
-        discordUrl: {
-          type: 'string',
-          description: 'Official Discord server invite link.',
-        },
-        network: {
-          type: 'string',
-          description: 'Target EVM network: sepolia (testnet), ethereum (mainnet), polygon, amoy, base, base_sepolia, arbitrum, bsc',
-        },
-        privateKey: {
-          type: 'string',
-          description: 'Optional private key (0x...) of the deployer wallet to sign and broadcast on-chain.',
-        },
-        seedPhrase: {
-          type: 'string',
-          description: 'Optional BIP-39 12 or 24 word seed phrase of the deployer wallet.',
+          description: 'Primary blockchain network',
         },
       },
-      required: ['contractName'],
+    },
+  },
+  {
+    name: 'import_wallet',
+    description: 'Registers an existing non-custodial address or provisions an MPC enclave reference for multi-chain operations under the non-custodial control plane.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'string',
+          description: '0x-prefixed public address of the wallet to track and coordinate.',
+        },
+        walletName: {
+          type: 'string',
+          description: 'Optional custom label for the vault wallet.',
+        },
+        chain: {
+          type: 'string',
+          description: 'Primary network: ethereum, sepolia, base, polygon, arbitrum, bsc.',
+        },
+      },
+      required: ['address'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'string',
+          description: '0x-prefixed public address of the wallet.',
+        },
+        walletName: {
+          type: 'string',
+          description: 'Custom name for the wallet.',
+        },
+        chain: {
+          type: 'string',
+          description: 'Primary network.',
+        },
+      },
+      required: ['address'],
     },
   },
   {
     name: 'send_transfer',
-    description: 'Executes an on-chain cryptocurrency transfer from the user wallet to a recipient address. SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
+    description: 'Initiates a native or ERC-20 token transfer from the vault wallet. If the transfer is within the user-configured autonomous spending limits, signs via Turnkey MPC enclaves and broadcasts immediately. Otherwise, stages an unsigned transaction request and returns a single-use token and Passkey approval URL for human confirmation.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
         token: {
           type: 'string',
-          description: 'Token symbol to transfer (e.g. ETH, USDT, SOL)',
+          description: 'Token symbol to transfer (e.g. ETH, USDT, USDC, SOL)',
         },
         amount: {
           type: 'number',
@@ -189,19 +132,15 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         },
         recipientAddress: {
           type: 'string',
-          description: 'Destination blockchain recipient public address',
+          description: 'Destination blockchain recipient public address (0x...)',
         },
         chain: {
           type: 'string',
-          description: 'Target network id (default: active chain)',
+          description: 'Target network: sepolia, base, ethereum, polygon, arbitrum, bsc',
         },
-        privateKey: {
+        fromAddress: {
           type: 'string',
-          description: 'Optional private key (0x...) of sender wallet for on-chain signing.',
-        },
-        seedPhrase: {
-          type: 'string',
-          description: 'Optional seed phrase of sender wallet for on-chain signing.',
+          description: 'Optional sender vault address (defaults to active user vault)',
         },
       },
       required: ['token', 'amount', 'recipientAddress'],
@@ -211,7 +150,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         token: {
           type: 'string',
-          description: 'Token symbol to transfer (e.g. ETH, USDT, SOL)',
+          description: 'Token symbol to transfer (e.g. ETH, USDT, USDC, SOL)',
         },
         amount: {
           type: 'number',
@@ -223,15 +162,11 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         },
         chain: {
           type: 'string',
-          description: 'Target network id (default: active chain)',
+          description: 'Target network',
         },
-        privateKey: {
+        fromAddress: {
           type: 'string',
-          description: 'Optional private key (0x...) of sender wallet for on-chain signing.',
-        },
-        seedPhrase: {
-          type: 'string',
-          description: 'Optional seed phrase of sender wallet for on-chain signing.',
+          description: 'Optional sender vault address',
         },
       },
       required: ['token', 'amount', 'recipientAddress'],
@@ -239,22 +174,26 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'execute_swap',
-    description: 'Executes a DEX token swap or cross-chain bridge trade via 1inch/Uniswap aggregation. SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
+    description: 'Executes a DEX token swap via 1inch/Uniswap/Aerodrome router. If within autonomous spending limits, signs via MPC enclave quorum and broadcasts. Otherwise, stages an unsigned transaction request requiring Passkey confirmation.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
         fromToken: {
           type: 'string',
-          description: 'Source token symbol (e.g. ETH)',
+          description: 'Source token symbol (e.g. ETH, WETH, USDC)',
         },
         toToken: {
           type: 'string',
-          description: 'Destination token symbol (e.g. USDC)',
+          description: 'Destination token symbol (e.g. USDC, UNI, PEPE)',
         },
         amount: {
           type: 'number',
           description: 'Amount of source token to swap',
+        },
+        network: {
+          type: 'string',
+          description: 'Target EVM network: sepolia, base, ethereum, polygon, arbitrum, bsc',
         },
         slippageTolerance: {
           type: 'number',
@@ -268,19 +207,23 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         fromToken: {
           type: 'string',
-          description: 'Source token symbol (e.g. ETH)',
+          description: 'Source token symbol',
         },
         toToken: {
           type: 'string',
-          description: 'Destination token symbol (e.g. USDC)',
+          description: 'Destination token symbol',
         },
         amount: {
           type: 'number',
           description: 'Amount of source token to swap',
         },
+        network: {
+          type: 'string',
+          description: 'Target EVM network',
+        },
         slippageTolerance: {
           type: 'number',
-          description: 'Slippage percentage tolerance (default: 0.5%)',
+          description: 'Slippage percentage tolerance',
         },
       },
       required: ['fromToken', 'toToken', 'amount'],
@@ -288,37 +231,40 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'buy_tokens',
-    description: 'Buys a token on DEX (Uniswap/1inch) using ETH, USDT, or native crypto. SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
+    description: 'Buys a token on DEX using ETH, USDT, or USDC. Evaluates autonomous spending limits before triggering MPC co-signing or staging a Passkey approval request.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
-        token: { type: 'string', description: 'Token symbol or contract address to buy (e.g. FTN, WBT, USDC)' },
+        token: { type: 'string', description: 'Token symbol or contract address to buy (e.g. WBT, USDC)' },
         amount: { type: 'number', description: 'Amount of native crypto or payment token to spend' },
         fromToken: { type: 'string', description: 'Payment token symbol (default: ETH)' },
+        network: { type: 'string', description: 'Blockchain network (default: sepolia)' },
       },
       required: ['token', 'amount'],
     },
     parameters: {
       type: 'object',
       properties: {
-        token: { type: 'string', description: 'Token symbol or contract address to buy (e.g. FTN, WBT, USDC)' },
-        amount: { type: 'number', description: 'Amount of native crypto or payment token to spend' },
-        fromToken: { type: 'string', description: 'Payment token symbol (default: ETH)' },
+        token: { type: 'string', description: 'Token symbol or contract address to buy' },
+        amount: { type: 'number', description: 'Amount of payment token to spend' },
+        fromToken: { type: 'string', description: 'Payment token symbol' },
+        network: { type: 'string', description: 'Blockchain network' },
       },
       required: ['token', 'amount'],
     },
   },
   {
     name: 'sell_tokens',
-    description: 'Sells a token on DEX (Uniswap/1inch) for ETH, USDT, or native crypto. SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
+    description: 'Sells a token on DEX for ETH or stablecoins. Evaluates autonomous spending limits before triggering MPC co-signing or staging a Passkey approval request.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
         token: { type: 'string', description: 'Token symbol or contract address to sell' },
         amount: { type: 'number', description: 'Amount of token units to sell' },
         toToken: { type: 'string', description: 'Target token symbol to receive (default: ETH)' },
+        network: { type: 'string', description: 'Blockchain network (default: sepolia)' },
       },
       required: ['token', 'amount'],
     },
@@ -327,290 +273,392 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         token: { type: 'string', description: 'Token symbol or contract address to sell' },
         amount: { type: 'number', description: 'Amount of token units to sell' },
-        toToken: { type: 'string', description: 'Target token symbol to receive (default: ETH)' },
+        toToken: { type: 'string', description: 'Target token symbol to receive' },
+        network: { type: 'string', description: 'Blockchain network' },
       },
       required: ['token', 'amount'],
     },
   },
   {
-    name: 'trade_tokens',
-    description: 'Trades or swaps one cryptocurrency token for another on-chain. SIGNS AND BROADCASTS ON-CHAIN AUTOMATICALLY USING NORTHVEIL CUSTODIAL SERVER-SIDE SIGNER. DO NOT ASK THE USER FOR A PRIVATE KEY OR SEED PHRASE.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
+    name: 'deploy_smart_contract',
+    description: 'Compiles and stages a smart contract deployment payload (ERC-20, ERC-721 NFT, or custom). Produces an unsigned deployment transaction and approval request requiring Passkey confirmation.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
-        fromToken: { type: 'string', description: 'Source token symbol or address' },
-        toToken: { type: 'string', description: 'Destination token symbol or address' },
-        amount: { type: 'number', description: 'Amount of source token to trade' },
-      },
-      required: ['fromToken', 'toToken', 'amount'],
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        fromToken: { type: 'string', description: 'Source token symbol or address' },
-        toToken: { type: 'string', description: 'Destination token symbol or address' },
-        amount: { type: 'number', description: 'Amount of source token to trade' },
-      },
-      required: ['fromToken', 'toToken', 'amount'],
-    },
-  },
-  {
-    name: 'create_smart_contract',
-    description: 'Generates complete production-ready Solidity or Rust smart contract code based on a prompt and detailed specifications (name, symbol, supply, owner allocation, metadata, image URL/Base64, socials). Northveil automatically generates and hosts fallback token logos and metadata JSON on Supabase Storage and Postgres database whenever an explicit image parameter is not provided.',
-    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        prompt: {
-          type: 'string',
-          description: 'Natural language specification of contract features and design goals.',
-        },
         contractName: {
           type: 'string',
-          description: 'Name of the smart contract (e.g. WorkBaseToken, ArgusCollection).',
+          description: 'Name of the smart contract (e.g. WorkBaseToken, GalacticNFT).',
         },
         symbol: {
           type: 'string',
-          description: 'Token ticker symbol (e.g. WBT, ARG). Recommended 3-5 uppercase characters.',
+          description: 'Token ticker symbol (e.g. WBT, ARG). Recommended: 3-5 uppercase characters.',
         },
         contractType: {
           type: 'string',
-          description: 'Template category (erc20, erc721, nft, erc1155, staking, dao, custom)',
+          description: 'Template category: erc20, erc721, nft, erc1155, staking, dao, custom',
           enum: ['erc20', 'erc721', 'nft', 'erc1155', 'staking', 'dao', 'custom'],
         },
         totalSupply: {
           type: 'number',
           description: 'Total token supply (e.g. 1000000000) or total max NFT collection size (e.g. 10000).',
         },
+        initialSupply: {
+          type: 'number',
+          description: 'Alias for totalSupply.',
+        },
         ownerAllocation: {
           type: 'number',
-          description: 'Amount or percentage allocated to owner wallet at deployment (e.g. 800000000 for 80% owner allocation).',
+          description: 'Amount allocated directly to owner wallet at deployment.',
         },
         description: {
           type: 'string',
-          description: 'Project description, tokenomics summary, or roadmap notes.',
+          description: 'Project description, utility details, or token roadmap summary.',
         },
         imageUrl: {
           type: 'string',
-          description: 'Token logo or NFT collection image URL (Supabase/IPFS/HTTP link).',
+          description: 'Optional token logo or NFT collection cover image URL.',
         },
-        imageBase64: {
+        network: {
           type: 'string',
-          description: 'Raw base64-encoded image string (data:image/png;base64,... or raw base64). Uploaded directly to Supabase Storage.',
-        },
-        websiteUrl: {
-          type: 'string',
-          description: 'Official project website URL.',
-        },
-        twitterUrl: {
-          type: 'string',
-          description: 'Official Twitter/X social link.',
-        },
-        telegramUrl: {
-          type: 'string',
-          description: 'Official Telegram group/channel link.',
-        },
-        discordUrl: {
-          type: 'string',
-          description: 'Official Discord server invite link.',
+          description: 'Target EVM network: sepolia, ethereum, base, polygon, arbitrum, bsc',
         },
       },
-      required: ['prompt'],
+      required: ['contractName'],
     },
     parameters: {
       type: 'object',
       properties: {
-        prompt: {
-          type: 'string',
-          description: 'Natural language specification of contract features and design goals.',
-        },
         contractName: {
           type: 'string',
-          description: 'Name of the smart contract (e.g. WorkBaseToken, ArgusCollection).',
+          description: 'Name of the smart contract.',
         },
         symbol: {
           type: 'string',
-          description: 'Token ticker symbol (e.g. WBT, ARG). Recommended 3-5 uppercase characters.',
+          description: 'Token ticker symbol.',
         },
         contractType: {
           type: 'string',
-          description: 'Template category (erc20, erc721, nft, erc1155, staking, dao, custom)',
+          description: 'Template category.',
           enum: ['erc20', 'erc721', 'nft', 'erc1155', 'staking', 'dao', 'custom'],
         },
         totalSupply: {
           type: 'number',
-          description: 'Total token supply (e.g. 1000000000) or total max NFT collection size (e.g. 10000).',
+          description: 'Total token supply.',
+        },
+        initialSupply: {
+          type: 'number',
+          description: 'Alias for totalSupply.',
         },
         ownerAllocation: {
           type: 'number',
-          description: 'Amount or percentage allocated to owner wallet at deployment (e.g. 800000000 for 80% owner allocation).',
+          description: 'Owner allocation.',
         },
         description: {
           type: 'string',
-          description: 'Project description, tokenomics summary, or roadmap notes.',
+          description: 'Project description.',
         },
         imageUrl: {
           type: 'string',
-          description: 'Token logo or NFT collection image URL (Supabase/IPFS/HTTP link).',
+          description: 'Token logo or NFT cover image URL.',
         },
-        websiteUrl: {
+        network: {
           type: 'string',
-          description: 'Official project website URL.',
-        },
-        twitterUrl: {
-          type: 'string',
-          description: 'Official Twitter/X social link.',
-        },
-        telegramUrl: {
-          type: 'string',
-          description: 'Official Telegram group/channel link.',
-        },
-        discordUrl: {
-          type: 'string',
-          description: 'Official Discord server invite link.',
+          description: 'Target EVM network.',
         },
       },
-      required: ['prompt'],
+      required: ['contractName'],
     },
   },
   {
-    name: 'upload_contract_asset',
-    description: 'Uploads a token logo or NFT collection image asset (via base64 encoded image string, file payload, or SVG string) to Supabase Storage and returns a permanent public Supabase CDN URL.',
-    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
+    name: 'mint_tokens',
+    description: 'Mints new tokens from a deployed ERC-20 contract where the user vault is the owner/minter. Signs via MPC and waits for on-chain block receipt confirmation before returning success.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
-        fileBase64: {
-          type: 'string',
-          description: 'Base64 encoded file string (e.g. data:image/png;base64,... or raw base64 data).',
-        },
-        fileName: {
-          type: 'string',
-          description: 'Target file name (e.g. "nerd_logo.png", "token_icon.svg").',
-        },
-        contentType: {
-          type: 'string',
-          description: 'MIME type of the uploaded file (e.g. "image/png", "image/jpeg", "image/svg+xml").',
-        },
-        contractSymbol: {
-          type: 'string',
-          description: 'Associated contract ticker symbol (e.g. NRD).',
-        },
+        contractAddress: { type: 'string', description: '0x-prefixed address of the deployed ERC-20 contract with a mint function' },
+        recipientAddress: { type: 'string', description: '0x-prefixed address to receive the minted tokens (defaults to vault address if omitted)' },
+        amount: { type: 'string', description: 'Amount of tokens to mint in human-readable units (e.g. "1000000")' },
+        network: { type: 'string', description: 'Target blockchain: sepolia, base, ethereum, polygon, arbitrum, bsc' },
       },
-      required: ['fileBase64'],
+      required: ['contractAddress', 'amount'],
     },
     parameters: {
       type: 'object',
       properties: {
-        fileBase64: {
-          type: 'string',
-          description: 'Base64 encoded file string (e.g. data:image/png;base64,... or raw base64 data).',
-        },
-        fileName: {
-          type: 'string',
-          description: 'Target file name (e.g. "nerd_logo.png", "token_icon.svg").',
-        },
-        contentType: {
-          type: 'string',
-          description: 'MIME type of the uploaded file (e.g. "image/png", "image/jpeg", "image/svg+xml").',
-        },
-        contractSymbol: {
-          type: 'string',
-          description: 'Associated contract ticker symbol (e.g. NRD).',
-        },
+        contractAddress: { type: 'string', description: 'ERC-20 contract address' },
+        recipientAddress: { type: 'string', description: 'Recipient address for minted tokens' },
+        amount: { type: 'string', description: 'Amount to mint in human-readable units' },
+        network: { type: 'string', description: 'Target network' },
       },
-      required: ['fileBase64'],
+      required: ['contractAddress', 'amount'],
     },
   },
   {
-    name: 'create_wallet',
-    description: 'Generates a new Ethereum wallet with a real private key and BIP-39 seed phrase. The wallet is stored in the Northveil database and ready for on-chain transactions. Returns the wallet address, private key, and seed phrase. The user MUST back up the seed phrase.',
+    name: 'create_transaction_request',
+    description: 'Prepares an unsigned transaction request, calculates gas fees & total cost, generates a single-use approval token and WebAuthn Passkey challenge. Returns an approval URL for human confirmation.',
     annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
-        name: {
+        recipient: {
           type: 'string',
-          description: 'Human-readable name for the wallet (e.g. "Main Trading Vault", "DeFi Wallet")',
+          description: 'Recipient EVM 0x wallet address or contract address',
         },
-        chain: {
+        amount: {
           type: 'string',
-          description: 'Primary blockchain network (default: ethereum). Options: ethereum, polygon, base, arbitrum, bsc',
+          description: 'Amount to send (e.g. 0.05)',
+        },
+        asset: {
+          type: 'string',
+          description: 'Asset symbol (e.g. ETH, USDC, WBT)',
+        },
+        network: {
+          type: 'string',
+          description: 'Target EVM network (e.g. sepolia, base, ethereum, polygon)',
+        },
+        contractSummary: {
+          type: 'string',
+          description: 'Summary of the transaction or contract call',
         },
       },
+      required: ['recipient', 'amount'],
     },
     parameters: {
       type: 'object',
       properties: {
-        name: {
+        recipient: {
           type: 'string',
-          description: 'Human-readable name for the wallet (e.g. "Main Trading Vault", "DeFi Wallet")',
+          description: 'Recipient EVM 0x wallet address or contract address',
         },
-        chain: {
+        amount: {
           type: 'string',
-          description: 'Primary blockchain network (default: ethereum). Options: ethereum, polygon, base, arbitrum, bsc',
+          description: 'Amount to send',
+        },
+        asset: {
+          type: 'string',
+          description: 'Asset symbol',
+        },
+        network: {
+          type: 'string',
+          description: 'Target EVM network',
+        },
+        contractSummary: {
+          type: 'string',
+          description: 'Summary of the transaction',
         },
       },
+      required: ['recipient', 'amount'],
     },
   },
   {
-    name: 'import_wallet',
-    description: 'Imports an existing Ethereum wallet using a private key or BIP-39 seed phrase. The wallet is stored in the Northveil database for future on-chain transactions (transfers, deployments, swaps).',
+    name: 'approve_transaction',
+    description: 'Submits a client-side WebAuthn Passkey signature to validate a single-use approval token. Authorizes the Turnkey MPC hardware enclave quorum to co-sign, broadcasts on-chain, and waits for confirmed block receipt.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        approvalToken: {
+          type: 'string',
+          description: 'Single-use transaction approval token generated by create_transaction_request',
+        },
+        passkeyAssertion: {
+          type: 'object',
+          description: 'Optional WebAuthn authentication response from client passkey prompt',
+          properties: {
+            credentialId: { type: 'string' },
+            clientDataJSON: { type: 'string' },
+            authenticatorData: { type: 'string' },
+            signature: { type: 'string' },
+          },
+        },
+      },
+      required: ['approvalToken'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        approvalToken: {
+          type: 'string',
+          description: 'Single-use transaction approval token',
+        },
+      },
+      required: ['approvalToken'],
+    },
+  },
+  {
+    name: 'reject_transaction',
+    description: 'Rejects a pending transaction request and immediately invalidates its single-use approval token.',
     annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
-        privateKey: {
+        approvalToken: {
           type: 'string',
-          description: 'The wallet private key (0x... hex string). Either privateKey or seedPhrase is required.',
-        },
-        seedPhrase: {
-          type: 'string',
-          description: 'BIP-39 mnemonic seed phrase (12 or 24 words). Either privateKey or seedPhrase is required.',
-        },
-        name: {
-          type: 'string',
-          description: 'Human-readable name for the imported wallet (e.g. "My MetaMask Wallet")',
-        },
-        chain: {
-          type: 'string',
-          description: 'Primary blockchain network (default: ethereum). Options: ethereum, polygon, base, arbitrum, bsc',
+          description: 'Approval token of the transaction request to reject',
         },
       },
+      required: ['approvalToken'],
     },
     parameters: {
       type: 'object',
       properties: {
-        privateKey: {
+        approvalToken: {
           type: 'string',
-          description: 'The wallet private key (0x... hex string). Either privateKey or seedPhrase is required.',
-        },
-        seedPhrase: {
-          type: 'string',
-          description: 'BIP-39 mnemonic seed phrase (12 or 24 words). Either privateKey or seedPhrase is required.',
-        },
-        name: {
-          type: 'string',
-          description: 'Human-readable name for the imported wallet (e.g. "My MetaMask Wallet")',
-        },
-        chain: {
-          type: 'string',
-          description: 'Primary blockchain network (default: ethereum). Options: ethereum, polygon, base, arbitrum, bsc',
+          description: 'Approval token of the transaction request to reject',
         },
       },
+      required: ['approvalToken'],
+    },
+  },
+  {
+    name: 'get_transaction_status',
+    description: 'Polls the status of an asynchronous transaction request (pending_approval, approved, signing, broadcasted, confirmed, rejected, failed, expired). Returns confirmed on-chain block receipt details when complete.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        requestId: {
+          type: 'string',
+          description: 'Unique transaction request ID (req_...) or approval token (tok_...)',
+        },
+      },
+      required: ['requestId'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        requestId: {
+          type: 'string',
+          description: 'Unique transaction request ID or approval token',
+        },
+      },
+      required: ['requestId'],
+    },
+  },
+  {
+    name: 'set_autonomous_scope',
+    description: 'Grants or updates a scoped, revocable autonomous spending policy for AI agent operations without requiring Passkey taps for every micro-transaction. Enforces per-tx limits, rolling daily budget, allowed chains, and asset whitelists.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Vault address to apply policy to',
+        },
+        maxAmountPerTxUsd: {
+          type: 'number',
+          description: 'Maximum USD value allowed for a single autonomous transaction (e.g. 25.0)',
+        },
+        maxDailyBudgetUsd: {
+          type: 'number',
+          description: 'Maximum cumulative USD spend allowed in 24 hours (e.g. 100.0)',
+        },
+        allowedChains: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of allowed network names or chain IDs (e.g. ["base", "sepolia", "arbitrum"])',
+        },
+        allowedAssets: {
+          type: 'string',
+          description: 'Asset symbol whitelist or "ANY" (default: "ANY")',
+        },
+        durationDays: {
+          type: 'number',
+          description: 'Validity duration in days before automatic expiry (default: 30)',
+        },
+      },
+      required: ['walletAddress', 'maxAmountPerTxUsd', 'maxDailyBudgetUsd'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Vault address',
+        },
+        maxAmountPerTxUsd: {
+          type: 'number',
+          description: 'Max USD per transaction',
+        },
+        maxDailyBudgetUsd: {
+          type: 'number',
+          description: 'Max USD daily budget',
+        },
+      },
+      required: ['walletAddress', 'maxAmountPerTxUsd', 'maxDailyBudgetUsd'],
+    },
+  },
+  {
+    name: 'activate_kill_switch',
+    description: 'Emergency security lockout: Instantly revokes all active autonomous spending scopes, voids outstanding approval tokens, and locks the vault against automated fund movement without requiring key rotation.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Vault address to lock immediately',
+        },
+        reason: {
+          type: 'string',
+          description: 'Reason for invoking emergency kill switch',
+        },
+      },
+      required: ['walletAddress'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Vault address to lock',
+        },
+        reason: {
+          type: 'string',
+          description: 'Reason for emergency lockout',
+        },
+      },
+      required: ['walletAddress'],
+    },
+  },
+  {
+    name: 'deactivate_kill_switch',
+    description: 'Unlocks a previously kill-switched vault after security review, restoring regular Passkey-gated transaction processing.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Vault address to unlock',
+        },
+      },
+      required: ['walletAddress'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Vault address to unlock',
+        },
+      },
+      required: ['walletAddress'],
     },
   },
   {
     name: 'get_wallet_info',
-    description: 'Retrieves current wallet address, active chain, network status, and account metadata.',
+    description: 'Retrieves current vault address, active chain, MPC provider status, and account metadata.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
         chain: {
           type: 'string',
-          description: 'Optional chain filter (ethereum, solana, bitcoin, polygon, arbitrum, bsc, avalanche, optimism)',
+          description: 'Optional chain filter (ethereum, solana, bitcoin, polygon, arbitrum, bsc, base)',
         },
       },
     },
@@ -619,14 +667,14 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         chain: {
           type: 'string',
-          description: 'Optional chain filter (ethereum, solana, bitcoin, polygon, arbitrum, bsc, avalanche, optimism)',
+          description: 'Optional chain filter',
         },
       },
     },
   },
   {
     name: 'get_portfolio',
-    description: 'Fetches the complete asset portfolio including token balances, fiat USD valuations, 24h price changes, and net worth.',
+    description: 'Fetches the complete asset portfolio including token balances, fiat USD valuations, 24h price changes, and net worth across EVM and Solana chains.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
@@ -666,7 +714,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         symbol: {
           type: 'string',
-          description: 'Token ticker symbol (e.g. ETH, USDT, SOL, BTC, UNI, LINK)',
+          description: 'Token ticker symbol',
         },
       },
       required: ['symbol'],
@@ -674,7 +722,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'get_transaction_history',
-    description: 'Retrieves audit logs of past wallet transactions, swaps, sends, and contract executions.',
+    description: 'Retrieves on-chain verified transaction history, filtering and checking on-chain receipts (status: 1) for accurate audit reporting.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
@@ -685,7 +733,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         },
         type: {
           type: 'string',
-          description: 'Filter transaction type (send, receive, swap, stake)',
+          description: 'Filter transaction type (send, receive, swap, stake, deploy)',
         },
       },
     },
@@ -694,18 +742,18 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         limit: {
           type: 'number',
-          description: 'Maximum number of transaction records to return (default 10)',
+          description: 'Maximum number of transaction records to return',
         },
         type: {
           type: 'string',
-          description: 'Filter transaction type (send, receive, swap, stake)',
+          description: 'Filter transaction type',
         },
       },
     },
   },
   {
     name: 'get_gas_estimate',
-    description: 'Fetches real-time base fee, priority fee, and EIP-1559 gas price estimates across all 8 supported chains.',
+    description: 'Fetches real-time base fee, priority fee, and EIP-1559 gas price estimates across all supported chains.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
@@ -752,177 +800,8 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     },
   },
   {
-    name: 'create_wallet',
-    description: 'Generates a new multi-chain custodial wallet with an AES-256-GCM encrypted seed phrase. Plaintext seed phrase is returned once for backup and securely erased from server memory.',
-    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        walletName: {
-          type: 'string',
-          description: 'Label/name for the new custodial wallet (e.g. Primary Treasury Wallet)',
-        },
-      },
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        walletName: {
-          type: 'string',
-          description: 'Label/name for the new custodial wallet',
-        },
-      },
-    },
-  },
-  {
-    name: 'import_wallet',
-    description: 'Imports an existing wallet using a Private Key or Seed Phrase (Mnemonic). Immediately encrypts the credential with AES-256-GCM and erases plaintext from server memory.',
-    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        privateKey: {
-          type: 'string',
-          description: '0x-prefixed private key to import',
-        },
-        seedPhrase: {
-          type: 'string',
-          description: '12 or 24 word mnemonic seed phrase to import',
-        },
-        walletName: {
-          type: 'string',
-          description: 'Optional custom name for the imported wallet',
-        },
-      },
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        privateKey: {
-          type: 'string',
-          description: '0x-prefixed private key to import',
-        },
-        seedPhrase: {
-          type: 'string',
-          description: '12 or 24 word mnemonic seed phrase to import',
-        },
-        walletName: {
-          type: 'string',
-          description: 'Optional custom name for the imported wallet',
-        },
-      },
-    },
-  },
-  {
-    name: 'create_transaction_request',
-    description: 'Prepares an unsigned EVM transaction request, calculates gas fees & total cost, and generates a single-use approval token. Requires explicit user confirmation before signing.',
-    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        recipient: {
-          type: 'string',
-          description: 'Recipient EVM 0x wallet address or contract address',
-        },
-        amount: {
-          type: 'string',
-          description: 'Amount to send (e.g. 0.05)',
-        },
-        asset: {
-          type: 'string',
-          description: 'Asset symbol (e.g. ETH, USDC, WBT)',
-        },
-        network: {
-          type: 'string',
-          description: 'Target EVM network (e.g. sepolia, ethereum, base, polygon)',
-        },
-        contractSummary: {
-          type: 'string',
-          description: 'Summary of the transaction or contract call',
-        },
-      },
-      required: ['recipient', 'amount'],
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        recipient: {
-          type: 'string',
-          description: 'Recipient EVM 0x wallet address or contract address',
-        },
-        amount: {
-          type: 'string',
-          description: 'Amount to send',
-        },
-        asset: {
-          type: 'string',
-          description: 'Asset symbol',
-        },
-        network: {
-          type: 'string',
-          description: 'Target EVM network',
-        },
-        contractSummary: {
-          type: 'string',
-          description: 'Summary of the transaction',
-        },
-      },
-      required: ['recipient', 'amount'],
-    },
-  },
-  {
-    name: 'approve_transaction',
-    description: 'Validates a single-use approval token, decrypts the custodial wallet credential in memory, signs the approved transaction, erases keys, and broadcasts live on-chain.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        approvalToken: {
-          type: 'string',
-          description: 'Single-use transaction approval token generated by create_transaction_request',
-        },
-      },
-      required: ['approvalToken'],
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        approvalToken: {
-          type: 'string',
-          description: 'Single-use transaction approval token',
-        },
-      },
-      required: ['approvalToken'],
-    },
-  },
-  {
-    name: 'reject_transaction',
-    description: 'Rejects a pending transaction request and immediately invalidates its single-use approval token.',
-    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        approvalToken: {
-          type: 'string',
-          description: 'Approval token of the transaction request to reject',
-        },
-      },
-      required: ['approvalToken'],
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        approvalToken: {
-          type: 'string',
-          description: 'Approval token of the transaction request to reject',
-        },
-      },
-      required: ['approvalToken'],
-    },
-  },
-  {
     name: 'get_nft_gallery',
-    description: 'Queries 36+ EVM & multi-chain blockchains directly to fetch all on-chain NFT assets (ERC-721 & ERC-1155), collections, token IDs, metadata images, and contract balances for the user wallet.',
+    description: 'Queries multi-chain blockchains to fetch all on-chain NFT assets (ERC-721 & ERC-1155), collections, metadata images, and contract balances.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
@@ -937,7 +816,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         },
         chain: {
           type: 'string',
-          description: 'Optional blockchain filter or "all" to scan all 36+ supported EVM networks.',
+          description: 'Optional blockchain filter (sepolia, ethereum, base, polygon, arbitrum).',
         },
       },
     },
@@ -946,29 +825,29 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         walletAddress: {
           type: 'string',
-          description: 'Optional target wallet public address to query NFTs for.',
+          description: 'Optional target wallet public address.',
         },
         contractAddress: {
           type: 'string',
-          description: 'Optional NFT contract address to check specific collection balances.',
+          description: 'Optional NFT contract address.',
         },
         chain: {
           type: 'string',
-          description: 'Optional blockchain filter or "all" to scan all 36+ supported EVM networks.',
+          description: 'Optional blockchain filter.',
         },
       },
     },
   },
   {
     name: 'get_realtime_prices',
-    description: 'Fetches real-time live market prices, 24h/7d price changes, market cap, and 24h volume for any cryptocurrency token or meme coin across ALL blockchains (Ethereum, Solana, BSC, Polygon, Base, Arbitrum, etc). Accepts token symbols or contract addresses. Data sourced from CoinPaprika, CoinGecko, and DexScreener live feeds.',
+    description: 'Fetches real-time live market prices, 24h price changes, market cap, and volume for cryptocurrency tokens.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
-        symbols: { type: 'string', description: 'Comma-separated token symbols (e.g. "ETH,BTC,SOL,PEPE,DOGE,SHIB,WIF,BONK")' },
-        contractAddresses: { type: 'string', description: 'Comma-separated contract addresses to look up on DexScreener (e.g. "0x6982508145454Ce325dDbE47a25d4ec3d2311933")' },
-        chain: { type: 'string', description: 'Optional chain filter (ethereum, solana, bsc, polygon, base, arbitrum, avalanche, all). Default: all' },
+        symbols: { type: 'string', description: 'Comma-separated token symbols (e.g. "ETH,BTC,SOL,PEPE,DOGE")' },
+        contractAddresses: { type: 'string', description: 'Comma-separated contract addresses' },
+        chain: { type: 'string', description: 'Optional chain filter (default: all)' },
       },
     },
     parameters: {
@@ -982,14 +861,14 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'get_trending_memecoins',
-    description: 'Discovers and lists currently trending meme coins across multiple blockchains (Ethereum, Solana, BSC, Base, Arbitrum) with real-time prices, liquidity, volume, price changes (5m/1h/6h/24h), and automated GoPlus security audit scores (honeypot detection, rug-pull risk, tax analysis). Returns top trending tokens sorted by momentum.',
+    description: 'Discovers and lists currently trending meme coins across blockchains with real-time prices, liquidity, volume, and GoPlus security audit scores.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
-        chain: { type: 'string', description: 'Filter by blockchain: ethereum, solana, bsc, base, arbitrum, polygon, or "all" (default: all)' },
-        limit: { type: 'number', description: 'Max number of trending tokens to return (default: 20, max: 50)' },
-        minLiquidity: { type: 'number', description: 'Minimum USD liquidity threshold to filter out micro-caps (default: 10000)' },
+        chain: { type: 'string', description: 'Filter by blockchain: ethereum, solana, bsc, base, arbitrum, polygon, or "all"' },
+        limit: { type: 'number', description: 'Max number of trending tokens to return (default: 20)' },
+        minLiquidity: { type: 'number', description: 'Minimum USD liquidity threshold (default: 10000)' },
       },
     },
     parameters: {
@@ -1003,13 +882,13 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'audit_token',
-    description: 'Performs a deep on-chain security audit of any token contract address using GoPlus Security API. Returns: honeypot status, buy/sell tax rates, hidden owner detection, proxy contract check, mint function risk, blacklist capability, LP lock status, holder concentration, and overall risk score. Works on Ethereum, BSC, Polygon, Base, Arbitrum, Solana.',
+    description: 'Performs deep on-chain security audit of any token contract address using GoPlus Security API with explicit chain resolution.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
-        contractAddress: { type: 'string', description: 'Token contract address to audit (e.g. 0x6982508145454Ce325dDbE47a25d4ec3d2311933 for PEPE)' },
-        chain: { type: 'string', description: 'Blockchain network: ethereum (default), bsc, polygon, base, arbitrum, solana, avalanche' },
+        contractAddress: { type: 'string', description: 'Token contract address to audit' },
+        chain: { type: 'string', description: 'Blockchain network: sepolia, ethereum, bsc, polygon, base, arbitrum, solana' },
       },
       required: ['contractAddress'],
     },
@@ -1024,16 +903,16 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'set_trade_order',
-    description: 'Sets a stop-loss or take-profit price trigger order on a token. When the real-time market price crosses the trigger threshold, the order auto-executes a swap on-chain via DEX aggregator. Monitors prices every 30 seconds. Works on EVM chains and Solana.',
-    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
+    description: 'Configures an automated stop-loss or take-profit price trigger order. Automatically registers a scoped autonomous spending allowance to execute the swap when market threshold is crossed.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
-        token: { type: 'string', description: 'Token symbol or contract address (e.g. ETH, PEPE, 0x6982...)' },
-        orderType: { type: 'string', description: 'Order type: "stop_loss" (sell when price drops to target) or "take_profit" (sell when price rises to target)', enum: ['stop_loss', 'take_profit'] },
+        token: { type: 'string', description: 'Token symbol or contract address (e.g. ETH, PEPE)' },
+        orderType: { type: 'string', description: 'Order type: "stop_loss" or "take_profit"', enum: ['stop_loss', 'take_profit'] },
         triggerPrice: { type: 'number', description: 'USD price that triggers the order execution' },
         amount: { type: 'number', description: 'Amount of tokens to sell when triggered' },
-        chain: { type: 'string', description: 'Blockchain: ethereum, solana, bsc, polygon, base, arbitrum (default: ethereum)' },
+        chain: { type: 'string', description: 'Blockchain: sepolia, base, ethereum, polygon, arbitrum (default: sepolia)' },
       },
       required: ['token', 'orderType', 'triggerPrice', 'amount'],
     },
@@ -1051,12 +930,12 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'get_active_orders',
-    description: 'Lists all active stop-loss and take-profit trade orders for the wallet, including current price vs trigger price, order status, and estimated P&L.',
+    description: 'Lists all active stop-loss and take-profit trade orders and their autonomous execution scopes.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
-        status: { type: 'string', description: 'Filter by status: ACTIVE, EXECUTED, CANCELLED, FAILED, or "all" (default: ACTIVE)' },
+        status: { type: 'string', description: 'Filter by status: ACTIVE, EXECUTED, CANCELLED, FAILED, or "all"' },
       },
     },
     parameters: {
@@ -1068,7 +947,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'cancel_trade_order',
-    description: 'Cancels an active stop-loss or take-profit trade order by its order ID. The order will stop monitoring prices and will NOT execute.',
+    description: 'Cancels an active stop-loss or take-profit trade order and revokes its autonomous spending allowance.',
     annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
@@ -1087,12 +966,12 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'check_wallet_health',
-    description: 'Performs a comprehensive wallet health check: multi-chain balance overview, gas reserve warnings, token diversity score, dust token detection, portfolio concentration risk, and overall health score (0-100). Scans EVM chains + Solana.',
+    description: 'Performs a comprehensive wallet health check: multi-chain balance overview, gas reserves, token diversity, and portfolio security.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
-        walletAddress: { type: 'string', description: 'Optional wallet address to check (defaults to connected wallet)' },
+        walletAddress: { type: 'string', description: 'Optional wallet address to check' },
       },
     },
     parameters: {
@@ -1104,18 +983,15 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'verify_smart_contract',
-    description: 'Verifies and publishes smart contract source code on block explorers (Etherscan, Sepolia Etherscan, Basescan, Polygonscan, Arbiscan, Bscscan, Sourcify, and Blockscout). Submits verified source code, compiler settings, constructor arguments, and generates official green checkmark verified badge on block explorers.',
+    description: 'Verifies smart contract source code on block explorers (Etherscan, Sepolia Etherscan, Basescan, Polygonscan). Requires ETHERSCAN_API_KEY.',
     annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
-        contractAddress: { type: 'string', description: '0x-prefixed contract address to verify (e.g. 0xdAC17F958D2ee523a2206206994597C13D831ec7)' },
-        contractName: { type: 'string', description: 'Name of the smart contract (e.g. WorkBaseToken, GalacticNFT)' },
-        sourceCode: { type: 'string', description: 'Solidity smart contract source code string. If omitted, Northveil automatically retrieves source code from the database.' },
-        network: { type: 'string', description: 'Blockchain network: sepolia (default), ethereum, base, polygon, arbitrum, bsc' },
-        compilerVersion: { type: 'string', description: 'Solidity compiler version (default: v0.8.24+commit.e11b9ed9)' },
-        optimizationUsed: { type: 'boolean', description: 'Whether compiler optimization was enabled (default: true)' },
-        runs: { type: 'number', description: 'Optimization runs count (default: 200)' },
+        contractAddress: { type: 'string', description: '0x-prefixed contract address to verify' },
+        contractName: { type: 'string', description: 'Name of the smart contract' },
+        sourceCode: { type: 'string', description: 'Solidity smart contract source code' },
+        network: { type: 'string', description: 'Blockchain network: sepolia, ethereum, base, polygon, arbitrum' },
       },
       required: ['contractAddress', 'contractName'],
     },
@@ -1124,230 +1000,55 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         contractAddress: { type: 'string', description: 'Contract address to verify' },
         contractName: { type: 'string', description: 'Contract name' },
-        sourceCode: { type: 'string', description: 'Solidity source code string' },
+        sourceCode: { type: 'string', description: 'Solidity source code' },
         network: { type: 'string', description: 'Target network' },
-        compilerVersion: { type: 'string', description: 'Solidity compiler version' },
-        optimizationUsed: { type: 'boolean', description: 'Compiler optimization enabled' },
-        runs: { type: 'number', description: 'Optimization runs count' },
       },
       required: ['contractAddress', 'contractName'],
     },
   },
   {
-    name: 'mint_tokens',
-    description: 'Mints new tokens from a deployed ERC-20 contract where the connected wallet is the contract owner or has minter role. Calls the contract\'s mint(address,uint256) function on-chain. Signs and broadcasts via Northveil custodial signer.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
+    name: 'create_smart_contract',
+    description: 'Generates complete production-ready Solidity smart contract code based on user prompt and specifications.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
-        contractAddress: { type: 'string', description: '0x-prefixed address of the deployed ERC-20 contract with a mint function' },
-        recipientAddress: { type: 'string', description: '0x-prefixed address to receive the minted tokens (defaults to wallet address if omitted)' },
-        amount: { type: 'string', description: 'Amount of tokens to mint (in human-readable units, e.g. "1000000" for 1M tokens)' },
-        network: { type: 'string', description: 'Target blockchain: sepolia (default), ethereum, base, polygon, arbitrum, bsc' },
+        prompt: { type: 'string', description: 'Natural language specification of contract features' },
+        contractName: { type: 'string', description: 'Name of the smart contract' },
+        symbol: { type: 'string', description: 'Token ticker symbol' },
+        contractType: { type: 'string', description: 'Template category (erc20, erc721, nft, custom)' },
+        totalSupply: { type: 'number', description: 'Total token supply' },
       },
-      required: ['contractAddress', 'amount'],
+      required: ['prompt'],
     },
     parameters: {
       type: 'object',
       properties: {
-        contractAddress: { type: 'string', description: 'ERC-20 contract address' },
-        recipientAddress: { type: 'string', description: 'Recipient address for minted tokens' },
-        amount: { type: 'string', description: 'Amount to mint in human-readable units' },
-        network: { type: 'string', description: 'Target network' },
+        prompt: { type: 'string', description: 'Natural language specification' },
+        contractName: { type: 'string', description: 'Contract name' },
+        symbol: { type: 'string', description: 'Token symbol' },
       },
-      required: ['contractAddress', 'amount'],
+      required: ['prompt'],
     },
   },
   {
-    name: 'reserve_tokens',
-    description: 'Creates a time-locked token reservation. Transfers tokens from the wallet into escrow and records a reservation in Northveil\'s database with an unlock date. Tokens can be claimed by the recipient after the unlock date. Useful for vesting schedules, team allocations, and investor lockups.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
+    name: 'upload_contract_asset',
+    description: 'Uploads a token logo or NFT collection image asset to Supabase Storage and returns a public CDN URL.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
-        contractAddress: { type: 'string', description: '0x-prefixed ERC-20 token contract address' },
-        recipientAddress: { type: 'string', description: '0x-prefixed address that can claim tokens after unlock' },
-        amount: { type: 'string', description: 'Amount of tokens to reserve (human-readable units)' },
-        unlockDate: { type: 'string', description: 'ISO 8601 date/time when tokens become claimable (e.g. "2026-12-31T00:00:00Z")' },
-        label: { type: 'string', description: 'Optional human-readable label for this reservation (e.g. "Team Vesting Q1", "Investor Lockup")' },
-        network: { type: 'string', description: 'Target blockchain: sepolia (default), ethereum, base, polygon, arbitrum, bsc' },
+        fileBase64: { type: 'string', description: 'Base64 encoded file string' },
+        fileName: { type: 'string', description: 'Target file name' },
       },
-      required: ['contractAddress', 'recipientAddress', 'amount', 'unlockDate'],
+      required: ['fileBase64'],
     },
     parameters: {
       type: 'object',
       properties: {
-        contractAddress: { type: 'string', description: 'ERC-20 contract address' },
-        recipientAddress: { type: 'string', description: 'Recipient address' },
-        amount: { type: 'string', description: 'Amount to reserve' },
-        unlockDate: { type: 'string', description: 'Unlock date (ISO 8601)' },
-        label: { type: 'string', description: 'Reservation label' },
-        network: { type: 'string', description: 'Target network' },
+        fileBase64: { type: 'string', description: 'Base64 encoded file string' },
       },
-      required: ['contractAddress', 'recipientAddress', 'amount', 'unlockDate'],
-    },
-  },
-  {
-    name: 'make_reservation',
-    description: 'Creates a real-world web3 reservation & booking ticket for flights, movie tickets, hotel rooms, concert/event passes, dining, or rentals paid with crypto. Generates an official digital booking pass, ticket ID, confirmation QR code payload, and settles payment via connected wallet.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        category: { type: 'string', description: 'Category: flight, movie, hotel, event, dining, rental, or custom', enum: ['flight', 'movie', 'hotel', 'event', 'dining', 'rental', 'custom'] },
-        title: { type: 'string', description: 'Reservation title (e.g. "Flight BA-204: London -> New York", "Movie: Dune 3 IMAX", "Grand Hyatt Suite")' },
-        bookingDate: { type: 'string', description: 'Date of flight/event/check-in (e.g. "2026-09-20")' },
-        bookingTime: { type: 'string', description: 'Time of flight/movie/reservation (e.g. "18:45 UTC")' },
-        quantity: { type: 'number', description: 'Number of seats, tickets, guests, or rooms (default: 1)' },
-        seatDetails: { type: 'string', description: 'Optional seat allocation, room number, or section (e.g. "Seat 14C", "VIP Row A", "Suite 502")' },
-        priceAmount: { type: 'string', description: 'Crypto price amount (e.g. "0.05", "120")' },
-        currency: { type: 'string', description: 'Crypto asset symbol for payment: ETH (default), USDC, USDT, SOL' },
-        customerName: { type: 'string', description: 'Passenger, guest, or ticket holder full name' },
-        network: { type: 'string', description: 'Target blockchain network: sepolia (default), ethereum, base, polygon, arbitrum, bsc' },
-      },
-      required: ['category', 'title', 'bookingDate', 'priceAmount'],
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        category: { type: 'string', description: 'Category of reservation' },
-        title: { type: 'string', description: 'Reservation title' },
-        bookingDate: { type: 'string', description: 'Booking date' },
-        bookingTime: { type: 'string', description: 'Booking time' },
-        quantity: { type: 'number', description: 'Quantity of seats/tickets' },
-        seatDetails: { type: 'string', description: 'Seat allocation or room details' },
-        priceAmount: { type: 'string', description: 'Price in crypto' },
-        currency: { type: 'string', description: 'Payment asset symbol' },
-        customerName: { type: 'string', description: 'Guest name' },
-        network: { type: 'string', description: 'Target network' },
-      },
-      required: ['category', 'title', 'bookingDate', 'priceAmount'],
-    },
-  },
-  {
-    name: 'list_reservations',
-    description: 'Retrieves all active web3 reservations, flight boarding passes, movie tickets, and hotel bookings associated with the wallet address.',
-    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        walletAddress: { type: 'string', description: 'Optional wallet address to filter reservations' },
-        category: { type: 'string', description: 'Optional filter by category: flight, movie, hotel, event, dining, rental' },
-      },
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        walletAddress: { type: 'string', description: 'Wallet address' },
-        category: { type: 'string', description: 'Category filter' },
-      },
-    },
-  },
-  {
-    name: 'search_flights',
-    description: 'Searches live international flight routes between global IATA airport codes (e.g. LHR, JFK, LAX, HND, DXB, CDG, SIN). Returns available airlines (British Airways, Delta, Emirates, Virgin Atlantic, Singapore Airlines), schedules, durations, stops, cabin tiers, and real-time pricing in both USD and Crypto (ETH / USDC / SOL).',
-    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        origin: { type: 'string', description: 'Origin 3-letter IATA airport code or city name (e.g. "LHR", "London", "JFK", "New York")' },
-        destination: { type: 'string', description: 'Destination 3-letter IATA airport code or city name (e.g. "JFK", "HND", "Tokyo", "DXB", "Dubai")' },
-        departureDate: { type: 'string', description: 'Departure date in YYYY-MM-DD format (e.g. "2026-09-20")' },
-        returnDate: { type: 'string', description: 'Optional return date for round-trip flights in YYYY-MM-DD format' },
-        passengers: { type: 'number', description: 'Number of adult passengers (default: 1)' },
-        cabinClass: { type: 'string', description: 'Cabin class: economy (default), premium_economy, business, first', enum: ['economy', 'premium_economy', 'business', 'first'] },
-        currency: { type: 'string', description: 'Payment crypto currency: ETH (default), USDC, USDT, SOL' },
-      },
-      required: ['origin', 'destination', 'departureDate'],
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        origin: { type: 'string', description: 'Origin IATA code or city' },
-        destination: { type: 'string', description: 'Destination IATA code or city' },
-        departureDate: { type: 'string', description: 'Departure date' },
-        returnDate: { type: 'string', description: 'Return date' },
-        passengers: { type: 'number', description: 'Passengers count' },
-        cabinClass: { type: 'string', description: 'Cabin class' },
-        currency: { type: 'string', description: 'Payment currency' },
-      },
-      required: ['origin', 'destination', 'departureDate'],
-    },
-  },
-  {
-    name: 'search_hotels',
-    description: 'Searches real-world hotel accommodations, luxury resorts, and boutique rooms across global destinations (Tokyo, London, New York, Dubai, Paris, Singapore, Bali, etc.). Returns property star ratings, room tiers, nightly rates, amenities, and total crypto pricing.',
-    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        destination: { type: 'string', description: 'City or destination name (e.g. "Tokyo", "London", "New York", "Paris", "Dubai")' },
-        checkInDate: { type: 'string', description: 'Check-in date in YYYY-MM-DD format (e.g. "2026-10-05")' },
-        checkOutDate: { type: 'string', description: 'Check-out date in YYYY-MM-DD format (e.g. "2026-10-08")' },
-        guests: { type: 'number', description: 'Number of guests (default: 1)' },
-        rooms: { type: 'number', description: 'Number of rooms (default: 1)' },
-        starRating: { type: 'number', description: 'Minimum hotel star rating (e.g. 4 or 5)' },
-        currency: { type: 'string', description: 'Payment crypto currency: ETH (default), USDC, USDT, SOL' },
-      },
-      required: ['destination', 'checkInDate', 'checkOutDate'],
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        destination: { type: 'string', description: 'City name or destination' },
-        checkInDate: { type: 'string', description: 'Check-in date' },
-        checkOutDate: { type: 'string', description: 'Check-out date' },
-        guests: { type: 'number', description: 'Guests count' },
-        rooms: { type: 'number', description: 'Rooms count' },
-        starRating: { type: 'number', description: 'Minimum stars' },
-        currency: { type: 'string', description: 'Payment currency' },
-      },
-      required: ['destination', 'checkInDate', 'checkOutDate'],
-    },
-  },
-  {
-    name: 'search_events_and_movies',
-    description: 'Searches cinema movie screenings (IMAX, 70mm, 3D), live music concerts, sporting events, and Web3 VIP conferences by city or title. Returns venue locations, showtimes, seating options, and live crypto pricing.',
-    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        city: { type: 'string', description: 'City name (e.g. "London", "New York", "Tokyo", "San Francisco")' },
-        category: { type: 'string', description: 'Event category: movie, concert, sports, conference, theater', enum: ['movie', 'concert', 'sports', 'conference', 'theater'] },
-        query: { type: 'string', description: 'Search term or movie title (e.g. "Interstellar", "Coldplay", "Formula 1", "ETHGlobal")' },
-        currency: { type: 'string', description: 'Payment crypto currency: ETH (default), USDC, USDT, SOL' },
-      },
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        city: { type: 'string', description: 'City name' },
-        category: { type: 'string', description: 'Event category' },
-        query: { type: 'string', description: 'Search query' },
-        currency: { type: 'string', description: 'Payment currency' },
-      },
-    },
-  },
-  {
-    name: 'get_booking_status',
-    description: 'Verifies and retrieves real-time confirmation status for any travel booking, flight, hotel, or ticket using an official airline PNR code (e.g. "7X9K2B") or Northveil reference ("NV-FLT-...").',
-    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        bookingReference: { type: 'string', description: 'Official airline PNR code (6 characters e.g. "7X9K2B") or Northveil reference (e.g. "NV-FLT-3885-K6WJ")' },
-        walletAddress: { type: 'string', description: 'Optional wallet address for verification' },
-      },
-      required: ['bookingReference'],
-    },
-    parameters: {
-      type: 'object',
-      properties: {
-        bookingReference: { type: 'string', description: 'PNR or Booking Reference code' },
-        walletAddress: { type: 'string', description: 'Wallet address' },
-      },
-      required: ['bookingReference'],
+      required: ['fileBase64'],
     },
   },
 ];
-
