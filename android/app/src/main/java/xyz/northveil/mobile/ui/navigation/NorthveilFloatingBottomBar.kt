@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -37,6 +38,8 @@ fun NorthveilFloatingBottomBar(
     onTabSelected: (NavTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colorScheme = MaterialTheme.colorScheme
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -45,18 +48,18 @@ fun NorthveilFloatingBottomBar(
     ) {
         Row(
             modifier = Modifier
-                .shadow(elevation = 16.dp, shape = RoundedCornerShape(32.dp), spotColor = Color.Black)
+                .shadow(elevation = 16.dp, shape = RoundedCornerShape(32.dp), spotColor = Color.Black.copy(alpha = 0.3f))
                 .clip(RoundedCornerShape(32.dp))
-                .background(CardSurfaceDark.copy(alpha = 0.95f))
-                .border(1.dp, CardSurfaceBorderDark, RoundedCornerShape(32.dp))
+                .background(colorScheme.surface.copy(alpha = 0.95f))
+                .border(1.dp, colorScheme.outline, RoundedCornerShape(32.dp))
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            NavTab.values().forEach { tab ->
+            NavTab.entries.forEach { tab ->
                 val isSelected = tab == currentTab
-                val tabBackground = if (isSelected) Color.White else Color.Transparent
-                val tabContentColor = if (isSelected) Color.Black else TextSecondary
+                val tabBackground = if (isSelected) colorScheme.onBackground else Color.Transparent
+                val tabContentColor = if (isSelected) colorScheme.background else colorScheme.onSurfaceVariant
 
                 Row(
                     modifier = Modifier

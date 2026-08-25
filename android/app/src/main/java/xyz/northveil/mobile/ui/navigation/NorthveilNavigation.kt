@@ -10,7 +10,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
-import xyz.northveil.mobile.core.designsystem.theme.VaultBlack
 import xyz.northveil.mobile.ui.agents.AgentsScreen
 import xyz.northveil.mobile.ui.agents.AgentsViewModel
 import xyz.northveil.mobile.ui.approvals.ApprovalsScreen
@@ -44,11 +43,12 @@ fun NorthveilNavigation(
 ) {
     val navController = rememberNavController()
     val startDestination = if (isVaultConfigured) Screen.Lock.route else Screen.Auth.route
+    val colorScheme = MaterialTheme.colorScheme
 
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        modifier = Modifier.background(VaultBlack)
+        modifier = Modifier.background(colorScheme.background)
     ) {
         composable(Screen.Auth.route) {
             val authViewModel: AuthViewModel = hiltViewModel()
@@ -112,6 +112,7 @@ fun MainContainerScreen(
     var currentTab by remember { mutableStateOf(NavTab.OVERVIEW) }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val colorScheme = MaterialTheme.colorScheme
 
     var showSendSheet by remember { mutableStateOf(false) }
     var showReceiveSheet by remember { mutableStateOf(false) }
@@ -143,7 +144,7 @@ fun MainContainerScreen(
                     onTabSelected = { currentTab = it }
                 )
             },
-            containerColor = VaultBlack
+            containerColor = colorScheme.background
         ) { innerPadding ->
             Box(
                 modifier = Modifier

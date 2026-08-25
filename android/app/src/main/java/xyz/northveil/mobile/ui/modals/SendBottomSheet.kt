@@ -30,10 +30,11 @@ fun SendBottomSheet(
     var recipientAddress by remember { mutableStateOf("") }
     var sendAmount by remember { mutableStateOf("") }
     var selectedToken by remember { mutableStateOf("ETH") }
+    val colorScheme = MaterialTheme.colorScheme
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = CardSurfaceDark,
+        containerColor = colorScheme.surface,
         tonalElevation = 16.dp
     ) {
         Column(
@@ -47,9 +48,18 @@ fun SendBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "Send Cryptocurrency", color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "Send Cryptocurrency",
+                    color = colorScheme.onSurface,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
                 IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
@@ -59,16 +69,22 @@ fun SendBottomSheet(
                 label = { Text("Recipient Address") },
                 trailingIcon = {
                     IconButton(onClick = onLaunchQrScanner) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan QR", tint = BrandAccentCyan)
+                        Icon(
+                            Icons.Default.QrCodeScanner,
+                            contentDescription = "Scan QR",
+                            tint = colorScheme.onSurface
+                        )
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.White,
-                    unfocusedBorderColor = CardSurfaceBorderDark,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
+                    focusedBorderColor = colorScheme.onBackground,
+                    unfocusedBorderColor = colorScheme.outline,
+                    focusedTextColor = colorScheme.onSurface,
+                    unfocusedTextColor = colorScheme.onSurface,
+                    focusedLabelColor = colorScheme.onSurface,
+                    unfocusedLabelColor = colorScheme.onSurfaceVariant
                 )
             )
 
@@ -80,10 +96,12 @@ fun SendBottomSheet(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.White,
-                    unfocusedBorderColor = CardSurfaceBorderDark,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
+                    focusedBorderColor = colorScheme.onBackground,
+                    unfocusedBorderColor = colorScheme.outline,
+                    focusedTextColor = colorScheme.onSurface,
+                    unfocusedTextColor = colorScheme.onSurface,
+                    focusedLabelColor = colorScheme.onSurface,
+                    unfocusedLabelColor = colorScheme.onSurfaceVariant
                 )
             )
 
@@ -91,32 +109,44 @@ fun SendBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black.copy(alpha = 0.4f))
+                    .background(colorScheme.surfaceVariant)
                     .padding(12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(text = "Estimated Network Fee:", color = TextSecondary, fontSize = 11.sp)
-                    Text(text = "~$0.18 USD (Sepolia/Base)", color = StatusGreen, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                    Text(
+                        text = "Estimated Gas",
+                        color = colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        text = "~0.0004 ETH (~$1.20)",
+                        color = colorScheme.onSurface,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
                 }
             }
 
             Button(
                 onClick = {
-                    val amount = sendAmount.toDoubleOrNull() ?: 0.0
-                    if (recipientAddress.isNotBlank() && amount > 0) {
-                        onConfirmSend(recipientAddress, amount, selectedToken)
+                    val amountVal = sendAmount.toDoubleOrNull() ?: 0.0
+                    if (recipientAddress.isNotBlank() && amountVal > 0) {
+                        onConfirmSend(recipientAddress, amountVal, selectedToken)
                         onDismiss()
                     }
                 },
-                enabled = recipientAddress.isNotBlank() && sendAmount.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colorScheme.onBackground,
+                    contentColor = colorScheme.background
+                ),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 12.dp)
             ) {
-                Text(text = "Review & Send", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(text = "Review & Send", fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

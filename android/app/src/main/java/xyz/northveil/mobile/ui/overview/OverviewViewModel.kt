@@ -13,6 +13,7 @@ import javax.inject.Inject
 
 data class OverviewUiState(
     val activeWallet: SubWallet? = null,
+    val subWallets: List<SubWallet> = emptyList(),
     val tokenHoldings: List<TokenHolding> = emptyList(),
     val totalNetWorthUsd: Double = 0.0,
     val isRefreshing: Boolean = false
@@ -29,6 +30,12 @@ class OverviewViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            walletRepository.allSubWallets.collect { list ->
+                _uiState.update { it.copy(subWallets = list) }
+            }
+        }
+
+        viewModelScope.launch {
             walletRepository.activeSubWallet.collect { active ->
                 _uiState.update { it.copy(activeWallet = active) }
                 if (active != null) {
@@ -41,6 +48,12 @@ class OverviewViewModel @Inject constructor(
                     }
                 }
             }
+        }
+    }
+
+    fun switchActiveWallet(walletId: String) {
+        viewModelScope.launch {
+            walletRepository.setActiveSubWallet(walletId)
         }
     }
 

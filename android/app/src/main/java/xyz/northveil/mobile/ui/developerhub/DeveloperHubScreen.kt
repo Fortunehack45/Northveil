@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import xyz.northveil.mobile.core.designsystem.theme.*
 
-enum class DevTab { CLI, SDK, WEBHOOKS, PLAYGROUND }
+enum class DevTab { CLI, SDK, PYTHON, MCP }
 
 @Composable
 fun DeveloperHubScreen(
@@ -32,11 +33,12 @@ fun DeveloperHubScreen(
     var activeTab by remember { mutableStateOf(DevTab.CLI) }
     val clipboardManager = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
+    val colorScheme = MaterialTheme.colorScheme
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(VaultBlack)
+            .background(colorScheme.background)
             .padding(horizontal = 16.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -48,11 +50,24 @@ fun DeveloperHubScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = colorScheme.onBackground
+                    )
                 }
                 Column {
-                    Text(text = "Developer Hub", color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text(text = "CLI, SDK, Webhooks & MCP Playground", color = TextSecondary, fontSize = 12.sp)
+                    Text(
+                        text = "Developer Hub",
+                        color = colorScheme.onBackground,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "CLI, TypeScript SDK, Python & Universal MCP Tools",
+                        color = colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
                 }
             }
         }
@@ -63,70 +78,98 @@ fun DeveloperHubScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(CardSurfaceDark)
+                    .background(colorScheme.surfaceVariant)
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                DevTab.values().forEach { tab ->
+                DevTab.entries.forEach { tab ->
                     val isSelected = tab == activeTab
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(if (isSelected) Color.White else Color.Transparent)
+                            .background(if (isSelected) colorScheme.onBackground else Color.Transparent)
                             .clickable { activeTab = tab }
                             .padding(vertical = 6.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = tab.name,
-                            color = if (isSelected) Color.Black else TextSecondary,
+                            color = if (isSelected) colorScheme.background else colorScheme.onSurfaceVariant,
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
                     }
                 }
             }
         }
 
-        // Content
+        // Content Card
         item {
             val codeSnippet = when (activeTab) {
-                DevTab.CLI -> "npm install -g @northveil/cli\nnorthveil auth login\nnorthveil balance"
-                DevTab.SDK -> "import { NorthveilClient } from '@northveil/sdk';\n\nconst client = new NorthveilClient({\n  apiKey: 'nv_live_...'\n});"
-                DevTab.WEBHOOKS -> "POST /api/webhook\nHeaders: X-Northveil-Signature\nBody: {\"event\": \"tx.confirmed\"}"
-                DevTab.PLAYGROUND -> "mcp.callTool('get_balance', {\n  wallet: '0x71C88915...'\n});"
+                DevTab.CLI -> "npm install -g northveil-cli\nnorthveil auth login\nnorthveil balance\nnorthveil mcp"
+                DevTab.SDK -> "import { NorthveilClient } from 'northveil-sdk';\n\nconst client = new NorthveilClient({\n  apiKey: 'nv_live_...'\n});\nconst portfolio = await client.getPortfolio();"
+                DevTab.PYTHON -> "import northveil\n\nclient = northveil.Client(api_key='nv_live_...')\nbalance = client.get_balance('0x71C8...')"
+                DevTab.MCP -> "// Claude Desktop (claude_desktop_config.json)\n{\n  \"mcpServers\": {\n    \"northveil\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"northveil-cli\", \"mcp\"]\n    }\n  }\n}"
             }
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(CardSurfaceDark)
-                    .border(1.dp, CardSurfaceBorderDark, RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(colorScheme.surface)
+                    .border(1.dp, colorScheme.outline, RoundedCornerShape(20.dp))
                     .padding(16.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "${activeTab.name} SNIPPET", color = BrandAccentCyan, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                        IconButton(onClick = {
-                            clipboardManager.setText(AnnotatedString(codeSnippet))
-                            copied = true
-                        }, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy", tint = TextSecondary, modifier = Modifier.size(14.dp))
+                        Text(
+                            text = "${activeTab.name} INTEGRATION",
+                            color = colorScheme.onSurface,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(codeSnippet))
+                                copied = true
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+                                contentDescription = "Copy",
+                                tint = if (copied) StatusGreen else colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp)
+                            )
                         }
                     }
 
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(colorScheme.surfaceVariant)
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = codeSnippet,
+                            color = colorScheme.onSurface,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            lineHeight = 18.sp
+                        )
+                    }
+
                     Text(
-                        text = codeSnippet,
-                        color = TextPrimary,
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        lineHeight = 18.sp
+                        text = "Access all 38 tools including DEX swaps, airline reservations, and static contract audits.",
+                        color = colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
                     )
                 }
             }

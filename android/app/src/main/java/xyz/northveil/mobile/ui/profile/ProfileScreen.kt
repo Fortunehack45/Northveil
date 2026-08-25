@@ -15,10 +15,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import xyz.northveil.mobile.core.designsystem.BlockiesIdenticon
 import xyz.northveil.mobile.core.designsystem.theme.*
 
 @Composable
@@ -27,73 +30,179 @@ fun ProfileScreen(
     onLockApp: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    val colorScheme = MaterialTheme.colorScheme
+    val themeModeState = LocalThemeMode.current
+    val clipboardManager = LocalClipboardManager.current
+    var isCopied by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(VaultBlack)
+            .background(colorScheme.background)
             .padding(horizontal = 16.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            Text(text = "Profile & Settings", color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = "Profile & Settings",
+                color = colorScheme.onBackground,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
 
-        // Profile Identity Card
+        // Profile Identity Card (Web Parity)
         item {
+            val addr = state.activeWallet?.address ?: "0x0000000000000000000000000000000000000000"
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(22.dp))
-                    .background(CardSurfaceDark)
-                    .border(1.dp, CardSurfaceBorderDark, RoundedCornerShape(22.dp))
+                    .background(colorScheme.surface)
+                    .border(1.dp, colorScheme.outline, RoundedCornerShape(22.dp))
                     .padding(20.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(54.dp)
-                            .clip(CircleShape)
-                            .background(Color.White),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Person, contentDescription = null, tint = Color.Black, modifier = Modifier.size(28.dp))
-                    }
+                    BlockiesIdenticon(address = addr, size = 52.dp)
 
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(text = state.activeWallet?.name ?: "Primary Vault", color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = state.activeWallet?.name ?: "Primary Vault",
+                                color = colorScheme.onSurface,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(Color.White.copy(alpha = 0.1f))
+                                    .background(colorScheme.surfaceVariant)
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
-                                Text(text = "VERIFIED", color = TextPrimary, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                Text(
+                                    text = "NON-CUSTODIAL",
+                                    color = colorScheme.onSurface,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
                             }
                         }
-                        Text(text = state.activeWallet?.address ?: "0x000...0000", color = TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        Text(
+                            text = "${addr.take(8)}...${addr.takeLast(6)}",
+                            color = colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            clipboardManager.setText(AnnotatedString(addr))
+                            isCopied = true
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+                            contentDescription = "Copy Address",
+                            tint = if (isCopied) StatusGreen else colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }
         }
 
-        // Security Settings
+        // Appearance & Theme Mode Section (Web Parity)
         item {
-            Text(text = "Security & Controls", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+            Text(
+                text = "Appearance & Theme",
+                color = colorScheme.onBackground,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
 
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(CardSurfaceDark)
-                    .border(1.dp, CardSurfaceBorderDark, RoundedCornerShape(18.dp))
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(colorScheme.surface)
+                    .border(1.dp, colorScheme.outline, RoundedCornerShape(20.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Interface Color Theme",
+                        color = colorScheme.onSurface,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(colorScheme.surfaceVariant)
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        listOf(
+                            ThemeMode.SYSTEM to "System",
+                            ThemeMode.DARK to "Dark",
+                            ThemeMode.LIGHT to "Light"
+                        ).forEach { (mode, label) ->
+                            val isSelected = themeModeState.value == mode
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) colorScheme.onBackground else Color.Transparent)
+                                    .clickable { themeModeState.value = mode }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = if (isSelected) colorScheme.background else colorScheme.onSurfaceVariant,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Security & Biometrics Controls
+        item {
+            Text(
+                text = "Security & Hardware Enclave",
+                color = colorScheme.onBackground,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(colorScheme.surface)
+                    .border(1.dp, colorScheme.outline, RoundedCornerShape(20.dp))
                     .padding(16.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -102,18 +211,40 @@ fun ProfileScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Icon(Icons.Default.Fingerprint, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(20.dp))
-                            Text(text = "Biometric Authentication", color = TextPrimary, fontSize = 14.sp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Fingerprint,
+                                contentDescription = null,
+                                tint = colorScheme.onSurface,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = "Biometric Passkey Gating",
+                                    color = colorScheme.onSurface,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "FIDO2 / WebAuthn assertions",
+                                    color = colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                         Switch(
                             checked = state.isBiometricsEnabled,
                             onCheckedChange = {},
-                            colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = Color.White)
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = colorScheme.background,
+                                checkedTrackColor = colorScheme.onBackground
+                            )
                         )
                     }
 
-                    HorizontalDivider(color = CardSurfaceBorderDark)
+                    HorizontalDivider(color = colorScheme.outline)
 
                     Row(
                         modifier = Modifier
@@ -123,11 +254,28 @@ fun ProfileScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Icon(Icons.Default.Lock, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(20.dp))
-                            Text(text = "Lock Vault Now", color = TextPrimary, fontSize = 14.sp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = colorScheme.onSurface,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Lock Vault Now",
+                                color = colorScheme.onSurface,
+                                fontSize = 14.sp
+                            )
                         }
-                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }

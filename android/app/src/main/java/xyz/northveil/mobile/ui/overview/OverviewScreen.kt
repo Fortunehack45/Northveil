@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,7 +23,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import xyz.northveil.mobile.core.designsystem.BlockiesIdenticon
+import xyz.northveil.mobile.core.designsystem.NorthveilBranding
 import xyz.northveil.mobile.core.designsystem.theme.*
+import xyz.northveil.mobile.domain.model.SubWallet
 import xyz.northveil.mobile.domain.model.TokenHolding
 
 @Composable
@@ -36,16 +40,17 @@ fun OverviewScreen(
     onTokenClick: (String) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    val colorScheme = MaterialTheme.colorScheme
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(VaultBlack)
+            .background(colorScheme.background)
             .padding(horizontal = 16.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Top Brand Header
+        // Top Brand Header with Hamburger Menu
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -57,7 +62,7 @@ fun OverviewScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     AsyncImage(
-                        model = xyz.northveil.mobile.core.designsystem.NorthveilBranding.WALLET_LOGO_URL,
+                        model = NorthveilBranding.WALLET_LOGO_URL,
                         contentDescription = "Northveil Wallet Logo",
                         modifier = Modifier
                             .size(34.dp)
@@ -67,7 +72,7 @@ fun OverviewScreen(
                         text = "NORTHVEIL",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+                        color = colorScheme.onBackground
                     )
                 }
 
@@ -76,10 +81,51 @@ fun OverviewScreen(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(CardSurfaceDark)
-                        .border(1.dp, CardSurfaceBorderDark, CircleShape)
+                        .background(colorScheme.surface)
+                        .border(1.dp, colorScheme.outline, CircleShape)
                 ) {
-                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = TextPrimary, modifier = Modifier.size(18.dp))
+                    Icon(
+                        Icons.Default.Menu,
+                        contentDescription = "Menu",
+                        tint = colorScheme.onSurface,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        // Sub-Wallet Switcher Pills (Web Parity)
+        if (state.subWallets.size > 1) {
+            item {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(state.subWallets) { wallet ->
+                        val isSelected = wallet.id == state.activeWallet?.id
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(if (isSelected) colorScheme.onBackground else colorScheme.surface)
+                                .border(
+                                    1.dp,
+                                    if (isSelected) Color.Transparent else colorScheme.outline,
+                                    RoundedCornerShape(20.dp)
+                                )
+                                .clickable { viewModel.switchActiveWallet(wallet.id) }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            BlockiesIdenticon(address = wallet.address, size = 16.dp)
+                            Text(
+                                text = wallet.name,
+                                color = if (isSelected) colorScheme.background else colorScheme.onSurface,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -89,7 +135,7 @@ fun OverviewScreen(
             VaultHeroCard(
                 netWorthUsd = state.totalNetWorthUsd,
                 activeAccountName = state.activeWallet?.name ?: "Primary Vault",
-                activeAddress = state.activeWallet?.address ?: "0x000...0000",
+                activeAddress = state.activeWallet?.address ?: "0x0000000000000000000000000000000000000000",
                 onRefresh = { viewModel.refreshBalances() },
                 isRefreshing = state.isRefreshing
             )
@@ -105,17 +151,30 @@ fun OverviewScreen(
             )
         }
 
-        // Multi-Chain Token Holdings Section
+        // Holdings Section Header
         item {
-            Text(
-                text = "Holdings (${state.tokenHoldings.size})",
-                color = TextPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Holdings (${state.tokenHoldings.size})",
+                    color = colorScheme.onBackground,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                Text(
+                    text = "Live USD Prices",
+                    color = colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
         }
 
+        // Token Holdings Rows
         items(state.tokenHoldings) { token ->
             TokenHoldingRow(
                 token = token,
@@ -133,12 +192,14 @@ fun VaultHeroCard(
     onRefresh: () -> Unit,
     isRefreshing: Boolean
 ) {
+    val colorScheme = MaterialTheme.colorScheme
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(CardSurfaceDark)
-            .border(1.dp, CardSurfaceBorderDark, RoundedCornerShape(24.dp))
+            .background(colorScheme.surface)
+            .border(1.dp, colorScheme.outline, RoundedCornerShape(24.dp))
             .padding(20.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -150,12 +211,12 @@ fun VaultHeroCard(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(ChipBackground)
+                        .background(colorScheme.surfaceVariant)
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = "VAULT OVERVIEW",
-                        color = TextPrimary,
+                        color = colorScheme.onSurface,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
@@ -164,14 +225,16 @@ fun VaultHeroCard(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(ChipBackground)
+                        .background(colorScheme.surfaceVariant)
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
+                    BlockiesIdenticon(address = activeAddress, size = 14.dp)
                     Text(
                         text = "$activeAccountName: ${activeAddress.take(6)}...${activeAddress.takeLast(4)}",
-                        color = TextSecondary,
+                        color = colorScheme.onSurfaceVariant,
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace
                     )
@@ -184,7 +247,7 @@ fun VaultHeroCard(
             ) {
                 Text(
                     text = "$${String.format("%,.2f", netWorthUsd)}",
-                    color = TextPrimary,
+                    color = colorScheme.onSurface,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -195,19 +258,19 @@ fun VaultHeroCard(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(CircleShape)
-                        .background(ChipBackground)
+                        .background(colorScheme.surfaceVariant)
                 ) {
                     if (isRefreshing) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
-                            color = BrandAccentCyan,
+                            color = colorScheme.primary,
                             strokeWidth = 2.dp
                         )
                     } else {
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Refresh",
-                            tint = TextSecondary,
+                            tint = colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -215,8 +278,8 @@ fun VaultHeroCard(
             }
 
             Text(
-                text = "Multi-chain balances across ETH, SOL, Base, ARB & Sepolia.",
-                color = TextTertiary,
+                text = "Multi-chain non-custodial balances across ETH, SOL, Base, ARB & Sepolia.",
+                color = colorScheme.onSurfaceVariant,
                 fontSize = 11.sp
             )
         }
@@ -273,14 +336,16 @@ fun ActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val bg = if (isPrimary) Color.White else CardSurfaceDark
-    val fg = if (isPrimary) Color.Black else TextPrimary
+    val colorScheme = MaterialTheme.colorScheme
+    val bg = if (isPrimary) colorScheme.onBackground else colorScheme.surface
+    val fg = if (isPrimary) colorScheme.background else colorScheme.onSurface
+    val borderCol = if (isPrimary) Color.Transparent else colorScheme.outline
 
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(24.dp))
             .background(bg)
-            .border(1.dp, if (isPrimary) Color.Transparent else CardSurfaceBorderDark, RoundedCornerShape(24.dp))
+            .border(1.dp, borderCol, RoundedCornerShape(24.dp))
             .clickable { onClick() }
             .padding(vertical = 10.dp),
         horizontalArrangement = Arrangement.Center,
@@ -297,12 +362,14 @@ fun TokenHoldingRow(
     token: TokenHolding,
     onClick: () -> Unit
 ) {
+    val colorScheme = MaterialTheme.colorScheme
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(CardSurfaceDark)
-            .border(1.dp, CardSurfaceBorderDark, RoundedCornerShape(16.dp))
+            .background(colorScheme.surface)
+            .border(1.dp, colorScheme.outline, RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .padding(14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -318,25 +385,25 @@ fun TokenHoldingRow(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(Color.Black)
+                    .background(colorScheme.surfaceVariant)
             )
             Column {
-                Text(text = token.symbol, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text(text = token.name, color = TextSecondary, fontSize = 11.sp)
+                Text(text = token.symbol, color = colorScheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text(text = token.name, color = colorScheme.onSurfaceVariant, fontSize = 11.sp)
             }
         }
 
         Column(horizontalAlignment = Alignment.End) {
             Text(
                 text = "${token.balance} ${token.symbol}",
-                color = TextPrimary,
+                color = colorScheme.onSurface,
                 fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
                 text = "$${String.format("%,.2f", token.balance * token.priceUsd)}",
-                color = TextSecondary,
+                color = colorScheme.onSurfaceVariant,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace
             )

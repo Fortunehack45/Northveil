@@ -1,12 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="vault_black">#0A0B0E</color>
-    <color name="card_surface_dark">#121215</color>
-    <color name="brand_accent_yellow">#CCFF00</color>
-    <color name="brand_accent_cyan">#00F0FF</color>
-    <color name="brand_accent_pink">#FF007F</color>
+    <!-- Dark Zinc Palette -->
+    <color name="vault_black">#000000</color>
+    <color name="card_surface_dark">#0F0F12</color>
+    <color name="card_surface_subtle">#18181C</color>
+    <color name="card_surface_border_dark">#27272A</color>
+
+    <!-- Light Zinc Palette -->
+    <color name="vault_light">#F8F8FA</color>
+    <color name="card_surface_light">#FFFFFF</color>
+    <color name="card_surface_subtle_light">#F4F4F5</color>
+    <color name="card_surface_border_light">#E4E4E7</color>
+
+    <!-- Typography -->
     <color name="text_primary">#FFFFFF</color>
     <color name="text_secondary">#A1A1AA</color>
+    <color name="text_tertiary">#71717A</color>
+
+    <!-- Semantic States -->
     <color name="status_green">#10B981</color>
+    <color name="status_amber">#F59E0B</color>
     <color name="status_red">#EF4444</color>
 </resources>

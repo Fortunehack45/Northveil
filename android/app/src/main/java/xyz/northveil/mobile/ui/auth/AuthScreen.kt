@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import xyz.northveil.mobile.core.designsystem.NorthveilBranding
 import xyz.northveil.mobile.core.designsystem.theme.*
 
 @Composable
@@ -23,6 +24,7 @@ fun AuthScreen(
     onAuthSuccess: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    val colorScheme = MaterialTheme.colorScheme
     var password by remember { mutableStateOf("") }
 
     LaunchedEffect(state.isComplete) {
@@ -38,13 +40,13 @@ fun AuthScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(VaultBlack)
+            .background(colorScheme.background)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         coil.compose.AsyncImage(
-            model = xyz.northveil.mobile.core.designsystem.NorthveilBranding.WALLET_LOGO_URL,
+            model = NorthveilBranding.WALLET_LOGO_URL,
             contentDescription = "Northveil Wallet Logo",
             modifier = Modifier
                 .size(64.dp)
@@ -55,13 +57,13 @@ fun AuthScreen(
 
         Text(
             text = "Welcome to Northveil",
-            color = TextPrimary,
+            color = colorScheme.onBackground,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "Native Multi-Chain Custodial Vault & AI Agent Hub",
-            color = TextSecondary,
+            text = "Non-Custodial MPC Vault & Autonomous Agent Hub",
+            color = colorScheme.onSurfaceVariant,
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 6.dp, bottom = 28.dp)
         )
@@ -71,13 +73,25 @@ fun AuthScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .background(CardSurfaceDark)
-                .border(1.dp, CardSurfaceBorderDark, RoundedCornerShape(16.dp))
+                .background(colorScheme.surface)
+                .border(1.dp, colorScheme.outline, RoundedCornerShape(16.dp))
                 .padding(16.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(text = "GENERATED RECOVERY PHRASE", color = BrandAccentYellow, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                Text(text = state.generatedSeed, color = TextPrimary, fontSize = 12.sp, fontFamily = FontFamily.Monospace, lineHeight = 18.sp)
+                Text(
+                    text = "HARDWARE VAULT RECOVERY PHRASE",
+                    color = colorScheme.onSurface,
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = state.generatedSeed,
+                    color = colorScheme.onSurface,
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace,
+                    lineHeight = 18.sp
+                )
             }
         }
 
@@ -91,27 +105,37 @@ fun AuthScreen(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color.White,
-                unfocusedBorderColor = CardSurfaceBorderDark,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary
+                focusedBorderColor = colorScheme.onBackground,
+                unfocusedBorderColor = colorScheme.outline,
+                focusedTextColor = colorScheme.onSurface,
+                unfocusedTextColor = colorScheme.onSurface,
+                focusedLabelColor = colorScheme.onSurface,
+                unfocusedLabelColor = colorScheme.onSurfaceVariant
             )
         )
-
-        state.error?.let {
-            Text(text = it, color = StatusRed, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
         Button(
-            onClick = { viewModel.completeCreation(password) },
-            enabled = password.isNotBlank(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-            shape = RoundedCornerShape(24.dp),
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            onClick = {
+                if (password.length >= 6) {
+                    viewModel.createVault(password)
+                }
+            },
+            enabled = password.length >= 6 && !state.isLoading,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colorScheme.onBackground,
+                contentColor = colorScheme.background
+            ),
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(vertical = 12.dp)
         ) {
-            Text(text = "Create Encrypted Vault", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(
+                text = if (state.isLoading) "Configuring Enclave..." else "Initialize Vault",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

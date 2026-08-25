@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import xyz.northveil.mobile.core.designsystem.BlockiesIdenticon
 import xyz.northveil.mobile.core.designsystem.theme.*
 import xyz.northveil.mobile.domain.model.SubWallet
 
@@ -39,13 +40,14 @@ fun WalletsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val clipboardManager = LocalClipboardManager.current
+    val colorScheme = MaterialTheme.colorScheme
     var copiedWalletId by remember { mutableStateOf<String?>(null) }
     var selectedWalletForKeyReveal by remember { mutableStateOf<SubWallet?>(null) }
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(VaultBlack)
+            .background(colorScheme.background)
             .padding(horizontal = 16.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -65,12 +67,12 @@ fun WalletsScreen(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(ChipBackground)
+                                .background(colorScheme.surfaceVariant)
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Text(
                                 text = "MULTI-ACCOUNT VAULT",
-                                color = TextPrimary,
+                                color = colorScheme.onSurface,
                                 fontSize = 10.sp,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold
@@ -78,14 +80,14 @@ fun WalletsScreen(
                         }
                         Text(
                             text = "${state.subWallets.size} Accounts",
-                            color = TextSecondary,
+                            color = colorScheme.onSurfaceVariant,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace
                         )
                     }
                     Text(
                         text = "Wallets & Accounts",
-                        color = TextPrimary,
+                        color = colorScheme.onBackground,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(top = 4.dp)
@@ -98,19 +100,29 @@ fun WalletsScreen(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(Color.White)
+                            .background(colorScheme.onBackground)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "New Account", tint = Color.Black, modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "New Account",
+                            tint = colorScheme.background,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                     IconButton(
                         onClick = onOpenImportAccount,
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(CardSurfaceDark)
-                            .border(1.dp, CardSurfaceBorderDark, CircleShape)
+                            .background(colorScheme.surface)
+                            .border(1.dp, colorScheme.outline, CircleShape)
                     ) {
-                        Icon(Icons.Default.Upload, contentDescription = "Import", tint = TextPrimary, modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Default.Upload,
+                            contentDescription = "Import",
+                            tint = colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }
@@ -132,11 +144,11 @@ fun WalletsScreen(
             }
         }
 
-        // Sub-Accounts List
+        // Sub-Accounts List Header
         item {
             Text(
                 text = "All Vault Accounts (${state.subWallets.size})",
-                color = TextPrimary,
+                color = colorScheme.onBackground,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 8.dp)
@@ -179,12 +191,14 @@ fun ActiveWalletHeroCard(
     onDeposit: () -> Unit,
     onRevealKey: () -> Unit
 ) {
+    val colorScheme = MaterialTheme.colorScheme
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(CardSurfaceDark)
-            .border(1.dp, CardSurfaceBorderDark, RoundedCornerShape(24.dp))
+            .background(colorScheme.surface)
+            .border(1.dp, colorScheme.outline, RoundedCornerShape(24.dp))
             .padding(20.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -197,28 +211,39 @@ fun ActiveWalletHeroCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color.White),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Color.Black, modifier = Modifier.size(22.dp))
-                    }
+                    BlockiesIdenticon(address = wallet.address, size = 44.dp)
                     Column {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(text = wallet.name, color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = wallet.name,
+                                color = colorScheme.onSurface,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(Color.White.copy(alpha = 0.1f))
+                                    .background(colorScheme.surfaceVariant)
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
-                                Text(text = "PRIMARY", color = TextPrimary, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                Text(
+                                    text = "PRIMARY",
+                                    color = colorScheme.onSurface,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
                             }
                         }
-                        Text(text = "Path: ${wallet.derivationPath}", color = TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        Text(
+                            text = "Path: ${wallet.derivationPath}",
+                            color = colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
                     }
                 }
             }
@@ -228,14 +253,14 @@ fun ActiveWalletHeroCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Color.Black.copy(alpha = 0.4f))
+                    .background(colorScheme.surfaceVariant)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "${wallet.address.take(10)}...${wallet.address.takeLast(8)}",
-                    color = TextPrimary,
+                    color = colorScheme.onSurface,
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace
                 )
@@ -243,7 +268,7 @@ fun ActiveWalletHeroCard(
                     Icon(
                         imageVector = if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy,
                         contentDescription = "Copy",
-                        tint = if (isCopied) BrandAccentYellow else TextSecondary,
+                        tint = if (isCopied) StatusGreen else colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp)
                     )
                 }
@@ -256,7 +281,10 @@ fun ActiveWalletHeroCard(
             ) {
                 Button(
                     onClick = onDeposit,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorScheme.onBackground,
+                        contentColor = colorScheme.background
+                    ),
                     shape = RoundedCornerShape(20.dp),
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(vertical = 8.dp)
@@ -268,14 +296,17 @@ fun ActiveWalletHeroCard(
 
                 Button(
                     onClick = onRevealKey,
-                    colors = ButtonDefaults.buttonColors(containerColor = CardSurfaceSubtle, contentColor = TextPrimary),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorScheme.surfaceVariant,
+                        contentColor = colorScheme.onSurface
+                    ),
                     shape = RoundedCornerShape(20.dp),
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
                     Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "Private Key", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Text(text = "Credentials", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -293,12 +324,18 @@ fun SubAccountItemCard(
     onDeposit: () -> Unit,
     onRevealKey: () -> Unit
 ) {
+    val colorScheme = MaterialTheme.colorScheme
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(if (isActive) CardSurfaceSubtle else CardSurfaceDark)
-            .border(1.dp, if (isActive) Color.White.copy(alpha = 0.2f) else CardSurfaceBorderDark, RoundedCornerShape(18.dp))
+            .background(colorScheme.surface)
+            .border(
+                1.dp,
+                if (isActive) colorScheme.onBackground.copy(alpha = 0.3f) else colorScheme.outline,
+                RoundedCornerShape(18.dp)
+            )
             .padding(14.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -311,23 +348,20 @@ fun SubAccountItemCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (isActive) Color.White else ChipBackground),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = index.toString(),
-                            color = if (isActive) Color.Black else TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                    }
+                    BlockiesIdenticon(address = wallet.address, size = 32.dp)
                     Column {
-                        Text(text = wallet.name, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        Text(text = "${wallet.address.take(6)}...${wallet.address.takeLast(4)}", color = TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        Text(
+                            text = wallet.name,
+                            color = colorScheme.onSurface,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${wallet.address.take(6)}...${wallet.address.takeLast(4)}",
+                            color = colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
                     }
                 }
 
@@ -335,26 +369,55 @@ fun SubAccountItemCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color.White)
+                            .background(colorScheme.onBackground)
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
-                        Text(text = "ACTIVE", color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        Text(
+                            text = "ACTIVE",
+                            color = colorScheme.background,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
                     }
                 } else {
-                    TextButton(onClick = onSwitch, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)) {
-                        Text(text = "Switch", color = BrandAccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    TextButton(
+                        onClick = onSwitch,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "Switch",
+                            color = colorScheme.onSurface,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
             }
 
-            // Quick actions
+            // Quick actions row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                ActionButtonSmall(label = if (isCopied) "Copied" else "Copy", icon = Icons.Default.ContentCopy, onClick = onCopy, modifier = Modifier.weight(1f))
-                ActionButtonSmall(label = "Funds", icon = Icons.Default.SouthWest, onClick = onDeposit, modifier = Modifier.weight(1f))
-                ActionButtonSmall(label = "Key", icon = Icons.Default.Key, onClick = onRevealKey, modifier = Modifier.weight(1f))
+                ActionButtonSmall(
+                    label = if (isCopied) "Copied" else "Copy",
+                    icon = if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+                    onClick = onCopy,
+                    modifier = Modifier.weight(1f)
+                )
+                ActionButtonSmall(
+                    label = "Funds",
+                    icon = Icons.Default.SouthWest,
+                    onClick = onDeposit,
+                    modifier = Modifier.weight(1f)
+                )
+                ActionButtonSmall(
+                    label = "Info",
+                    icon = Icons.Default.Key,
+                    onClick = onRevealKey,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
@@ -367,18 +430,30 @@ fun ActionButtonSmall(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colorScheme = MaterialTheme.colorScheme
+
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(ChipBackground)
+            .background(colorScheme.surfaceVariant)
             .clickable { onClick() }
             .padding(vertical = 6.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(imageVector = icon, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(12.dp))
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(12.dp)
+        )
         Spacer(modifier = Modifier.width(4.dp))
-        Text(text = label, color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Text(
+            text = label,
+            color = colorScheme.onSurfaceVariant,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
@@ -394,6 +469,7 @@ fun HoldToRevealKeyBottomSheet(
     val clipboardManager = LocalClipboardManager.current
     var isCopied by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+    val colorScheme = MaterialTheme.colorScheme
 
     LaunchedEffect(wallet.id) {
         coroutineScope.launch {
@@ -403,7 +479,7 @@ fun HoldToRevealKeyBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = CardSurfaceDark,
+        containerColor = colorScheme.surface,
         tonalElevation = 16.dp
     ) {
         Column(
@@ -417,22 +493,27 @@ fun HoldToRevealKeyBottomSheet(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.08f)),
+                    .background(colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Lock, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(24.dp))
+                Icon(
+                    Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = colorScheme.onSurface,
+                    modifier = Modifier.size(24.dp)
+                )
             }
 
             Text(
-                text = "Reveal Private Key",
-                color = TextPrimary,
+                text = "Vault Key Attestation",
+                color = colorScheme.onSurface,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
 
             Text(
-                text = "Never share your private key. Anyone with this key has full control over the funds in ${wallet.name}.",
-                color = StatusRed,
+                text = "Northveil operates on a hardware-isolated Non-Custodial MPC control plane. Derivation seed and sub-keys are encrypted in your hardware keystore.",
+                color = StatusAmber,
                 fontSize = 12.sp,
                 lineHeight = 16.sp
             )
@@ -442,8 +523,8 @@ fun HoldToRevealKeyBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color.Black)
-                    .border(1.dp, CardSurfaceBorderDark, RoundedCornerShape(16.dp))
+                    .background(colorScheme.surfaceVariant)
+                    .border(1.dp, colorScheme.outline, RoundedCornerShape(16.dp))
                     .padding(16.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -452,7 +533,7 @@ fun HoldToRevealKeyBottomSheet(
 
                 Text(
                     text = displayKey,
-                    color = TextPrimary,
+                    color = colorScheme.onSurface,
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
                     modifier = Modifier.blur(blurRadius)
@@ -461,7 +542,7 @@ fun HoldToRevealKeyBottomSheet(
                 if (!isHolding) {
                     Text(
                         text = "HOLD BUTTON TO UNBLUR",
-                        color = BrandAccentYellow,
+                        color = colorScheme.onSurfaceVariant,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
@@ -474,7 +555,7 @@ fun HoldToRevealKeyBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(24.dp))
-                    .background(if (isHolding) BrandAccentYellow else Color.White)
+                    .background(colorScheme.onBackground)
                     .pointerInput(Unit) {
                         detectTapGestures(
                             onPress = {
@@ -489,7 +570,7 @@ fun HoldToRevealKeyBottomSheet(
             ) {
                 Text(
                     text = if (isHolding) "REVEALING CREDENTIAL..." else "HOLD TO REVEAL",
-                    color = Color.Black,
+                    color = colorScheme.background,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp
                 )
@@ -504,9 +585,18 @@ fun HoldToRevealKeyBottomSheet(
                 },
                 enabled = isHolding
             ) {
-                Icon(if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(14.dp))
+                Icon(
+                    if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+                    contentDescription = null,
+                    tint = colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp)
+                )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(text = if (isCopied) "Copied Key" else "Copy Private Key", color = TextSecondary, fontSize = 12.sp)
+                Text(
+                    text = if (isCopied) "Copied Credential" else "Copy Vault Credential",
+                    color = colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp
+                )
             }
         }
     }

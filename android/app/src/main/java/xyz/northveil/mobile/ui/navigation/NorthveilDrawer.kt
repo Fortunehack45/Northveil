@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import xyz.northveil.mobile.core.designsystem.NorthveilBranding
 import xyz.northveil.mobile.core.designsystem.theme.*
 
 enum class DrawerItem(val title: String, val icon: ImageVector) {
@@ -30,9 +31,12 @@ fun NorthveilDrawerContent(
     onItemSelected: (DrawerItem) -> Unit,
     onCloseDrawer: () -> Unit
 ) {
+    val colorScheme = MaterialTheme.colorScheme
+    val themeModeState = LocalThemeMode.current
+
     ModalDrawerSheet(
-        drawerContainerColor = CardSurfaceDark,
-        drawerContentColor = TextPrimary,
+        drawerContainerColor = colorScheme.surface,
+        drawerContentColor = colorScheme.onSurface,
         modifier = Modifier.width(300.dp)
     ) {
         Column(
@@ -48,19 +52,28 @@ fun NorthveilDrawerContent(
                 modifier = Modifier.padding(bottom = 12.dp)
             ) {
                 coil.compose.AsyncImage(
-                    model = xyz.northveil.mobile.core.designsystem.NorthveilBranding.WALLET_LOGO_URL,
+                    model = NorthveilBranding.WALLET_LOGO_URL,
                     contentDescription = "Northveil Wallet Logo",
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(10.dp))
                 )
                 Column {
-                    Text("Northveil", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                    Text("Native Mobile Vault", fontSize = 12.sp, color = TextSecondary)
+                    Text(
+                        "Northveil",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorScheme.onSurface
+                    )
+                    Text(
+                        "Non-Custodial MPC Vault",
+                        fontSize = 12.sp,
+                        color = colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
-            HorizontalDivider(color = CardSurfaceBorderDark)
+            HorizontalDivider(color = colorScheme.outline)
 
             DrawerItem.entries.forEach { item ->
                 Row(
@@ -75,16 +88,69 @@ fun NorthveilDrawerContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(imageVector = item.icon, contentDescription = item.title, tint = TextSecondary, modifier = Modifier.size(20.dp))
-                    Text(text = item.title, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = item.title,
+                        tint = colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = item.title,
+                        color = colorScheme.onSurface,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.weight(1f))
+
+            // Quick Theme Switcher Button (Web Parity)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(colorScheme.surfaceVariant)
+                    .clickable {
+                        themeModeState.value = when (themeModeState.value) {
+                            ThemeMode.SYSTEM -> ThemeMode.DARK
+                            ThemeMode.DARK -> ThemeMode.LIGHT
+                            ThemeMode.LIGHT -> ThemeMode.DARK
+                        }
+                    }
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = if (themeModeState.value == ThemeMode.LIGHT) Icons.Default.LightMode else Icons.Default.DarkMode,
+                        contentDescription = "Theme",
+                        tint = colorScheme.onSurface,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Theme: ${themeModeState.value.name}",
+                        color = colorScheme.onSurface,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                Text(
+                    text = "Toggle",
+                    color = colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
             Text(
-                text = "v1.0.0 (Native Android Engine)",
+                text = "v1.0.0 (Non-Custodial Engine)",
                 fontSize = 11.sp,
-                color = TextTertiary,
+                color = colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 14.dp)
             )
         }

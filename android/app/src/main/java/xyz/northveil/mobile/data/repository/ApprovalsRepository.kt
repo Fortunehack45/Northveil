@@ -44,19 +44,37 @@ class ApprovalsRepository @Inject constructor(
         }
     }
 
-    suspend fun updateDecision(id: String, isApproved: Boolean) {
+    suspend fun createTestApprovalRequest(toolName: String = "transfer_token") {
+        val testEntity = ApprovalRecordEntity(
+            id = "appr-${System.currentTimeMillis()}",
+            toolName = toolName,
+            txHash = null,
+            agentType = "Claude Desktop",
+            status = "PENDING",
+            parametersJson = "{\"amount\": 0.15, \"token\": \"ETH\", \"recipient\": \"0x56f0...4517\", \"approvalToken\": \"tok_${System.currentTimeMillis().toString(16)}\"}",
+            timestamp = System.currentTimeMillis()
+        )
+        approvalDao.insertApprovals(listOf(testEntity))
+    }
+
+    suspend fun updateDecision(id: String, isApproved: Boolean): Result<Unit> {
         val status = if (isApproved) "CONFIRMED" else "REJECTED"
+        val mockTxHash = if (isApproved) "0x" + (1..64).map { "0123456789abcdef".random() }.joinToString("") else null
+        
         approvalDao.updateApprovalStatus(id, status)
-        try {
+        return try {
             apiService.submitApprovalDecision(id, ApprovalDecisionDto(if (isApproved) "approved" else "rejected"))
-        } catch (_: Exception) {}
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.success(Unit) // Offline local state updated
+        }
     }
 
     private suspend fun seedDefaultApprovals() {
         val defaults = listOf(
-            ApprovalRecordEntity("appr-1", "transfer_token", "0x3a4b...9c1d", "Claude Desktop", "CONFIRMED", "{\"amount\": 0.25, \"token\": \"ETH\"}", System.currentTimeMillis() - 3600000),
-            ApprovalRecordEntity("appr-2", "deploy_smart_contract", null, "ChatGPT Agent", "PENDING", "{\"name\": \"AI Vault Token\", \"symbol\": \"AIV\"}", System.currentTimeMillis() - 1200000),
-            ApprovalRecordEntity("appr-3", "execute_swap", "0x8f2a...4b7e", "Autonomous Agent", "CONFIRMED", "{\"from\": \"USDT\", \"to\": \"ETH\"}", System.currentTimeMillis() - 7200000)
+            ApprovalRecordEntity("appr-1", "transfer_token", "0x3a4b9c1d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b", "Claude Desktop", "CONFIRMED", "{\"amount\": 0.25, \"token\": \"ETH\", \"recipient\": \"0x8767...8345\"}", System.currentTimeMillis() - 3600000),
+            ApprovalRecordEntity("appr-2", "deploy_smart_contract", null, "ChatGPT Agent", "PENDING", "{\"name\": \"AI Vault Token\", \"symbol\": \"AIV\", \"standard\": \"ERC-20\", \"approvalToken\": \"tok_a8b9c0d1e2f3\"}", System.currentTimeMillis() - 1200000),
+            ApprovalRecordEntity("appr-3", "execute_swap", "0x8f2a4b7e1c3d5e7f9a0b2c4d6e8f0a1b3c5d7e9f", "Autonomous Agent", "CONFIRMED", "{\"from\": \"USDT\", \"to\": \"ETH\", \"amount\": 250.00}", System.currentTimeMillis() - 7200000)
         )
         approvalDao.insertApprovals(defaults)
     }
