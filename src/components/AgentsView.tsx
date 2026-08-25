@@ -152,11 +152,11 @@ export const AgentsView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
         <div>
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white text-xs font-mono font-medium flex items-center gap-1.5">
+            <span className="px-2.5 py-0.5 rounded-full bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white text-xs font-mono font-medium flex items-center gap-1.5 whitespace-nowrap">
               <span className={`w-1.5 h-1.5 rounded-full bg-zinc-900 dark:bg-white ${mcpOnline ? 'animate-pulse' : 'opacity-40'}`} />
-              {mcpOnline ? 'MCP SERVER ACTIVE' : 'MCP GATEWAY LOCAL'}
+              {mcpOnline ? 'MCP ACTIVE' : 'MCP LOCAL'}
             </span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono whitespace-nowrap">
               {agents.filter((a) => a.status === 'active').length} Connected
             </span>
           </div>
@@ -171,24 +171,24 @@ export const AgentsView: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={() => handleOpenConnect('claude')}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs sm:text-sm hover:opacity-85 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
+            className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs sm:text-sm hover:opacity-85 active:scale-[0.98] transition-all shadow-sm cursor-pointer whitespace-nowrap"
           >
             <Bot className="w-4 h-4" />
-            Connect Claude
+            <span>Connect Claude</span>
           </button>
           <button
             onClick={() => handleOpenConnect('chatgpt')}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white active:scale-[0.98] font-medium text-xs sm:text-sm transition-all cursor-pointer"
+            className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white active:scale-[0.98] font-medium text-xs sm:text-sm transition-all cursor-pointer whitespace-nowrap"
           >
             <Sparkles className="w-4 h-4" />
-            Connect ChatGPT
+            <span>Connect ChatGPT</span>
           </button>
           <button
             onClick={() => handleOpenConnect('custom')}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white active:scale-[0.98] font-medium text-xs sm:text-sm transition-all cursor-pointer"
+            className="flex items-center gap-1.5 sm:gap-2 px-3.5 py-2 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white active:scale-[0.98] font-medium text-xs sm:text-sm transition-all cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-4 h-4 text-zinc-500 dark:text-zinc-300" />
-            Custom
+            <span>Custom</span>
           </button>
         </div>
       </div>

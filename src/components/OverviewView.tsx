@@ -111,13 +111,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="px-3 py-1 rounded-full bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white text-xs font-mono font-medium flex items-center gap-1.5">
+              <span className="px-3 py-1 rounded-full bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white text-xs font-mono font-medium flex items-center gap-1.5 whitespace-nowrap">
                 <span className="w-1.5 h-1.5 rounded-full bg-zinc-900 dark:bg-white animate-pulse" />
                 VAULT OVERVIEW
               </span>
               <button
                 onClick={handleCopyAddress}
-                className="px-3 py-1 rounded-full bg-black/[0.04] dark:bg-white/[0.04] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="px-3 py-1 rounded-full bg-black/[0.04] dark:bg-white/[0.04] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap"
                 title="Copy Active Address"
               >
                 <span>{activeSubWallet?.name || 'Primary Vault'}:</span>
@@ -151,31 +151,31 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div id="tour-action-bar" className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          <div id="tour-action-bar" className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button
               onClick={() => onOpenSend()}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs sm:text-sm hover:opacity-85 active:scale-[0.98] transition-all shadow-md cursor-pointer"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2.5 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs sm:text-sm hover:opacity-85 active:scale-[0.98] transition-all shadow-md cursor-pointer whitespace-nowrap"
             >
               <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-              Send
+              <span>Send</span>
             </button>
             <button
               onClick={() => onOpenReceive()}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white active:scale-[0.98] font-medium text-xs sm:text-sm transition-all cursor-pointer"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2.5 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white active:scale-[0.98] font-medium text-xs sm:text-sm transition-all cursor-pointer whitespace-nowrap"
             >
               <ArrowDownLeft className="w-4 h-4" />
-              Receive
+              <span>Receive</span>
             </button>
             <button
               onClick={() => setShowAddFundsModal(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white font-medium text-xs sm:text-sm active:scale-[0.98] transition-all cursor-pointer"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2.5 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white font-medium text-xs sm:text-sm active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
-              Add Funds
+              <span>Deposit</span>
             </button>
             <button
               onClick={onNavigateApprovals}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white active:scale-[0.98] font-medium text-xs sm:text-sm transition-all cursor-pointer"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2.5 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white active:scale-[0.98] font-medium text-xs sm:text-sm transition-all cursor-pointer whitespace-nowrap"
               title="MCP Action Approvals"
             >
               <ShieldCheck className="w-4 h-4" />

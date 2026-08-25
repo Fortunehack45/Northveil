@@ -120,13 +120,13 @@ export const ProfileView: React.FC = () => {
               <User className="w-8 h-8" />
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white">
+                <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white whitespace-nowrap truncate">
                   {activeSubWallet?.name || 'Primary Vault'}
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-full bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white text-xs font-mono font-medium">
-                  VERIFIED IDENTITY
+                <span className="px-2.5 py-0.5 rounded-full bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white text-xs font-mono font-medium whitespace-nowrap shrink-0">
+                  VERIFIED
                 </span>
               </div>
               <div className="flex items-center gap-2 text-xs font-mono text-zinc-500 dark:text-zinc-400">

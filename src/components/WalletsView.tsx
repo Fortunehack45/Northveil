@@ -218,17 +218,17 @@ export const WalletsView: React.FC = () => {
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs sm:text-sm hover:opacity-85 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
+            className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs sm:text-sm hover:opacity-85 active:scale-[0.98] transition-all shadow-sm cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
-            Create Account
+            <span>New Account</span>
           </button>
           <button
             onClick={() => setShowImportModal(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white active:scale-[0.98] font-medium text-xs sm:text-sm transition-all cursor-pointer"
+            className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white active:scale-[0.98] font-medium text-xs sm:text-sm transition-all cursor-pointer whitespace-nowrap"
           >
             <Upload className="w-4 h-4" />
-            Import
+            <span>Import</span>
           </button>
         </div>
       </div>
@@ -240,23 +240,23 @@ export const WalletsView: React.FC = () => {
         <div className="relative z-10 space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-black text-white dark:bg-white dark:text-black font-bold shadow-md">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-black text-white dark:bg-white dark:text-black font-bold shadow-md shrink-0">
                 <Wallet className="w-6 h-6 stroke-[2]" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white">
+                  <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white whitespace-nowrap truncate">
                     {activeSubWallet?.name}
                   </h2>
                   <button
                     onClick={() => handleOpenRename(activeSubWallet)}
-                    className="p-1 rounded text-zinc-500 hover:text-black dark:hover:text-white hover:bg-black/[0.06] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+                    className="p-1 rounded text-zinc-500 hover:text-black dark:hover:text-white hover:bg-black/[0.06] dark:hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0"
                     title="Rename"
                   >
                     <Edit3 className="w-4 h-4" />
                   </button>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-black/[0.06] dark:bg-white/[0.1] text-zinc-900 dark:text-white font-semibold">
-                    PRIMARY ACTIVE
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-black/[0.06] dark:bg-white/[0.1] text-zinc-900 dark:text-white font-semibold whitespace-nowrap shrink-0">
+                    PRIMARY
                   </span>
                 </div>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">
@@ -289,32 +289,32 @@ export const WalletsView: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2.5 pt-2">
             <button
               onClick={() => handleOpenDeposit(activeSubWallet)}
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs hover:opacity-85 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
+              className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs hover:opacity-85 active:scale-[0.98] transition-all shadow-sm cursor-pointer whitespace-nowrap"
             >
               <ArrowDownLeft className="w-4 h-4 stroke-[2]" />
-              Add Funds
+              <span>Deposit</span>
             </button>
             <button
               onClick={() => handleOpenReveal(activeSubWallet)}
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white active:scale-[0.98] font-medium text-xs transition-all cursor-pointer"
+              className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white active:scale-[0.98] font-medium text-xs transition-all cursor-pointer whitespace-nowrap"
             >
               <Key className="w-4 h-4" />
-              Reveal Private Key
+              <span>Private Key</span>
             </button>
             <button
               onClick={() => handleOpenRename(activeSubWallet)}
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/[0.04] dark:bg-white/[0.04] text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-black/[0.08] dark:hover:bg-white/[0.08] active:scale-[0.98] font-medium text-xs transition-all cursor-pointer"
+              className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 rounded-full bg-black/[0.04] dark:bg-white/[0.04] text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-black/[0.08] dark:hover:bg-white/[0.08] active:scale-[0.98] font-medium text-xs transition-all cursor-pointer whitespace-nowrap"
             >
               <Edit3 className="w-4 h-4" />
-              Edit Name
+              <span>Edit</span>
             </button>
             {subWallets.length > 1 && (
               <button
                 onClick={() => handleOpenDelete(activeSubWallet)}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/[0.04] dark:bg-white/[0.04] text-zinc-500 hover:text-red-500 hover:bg-red-500/10 active:scale-[0.98] font-medium text-xs transition-all cursor-pointer ml-auto"
+                className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 rounded-full bg-black/[0.04] dark:bg-white/[0.04] text-zinc-500 hover:text-red-500 hover:bg-red-500/10 active:scale-[0.98] font-medium text-xs transition-all cursor-pointer ml-auto whitespace-nowrap"
               >
                 <Trash2 className="w-4 h-4" />
-                Delete
+                <span>Delete</span>
               </button>
             )}
           </div>

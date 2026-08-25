@@ -114,11 +114,11 @@ export const ApprovalsView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
         <div>
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white text-xs font-mono font-medium flex items-center gap-1.5">
+            <span className="px-2.5 py-0.5 rounded-full bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white text-xs font-mono font-medium flex items-center gap-1.5 whitespace-nowrap">
               <ShieldCheck className="w-3.5 h-3.5" />
-              LIVE SUPABASE ON-CHAIN AUDIT
+              ON-CHAIN AUDIT
             </span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono whitespace-nowrap">
               {approvals.length} Live Records
             </span>
           </div>
@@ -134,10 +134,10 @@ export const ApprovalsView: React.FC = () => {
           <button
             onClick={handleCreateTestRequest}
             disabled={isCreatingTest}
-            className="px-3.5 py-1.5 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold hover:opacity-85 active:scale-[0.98] transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold hover:opacity-85 active:scale-[0.98] transition-all cursor-pointer shadow-sm flex items-center gap-1.5 whitespace-nowrap"
           >
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>{isCreatingTest ? 'Submitting...' : '+ New Test Request'}</span>
+            <span>{isCreatingTest ? 'Submitting...' : '+ Test Request'}</span>
           </button>
           <button
             onClick={fetchLogs}
@@ -147,10 +147,10 @@ export const ApprovalsView: React.FC = () => {
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-zinc-900 dark:text-white' : ''}`} />
           </button>
-          <span className="px-3 py-1 rounded-full bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white font-medium">
+          <span className="px-3 py-1 rounded-full bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white font-medium whitespace-nowrap">
             {approvals.filter((a) => a.status === 'CONFIRMED').length} Confirmed
           </span>
-          <span className="px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium">
+          <span className="px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap">
             {approvals.filter((a) => a.status === 'PENDING').length} Pending
           </span>
         </div>
@@ -160,9 +160,9 @@ export const ApprovalsView: React.FC = () => {
       {/* SEARCH BAR & STATUS TABS (Seamless) */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-        <div className="mono-segmented-container">
+        <div className="mono-segmented-container flex flex-wrap">
           {[
-            { id: 'ALL', label: 'All History' },
+            { id: 'ALL', label: 'All' },
             { id: 'CONFIRMED', label: 'Confirmed' },
             { id: 'PENDING', label: 'Pending' },
             { id: 'REJECTED', label: 'Failed' },
@@ -170,7 +170,7 @@ export const ApprovalsView: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setFilterStatus(tab.id as any)}
-              className={`px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                 filterStatus === tab.id
                   ? 'bg-black text-white dark:bg-white dark:text-black font-semibold shadow'
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white'

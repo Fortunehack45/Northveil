@@ -478,10 +478,10 @@ export const DeveloperHubView: React.FC = () => {
       {/* ═══════════════════════════════════════════════════════════════════ */}
       <div className="mono-segmented-container w-full sm:w-auto flex flex-wrap">
         {[
-          { id: 'cli', label: 'CLI Tool', icon: Terminal },
-          { id: 'sdk', label: 'TypeScript SDK', icon: Code2 },
+          { id: 'cli', label: 'CLI', icon: Terminal },
+          { id: 'sdk', label: 'SDK', icon: Code2 },
           { id: 'webhooks', label: 'Webhooks', icon: Webhook },
-          { id: 'playground', label: 'MCP Playground', icon: Play },
+          { id: 'playground', label: 'Playground', icon: Play },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -489,7 +489,7 @@ export const DeveloperHubView: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 ${
+              className={`flex-1 sm:flex-none px-3.5 sm:px-4 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap ${
                 isActive
                   ? 'bg-black text-white dark:bg-white dark:text-black font-semibold shadow'
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white'
@@ -603,10 +603,10 @@ export const DeveloperHubView: React.FC = () => {
                   'sdk-code'
                 )
               }
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/[0.06] dark:bg-white/[0.08] hover:bg-black/[0.12] dark:hover:bg-white/[0.16] text-zinc-900 dark:text-white text-xs font-mono cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/[0.06] dark:bg-white/[0.08] hover:bg-black/[0.12] dark:hover:bg-white/[0.16] text-zinc-900 dark:text-white text-xs font-mono cursor-pointer whitespace-nowrap"
             >
               {copiedSection === 'sdk-code' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              Copy Code
+              <span>Copy</span>
             </button>
           </div>
 
