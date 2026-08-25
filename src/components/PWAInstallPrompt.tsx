@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, X, Smartphone, Monitor, Share2, PlusSquare, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Smartphone, X, Download } from 'lucide-react';
 
 export const PWAInstallPrompt: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -21,7 +21,6 @@ export const PWAInstallPrompt: React.FC = () => {
     const isIphoneOrIpad = /iphone|ipad|ipod/.test(userAgent);
     if (isIphoneOrIpad) {
       setIsIOS(true);
-      // Check if user dismissed prompt recently
       const dismissed = localStorage.getItem('northveil_pwa_dismissed');
       if (!dismissed) {
         setShowPrompt(true);
@@ -68,97 +67,64 @@ export const PWAInstallPrompt: React.FC = () => {
   return (
     <>
       {/* Floating Bottom PWA Banner */}
-      <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 bg-[#141419] border-3 border-white p-4 shadow-[8px_8px_0px_0px_#ccff00] font-mono animate-in slide-in-from-bottom duration-300">
+      <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 bg-white dark:bg-[#121215] border border-black/[0.08] dark:border-white/[0.1] rounded-3xl p-4 shadow-2xl mono-animate-in">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-[#ccff00] border-2 border-black flex items-center justify-center text-black shrink-0 shadow-[2px_2px_0px_0px_#000]">
-              <Smartphone className="w-6 h-6 stroke-[2.5]" />
+            <div className="w-10 h-10 rounded-2xl bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-bold shrink-0 shadow-sm">
+              <Smartphone className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-black text-white uppercase tracking-wider">INSTALL NORTHVEIL APP</span>
-                <span className="px-1.5 py-0.5 bg-[#00f0ff] text-black text-[9px] font-black uppercase border border-black">PWA</span>
+                <span className="text-xs font-bold text-zinc-900 dark:text-white">Install Northveil App</span>
+                <span className="px-1.5 py-0.2 bg-black/[0.06] dark:bg-white/[0.08] text-zinc-700 dark:text-white text-[9px] font-mono rounded border border-black/[0.08] dark:border-white/20">
+                  PWA
+                </span>
               </div>
-              <p className="text-[11px] text-slate-300 mt-0.5">
-                Install as native app on iOS, Android, macOS & Windows!
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Install as a native standalone app on your device.
               </p>
             </div>
           </div>
 
           <button
             onClick={handleDismiss}
-            className="text-slate-400 hover:text-white p-1 hover:bg-white/10"
+            className="text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white p-1 text-xs font-medium cursor-pointer"
             title="Dismiss"
           >
-            <X className="w-4 h-4 stroke-[3]" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="mt-3 pt-3 border-t border-white/20 flex items-center gap-2">
+        <div className="mt-3 pt-3 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center gap-2">
           <button
             onClick={handleInstallClick}
-            className="flex-1 py-2 bg-[#ccff00] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:bg-[#d8ff33] cursor-pointer flex items-center justify-center gap-1.5 transition-all"
+            className="flex-1 py-2 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer flex items-center justify-center gap-1.5 transition-all shadow-sm"
           >
-            <Download className="w-4 h-4 stroke-[3]" />
-            <span>INSTALL NOW</span>
+            <Download className="w-3.5 h-3.5" />
+            <span>Install Now</span>
           </button>
           <button
             onClick={handleDismiss}
-            className="px-3 py-2 bg-[#0a0a0c] text-slate-300 font-bold text-xs uppercase border-2 border-white hover:text-white cursor-pointer"
+            className="px-3.5 py-2 bg-black/[0.04] dark:bg-white/[0.04] text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white text-xs font-medium rounded-full cursor-pointer transition-colors"
           >
-            LATER
+            Later
           </button>
         </div>
       </div>
 
-      {/* iOS Step-By-Step Installation Modal */}
+      {/* iOS Instructions Modal */}
       {showIOSInstructions && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 font-mono">
-          <div className="bg-[#141419] border-4 border-white p-6 max-w-md w-full shadow-[10px_10px_0px_0px_#00f0ff] space-y-5 relative">
-            <div className="flex items-center justify-between border-b-2 border-white pb-3">
-              <div className="flex items-center gap-2">
-                <Share2 className="w-5 h-5 text-[#00f0ff]" />
-                <span className="text-white font-black text-sm uppercase">INSTALL ON IOS SAFARI</span>
-              </div>
-              <button
-                onClick={() => setShowIOSInstructions(false)}
-                className="text-slate-400 hover:text-white p-1"
-              >
-                <X className="w-5 h-5 stroke-[3]" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs text-slate-200">
-              <div className="flex items-start gap-3 bg-[#0a0a0c] p-3 border-2 border-white">
-                <span className="w-6 h-6 rounded-full bg-[#00f0ff] text-black font-black flex items-center justify-center shrink-0">1</span>
-                <div>
-                  <p className="font-black text-white uppercase">Tap Share Button</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Tap the Share icon at the bottom of your Safari browser bar.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 bg-[#0a0a0c] p-3 border-2 border-white">
-                <span className="w-6 h-6 rounded-full bg-[#ccff00] text-black font-black flex items-center justify-center shrink-0">2</span>
-                <div>
-                  <p className="font-black text-white uppercase">Add to Home Screen</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Scroll down in the action menu and tap <strong>"Add to Home Screen"</strong>.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 bg-[#0a0a0c] p-3 border-2 border-white">
-                <span className="w-6 h-6 rounded-full bg-[#ff007f] text-white font-black flex items-center justify-center shrink-0">3</span>
-                <div>
-                  <p className="font-black text-white uppercase">Launch Northveil App</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Tap "Add" in the top right to open Northveil as a standalone app!</p>
-                </div>
-              </div>
-            </div>
-
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 dark:bg-black/80 p-4 mono-animate-in">
+          <div className="bg-white dark:bg-[#121215] border border-black/[0.08] dark:border-white/[0.1] rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-center">
+            <h3 className="text-base font-bold text-zinc-900 dark:text-white">Install on iOS Safari</h3>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              Tap the <strong>Share button (square with arrow)</strong> in your Safari toolbar at the bottom, then scroll down and select <strong>"Add to Home Screen"</strong>.
+            </p>
             <button
               onClick={() => setShowIOSInstructions(false)}
-              className="w-full py-2.5 bg-[#ccff00] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:bg-[#d8ff33] cursor-pointer"
+              className="w-full py-2.5 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer shadow-sm"
             >
-              GOT IT!
+              Got it
             </button>
           </div>
         </div>

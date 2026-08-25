@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useWallet } from '../context/WalletContext';
-import { CustomSelect } from './CustomSelect';
 import { TokenSearchModal } from './TokenSearchModal';
-import { Send, QrCode, Copy, Check, ShieldCheck, HardDrive, AlertTriangle, ChevronDown, Search } from 'lucide-react';
+import { Send, QrCode, Copy, Check, ChevronDown } from 'lucide-react';
 
 interface SendReceiveModalProps {
   mode: 'send' | 'receive';
@@ -15,13 +15,13 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
   initialAssetId,
   onClose,
 }) => {
-  const { assets, sendCrypto, receiveCrypto, triggerBiometricAuth, hardwareWallet, activeSubWallet } = useWallet();
+  const { assets, sendCrypto, triggerBiometricAuth, hardwareWallet, activeSubWallet } = useWallet();
 
   const [selectedAssetId, setSelectedAssetId] = useState<string>(
     initialAssetId || assets[0]?.id || 'eth-main'
   );
   const [recipientAddress, setRecipientAddress] = useState<string>('');
-  const [amount, setAmount] = useState<string>('0.5');
+  const [amount, setAmount] = useState<string>('0.05');
   const [copied, setCopied] = useState<boolean>(false);
   const [isSending, setIsSending] = useState<boolean>(false);
   const [isTokenSearchOpen, setIsTokenSearchOpen] = useState<boolean>(false);
@@ -68,8 +68,8 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
     });
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 animate-fadeIn">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 dark:bg-black/80 p-4 sm:p-6 mono-animate-in">
       {/* Token Search Modal */}
       <TokenSearchModal
         isOpen={isTokenSearchOpen}
@@ -79,108 +79,173 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
           setSelectedAssetId(t.id);
           setIsTokenSearchOpen(false);
         }}
-        title="SELECT ASSET FOR TRANSACTION"
+        title="Select Token"
       />
 
-      <div className="bg-[#141419] border-t-4 sm:border-4 border-white p-5 sm:p-8 max-w-md w-full rounded-t-3xl sm:rounded-none shadow-[0px_-8px_20px_rgba(0,0,0,0.9)] sm:shadow-[10px_10px_0px_0px_#ccff00] relative space-y-4 max-h-[88vh] sm:max-h-[90vh] overflow-y-auto no-scrollbar font-mono">
-        {/* Native Mobile Sheet Pull Handle Bar */}
-        <div className="w-12 h-1.5 bg-white/40 rounded-full mx-auto sm:hidden -mt-1 mb-2" />
-
-        <div className="flex items-center justify-between border-b-2 border-white pb-3">
-          <h3 className="text-xl font-black text-white font-mono uppercase flex items-center gap-2 tracking-tight">
-            {mode === 'send' ? <Send className="w-5 h-5 text-[#ccff00] stroke-[3]" /> : <QrCode className="w-5 h-5 text-[#ccff00] stroke-[3]" />}
-            <span>{mode === 'send' ? `SEND ${asset.symbol}` : `RECEIVE ${asset.symbol}`}</span>
-          </h3>
+      <div className="bg-white dark:bg-[#121215] border border-black/[0.08] dark:border-white/[0.08] rounded-3xl max-w-md w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+        {/* Fixed Header (Never Cut Off) */}
+        <div className="p-6 pb-3 flex items-center justify-between shrink-0 bg-white dark:bg-[#121215]">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-2xl bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white">
+              {mode === 'send' ? <Send className="w-5 h-5" /> : <QrCode className="w-5 h-5" />}
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-zinc-900 dark:text-white">
+                {mode === 'send' ? `Send ${asset.symbol}` : `Receive ${asset.symbol}`}
+              </h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+                {mode === 'send' ? 'Instant On-Chain Transfer' : 'Direct Multi-Chain Vault Deposit'}
+              </p>
+            </div>
+          </div>
           <button
             onClick={onClose}
-            className="p-1 px-3 border-2 border-black bg-[#ff007f] text-white font-black hover:bg-[#ff3399] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+            className="text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white p-2 rounded-full hover:bg-black/[0.06] dark:hover:bg-white/[0.06] text-sm font-medium cursor-pointer"
           >
             ✕
           </button>
         </div>
 
-        {/* Asset Selector Button */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-mono font-black text-slate-300 uppercase">SELECT ASSET</label>
-          <button
-            onClick={() => setIsTokenSearchOpen(true)}
-            className="w-full flex items-center justify-between bg-[#0a0a0c] border-2 border-white p-3 hover:border-[#00f0ff] cursor-pointer transition-all shadow-[3px_3px_0px_0px_#000]"
-          >
-            <div className="flex items-center gap-2.5">
-              <img src={asset.icon} alt={asset.symbol} className="w-6 h-6 object-contain" />
-              <div className="text-left">
-                <div className="text-xs font-black text-white uppercase">{asset.symbol} - {asset.name}</div>
-                <div className="text-[10px] text-slate-400 font-bold">BALANCE: {asset.balance} {asset.symbol}</div>
-              </div>
-            </div>
-            <ChevronDown className="w-4 h-4 text-slate-400 stroke-[3]" />
-          </button>
-        </div>
-
+        {/* Scrollable Modal Body */}
         {mode === 'send' ? (
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono font-black text-slate-300 uppercase">RECIPIENT ADDRESS</label>
+          <div className="p-6 pt-2 overflow-y-auto no-scrollbar space-y-4 flex-1">
+            {/* Token Selector */}
+            <div>
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Asset</label>
+              <button
+                type="button"
+                onClick={() => setIsTokenSearchOpen(true)}
+                className="w-full flex items-center justify-between p-3 bg-black/[0.04] dark:bg-black border border-black/[0.06] dark:border-transparent rounded-xl text-xs hover:bg-black/[0.07] dark:hover:bg-zinc-900 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <img
+                    src={asset.icon}
+                    alt={asset.symbol}
+                    className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover"
+                  />
+                  <div className="text-left">
+                    <span className="font-semibold text-zinc-900 dark:text-white block">{asset.name} ({asset.symbol})</span>
+                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">Balance: {asset.balance.toLocaleString()} {asset.symbol}</span>
+                  </div>
+                </div>
+                <ChevronDown className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+              </button>
+            </div>
+
+            {/* Recipient Input */}
+            <div>
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                Recipient Address
+              </label>
               <input
                 type="text"
-                placeholder="PASTE 0X ADDRESS OR ENS..."
+                placeholder={asset.network === 'solana' ? 'Solana base58 address...' : '0x...'}
                 value={recipientAddress}
                 onChange={(e) => setRecipientAddress(e.target.value)}
-                className="w-full bg-[#0a0a0c] border-2 border-white p-3 text-xs text-white font-mono focus:outline-none"
+                className="w-full bg-black/[0.04] dark:bg-black border border-black/[0.08] dark:border-white/[0.08] rounded-xl p-3 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-black dark:focus:border-white"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-mono font-black">
-                <span className="text-slate-300 uppercase">AMOUNT</span>
-                <span className="text-slate-300 uppercase">
-                  AVAILABLE: <strong className="text-[#ccff00] font-black">{asset.balance} {asset.symbol}</strong>
-                </span>
+            {/* Amount Input */}
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Amount</label>
+                <button
+                  type="button"
+                  onClick={() => setAmount(asset.balance.toString())}
+                  className="text-[11px] text-zinc-900 dark:text-white font-semibold hover:underline font-mono cursor-pointer"
+                >
+                  MAX ({asset.balance.toLocaleString()} {asset.symbol})
+                </button>
               </div>
               <input
                 type="number"
+                step="any"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-[#0a0a0c] border-2 border-white p-3 text-lg font-mono font-black text-white focus:outline-none"
+                className="w-full bg-black/[0.04] dark:bg-black border border-black/[0.08] dark:border-white/[0.08] rounded-xl p-3 text-sm text-zinc-900 dark:text-white font-mono font-medium focus:outline-none focus:border-black dark:focus:border-white"
               />
             </div>
 
+            {/* Transaction Review Breakdown */}
+            <div className="p-3.5 bg-black/[0.03] dark:bg-black/50 border border-black/[0.04] dark:border-transparent rounded-xl space-y-1.5 font-mono text-[11px]">
+              <div className="flex justify-between text-zinc-500 dark:text-zinc-400">
+                <span>Estimated Network Gas:</span>
+                <span className="text-zinc-900 dark:text-white font-medium">$2.50 USD</span>
+              </div>
+              <div className="flex justify-between text-zinc-500 dark:text-zinc-400">
+                <span>Total Outflow:</span>
+                <span className="text-zinc-900 dark:text-white font-semibold">
+                  {numAmount} {asset.symbol} (~${(numAmount * asset.priceUsd).toFixed(2)})
+                </span>
+              </div>
+            </div>
+
+            {/* Send Button */}
             <button
-              disabled={isSending || !recipientAddress || numAmount <= 0}
               onClick={handleConfirmSend}
-              className="w-full py-3.5 bg-[#ccff00] text-black font-mono font-black uppercase tracking-wider text-xs border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:bg-[#d8ff33] active:translate-x-1 active:translate-y-1 active:shadow-none cursor-pointer disabled:opacity-50 transition-all"
+              disabled={isSending || !recipientAddress || numAmount <= 0}
+              className="w-full py-3 bg-black text-white dark:bg-white dark:text-black font-semibold rounded-full text-xs hover:opacity-85 active:scale-[0.98] cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
             >
-              {isSending ? 'SIGNING TRANSACTION...' : `SEND ${numAmount} ${asset.symbol}`}
+              {isSending ? 'Signing & Broadcasting...' : `Confirm & Send ${asset.symbol}`}
             </button>
           </div>
         ) : (
-          <div className="space-y-4 text-center">
-            {/* Generated QR Code placeholder */}
-            <div className="bg-white p-4 w-48 h-48 mx-auto flex items-center justify-center border-4 border-black shadow-[4px_4px_0px_0px_#000]">
+          <div className="p-6 pt-2 overflow-y-auto no-scrollbar space-y-4 flex-1 text-center">
+            {/* Token Selector for Receiving */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setIsTokenSearchOpen(true)}
+                className="w-full flex items-center justify-between p-3 bg-black/[0.04] dark:bg-black border border-black/[0.06] dark:border-transparent rounded-xl text-xs hover:bg-black/[0.07] dark:hover:bg-zinc-900 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <img
+                    src={asset.icon}
+                    alt={asset.symbol}
+                    className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover"
+                  />
+                  <div className="text-left">
+                    <span className="font-semibold text-zinc-900 dark:text-white block">{asset.name} ({asset.symbol})</span>
+                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono capitalize">{asset.network}</span>
+                  </div>
+                </div>
+                <ChevronDown className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+              </button>
+            </div>
+
+            {/* QR Display */}
+            <div className="mx-auto w-48 h-48 bg-white p-3 rounded-2xl border border-black/[0.08] shadow-md flex items-center justify-center">
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${getActiveDisplayAddress()}`}
-                alt="Deposit QR Code"
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=${getActiveDisplayAddress()}`}
+                alt="Deposit Address QR"
                 className="w-full h-full object-contain"
               />
             </div>
 
-            <div className="space-y-1">
-              <span className="text-[10px] font-mono text-slate-300 font-black uppercase tracking-wider">YOUR DEPOSIT ADDRESS ({asset.network.toUpperCase()})</span>
-              <div className="bg-[#0a0a0c] p-3 border-2 border-white text-xs font-mono text-[#00f0ff] font-bold break-all select-all shadow-[2px_2px_0px_0px_#000]">
+            {/* Address copy */}
+            <div className="p-3 bg-black/[0.04] dark:bg-black border border-black/[0.06] dark:border-transparent rounded-xl flex items-center justify-between gap-2">
+              <span className="font-mono text-xs text-zinc-900 dark:text-zinc-200 truncate">
                 {getActiveDisplayAddress()}
-              </div>
+              </span>
+              <button
+                onClick={handleCopyAddress}
+                className="p-1.5 rounded-lg bg-black/[0.06] dark:bg-white/[0.08] hover:bg-black/[0.12] dark:hover:bg-white/[0.16] text-zinc-900 dark:text-white cursor-pointer shrink-0"
+              >
+                {copied ? <Check className="w-4 h-4 text-zinc-900 dark:text-white" /> : <Copy className="w-4 h-4" />}
+              </button>
             </div>
 
             <button
-              onClick={handleCopyAddress}
-              className="w-full py-3.5 bg-[#00f0ff] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[4px_4px_0px_0px_#000] flex items-center justify-center gap-2 cursor-pointer hover:bg-[#33f3ff] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
+              onClick={onClose}
+              className="w-full py-3 bg-black text-white dark:bg-white dark:text-black font-semibold rounded-full text-xs hover:opacity-85 active:scale-[0.98] cursor-pointer transition-all shadow-md"
             >
-              {copied ? <Check className="w-4 h-4 text-black stroke-[3]" /> : <Copy className="w-4 h-4 stroke-[3]" />}
-              <span>{copied ? 'COPIED ADDRESS!' : 'COPY DEPOSIT ADDRESS'}</span>
+              Done
             </button>
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

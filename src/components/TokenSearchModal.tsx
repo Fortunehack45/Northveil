@@ -1,296 +1,167 @@
 import React, { useState, useMemo } from 'react';
-import {
-  X,
-  Search,
-  Star,
-  Loader2,
-  Check,
-  Plus,
-  Coins,
-  ArrowUpRight,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { useWallet } from '../context/WalletContext';
 import { CryptoAsset } from '../types';
-import { TokenService } from '../services/TokenService';
-import { INITIAL_ASSETS } from '../data/initialData';
+import {
+  Search,
+  Check,
+  Zap,
+  Sparkles,
+} from 'lucide-react';
 
 interface TokenSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectToken?: (asset: CryptoAsset) => void;
-  onSelect?: (asset: CryptoAsset) => void;
+  onSelectToken: (token: CryptoAsset) => void;
   selectedAssetId?: string;
   title?: string;
-  filterNetwork?: string;
 }
 
 export const TokenSearchModal: React.FC<TokenSearchModalProps> = ({
   isOpen,
   onClose,
   onSelectToken,
-  onSelect,
   selectedAssetId,
-  title = 'SELECT TOKEN',
-  filterNetwork,
+  title = 'Select Token',
 }) => {
-  const { assets, toggleFavoriteAsset, activeSubWallet, addCustomToken } = useWallet();
+  const { assets } = useWallet();
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState<'all' | 'favorites' | 'stables' | 'layer1' | 'defi'>('all');
-  const [isResolvingContract, setIsResolvingContract] = useState(false);
-  const [contractError, setContractError] = useState('');
+  const [activeCategory, setActiveCategory] = useState<'all' | 'holdings' | 'l1' | 'defi' | 'meme'>('all');
 
-  // Ensure assets fallback to INITIAL_ASSETS if assets array is empty
-  const baseAssets = (assets && assets.length > 0) ? assets : INITIAL_ASSETS;
+  const filteredTokens = useMemo(() => {
+    // 1. Separate tokens with balance > 0 vs 0 balance
+    const withBalance = assets
+      .filter((a) => a.balance > 0)
+      .sort((a, b) => (b.balance * b.priceUsd) - (a.balance * a.priceUsd));
 
-  // Filter assets by search query (symbol, name, contract address) and category
-  const filteredAssets = useMemo(() => {
-    let list = baseAssets;
+    const ethZero = assets.find((a) => a.id === 'eth-main' || (a.symbol === 'ETH' && a.network === 'ethereum'));
+    const usdcZero = assets.find((a) => a.id === 'usdc-eth' || (a.symbol === 'USDC' && a.network === 'ethereum'));
+    const solZero = assets.find((a) => a.id === 'sol-main' || (a.symbol === 'SOL' && a.network === 'solana'));
 
-    if (filterNetwork) {
-      list = list.filter((a) => a.network === filterNetwork);
-    }
+    const coreZero = [ethZero, usdcZero, solZero].filter(
+      (item): item is CryptoAsset => !!item && !withBalance.some((t) => t.id === item.id)
+    );
 
-    if (activeCategory === 'favorites') {
-      const favs = list.filter((a) => a.isFavorite);
-      list = favs.length > 0 ? favs : list;
-    } else if (activeCategory === 'stables') {
-      list = list.filter((a) => ['USDC', 'USDT', 'DAI', 'FDUSD', 'BUSD'].includes(a.symbol.toUpperCase()));
-    } else if (activeCategory === 'layer1') {
-      list = list.filter((a) => ['ETH', 'SOL', 'BTC', 'POL', 'BNB', 'AVAX', 'MATIC'].includes(a.symbol.toUpperCase()));
-    } else if (activeCategory === 'defi') {
-      list = list.filter((a) => ['UNI', 'AAVE', 'LINK', 'CRV', 'LDO', 'MKR', 'PENDLE', 'SNX'].includes(a.symbol.toUpperCase()));
-    }
+    const baseList = [...withBalance, ...coreZero];
 
-    const query = searchQuery.trim().toLowerCase();
-    let result = list;
-    if (query) {
-      result = list.filter((a) => {
-        const matchSymbol = (a.symbol || '').toLowerCase().includes(query);
-        const matchName = (a.name || '').toLowerCase().includes(query);
-        const matchContract = a.contractAddress ? a.contractAddress.toLowerCase().includes(query) : false;
-        return matchSymbol || matchName || matchContract;
-      });
-    }
+    return baseList.filter((asset) => {
+      // Category filter
+      if (activeCategory === 'holdings' && asset.balance <= 0) return false;
+      if (activeCategory === 'meme' && !asset.name.toLowerCase().includes('pepe') && !asset.name.toLowerCase().includes('doge') && !asset.name.toLowerCase().includes('bonk')) return false;
 
-    // Sort Alphabetically by Symbol (A to Z)
-    return [...result].sort((a, b) => (a.symbol || '').localeCompare(b.symbol || ''));
-  }, [assets, filterNetwork, activeCategory, searchQuery]);
-
-  const handleSelectAsset = (asset: CryptoAsset) => {
-    if (onSelectToken) onSelectToken(asset);
-    if (onSelect) onSelect(asset);
-    onClose();
-  };
+      // Search query filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchName = asset.name.toLowerCase().includes(q);
+        const matchSym = asset.symbol.toLowerCase().includes(q);
+        const matchAddr = asset.contractAddress && asset.contractAddress.toLowerCase().includes(q);
+        return matchName || matchSym || matchAddr;
+      }
+      return true;
+    });
+  }, [assets, searchQuery, activeCategory]);
 
   if (!isOpen) return null;
 
-  // Handle Contract Resolution if user pastes a 0x address not in list
-  const isAddressQuery = searchQuery.startsWith('0x') && searchQuery.length >= 38;
-  const showContractImportButton = isAddressQuery && filteredAssets.length === 0;
-
-  const handleResolveContract = async () => {
-    setIsResolvingContract(true);
-    setContractError('');
-    try {
-      const networkToUse = filterNetwork || 'ethereum';
-      const walletAddressToUse = activeSubWallet?.address || '';
-      const resolved = await TokenService.resolveCustomToken(searchQuery.trim(), networkToUse, walletAddressToUse);
-
-      if (resolved) {
-        addCustomToken(resolved);
-        onSelectToken(resolved);
-        onClose();
-      } else {
-        setContractError('Could not find ERC-20 contract on this network.');
-      }
-    } catch (e: any) {
-      setContractError('Failed to resolve contract: ' + (e.message || e));
-    } finally {
-      setIsResolvingContract(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-150">
-      <div className="bg-[#141419] border-t-4 sm:border-2 border-white p-5 sm:p-8 max-w-lg w-full rounded-t-3xl sm:rounded-none shadow-[0px_-8px_20px_rgba(0,0,0,0.9)] sm:shadow-[12px_12px_0px_0px_#00f0ff] relative space-y-4 sm:space-y-5 max-h-[88vh] sm:max-h-[85vh] flex flex-col font-mono">
-        {/* Native Mobile Sheet Pull Handle Bar */}
-        <div className="w-12 h-1.5 bg-white/40 rounded-full mx-auto sm:hidden -mt-1 mb-1" />
-
-        {/* Modal Header */}
-        <div className="flex items-center justify-between border-b-2 border-white pb-3 sm:pb-4 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-[#00f0ff] text-black border border-black shadow-[2px_2px_0px_0px_#000]">
-              <Coins className="w-4 h-4 stroke-[3]" />
-            </div>
-            <div>
-              <h3 className="text-white font-black text-sm uppercase tracking-wider">{title}</h3>
-              <p className="text-[10px] text-slate-300">SEARCH BY NAME, TICKER, OR CONTRACT ADDRESS</p>
-            </div>
-          </div>
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 dark:bg-black/80 p-4 mono-animate-in">
+      <div className="bg-white dark:bg-[#121215] border border-black/[0.08] dark:border-white/[0.08] p-6 max-w-md w-full rounded-3xl shadow-2xl relative space-y-4 max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-1 shrink-0">
+          <h3 className="text-base font-semibold text-zinc-900 dark:text-white">{title}</h3>
           <button
             onClick={onClose}
-            className="p-1 text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer border border-transparent hover:border-white/30"
+            className="text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white p-1 text-sm font-medium cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            ✕
           </button>
         </div>
 
-        {/* Search Input Bar */}
+        {/* Search input */}
         <div className="relative shrink-0">
           <input
             type="text"
-            placeholder="SEARCH TOKEN NAME, TICKER (ETH/USDC) OR 0X ADDRESS..."
+            placeholder="Search name or paste contract address..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-black/[0.04] dark:bg-black border border-black/[0.08] dark:border-white/[0.08] rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:border-black dark:focus:border-white"
             autoFocus
-            className="w-full pl-10 pr-10 py-3 bg-[#0a0a0c] text-white font-mono font-black text-xs border-2 border-white shadow-[3px_3px_0px_0px_#000] focus:outline-none focus:border-[#00f0ff] placeholder:text-slate-400 placeholder:font-normal"
           />
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
         </div>
 
-        {/* Category Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0 pb-1">
+        {/* Categories */}
+        <div className="mono-segmented-container w-full flex shrink-0">
           {[
-            { id: 'all', label: 'ALL' },
-            { id: 'favorites', label: '★ FAVORITES' },
-            { id: 'stables', label: 'STABLES' },
-            { id: 'layer1', label: 'LAYER 1' },
-            { id: 'defi', label: 'DEFI' },
-          ].map((tab) => (
+            { id: 'all', label: 'All' },
+            { id: 'holdings', label: 'Holdings' },
+            { id: 'l1', label: 'Layer 1' },
+            { id: 'meme', label: 'Meme' },
+          ].map((cat) => (
             <button
-              key={tab.id}
-              onClick={() => setActiveCategory(tab.id as any)}
-              className={`px-3 py-1.5 text-[10px] font-black uppercase border-2 transition-all cursor-pointer whitespace-nowrap ${
-                activeCategory === tab.id
-                  ? 'border-[#00f0ff] bg-[#00f0ff] text-black shadow-[2px_2px_0px_0px_#000]'
-                  : 'border-white/20 bg-[#0a0a0c] text-slate-300 hover:border-white/50'
+              key={cat.id}
+              onClick={() => setActiveCategory(cat.id as any)}
+              className={`flex-1 py-1 text-xs font-medium rounded-lg transition-all cursor-pointer ${
+                activeCategory === cat.id
+                  ? 'bg-black text-white dark:bg-white dark:text-black font-semibold shadow'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white'
               }`}
             >
-              {tab.label}
+              {cat.label}
             </button>
           ))}
         </div>
 
-        {/* Token List View */}
-        <div className="overflow-y-auto no-scrollbar flex-1 space-y-2 pr-1 pb-20 sm:pb-4 divide-y divide-white/10">
-          {filteredAssets.length === 0 ? (
-            <div className="py-8 text-center space-y-4 font-mono">
-              {showContractImportButton ? (
-                <div className="bg-[#0a0a0c] border-2 border-[#00f0ff] p-5 space-y-3 text-center shadow-[4px_4px_0px_0px_#000]">
-                  <Sparkles className="w-8 h-8 text-[#00f0ff] mx-auto animate-pulse" />
-                  <div className="space-y-1">
-                    <h4 className="text-xs font-black text-white uppercase">UNTRACKED SMART CONTRACT DETECTED</h4>
-                    <p className="text-[10px] text-slate-300 font-bold break-all">{searchQuery}</p>
-                  </div>
-                  <button
-                    disabled={isResolvingContract}
-                    onClick={handleResolveContract}
-                    className="w-full py-2.5 bg-[#ccff00] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:bg-[#d8ff33] flex items-center justify-center gap-2 cursor-pointer transition-all"
-                  >
-                    {isResolvingContract ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin text-black" />
-                        <span>READING SMART CONTRACT...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4 stroke-[3]" />
-                        <span>IMPORT TOKEN FROM BLOCKCHAIN</span>
-                      </>
-                    )}
-                  </button>
-                  {contractError && <p className="text-[10px] text-[#ff007f] font-bold">{contractError}</p>}
-                </div>
-              ) : (
-                <div className="text-slate-400 py-6">
-                  <Coins className="w-8 h-8 text-slate-500 mx-auto mb-2" />
-                  <p className="text-xs font-bold uppercase">NO TOKENS FOUND MATCHING "{searchQuery}"</p>
-                  <p className="text-[10px] text-slate-400 mt-1">Try searching by ticker, name, or full 0x contract address.</p>
-                </div>
-              )}
+        {/* Token List */}
+        <div className="flex-1 overflow-y-auto no-scrollbar space-y-1 pr-1">
+          {filteredTokens.length === 0 ? (
+            <div className="p-8 text-center text-xs text-zinc-500">
+              No matching tokens found.
             </div>
           ) : (
-            filteredAssets.map((asset) => {
-              if (!asset) return null;
-              const symbol = asset.symbol || 'TOKEN';
-              const name = asset.name || symbol;
-              const network = asset.network || 'ethereum';
-              const icon = asset.icon || 'https://assets.coingecko.com/coins/images/279/small/ethereum.png';
-              const safePrice = typeof asset.priceUsd === 'number' && !isNaN(asset.priceUsd) ? asset.priceUsd : 0;
-              const safeBalance = typeof asset.balance === 'number' && !isNaN(asset.balance) ? asset.balance : 0;
-              const isSelected = selectedAssetId === asset.id;
-              const usdValue = safeBalance * safePrice;
-
+            filteredTokens.map((token) => {
+              const isSelected = token.id === selectedAssetId;
               return (
                 <div
-                  key={asset.id || `token-${Math.random()}`}
-                  onClick={() => handleSelectAsset(asset)}
-                  className={`flex items-center justify-between p-3 border-2 transition-all cursor-pointer group ${
+                  key={token.id}
+                  onClick={() => onSelectToken(token)}
+                  className={`p-2.5 rounded-2xl flex items-center justify-between cursor-pointer transition-colors ${
                     isSelected
-                      ? 'border-[#00f0ff] bg-[#00f0ff]/10 shadow-[3px_3px_0px_0px_#00f0ff]'
-                      : 'border-transparent hover:border-white/40 hover:bg-[#1a1a24]'
+                      ? 'bg-black text-white dark:bg-white dark:text-black font-semibold'
+                      : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.04] text-zinc-800 dark:text-zinc-200'
                   }`}
                 >
-                  {/* Left: Icon, Symbol, Name & Network */}
                   <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <img
-                        src={icon}
-                        alt={symbol}
-                        className="w-8 h-8 object-contain rounded-full border border-white/20 bg-black p-0.5"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                      <span className="absolute -bottom-1 -right-1 text-[8px] font-black uppercase px-1 bg-black text-[#00f0ff] border border-white/40">
-                        {network.slice(0, 3)}
-                      </span>
-                    </div>
-
+                    <img
+                      src={token.icon}
+                      alt={token.symbol}
+                      className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-white group-hover:text-[#00f0ff] uppercase">
-                          {symbol}
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-xs">{token.symbol}</span>
+                        <span className={`text-[10px] ${isSelected ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-500'}`}>
+                          {token.name}
                         </span>
-                        {isSelected && <Check className="w-3.5 h-3.5 text-[#00f0ff] stroke-[3]" />}
                       </div>
-                      <p className="text-[10px] text-slate-300 font-bold max-w-[140px] truncate">{name}</p>
+                      <span className={`text-[10px] font-mono capitalize block ${isSelected ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                        {token.network}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Right: Balance, Price & Favorite Button */}
-                  <div className="flex items-center gap-4 text-right">
-                    <div>
-                      <div className="text-xs font-black font-mono text-white">
-                        {safeBalance > 0 ? safeBalance.toLocaleString(undefined, { maximumFractionDigits: 6 }) : '0.00'}{' '}
-                        <span className="text-[10px] text-slate-400">{symbol}</span>
-                      </div>
-                      <div className="text-[10px] text-slate-300 font-mono">
-                        ${safePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        {safeBalance > 0 && <span className="text-[#ccff00] font-bold"> (${usdValue.toFixed(2)})</span>}
-                      </div>
+                  <div className="text-right font-mono text-xs">
+                    <div className="font-semibold">
+                      ${token.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                     </div>
-
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (asset.id) toggleFavoriteAsset(asset.id);
-                      }}
-                      className="p-1.5 hover:bg-white/10 text-slate-400 hover:text-[#ccff00] transition-colors cursor-pointer"
-                      title={asset.isFavorite ? 'Remove Favorite' : 'Mark Favorite'}
-                    >
-                      <Star className={`w-4 h-4 ${asset.isFavorite ? 'fill-[#ccff00] text-[#ccff00]' : ''}`} />
-                    </button>
+                    {token.balance > 0 && (
+                      <span className={`text-[10px] ${isSelected ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                        {token.balance.toLocaleString()} {token.symbol}
+                      </span>
+                    )}
                   </div>
                 </div>
               );
@@ -298,6 +169,7 @@ export const TokenSearchModal: React.FC<TokenSearchModalProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

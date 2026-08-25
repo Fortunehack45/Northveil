@@ -186,3 +186,55 @@ export interface TaxReportSummary {
   stakingRewardsIncomeUsd: number;
   totalGasFeesPaidUsd: number;
 }
+
+export interface AgentConnection {
+  id: string;
+  name: string;
+  type: 'claude' | 'chatgpt' | 'custom';
+  walletAddress: string;
+  apiKey?: string;
+  status: 'active' | 'expiring' | 'expired' | 'revoked';
+  expiresAt: string | null; // ISO string or null for never
+  duration: '1h' | '24h' | '7d' | '30d' | 'never';
+  createdAt: string;
+  lastActiveAt?: string;
+  permissions: string[];
+  recentActionsCount?: number;
+  sseUrl?: string;
+}
+
+export interface McpApprovalRecord {
+  id: string;
+  tool_name: string;
+  status: 'CONFIRMED' | 'PENDING' | 'REJECTED' | 'FAILED';
+  parameters: any;
+  response?: any;
+  wallet_address: string;
+  agent_type?: string;
+  created_at: string;
+  tx_hash?: string;
+  gas_fee_usd?: number;
+}
+
+export interface SocialAccountsState {
+  google?: { connected: boolean; email?: string; linkedAt?: string };
+  github?: { connected: boolean; username?: string; linkedAt?: string };
+  twitter?: { connected: boolean; handle?: string; linkedAt?: string };
+}
+
+export interface SmartContractRecord {
+  id: string;
+  contract_name: string;
+  symbol: string;
+  contract_address?: string;
+  predicted_address?: string;
+  contract_type: string;
+  total_supply: number;
+  network: string;
+  wallet_address: string;
+  tx_hash?: string;
+  verified_on_explorer?: boolean;
+  explorer_verification_url?: string;
+  image_url?: string;
+  created_at: string;
+}

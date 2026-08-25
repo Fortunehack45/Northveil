@@ -1,43 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useWallet } from '../context/WalletContext';
 import { BlockiesAvatar } from './BlockiesAvatar';
 import {
   LayoutGrid,
-  ArrowLeftRight,
-  ArrowUpRight,
-  Layers,
-  Settings,
-  User,
-  LogOut,
-  FileText,
-  Compass,
-  Image as ImageIcon,
-  Code2,
-  ShieldAlert,
+  Wallet,
   Bot,
-  CreditCard,
-  Menu,
-  HelpCircle,
-  Globe,
+  ShieldCheck,
+  Code2,
+  User,
+  Lock,
+  LogOut,
+  Sparkles,
+  AlertTriangle,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 export type TabType =
-  | 'portfolio'
-  | 'dexBridge'
-  | 'buySell'
-  | 'gasEstimator'
-  | 'staking'
-  | 'nftGallery'
-  | 'smartContractStudio'
-  | 'historyTax'
-  | 'dappBrowser'
-  | 'securityCenter'
+  | 'overview'
+  | 'wallets'
+  | 'agents'
+  | 'approvals'
   | 'developerHub'
-  | 'securityBackup'
-  | 'systemMetrics'
-  | 'helpSupport'
-  | 'reportBug'
-  | 'networkManager'
+  | 'profile'
   | 'adminPanel';
 
 interface NavigationProps {
@@ -45,8 +31,8 @@ interface NavigationProps {
   setActiveTab: (tab: TabType) => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
-  onToggleMobile?: () => void;
   onOpenOnboarding?: () => void;
+  onOpenTour?: () => void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
@@ -54,99 +40,94 @@ export const Navigation: React.FC<NavigationProps> = ({
   setActiveTab,
   isMobileOpen,
   onCloseMobile,
-  onToggleMobile,
   onOpenOnboarding,
+  onOpenTour,
 }) => {
-  const { lockWallet, activeSubWallet } = useWallet();
+  const { lockWallet, logOut, activeSubWallet, theme, toggleTheme } = useWallet();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const navItems: { id: TabType; label: string; icon: React.ReactNode }[] = [
-    { id: 'portfolio', label: 'DASHBOARD', icon: <LayoutGrid className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'buySell', label: 'BUY & SELL', icon: <CreditCard className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'dexBridge', label: 'TRADE & SWAP', icon: <ArrowLeftRight className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'gasEstimator', label: 'DEPOSITS', icon: <ArrowUpRight className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'nftGallery', label: 'NFT GALLERY', icon: <ImageIcon className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'smartContractStudio', label: 'CONTRACT STUDIO', icon: <Code2 className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'staking', label: 'PROTOCOLS', icon: <Layers className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'historyTax', label: 'TAX & HISTORY', icon: <FileText className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'securityCenter', label: 'SECURITY SHIELD', icon: <ShieldAlert className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'developerHub', label: 'AI & DEV HUB', icon: <Bot className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'adminPanel', label: 'ADMIN PANEL', icon: <ShieldAlert className="w-4 h-4 text-[#ff007f] stroke-[3]" /> },
-    { id: 'securityBackup', label: 'SETTINGS', icon: <Settings className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'systemMetrics', label: 'PROFILE', icon: <User className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'helpSupport', label: 'HELP & SUPPORT', icon: <HelpCircle className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'networkManager', label: 'NETWORK MGR', icon: <Globe className="w-4 h-4 stroke-[2.5]" /> },
-  ];
-
-  // Core 5 primary pages (featured on mobile bottom nav bar)
-  const coreNavItems: { id: TabType; label: string; icon: React.ReactNode }[] = [
-    { id: 'portfolio', label: 'HOME', icon: <LayoutGrid className="w-5 h-5 stroke-[2.5]" /> },
-    { id: 'buySell', label: 'BUY & SELL', icon: <CreditCard className="w-5 h-5 stroke-[2.5]" /> },
-    { id: 'dexBridge', label: 'TRADE & SWAP', icon: <ArrowLeftRight className="w-5 h-5 stroke-[2.5]" /> },
-    { id: 'nftGallery', label: 'NFT', icon: <ImageIcon className="w-5 h-5 stroke-[2.5]" /> },
-    { id: 'dappBrowser', label: 'DAPP BROWSER', icon: <Compass className="w-5 h-5 stroke-[2.5]" /> },
-  ];
-
-  // Secondary items (featured in sidebar)
-  const secondaryNavItems: { id: TabType; label: string; icon: React.ReactNode }[] = [
-    { id: 'gasEstimator', label: 'DEPOSITS', icon: <ArrowUpRight className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'smartContractStudio', label: 'CONTRACT STUDIO', icon: <Code2 className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'staking', label: 'PROTOCOLS', icon: <Layers className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'historyTax', label: 'TAX & HISTORY', icon: <FileText className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'securityCenter', label: 'SECURITY SHIELD', icon: <ShieldAlert className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'developerHub', label: 'AI & DEV HUB', icon: <Bot className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'securityBackup', label: 'SETTINGS', icon: <Settings className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'systemMetrics', label: 'PROFILE', icon: <User className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'helpSupport', label: 'HELP & SUPPORT', icon: <HelpCircle className="w-4 h-4 stroke-[2.5]" /> },
-    { id: 'networkManager', label: 'NETWORK MGR', icon: <Globe className="w-4 h-4 stroke-[2.5]" /> },
+  const navItems: {
+    id: TabType;
+    label: string;
+    icon: React.ReactNode;
+    badge?: string;
+  }[] = [
+    {
+      id: 'overview',
+      label: 'Overview',
+      icon: <LayoutGrid className="w-4 h-4 stroke-[1.8]" />,
+    },
+    {
+      id: 'wallets',
+      label: 'Wallets',
+      icon: <Wallet className="w-4 h-4 stroke-[1.8]" />,
+    },
+    {
+      id: 'agents',
+      label: 'AI Agents',
+      icon: <Bot className="w-4 h-4 stroke-[1.8]" />,
+      badge: 'Live',
+    },
+    {
+      id: 'approvals',
+      label: 'Approvals',
+      icon: <ShieldCheck className="w-4 h-4 stroke-[1.8]" />,
+    },
+    {
+      id: 'developerHub',
+      label: 'Developers',
+      icon: <Code2 className="w-4 h-4 stroke-[1.8]" />,
+    },
+    {
+      id: 'profile',
+      label: 'Profile',
+      icon: <User className="w-4 h-4 stroke-[1.8]" />,
+    },
   ];
 
   return (
     <>
-      {/* Mobile Backdrop Overlay when Drawer is open */}
+      {/* Mobile Backdrop */}
       {isMobileOpen && (
         <div
           onClick={onCloseMobile}
-          className="md:hidden fixed inset-0 bg-black/80 z-40 transition-opacity"
+          className="fixed inset-0 bg-black/60 z-40 md:hidden transition-opacity"
         />
       )}
 
-      {/* Sidebar (Desktop + Mobile Drawer) */}
+      {/* Sidebar Navigation */}
       <aside
-        className={`w-64 bg-[#0e1017] border-r-2 border-white flex flex-col h-full shrink-0 select-none transition-transform duration-300 ${
+        id="tour-navigation"
+        className={`w-64 h-full bg-white dark:bg-[#070709] flex flex-col justify-between shrink-0 transition-transform duration-200 ${
           isMobileOpen
-            ? 'fixed inset-y-0 left-0 z-50 flex shadow-[8px_0px_20px_rgba(0,0,0,0.9)] translate-x-0'
+            ? 'fixed inset-y-0 left-0 z-50 translate-x-0'
             : 'hidden md:flex z-30'
         }`}
       >
-        {/* Northveil Brand Header */}
-        <div className="p-4 sm:p-5 border-b-2 border-white/20 shrink-0 bg-[#0e1017]">
+        {/* Brand Header with Standalone Logo (No container, no extra subtitle) */}
+        <div className="p-5 pb-3 shrink-0 bg-white dark:bg-[#070709]">
           <div className="flex items-center justify-between">
-            <button 
+            <button
               onClick={() => {
-                setActiveTab('portfolio');
-                window.dispatchEvent(new CustomEvent('reset-portfolio'));
+                setActiveTab('overview');
                 if (isMobileOpen && onCloseMobile) onCloseMobile();
               }}
-              className="flex items-center gap-3 cursor-pointer hover:opacity-90 transition-opacity"
+              className="flex items-center gap-1 cursor-pointer hover:opacity-85 transition-opacity text-left"
             >
-              <img 
-                src="https://iili.io/CgBPBHv.jpg" 
-                alt="Northveil Logo" 
-                className="w-9 h-9 object-cover rounded-none border-2 border-white bg-black shadow-[3px_3px_0px_0px_#d4ff00] shrink-0 bg-[#000]" 
+              {/* Standalone Logo - Pure Black in Light Mode, Pure White in Dark Mode */}
+              <img
+                src="https://iili.io/CDj46zl.png"
+                alt="Northveil Logo"
+                className="h-13 w-auto object-contain shrink-0 northveil-logo dark:brightness-100 brightness-0 transition-all"
               />
-              <div className="flex flex-col text-left font-mono">
-                <span className="text-lg font-black tracking-tighter text-white uppercase leading-tight">
-                  North<span className="text-[#d4ff00]">veil</span>
-                </span>
-                <span className="text-[9px] font-bold text-[#00f0ff] uppercase tracking-wider -mt-0.5">
-                  AI DEFI VAULT
-                </span>
-              </div>
+              <span className="text-xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
+                Northveil
+              </span>
             </button>
             {isMobileOpen && (
               <button
                 onClick={onCloseMobile}
-                className="md:hidden text-black bg-[#ff007f] px-2.5 py-1 font-black border-2 border-black shadow-[2px_2px_0px_0px_#000] text-xs cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                className="md:hidden text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white p-1 text-sm cursor-pointer"
               >
                 ✕
               </button>
@@ -154,141 +135,173 @@ export const Navigation: React.FC<NavigationProps> = ({
           </div>
         </div>
 
-        {/* Navigation Items - Scrollable list */}
-        <nav className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-3 font-mono">
-          {/* Desktop Core Apps section */}
-          <div className="hidden md:block space-y-1.5">
-            <div className="px-2 py-0.5 text-[10px] font-black text-[#d4ff00] uppercase tracking-wider">
-              CORE ECOSYSTEM
-            </div>
-            {coreNavItems.map((item) => {
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    if (item.id === 'portfolio' && activeTab === 'portfolio') {
-                      window.dispatchEvent(new CustomEvent('reset-portfolio'));
-                    }
-                    setActiveTab(item.id);
-                    if (onCloseMobile) onCloseMobile();
-                  }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 font-mono font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-[#d4ff00] text-black border-2 border-black shadow-[3px_3px_0px_0px_#ff007f] translate-x-0.5'
-                      : 'bg-[#151821] text-slate-200 border-2 border-white/20 hover:border-white hover:text-white hover:bg-[#1d212d] shadow-[2px_2px_0px_0px_#000]'
-                  }`}
-                >
-                  <span className="shrink-0">{item.icon}</span>
-                  <span className="truncate">{item.label}</span>
-                </button>
-              );
-            })}
+        {/* Navigation Items (Clean, without unnecessary sub-descriptions) */}
+        <nav className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-1">
+          <div className="px-3 py-1.5 text-[11px] font-mono font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+            Menu
           </div>
 
-          {/* Secondary Tools & Services section */}
-          <div className="space-y-1.5">
-            <div className="px-2 py-0.5 text-[10px] font-black text-[#00f0ff] uppercase tracking-wider">
-              {isMobileOpen ? 'MORE SERVICES & TOOLS' : 'SERVICES & PROTOCOLS'}
-            </div>
-            {secondaryNavItems.map((item) => {
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    if (onCloseMobile) onCloseMobile();
-                  }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 font-mono font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-[#00f0ff] text-black border-2 border-black shadow-[3px_3px_0px_0px_#ff007f] translate-x-0.5'
-                      : 'bg-[#151821] text-slate-200 border-2 border-white/20 hover:border-white hover:text-white hover:bg-[#1d212d] shadow-[2px_2px_0px_0px_#000]'
-                  }`}
-                >
-                  <span className="shrink-0">{item.icon}</span>
+          {navItems.map((item) => {
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  if (isMobileOpen && onCloseMobile) onCloseMobile();
+                }}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer select-none ${
+                  isActive
+                    ? 'bg-black text-white dark:bg-white dark:text-black font-bold shadow-md'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.04]'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className={isActive ? 'text-white dark:text-black' : 'text-zinc-500 dark:text-zinc-400'}>
+                    {item.icon}
+                  </span>
                   <span className="truncate">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
+                </div>
+
+                {item.badge && (
+                  <span
+                    className={`text-[9px] font-mono uppercase px-2 py-0.5 rounded-full font-bold ${
+                      isActive
+                        ? 'bg-white text-black dark:bg-black dark:text-white'
+                        : 'bg-black/[0.08] text-black dark:bg-white/[0.08] dark:text-white'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </nav>
 
-        {/* Footer Actions - Fixed at Bottom */}
-        <div className="p-3 border-t-2 border-white/20 bg-[#0e1017] shrink-0 space-y-2 font-mono">
-          {/* Account Profile Badge */}
+        {/* Footer Actions: Active Identity, Quick Tour + Theme Toggle, Lock Vault, Log Out */}
+        <div className="p-3 bg-white dark:bg-[#070709] shrink-0 space-y-2">
           {activeSubWallet && (
-            <div className="p-2 bg-[#0a0b0e] border-2 border-white/40 shadow-[2px_2px_0px_0px_#000] flex items-center gap-2.5 mb-2 font-mono">
-              <BlockiesAvatar address={activeSubWallet.address} size={30} />
+            <div className="p-2.5 bg-black/[0.03] dark:bg-white/[0.03] rounded-xl flex items-center gap-2.5">
+              <BlockiesAvatar address={activeSubWallet.address} size={24} />
               <div className="min-w-0 flex-1">
-                <span className="text-xs font-black text-white block truncate uppercase">{activeSubWallet.name}</span>
-                <span className="text-[10px] text-[#00f0ff] font-bold block truncate font-mono">
+                <span className="text-xs font-semibold text-zinc-900 dark:text-white block truncate">
+                  {activeSubWallet.name}
+                </span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono block truncate">
                   {activeSubWallet.address.slice(0, 6)}...{activeSubWallet.address.slice(-4)}
                 </span>
               </div>
             </div>
           )}
 
-          {onOpenOnboarding && (
-            <button
-              onClick={() => {
-                onOpenOnboarding();
-                if (onCloseMobile) onCloseMobile();
-              }}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#00f0ff] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000] font-mono font-black text-[11px] uppercase tracking-wider hover:bg-[#33f3ff] cursor-pointer mb-2"
-            >
-              <span>VAULT & BACKUP</span>
-            </button>
-          )}
+          {/* Quick Tour Button + Theme Toggle Row */}
+          <div className="flex gap-1.5 items-center">
+            {(onOpenTour || onOpenOnboarding) && (
+              <button
+                onClick={() => {
+                  if (onOpenTour) onOpenTour();
+                  else if (onOpenOnboarding) onOpenOnboarding();
+                  if (onCloseMobile) onCloseMobile();
+                }}
+                className="flex-1 py-2 px-3 rounded-xl bg-black/[0.04] dark:bg-white/[0.04] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] text-zinc-800 dark:text-zinc-300 text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Quick Tour
+              </button>
+            )}
 
-          <button
-            onClick={lockWallet}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#ff007f] text-white border-2 border-black shadow-[3px_3px_0px_0px_#000] font-mono font-black text-xs uppercase tracking-wider hover:bg-[#ff3399] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
-          >
-            <LogOut className="w-4 h-4 stroke-[3]" />
-            <span>LOG OUT</span>
-          </button>
+            <button
+              onClick={toggleTheme}
+              className="py-2 px-2.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.04] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] text-zinc-800 dark:text-zinc-300 text-xs font-medium flex items-center justify-center transition-colors cursor-pointer"
+              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-3.5 h-3.5 stroke-[1.8]" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 stroke-[1.8]" />
+              )}
+            </button>
+          </div>
+
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => lockWallet()}
+              className="flex-1 py-2 px-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.06] dark:hover:bg-white/[0.06] text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              title="Lock Vault"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              Lock
+            </button>
+
+            <button
+              onClick={() => setShowLogoutModal(true)}
+              className="flex-1 py-2 px-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.03] hover:bg-red-500/20 text-zinc-600 dark:text-zinc-400 hover:text-red-500 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              title="Log Out & Clear Session"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Log Out
+            </button>
+          </div>
         </div>
       </aside>
 
-      {/* Mobile Fixed Bottom Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#0e1017] border-t-2 border-white flex items-center justify-around z-40 px-1 font-mono select-none shadow-[0px_-4px_12px_rgba(0,0,0,0.8)]">
-        {coreNavItems.map((item) => {
+      {/* Log Out Confirmation Modal (Rendered with React Portal) */}
+      {showLogoutModal &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 dark:bg-black/80 p-4 mono-animate-in">
+            <div className="bg-white dark:bg-[#121215] border border-black/[0.08] dark:border-white/[0.08] rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white mx-auto flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white">Log Out of Northveil?</h3>
+              <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                This will clear active vault credentials and session state from this browser. Make sure you have backed up your seed phrase or private key before logging out.
+              </p>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLogoutModal(false)}
+                  className="flex-1 py-2.5 rounded-full bg-black/[0.04] dark:bg-white/[0.04] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] text-zinc-700 dark:text-zinc-300 text-xs font-medium cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLogoutModal(false);
+                    logOut();
+                  }}
+                  className="flex-1 py-2.5 rounded-full bg-black text-white dark:bg-white dark:text-black hover:opacity-85 text-xs font-bold cursor-pointer shadow-sm"
+                >
+                  Confirm Log Out
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* Mobile Bottom Bar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#070709] px-3 py-2 flex items-center justify-around pb-safe">
+        {navItems.map((item) => {
           const isActive = activeTab === item.id;
           return (
             <button
               key={item.id}
-              onClick={() => {
-                if (item.id === 'portfolio' && activeTab === 'portfolio') {
-                  window.dispatchEvent(new CustomEvent('reset-portfolio'));
-                }
-                setActiveTab(item.id);
-                if (isMobileOpen && onCloseMobile) onCloseMobile();
-              }}
-              className={`flex-1 flex flex-col items-center justify-center py-1 transition-all cursor-pointer ${
-                isActive
-                  ? 'text-[#d4ff00] font-black scale-105'
-                  : 'text-slate-400 hover:text-white font-bold'
+              onClick={() => setActiveTab(item.id)}
+              className={`flex flex-col items-center justify-center p-1 rounded-xl transition-colors cursor-pointer ${
+                isActive ? 'text-white font-semibold' : 'text-zinc-500'
               }`}
             >
-              <div
-                className={`p-1 border-2 transition-all ${
-                  isActive
-                    ? 'bg-[#d4ff00] text-black border-black shadow-[2px_2px_0px_0px_#ff007f]'
-                    : 'bg-transparent border-transparent'
-                }`}
-              >
+              <span className={`p-1.5 rounded-lg ${isActive ? 'bg-white text-black' : ''}`}>
                 {item.icon}
-              </div>
-              <span className="text-[8.5px] uppercase tracking-tighter mt-0.5 truncate max-w-[56px] text-center font-black">
-                {item.label === 'TRADE & SWAP' ? 'SWAP' : item.label === 'DAPP BROWSER' ? 'DAPPS' : item.label}
               </span>
+              <span className="text-[10px] mt-0.5">{item.label}</span>
             </button>
           );
         })}
-      </nav>
+      </div>
     </>
   );
 };
-
-

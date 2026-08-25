@@ -1,88 +1,40 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 
-export interface SelectOption {
+export interface Option {
   value: string;
   label: string;
   icon?: React.ReactNode;
   badge?: string;
-  description?: string;
-  color?: string;
 }
 
-export interface CustomSelectProps {
-  options: (string | SelectOption)[];
+interface CustomSelectProps {
+  options: Option[];
   value: string;
   onChange: (value: string) => void;
-  placeholder?: string;
-  variant?: 'yellow' | 'cyan' | 'magenta' | 'green' | 'dark' | 'outline';
   className?: string;
-  buttonClassName?: string;
-  menuClassName?: string;
-  disabled?: boolean;
+  variant?: 'pill' | 'form' | 'dark' | 'light' | 'glass';
+  placeholder?: string;
   align?: 'left' | 'right';
-  menuWidth?: string;
-  compact?: boolean;
 }
 
 export const CustomSelect: React.FC<CustomSelectProps> = ({
   options,
   value,
   onChange,
-  placeholder = 'Select...',
-  variant = 'yellow',
   className = '',
-  buttonClassName = '',
-  menuClassName = '',
-  disabled = false,
+  variant = 'pill',
+  placeholder = 'Select an option...',
   align = 'left',
-  menuWidth,
-  compact = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [openUpward, setOpenUpward] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const selectRef = useRef<HTMLDivElement>(null);
 
-  // Normalize options to object format with 100% defensive safety
-  const safeOptions = Array.isArray(options) ? options : [];
-  const normalizedOptions: SelectOption[] = safeOptions
-    .filter(Boolean)
-    .map((opt) => {
-      if (typeof opt === 'string') {
-        return { value: opt, label: opt };
-      }
-      return {
-        value: opt.value || '',
-        label: opt.label || opt.value || 'Option',
-        icon: opt.icon,
-        badge: opt.badge,
-        description: opt.description,
-        color: opt.color,
-      };
-    });
+  const selectedOption = options.find((opt) => opt.value === value);
 
-  const selectedOption: SelectOption = normalizedOptions.find((opt) => opt && opt.value === value) || {
-    value: value || '',
-    label: value || placeholder || 'Select...',
-  };
-
-  // Auto-detect viewport boundary to open upwards if near bottom of screen
-  useEffect(() => {
-    if (isOpen && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      if (spaceBelow < 220 && rect.top > 220) {
-        setOpenUpward(true);
-      } else {
-        setOpenUpward(false);
-      }
-    }
-  }, [isOpen]);
-
-  // Close when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -90,116 +42,79 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsOpen(false);
-      }
-    };
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-    }
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
-
-  // Variant classes for the trigger button
-  const variantStyles = {
-    yellow: 'bg-[#ffe600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:bg-[#fff033]',
-    green: 'bg-[#ccff00] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:bg-[#d8ff33]',
-    cyan: 'bg-[#00f0ff] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:bg-[#33f3ff]',
-    magenta: 'bg-[#ff007f] text-white border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:bg-[#ff3399]',
-    dark: 'bg-[#0a0a0c] text-white border-2 border-white shadow-[2px_2px_0px_0px_#000] hover:bg-[#141419]',
-    outline: 'bg-[#141419] text-white border-2 border-white/40 hover:border-white shadow-[2px_2px_0px_0px_#000]',
-  };
-
-  const currentVariantStyle = variantStyles[variant] || variantStyles.yellow;
+  const isFormVariant = variant === 'form';
 
   return (
-    <div className={`relative inline-block font-mono select-none min-w-0 max-w-full ${isOpen ? 'z-[100]' : 'z-10'} ${className}`} ref={containerRef}>
-      {/* Trigger Button */}
+    <div className={`relative ${className}`} ref={selectRef}>
       <button
         type="button"
-        disabled={disabled}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!disabled) setIsOpen((prev) => !prev);
-        }}
-        className={`w-full flex items-center justify-between gap-2 font-black uppercase text-left transition-all cursor-pointer ${
-          compact ? 'px-2 py-1 text-[10px]' : 'px-3 py-1.5 text-xs'
-        } ${currentVariantStyle} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${buttonClassName}`}
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full flex items-center justify-between gap-2 text-xs transition-all cursor-pointer select-none ${
+          isFormVariant
+            ? 'px-3 py-2.5 rounded-xl bg-black/[0.05] dark:bg-black text-zinc-900 dark:text-white border border-black/[0.08] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-zinc-900'
+            : 'px-3 py-2 rounded-full bg-black/[0.05] dark:bg-white/[0.05] hover:bg-black/[0.09] dark:hover:bg-white/[0.09] text-zinc-900 dark:text-white'
+        }`}
       >
-        <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
-          {selectedOption.icon && <span className="shrink-0">{selectedOption.icon}</span>}
-          <span className="truncate">{selectedOption.label}</span>
-          {selectedOption.badge && (
-            <span className="px-1 py-0.2 bg-black text-[#ccff00] text-[9px] font-black border border-[#ccff00] shrink-0">
-              {selectedOption.badge}
+        <div className="flex items-center gap-2.5 truncate min-w-0">
+          {selectedOption?.icon && (
+            <span className="shrink-0 flex items-center justify-center">
+              {selectedOption.icon}
             </span>
           )}
+          <span className="truncate font-medium text-xs">
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
         </div>
         <ChevronDown
-          className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 stroke-[3] ${
-            isOpen ? 'rotate-180' : ''
+          className={`w-3.5 h-3.5 text-zinc-400 shrink-0 transition-transform duration-200 ${
+            isOpen ? 'rotate-180 text-zinc-900 dark:text-white' : ''
           }`}
         />
       </button>
 
-      {/* Built-in Custom Dropdown Menu Popup */}
       {isOpen && (
         <div
-          className={`absolute ${openUpward ? 'bottom-full mb-1.5 top-auto' : 'top-full mt-1.5'} z-[999] bg-[#0a0a0c] border-2 border-white p-1.5 shadow-[6px_6px_0px_0px_#ccff00] max-h-64 overflow-y-auto no-scrollbar font-mono ${
+          className={`absolute z-50 mt-1.5 min-w-[200px] w-full max-h-60 overflow-y-auto no-scrollbar rounded-2xl bg-white dark:bg-[#131317] border border-black/[0.08] dark:border-white/[0.08] p-1.5 shadow-2xl mono-animate-in ${
             align === 'right' ? 'right-0' : 'left-0'
-          } ${menuWidth || 'min-w-[180px] w-full'} ${menuClassName}`}
+          }`}
         >
-          {normalizedOptions.map((opt, index) => {
-            if (!opt) return null;
-            const isSelected = opt.value === value;
+          {options.map((option) => {
+            const isSelected = option.value === value;
             return (
               <button
-                key={opt.value || `opt-${index}`}
+                key={option.value}
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onChange(opt.value);
+                onClick={() => {
+                  onChange(option.value);
                   setIsOpen(false);
                 }}
-                className={`w-full text-left px-2.5 py-1.5 text-xs font-mono font-black uppercase flex items-center justify-between gap-2 transition-all cursor-pointer ${
+                className={`w-full flex items-center justify-between gap-2.5 px-3 py-2 text-xs rounded-xl transition-all cursor-pointer ${
                   isSelected
-                    ? 'bg-[#ccff00] text-black border border-black shadow-[1.5px_1.5px_0px_0px_#000]'
-                    : 'text-slate-200 hover:bg-[#181820] hover:text-[#ccff00]'
+                    ? 'bg-black text-white dark:bg-white dark:text-black font-semibold'
+                    : 'text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
                 }`}
               >
-                <div className="flex items-center gap-2 min-w-0 flex-1 truncate">
-                  {opt.icon && <span className="shrink-0">{opt.icon}</span>}
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate flex items-center gap-1.5">
-                      <span className="truncate">{opt.label}</span>
-                      {opt.badge && (
-                        <span
-                          className={`px-1 py-0.2 text-[8px] font-black uppercase border ${
-                            isSelected
-                              ? 'bg-black text-[#ccff00] border-black'
-                              : 'bg-[#ff007f] text-white border-black'
-                          }`}
-                        >
-                          {opt.badge}
-                        </span>
-                      )}
-                    </div>
-                    {opt.description && (
-                      <div
-                        className={`text-[9px] font-normal lowercase truncate ${
-                          isSelected ? 'text-black/70' : 'text-slate-400'
-                        }`}
-                      >
-                        {opt.description}
-                      </div>
-                    )}
-                  </div>
+                <div className="flex items-center gap-2.5 truncate min-w-0">
+                  {option.icon && (
+                    <span className="shrink-0 flex items-center justify-center">
+                      {option.icon}
+                    </span>
+                  )}
+                  <span className="truncate">{option.label}</span>
                 </div>
 
-                {isSelected && <Check className="w-3.5 h-3.5 text-black shrink-0 stroke-[3]" />}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {option.badge && (
+                    <span
+                      className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                        isSelected ? 'bg-white text-black dark:bg-black dark:text-white' : 'bg-black/[0.06] text-zinc-900 dark:bg-white/[0.08] dark:text-white'
+                      }`}
+                    >
+                      {option.badge}
+                    </span>
+                  )}
+                  {isSelected && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                </div>
               </button>
             );
           })}

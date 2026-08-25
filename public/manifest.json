@@ -4,15 +4,15 @@
   "description": "Next-Gen Multi-Chain AI Wallet, MCP Server Hub & Non-Custodial Vault",
   "icons": [
     {
-      "src": "https://iili.io/CgBPBHv.jpg",
+      "src": "https://iili.io/CD1CWRS.png",
       "sizes": "192x192",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://iili.io/CgBPBHv.jpg",
+      "src": "https://iili.io/CD1CWRS.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ],

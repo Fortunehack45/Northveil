@@ -17,7 +17,7 @@ export const ImportTokenModal: React.FC<ImportTokenModalProps> = ({ onClose }) =
   const [resolvedToken, setResolvedToken] = useState<CryptoAsset | null>(null);
   const [error, setError] = useState('');
 
-  const evmChains = SUPPORTED_CHAINS.filter(c => c.id !== 'solana' && c.id !== 'bitcoin');
+  const evmChains = SUPPORTED_CHAINS.filter((c) => c.id !== 'solana' && c.id !== 'bitcoin');
 
   const handleResolve = async () => {
     if (!contractAddress || contractAddress.length < 30) {
@@ -30,7 +30,7 @@ export const ImportTokenModal: React.FC<ImportTokenModalProps> = ({ onClose }) =
 
     // Check if token already exists
     const alreadyExists = assets.find(
-      a => a.contractAddress?.toLowerCase() === contractAddress.toLowerCase() && a.network === selectedNetwork
+      (a) => a.contractAddress?.toLowerCase() === contractAddress.toLowerCase() && a.network === selectedNetwork
     );
     if (alreadyExists) {
       setError(`Token "${alreadyExists.symbol}" is already tracked in your wallet.`);
@@ -41,7 +41,7 @@ export const ImportTokenModal: React.FC<ImportTokenModalProps> = ({ onClose }) =
     const token = await TokenService.resolveCustomToken(
       contractAddress,
       selectedNetwork,
-      '' // wallet address not needed for metadata resolution, but for balance we'd need it
+      ''
     );
 
     setIsResolving(false);
@@ -59,25 +59,30 @@ export const ImportTokenModal: React.FC<ImportTokenModalProps> = ({ onClose }) =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-      <div className="bg-[#141419] border-4 border-white p-6 sm:p-8 max-w-lg w-full shadow-[12px_12px_0px_0px_#00f0ff] relative space-y-6 max-h-[90vh] overflow-y-auto no-scrollbar font-mono">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 dark:bg-black/80 p-4 sm:p-6 mono-animate-in">
+      <div className="bg-white dark:bg-[#121215] border border-black/[0.08] dark:border-white/[0.08] rounded-3xl max-w-lg w-full shadow-2xl p-6 sm:p-7 relative space-y-5 max-h-[85vh] overflow-y-auto no-scrollbar">
         {/* Header */}
-        <div className="flex items-center justify-between border-b-2 border-white pb-3">
-          <div className="flex items-center gap-2">
-            <Coins className="w-5 h-5 text-[#00f0ff]" />
-            <span className="text-white font-black text-sm uppercase">IMPORT CUSTOM TOKEN</span>
+        <div className="flex items-center justify-between pb-2">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-2xl bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white">
+              <Coins className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-zinc-900 dark:text-white">Import Custom Token</h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Track any ERC-20 token in your vault.</p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-white/10 transition-colors cursor-pointer"
+            className="text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white p-2 rounded-full hover:bg-black/[0.06] dark:hover:bg-white/[0.06] text-sm font-medium cursor-pointer"
           >
-            <X className="w-5 h-5 text-white" />
+            ✕
           </button>
         </div>
 
         {/* Network Selector */}
-        <div className="space-y-2">
-          <label className="text-xs font-black text-slate-300 uppercase">SELECT NETWORK</label>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Select Network</label>
           <div className="grid grid-cols-3 gap-2">
             {evmChains.map((chain) => (
               <button
@@ -87,13 +92,13 @@ export const ImportTokenModal: React.FC<ImportTokenModalProps> = ({ onClose }) =
                   setResolvedToken(null);
                   setError('');
                 }}
-                className={`flex items-center gap-1.5 p-2 border-2 text-[10px] font-black uppercase cursor-pointer transition-all ${
+                className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
                   selectedNetwork === chain.id
-                    ? 'border-[#00f0ff] bg-[#00f0ff]/10 text-[#00f0ff]'
-                    : 'border-white/20 bg-[#0a0a0c] text-white/60 hover:border-white/40'
+                    ? 'bg-black text-white dark:bg-white dark:text-black border-transparent shadow-sm'
+                    : 'bg-black/[0.02] dark:bg-black/40 border-black/[0.06] dark:border-white/[0.06] text-zinc-700 dark:text-zinc-300 hover:bg-black/[0.05] dark:hover:bg-zinc-900'
                 }`}
               >
-                <img src={chain.icon} alt={chain.name} className="w-4 h-4 object-contain" />
+                <img src={chain.icon} alt={chain.name} className="w-4 h-4 object-contain rounded-full" />
                 <span className="truncate">{chain.symbol}</span>
               </button>
             ))}
@@ -101,8 +106,8 @@ export const ImportTokenModal: React.FC<ImportTokenModalProps> = ({ onClose }) =
         </div>
 
         {/* Contract Address Input */}
-        <div className="space-y-2">
-          <label className="text-xs font-black text-slate-300 uppercase">CONTRACT ADDRESS</label>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Contract Address</label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -113,12 +118,12 @@ export const ImportTokenModal: React.FC<ImportTokenModalProps> = ({ onClose }) =
                 setResolvedToken(null);
                 setError('');
               }}
-              className="flex-1 bg-[#0a0a0c] border-2 border-white p-3 text-xs text-white font-mono focus:outline-none focus:border-[#00f0ff]"
+              className="flex-1 bg-black/[0.04] dark:bg-black border border-black/[0.08] dark:border-white/[0.08] rounded-xl p-3 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-black dark:focus:border-white"
             />
             <button
               onClick={handleResolve}
               disabled={isResolving}
-              className="px-4 bg-[#00f0ff] text-black font-black text-xs uppercase border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:bg-[#33f3ff] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="px-4 py-2.5 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-xl hover:opacity-85 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center"
             >
               {isResolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
             </button>
@@ -127,45 +132,45 @@ export const ImportTokenModal: React.FC<ImportTokenModalProps> = ({ onClose }) =
 
         {/* Error */}
         {error && (
-          <div className="flex items-center gap-2 p-3 bg-[#ff007f]/10 border-2 border-[#ff007f]">
-            <AlertTriangle className="w-4 h-4 text-[#ff007f] flex-shrink-0" />
-            <p className="text-xs text-[#ff007f] font-bold">{error}</p>
+          <div className="flex items-center gap-2 p-3 bg-black/[0.05] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] rounded-xl">
+            <AlertTriangle className="w-4 h-4 text-zinc-900 dark:text-white flex-shrink-0" />
+            <p className="text-xs text-zinc-800 dark:text-zinc-200 font-medium">{error}</p>
           </div>
         )}
 
         {/* Resolved Token Preview */}
         {resolvedToken && (
           <div className="space-y-4">
-            <div className="p-4 bg-[#0a0a0c] border-2 border-[#ccff00] space-y-3">
+            <div className="p-4 bg-black/[0.02] dark:bg-black/40 border border-black/[0.08] dark:border-white/[0.08] rounded-2xl space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-lg font-black text-white">{resolvedToken.symbol}</p>
-                  <p className="text-xs text-slate-400">{resolvedToken.name}</p>
+                  <p className="text-base font-bold text-zinc-900 dark:text-white">{resolvedToken.symbol}</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">{resolvedToken.name}</p>
                 </div>
-                <CheckCircle2 className="w-6 h-6 text-[#ccff00]" />
+                <CheckCircle2 className="w-5 h-5 text-zinc-900 dark:text-white" />
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-[#141419] p-2 border border-white/10">
-                  <span className="text-slate-500">NETWORK</span>
-                  <p className="text-white font-bold mt-0.5">{selectedNetwork.toUpperCase()}</p>
+                <div className="bg-black/[0.04] dark:bg-black p-2.5 rounded-xl border border-black/[0.04] dark:border-white/[0.04]">
+                  <span className="text-zinc-500 text-[11px] block">NETWORK</span>
+                  <p className="text-zinc-900 dark:text-white font-semibold mt-0.5">{selectedNetwork.toUpperCase()}</p>
                 </div>
-                <div className="bg-[#141419] p-2 border border-white/10">
-                  <span className="text-slate-500">PRICE</span>
-                  <p className="text-white font-bold mt-0.5">
-                    {resolvedToken.priceUsd > 0 ? `$${resolvedToken.priceUsd.toFixed(6)}` : 'N/A'}
+                <div className="bg-black/[0.04] dark:bg-black p-2.5 rounded-xl border border-black/[0.04] dark:border-white/[0.04]">
+                  <span className="text-zinc-500 text-[11px] block">PRICE</span>
+                  <p className="text-zinc-900 dark:text-white font-semibold mt-0.5">
+                    {resolvedToken.priceUsd > 0 ? `$${resolvedToken.priceUsd.toFixed(4)}` : '$0.00'}
                   </p>
                 </div>
               </div>
-              <div className="text-[10px] text-slate-500 break-all font-mono">
+              <div className="text-[11px] text-zinc-500 break-all font-mono">
                 {contractAddress}
               </div>
             </div>
 
             <button
               onClick={handleImport}
-              className="w-full py-3.5 bg-[#ccff00] text-black font-black text-xs uppercase border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:bg-[#d8ff33] cursor-pointer transition-all"
+              className="w-full py-2.5 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer transition-all shadow-sm"
             >
-              IMPORT TOKEN TO WALLET
+              Import Token to Vault
             </button>
           </div>
         )}
@@ -173,8 +178,8 @@ export const ImportTokenModal: React.FC<ImportTokenModalProps> = ({ onClose }) =
         {/* Loading state */}
         {isResolving && (
           <div className="flex flex-col items-center gap-3 py-6">
-            <Loader2 className="w-8 h-8 text-[#00f0ff] animate-spin" />
-            <p className="text-xs text-slate-300 font-mono animate-pulse">QUERYING BLOCKCHAIN FOR TOKEN METADATA...</p>
+            <Loader2 className="w-7 h-7 text-zinc-900 dark:text-white animate-spin" />
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono animate-pulse">Querying blockchain for token metadata...</p>
           </div>
         )}
       </div>
