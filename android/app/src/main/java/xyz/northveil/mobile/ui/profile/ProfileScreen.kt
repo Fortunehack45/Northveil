@@ -113,7 +113,7 @@ fun ProfileScreen(
                         )
                     }
 
-                    Divider(color = CardSurfaceBorderDark)
+                    HorizontalDivider(color = CardSurfaceBorderDark)
 
                     Row(
                         modifier = Modifier

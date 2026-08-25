@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -48,7 +48,7 @@ fun DeveloperHubScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                 }
                 Column {
                     Text(text = "Developer Hub", color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)

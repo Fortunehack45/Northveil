@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -21,7 +22,7 @@ import xyz.northveil.mobile.core.designsystem.theme.*
 enum class DrawerItem(val title: String, val icon: ImageVector) {
     APPROVALS("Action Approvals", Icons.Default.Shield),
     DEVELOPER_HUB("Developer Hub", Icons.Default.Code),
-    TOUR("Interactive Tour", Icons.Default.HelpOutline)
+    TOUR("Interactive Tour", Icons.AutoMirrored.Filled.HelpOutline)
 }
 
 @Composable
@@ -59,9 +60,9 @@ fun NorthveilDrawerContent(
                 }
             }
 
-            Divider(color = CardSurfaceBorderDark)
+            HorizontalDivider(color = CardSurfaceBorderDark)
 
-            DrawerItem.values().forEach { item ->
+            DrawerItem.entries.forEach { item ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

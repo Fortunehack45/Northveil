@@ -183,7 +183,7 @@ fun AgentCard(
                 }
             }
 
-            Divider(color = CardSurfaceBorderDark)
+            HorizontalDivider(color = CardSurfaceBorderDark)
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

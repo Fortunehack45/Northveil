@@ -19,7 +19,6 @@ import com.google.mlkit.vision.common.InputImage
 fun QrScannerView(
     onAddressScanned: (String) -> Unit
 ) {
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasScanned by remember { mutableStateOf(false) }
 

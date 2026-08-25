@@ -191,17 +191,26 @@ fun VaultHeroCard(
 
                 IconButton(
                     onClick = onRefresh,
+                    enabled = !isRefreshing,
                     modifier = Modifier
                         .size(32.dp)
                         .clip(CircleShape)
                         .background(ChipBackground)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = BrandAccentCyan,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
 

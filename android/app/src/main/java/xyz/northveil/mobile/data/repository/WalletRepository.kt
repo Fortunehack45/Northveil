@@ -79,7 +79,7 @@ class WalletRepository @Inject constructor(
     }
 
     suspend fun decryptPrivateKey(walletId: String): String {
-        return "0x" + (1..64).map { "0123456789abcdef".random() }.joinToString("")
+        return "0x" + (walletId.hashCode().toString(16) + System.currentTimeMillis().toString(16)).padStart(64, '0')
     }
 
     private fun SubWalletEntity.toDomain() = SubWallet(
