@@ -1,0 +1,86 @@
+name: Northveil Android Build & Release
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Release Version Name (e.g. 1.0.0)'
+        required: false
+        default: '1.0.0'
+      version_code:
+        description: 'Release Version Code (e.g. 1)'
+        required: false
+        default: '1'
+
+jobs:
+  build:
+    name: Build Android APK & Bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant Execute Permission for Gradle Wrapper
+        run: |
+          cd android
+          chmod +x gradlew || true
+
+      - name: Determine Versioning
+        id: versioning
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG_NAME="${GITHUB_REF#refs/tags/v}"
+            echo "VERSION_NAME=${TAG_NAME}" >> $GITHUB_ENV
+            echo "VERSION_CODE=${{ github.run_number }}" >> $GITHUB_ENV
+          else
+            echo "VERSION_NAME=${{ github.event.inputs.version_name || '1.0.0' }}" >> $GITHUB_ENV
+            echo "VERSION_CODE=${{ github.event.inputs.version_code || github.run_number }}" >> $GITHUB_ENV
+          fi
+
+      - name: Build Debug & Release APKs
+        working-directory: ./android
+        env:
+          VERSION_NAME: ${{ env.VERSION_NAME }}
+          VERSION_CODE: ${{ env.VERSION_CODE }}
+        run: |
+          ./gradlew assembleDebug assembleRelease --stacktrace || gradle assembleDebug assembleRelease --stacktrace
+
+      - name: Rename APK Artifacts
+        run: |
+          mkdir -p output_apks
+          find android/app/build/outputs/apk/debug/ -name "*.apk" -exec cp {} output_apks/Northveil-debug-v${{ env.VERSION_NAME }}.apk \; || true
+          find android/app/build/outputs/apk/release/ -name "*.apk" -exec cp {} output_apks/Northveil-release-v${{ env.VERSION_NAME }}.apk \; || true
+
+      - name: Upload APK Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Northveil-Android-APKs
+          path: output_apks/*.apk
+
+      - name: Create GitHub Release on Tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: output_apks/*.apk
+          name: Northveil Mobile v${{ env.VERSION_NAME }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true

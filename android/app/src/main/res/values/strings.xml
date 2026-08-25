@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Northveil</string>
+    <string name="portfolio_widget_name">Northveil Portfolio</string>
+    <string name="unlock_vault_title">Unlock Northveil Vault</string>
+    <string name="unlock_vault_subtitle">Authenticate to decrypt non-custodial credentials</string>
+    <string name="camera_permission_required">Camera permission is required to scan address QR codes</string>
+</resources>
