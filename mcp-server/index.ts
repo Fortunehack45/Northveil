@@ -345,7 +345,7 @@ app.use('/sse', apiRateLimiter);
 
 // Favicon Redirect Route for Browser & MCP Clients
 app.get(['/favicon.ico', '/favicon.png', '/favicon.jpg'], (req: Request, res: Response) => {
-  res.redirect(301, 'https://iili.io/CgBPBHv.jpg');
+  res.redirect(301, 'https://iili.io/CDS9fvn.png');
 });
 
 // Real MCP Server Health & Telemetry Status Route
@@ -1404,7 +1404,7 @@ function getOpenApiSpec(baseUrl: string) {
       title: 'Northveil AI Assistant Wallet API',
       description: 'Allows AI models (Claude, ChatGPT, Cursor) to manage crypto wallets, deploy smart contracts, execute trades, and make web3 reservations on real blockchains.',
       version: '1.0.0',
-      'x-logo': { url: 'https://iili.io/CgBPBHv.jpg' },
+      'x-logo': { url: 'https://iili.io/CDS9fvn.png' },
     },
     servers: [
       { url: baseUrl, description: 'Active Northveil MCP Server' },
@@ -1450,7 +1450,7 @@ app.get('/ui/widget', async (req: Request, res: Response) => {
 <head>
   <meta charset="UTF-8">
   <title>Northveil Wallet Dashboard</title>
-  <link rel="icon" type="image/png" href="https://iili.io/CgBPBHv.jpg">
+  <link rel="icon" type="image/png" href="https://iili.io/CDS9fvn.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1475,7 +1475,7 @@ app.get('/ui/widget', async (req: Request, res: Response) => {
 <body>
   <div class="header">
     <div class="title">
-      <img src="https://iili.io/CgBPBHv.jpg" style="height:22px; width:22px; border-radius:6px;" />
+      <img src="https://iili.io/CDS9fvn.png" style="height:22px; width:22px; border-radius:6px;" />
       <span>NORTHVEIL WALLET DASHBOARD</span>
     </div>
     <div class="badge">ON-CHAIN SYNC ACTIVE</div>

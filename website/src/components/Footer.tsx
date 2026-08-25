@@ -26,9 +26,9 @@ export const Footer: React.FC<FooterProps> = ({ setActiveTab }) => {
           <div className="flex items-center gap-3">
             <div className="bg-[#ccff00] p-1 border-2 border-black">
               <img 
-                src="https://iili.io/CgBPBHv.jpg" 
+                src="https://iili.io/CDS9fvn.png" 
                 alt="Northveil Logo" 
-                className="w-8 h-8 object-cover bg-black p-0.5 border border-white" 
+                className="w-8 h-8 object-contain bg-black p-0.5 border border-white" 
               />
             </div>
             <span className="text-2xl font-black text-white uppercase tracking-tighter">

@@ -235,9 +235,11 @@ export const App: React.FC = () => {
       {/* Top Header Navbar */}
       <header className="w-full h-20 px-4 sm:px-8 border-b-3 border-white bg-[#141419] flex items-center justify-between gap-4 sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#ccff00] text-black border-2 border-black flex items-center justify-center font-black shadow-[2px_2px_0px_0px_#000]">
-            <Activity className="w-6 h-6 stroke-[3]" />
-          </div>
+          <img
+            src="https://iili.io/CDS9fvn.png"
+            alt="Northveil MCP Logo"
+            className="w-10 h-10 object-contain rounded-lg border-2 border-white shadow-[2px_2px_0px_0px_#ccff00] bg-black"
+          />
           <div>
             <h1 className="text-base sm:text-xl font-black text-white uppercase tracking-tight">
               NORTHVEIL MCP TELEMETRY &amp; STATUS

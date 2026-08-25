@@ -4,7 +4,7 @@ const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  'https://iili.io/CgBPBHv.jpg'
+  'https://iili.io/CDS9fvn.png'
 ];
 
 self.addEventListener('install', (event) => {
