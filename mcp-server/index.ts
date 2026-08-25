@@ -57,24 +57,24 @@ import {
   isKillSwitchActive,
   initSupabase,
   executeWithRpcFailover,
+  generatePasskeyRegistrationOptionsHandler,
+  verifyAndStorePasskeyRegistration,
   inMemoryTxRequests,
   inMemoryMpcWallets,
 } from './mpcControlPlaneService.js';
-import { encryptCredential, decryptCredential } from './encryptionService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Supabase Database Connection Credentials
-const DEFAULT_SUPABASE_URL = 'https://ulkbchewsrksgvlbzjzl.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsa2JjaGV3c3Jrc2d2bGJ6anpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NzkzMDIsImV4cCI6MjEwMTI1NTMwMn0.L8d4ZI9f1mJda9mraZRb5O_Tjc9wzSur84pB_Y0vjTA';
+// Supabase Database Connection (Strict environment variable loading)
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : ({} as any);
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// Share Supabase client with custodialSigningService so it uses the same authenticated connection
+// Share Supabase client with MPC service
 initSupabase(supabase);
 
 // Real Multi-Chain On-Chain RPC Providers
@@ -882,6 +882,7 @@ export interface AuthResult {
 export interface OAuthTokenRecord {
   token: string;
   clientId: string;
+  userId?: string;
   walletAddress: string;
   permissions: string[];
   expiresAt: number;
@@ -891,12 +892,15 @@ export const inMemoryOAuthTokens = new Map<string, OAuthTokenRecord>();
 export const inMemoryAuthCodes = new Map<string, {
   code: string;
   clientId: string;
+  userId?: string;
+  walletAddress?: string;
+  requestedScope?: string;
   redirectUri: string;
   codeChallenge?: string;
   codeChallengeMethod?: string;
   expiresAt: number;
 }>();
-export const inMemoryOAuthClients = new Map<string, { clientId: string; clientSecret: string; redirectUris: string[]; name: string }>();
+export const inMemoryOAuthClients = new Map<string, { clientId: string; clientSecret: string; redirectUris: string[]; name: string; walletAddress?: string }>();
 
 // Pre-seed official Claude / ChatGPT / Cursor integration OAuth clients
 inMemoryOAuthClients.set('northveil_ai_client', {
@@ -954,30 +958,30 @@ export const inMemoryApiKeys = new Map<string, ApiKeyRecord>();
 // Pre-seed known developer and integration keys in memory
 inMemoryApiKeys.set('nv_live_9f82a17b09c82415d8a9', {
   apiKey: 'nv_live_9f82a17b09c82415d8a9',
-  walletAddress: '0x87678de86804c6c3612d66cbd6e2857f1a7d8345',
+  walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
   keyName: 'Production Developer Key',
-  permissions: ['*'],
-  allowedWallets: ['0x87678de86804c6c3612d66cbd6e2857f1a7d8345', '0x71c8891575b50d22e032d847847c234a413d4cc8'],
+  permissions: ['tools:read', 'tools:execute'],
+  allowedWallets: ['0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'],
   tier: 'developer',
   userId: 'dev_user',
 });
 
 inMemoryApiKeys.set('nv_test_7a12b99c43d21100e45b', {
   apiKey: 'nv_test_7a12b99c43d21100e45b',
-  walletAddress: '0x87678de86804c6c3612d66cbd6e2857f1a7d8345',
+  walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
   keyName: 'Sandbox Developer Key',
-  permissions: ['read_only', 'read', 'write', 'transfer_enabled'],
-  allowedWallets: ['0x87678de86804c6c3612d66cbd6e2857f1a7d8345'],
+  permissions: ['tools:read', 'tools:execute'],
+  allowedWallets: ['0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'],
   tier: 'developer',
   userId: 'sandbox_user',
 });
 
 inMemoryApiKeys.set('nv_live_default_northveil_key', {
   apiKey: 'nv_live_default_northveil_key',
-  walletAddress: '0x87678de86804c6c3612d66cbd6e2857f1a7d8345',
+  walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
   keyName: 'Default Production Key',
-  permissions: ['*'],
-  allowedWallets: ['0x87678de86804c6c3612d66cbd6e2857f1a7d8345'],
+  permissions: ['tools:read', 'tools:execute'],
+  allowedWallets: ['0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'],
   tier: 'developer',
   userId: 'default_user',
 });
@@ -1205,18 +1209,18 @@ async function enforceConfirmationGate(
     if (!reqRecord) {
       return { canProceed: false, error: 'SECURITY ERROR: Invalid or unrecognized approval token. Please stage a new transaction request.' };
     }
-    if (reqRecord.token_used) {
+    if (reqRecord.status !== 'pending' || (reqRecord as any).token_used) {
       return { canProceed: false, error: 'SECURITY ERROR: Single-use approval token has already been used. Replay rejected.' };
     }
-    if (new Date() > new Date(reqRecord.expires_at)) {
+    const expTime = new Date(reqRecord.expiresAt || (reqRecord as any).expires_at || 0).getTime();
+    if (expTime > 0 && Date.now() > expTime) {
       return { canProceed: false, error: 'SECURITY ERROR: Approval token has expired (10-minute validity deadline exceeded).' };
     }
 
     // Token is valid - consume it immediately to prevent concurrent replay
-    reqRecord.token_used = true;
-    reqRecord.status = 'approved';
+    reqRecord.status = 'confirmed';
     try {
-      await supabase.from('transaction_requests').update({ status: 'approved', token_used: true }).eq('approval_token', approvalToken);
+      await supabase.from('transaction_requests').update({ status: 'confirmed' }).eq('approval_token', approvalToken);
     } catch (e) {}
 
     return { canProceed: true };
@@ -1228,15 +1232,16 @@ async function enforceConfirmationGate(
   const targetAsset = (toolArgs?.tokenSymbol || toolArgs?.symbol || toolArgs?.token || toolArgs?.asset || 'ETH').toUpperCase();
   const targetAmount = toolArgs?.amount || toolArgs?.tokenAmount || toolArgs?.value || 0;
 
-  const staged = await createTransactionRequest({
-    walletAddress: targetSender,
-    recipient: targetRecipient,
-    amount: targetAmount,
-    asset: targetAsset,
-    network: toolArgs?.network || toolArgs?.chain || 'sepolia',
-    contractSummary: `Staged confirmation for ${tool.name} (${toolArgs?.contractName || targetAsset || 'On-Chain Operation'})`,
-    unsignedPayload: toolArgs,
-  });
+  const staged: any = await stageTransactionRequest(
+    targetSender,
+    targetRecipient,
+    targetAmount,
+    targetAsset,
+    toolArgs?.network || toolArgs?.chain || 'sepolia',
+    toolArgs,
+    'default_user',
+    `Staged confirmation for ${tool.name} (${toolArgs?.contractName || targetAsset || 'On-Chain Operation'})`
+  );
 
   return {
     canProceed: false,
@@ -1518,33 +1523,82 @@ const handleRegister = (req: Request, res: Response) => {
   });
 };
 
-const handleAuthorize = (req: Request, res: Response) => {
-  const clientId = (req.query.client_id as string) || 'northveil_ai_client';
+// Dedicated rate limiter for OAuth token exchange
+const oauthTokenRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'slow_down',
+    error_description: 'Too many authentication attempts. Please try again in 1 minute.',
+  },
+});
+
+const handleAuthorize = async (req: Request, res: Response) => {
+  const clientId = (req.query.client_id as string) || '';
   const redirectUri = (req.query.redirect_uri as string) || '';
   const state = (req.query.state as string) || '';
   const codeChallenge = (req.query.code_challenge as string) || '';
   const codeChallengeMethod = (req.query.code_challenge_method as string) || 'plain';
+  const requestedScope = (req.query.scope as string) || 'tools:read tools:execute';
 
-  // Generate stateless HMAC-signed authorization code
+  // Strict session authentication: Require valid active session before issuing authorization code
+  const authHeader = (req.headers.authorization || '').trim();
+  const apiKeyHeader = ((req.headers['x-api-key'] || req.query.api_key) as string || '').trim();
+  let authenticatedUser: { id: string; walletAddress: string } | null = null;
+
+  if (apiKeyHeader) {
+    const keyRec = inMemoryApiKeys.get(apiKeyHeader);
+    if (keyRec) {
+      authenticatedUser = { id: keyRec.userId || 'api_user', walletAddress: keyRec.walletAddress };
+    }
+  } else if (authHeader.startsWith('Bearer ')) {
+    const tokenStr = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (tokenStr.startsWith('nv_oauth_')) {
+      const verified = verifyOAuthPayload(tokenStr.replace('nv_oauth_', ''));
+      if (verified && verified.walletAddress) {
+        authenticatedUser = { id: verified.userId || 'oauth_user', walletAddress: verified.walletAddress };
+      }
+    } else if (inMemoryApiKeys.has(tokenStr)) {
+      const keyRec = inMemoryApiKeys.get(tokenStr)!;
+      authenticatedUser = { id: keyRec.userId || 'api_user', walletAddress: keyRec.walletAddress };
+    }
+  }
+
+  if (!authenticatedUser) {
+    return res.status(401).json({
+      error: 'unauthorized',
+      error_description: 'User session authentication required before granting an OAuth authorization code. Pass valid Authorization: Bearer <session_token> or X-API-Key header.',
+    });
+  }
+
+  // Generate stateless HMAC-signed authorization code bound to authenticated user's ID & wallet
   const authPayload = {
     type: 'auth_code',
     clientId,
+    userId: authenticatedUser.id,
+    walletAddress: authenticatedUser.walletAddress,
     redirectUri,
     codeChallenge,
     codeChallengeMethod,
+    requestedScope,
     iat: Date.now(),
     exp: Date.now() + 15 * 60 * 1000, // 15 minute validity
   };
 
   const code = 'nv_code_' + signOAuthPayload(authPayload);
 
-  // Also cache in memory for local single-instance fast lookup
+  // Cache in memory for single-instance fast lookup
   inMemoryAuthCodes.set(code, {
     code,
     clientId,
+    userId: authenticatedUser.id,
+    walletAddress: authenticatedUser.walletAddress,
     redirectUri,
     codeChallenge,
     codeChallengeMethod,
+    requestedScope,
     expiresAt: authPayload.exp,
   });
 
@@ -1552,7 +1606,13 @@ const handleAuthorize = (req: Request, res: Response) => {
     const separator = redirectUri.includes('?') ? '&' : '?';
     return res.redirect(`${redirectUri}${separator}code=${code}&state=${encodeURIComponent(state)}`);
   }
-  return res.json({ status: 'AUTHORIZED', code, state, message: 'Northveil OAuth Authorization Code Issued (Valid for 15 minutes).' });
+  return res.json({
+    status: 'AUTHORIZED',
+    code,
+    state,
+    walletAddress: authenticatedUser.walletAddress,
+    message: 'Northveil OAuth Authorization Code Issued (Valid for 15 minutes).',
+  });
 };
 
 const handleToken = async (req: Request, res: Response) => {
@@ -1561,6 +1621,7 @@ const handleToken = async (req: Request, res: Response) => {
   const clientSecret = req.body?.client_secret || req.query?.client_secret || '';
   const code = req.body?.code || req.query?.code || '';
   const codeVerifier = req.body?.code_verifier || req.query?.code_verifier || '';
+  const refreshToken = req.body?.refresh_token || req.query?.refresh_token || '';
 
   // 1. Authorization Code Grant (supports standard & PKCE statelessly)
   if (grantType === 'authorization_code') {
@@ -1570,7 +1631,7 @@ const handleToken = async (req: Request, res: Response) => {
 
     let authPayload: any = null;
 
-    // Check signed stateless token first
+    // Check signed stateless token
     if (code.startsWith('nv_code_')) {
       const rawSigned = code.replace('nv_code_', '');
       authPayload = verifyOAuthPayload(rawSigned);
@@ -1588,7 +1649,7 @@ const handleToken = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'invalid_grant', error_description: 'Invalid, used, or expired authorization code.' });
     }
 
-    // PKCE S256 Verification: Verify code_verifier matches code_challenge from authorization
+    // PKCE S256 Verification
     if (authPayload.codeChallenge && authPayload.codeChallengeMethod === 'S256') {
       if (!codeVerifier) {
         return res.status(400).json({ error: 'invalid_request', error_description: 'PKCE code_verifier is required.' });
@@ -1603,53 +1664,129 @@ const handleToken = async (req: Request, res: Response) => {
       }
     }
 
-    // Invalidate from memory cache
+    // Invalidate from memory cache (single-use)
     inMemoryAuthCodes.delete(code);
+
+    const userWallet = authPayload.walletAddress || '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+    const userId = authPayload.userId || 'oauth_user';
+    const grantedScope = authPayload.requestedScope || 'tools:read tools:execute';
+    const permissions = ['tools:read', 'tools:execute'];
 
     const expiresIn = 30 * 86400; // 30 days token lifespan
     const tokenPayload = {
       type: 'access_token',
       clientId: authPayload.clientId || 'northveil_ai_client',
-      walletAddress: '0x87678de86804c6c3612d66cbd6e2857f1a7d8345',
-      permissions: ['*'],
+      userId,
+      walletAddress: userWallet,
+      permissions,
+      scope: grantedScope,
       iat: Date.now(),
       exp: Date.now() + expiresIn * 1000,
-      scope: 'read write admin',
     };
 
     const token = 'nv_oauth_' + signOAuthPayload(tokenPayload);
-    const refreshToken = 'nv_ref_' + crypto.randomBytes(24).toString('hex');
+    const issuedRefreshToken = 'nv_ref_' + crypto.randomBytes(24).toString('hex');
 
-    // Also store in memory cache
     inMemoryOAuthTokens.set(token, {
       token,
       clientId: tokenPayload.clientId,
-      walletAddress: tokenPayload.walletAddress,
-      permissions: tokenPayload.permissions,
+      userId,
+      walletAddress: userWallet,
+      permissions,
+      scope: grantedScope,
       expiresAt: tokenPayload.exp,
-      scope: tokenPayload.scope,
     });
 
     return res.json({
       access_token: token,
       token_type: 'Bearer',
       expires_in: expiresIn,
-      refresh_token: refreshToken,
-      scope: 'read write admin',
+      refresh_token: issuedRefreshToken,
+      scope: grantedScope,
+      wallet_address: userWallet,
     });
   }
 
-  // 2. Client Credentials Grant / Refresh Grant
-  if (grantType === 'client_credentials' || grantType === 'refresh_token') {
+  // 2. Client Credentials Grant (Strict client_secret verification)
+  if (grantType === 'client_credentials') {
+    if (!clientId || !clientSecret) {
+      return res.status(401).json({
+        error: 'invalid_client',
+        error_description: 'client_id and client_secret are required for client_credentials grant.',
+      });
+    }
+
+    const clientRecord = inMemoryOAuthClients.get(clientId);
+    if (!clientRecord) {
+      return res.status(401).json({
+        error: 'invalid_client',
+        error_description: 'Client is not registered.',
+      });
+    }
+
+    // Constant-time secret comparison
+    const storedBuf = Buffer.from(clientRecord.clientSecret);
+    const providedBuf = Buffer.from(clientSecret);
+    if (storedBuf.length !== providedBuf.length || !crypto.timingSafeEqual(storedBuf, providedBuf)) {
+      return res.status(401).json({
+        error: 'invalid_client',
+        error_description: 'Invalid client_secret provided for client_id.',
+      });
+    }
+
+    const boundWallet = clientRecord.walletAddress || '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+    const grantedScope = 'tools:read tools:execute';
+    const permissions = ['tools:read', 'tools:execute'];
     const expiresIn = 30 * 86400;
+
+    const tokenPayload = {
+      type: 'access_token',
+      clientId,
+      walletAddress: boundWallet,
+      permissions,
+      scope: grantedScope,
+      iat: Date.now(),
+      exp: Date.now() + expiresIn * 1000,
+    };
+
+    const token = 'nv_oauth_' + signOAuthPayload(tokenPayload);
+
+    inMemoryOAuthTokens.set(token, {
+      token,
+      clientId,
+      walletAddress: boundWallet,
+      permissions,
+      scope: grantedScope,
+      expiresAt: tokenPayload.exp,
+    });
+
+    return res.json({
+      access_token: token,
+      token_type: 'Bearer',
+      expires_in: expiresIn,
+      scope: grantedScope,
+      wallet_address: boundWallet,
+    });
+  }
+
+  // 3. Refresh Token Grant
+  if (grantType === 'refresh_token') {
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'invalid_request', error_description: 'Missing refresh_token parameter.' });
+    }
+
+    const boundWallet = '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+    const grantedScope = 'tools:read tools:execute';
+    const expiresIn = 30 * 86400;
+
     const tokenPayload = {
       type: 'access_token',
       clientId: clientId || 'northveil_ai_client',
-      walletAddress: '0x87678de86804c6c3612d66cbd6e2857f1a7d8345',
-      permissions: ['*'],
+      walletAddress: boundWallet,
+      permissions: ['tools:read', 'tools:execute'],
+      scope: grantedScope,
       iat: Date.now(),
       exp: Date.now() + expiresIn * 1000,
-      scope: 'read write admin',
     };
 
     const token = 'nv_oauth_' + signOAuthPayload(tokenPayload);
@@ -1658,7 +1795,7 @@ const handleToken = async (req: Request, res: Response) => {
       access_token: token,
       token_type: 'Bearer',
       expires_in: expiresIn,
-      scope: 'read write admin',
+      scope: grantedScope,
     });
   }
 
@@ -1666,8 +1803,36 @@ const handleToken = async (req: Request, res: Response) => {
 };
 
 app.get(['/authorize', '/oauth/authorize', '/oauth2/authorize', '/auth/authorize'], handleAuthorize);
-app.post(['/token', '/oauth/token', '/oauth2/token', '/auth/token'], handleToken);
+app.post(['/token', '/oauth/token', '/oauth2/token', '/auth/token'], oauthTokenRateLimiter, handleToken);
 app.post(['/register', '/oauth/register', '/oauth2/register'], handleRegister);
+
+// ═════════════════════════════════════════════════════════════
+// WEBAUTHN PASSKEY REGISTRATION & MANAGEMENT REST ROUTES
+// ═════════════════════════════════════════════════════════════
+app.post(['/auth/passkey/register-options', '/api/v1/auth/passkey/register-options'], async (req: Request, res: Response) => {
+  try {
+    const userId = req.body?.userId || 'default_user';
+    const userName = req.body?.userName || 'user@northveil.xyz';
+    const userDisplayName = req.body?.userDisplayName || 'Northveil Web3 User';
+    const options = await generatePasskeyRegistrationOptionsHandler(userId, userName, userDisplayName);
+    res.json(options);
+  } catch (err: any) {
+    res.status(400).json({ error: 'passkey_registration_options_failed', message: err.message });
+  }
+});
+
+app.post(['/auth/passkey/verify-register', '/api/v1/auth/passkey/verify-register'], async (req: Request, res: Response) => {
+  try {
+    const { userId, walletAddress, registrationResponse } = req.body;
+    if (!userId || !walletAddress || !registrationResponse) {
+      return res.status(400).json({ error: 'invalid_request', message: 'userId, walletAddress, and registrationResponse are required.' });
+    }
+    const result = await verifyAndStorePasskeyRegistration(userId, walletAddress, registrationResponse);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ error: 'passkey_verification_failed', message: err.message });
+  }
+});
 
 // Root Route & OpenAPI spec
 app.get('/', (req: Request, res: Response) => {
@@ -2224,180 +2389,6 @@ function parsePromptParameters(promptStr: string, args: any) {
   };
 }
 
-// Dynamic Multi-User Private Key & Secret Resolver from Supabase DB, Headers, Args, and Env
-async function resolveWalletPrivateKey(
-  args: any,
-  req: Request | undefined,
-  cleanAddress: string,
-  dbWallet: any
-): Promise<string | null> {
-  // 1. Direct Tool Arguments (privateKey, secretKey, walletSecret, seedPhrase, mnemonic)
-  let pk = args?.privateKey || args?.secretKey || args?.walletSecret || args?.private_key || args?.userPrivateKey;
-  let seed = args?.seedPhrase || args?.mnemonic || args?.seed_phrase;
-
-  // 2. HTTP Request Headers (x-private-key, x-wallet-secret, x-seed-phrase)
-  if (!pk && req?.headers) {
-    pk = (req.headers['x-private-key'] as string) || (req.headers['x-wallet-secret'] as string);
-    if (!seed) seed = (req.headers['x-seed-phrase'] as string) || (req.headers['x-mnemonic'] as string);
-  }
-
-  // 3. Pre-fetched Supabase DB Wallet Record
-  if (!pk && dbWallet) {
-    if (!dbWallet.encrypted_credential && (dbWallet.private_key || dbWallet.seed_phrase)) {
-      try {
-        const rawSecret = dbWallet.seed_phrase || dbWallet.private_key;
-        const encrypted = encryptCredential(rawSecret);
-        const credType = dbWallet.seed_phrase ? 'seed_phrase' : 'private_key';
-        dbWallet.encrypted_credential = encrypted.ciphertext;
-        dbWallet.iv = encrypted.iv;
-        dbWallet.auth_tag = encrypted.authTag;
-        dbWallet.credential_type = credType;
-        supabase.from('wallets').update({
-          encrypted_credential: encrypted.ciphertext,
-          iv: encrypted.iv,
-          auth_tag: encrypted.authTag,
-          credential_type: credType
-        }).eq('id', dbWallet.id).then();
-      } catch (e) { }
-    }
-
-    if (dbWallet.encrypted_credential && dbWallet.iv && dbWallet.auth_tag) {
-      try {
-        const decrypted = decryptCredential({
-          ciphertext: dbWallet.encrypted_credential,
-          iv: dbWallet.iv,
-          authTag: dbWallet.auth_tag,
-        });
-        if (dbWallet.credential_type === 'seed_phrase') {
-          pk = ethers.Wallet.fromPhrase(decrypted, dbWallet.derivation_path || "m/44'/60'/0'/0/0").privateKey;
-        } else {
-          pk = decrypted.startsWith('0x') ? decrypted : `0x${decrypted}`;
-        }
-      } catch (e) {
-        console.warn('[AES Decryption Note]:', e);
-      }
-    }
-    if (!pk) {
-      const candidatePk = dbWallet.private_key || dbWallet.secret || dbWallet.wallet_secret || dbWallet.privateKey || dbWallet.secret_key;
-      if (candidatePk && candidatePk !== 'null' && candidatePk !== 'undefined') pk = candidatePk;
-      if (!seed) {
-        const candidateSeed = dbWallet.seed_phrase || dbWallet.mnemonic;
-        if (candidateSeed && candidateSeed !== 'null' && candidateSeed !== 'undefined') seed = candidateSeed;
-      }
-    }
-  }
-
-  // 4. Dynamic Supabase DB Query across 100,000+ users by address, user_id, or walletAddress
-  if (!pk && !seed) {
-    try {
-      const searchAddress = (args?.walletAddress || args?.userWallet || args?.fromAddress || args?.address || cleanAddress || '').toLowerCase();
-      if (searchAddress && searchAddress.startsWith('0x')) {
-        const { data: wRow } = await supabase
-          .from('wallets')
-          .select('*')
-          .or(`address.ilike.${searchAddress},user_id.eq.${searchAddress}`)
-          .maybeSingle();
-
-        if (wRow) {
-          if (wRow.encrypted_credential && wRow.iv && wRow.auth_tag) {
-            try {
-              const decrypted = decryptCredential({
-                ciphertext: wRow.encrypted_credential,
-                iv: wRow.iv,
-                authTag: wRow.auth_tag,
-              });
-              if (wRow.credential_type === 'seed_phrase') {
-                pk = ethers.Wallet.fromPhrase(decrypted, wRow.derivation_path || "m/44'/60'/0'/0/0").privateKey;
-              } else {
-                pk = decrypted.startsWith('0x') ? decrypted : `0x${decrypted}`;
-              }
-            } catch (e) { }
-          }
-          if (!pk) {
-            const candidatePk = wRow.private_key || wRow.secret || wRow.wallet_secret || wRow.privateKey || wRow.secret_key;
-            if (candidatePk && candidatePk !== 'null' && candidatePk !== 'undefined') pk = candidatePk;
-            if (!seed) {
-              const candidateSeed = wRow.seed_phrase || wRow.mnemonic;
-              if (candidateSeed && candidateSeed !== 'null' && candidateSeed !== 'undefined') seed = candidateSeed;
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('[Supabase Key Resolution Note]:', e);
-    }
-  }
-
-  // 4b. Global Supabase DB Fallback: Query ANY stored user wallet that matches cleanAddress or has valid credentials
-  if (!pk && !seed) {
-    try {
-      const { data: allRows } = await supabase
-        .from('wallets')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (allRows && allRows.length > 0) {
-        // Match cleanAddress first
-        const matchRow = allRows.find((r: any) =>
-          r.address?.toLowerCase() === cleanAddress?.toLowerCase()
-        ) || allRows.find((r: any) =>
-          (r.encrypted_credential && r.iv && r.auth_tag) ||
-          (r.private_key && r.private_key !== 'null' && r.private_key.length >= 64) ||
-          (r.seed_phrase && r.seed_phrase !== 'null')
-        );
-
-        if (matchRow) {
-          if (matchRow.encrypted_credential && matchRow.iv && matchRow.auth_tag) {
-            try {
-              const decrypted = decryptCredential({
-                ciphertext: matchRow.encrypted_credential,
-                iv: matchRow.iv,
-                authTag: matchRow.auth_tag,
-              });
-              if (matchRow.credential_type === 'seed_phrase') {
-                pk = ethers.Wallet.fromPhrase(decrypted, matchRow.derivation_path || "m/44'/60'/0'/0/0").privateKey;
-              } else {
-                pk = decrypted.startsWith('0x') ? decrypted : `0x${decrypted}`;
-              }
-            } catch (e) { }
-          }
-          if (!pk) {
-            pk = matchRow.private_key || matchRow.secret || matchRow.wallet_secret || matchRow.privateKey;
-            if (!seed) seed = matchRow.seed_phrase || matchRow.mnemonic;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('[Supabase Fallback Key Lookup Note]:', e);
-    }
-  }
-
-  // 5. BIP-39 Mnemonic Seed Phrase / Private Key Derivation
-  if (!pk && seed) {
-    try {
-      const cleanSeed = seed.trim();
-      if (cleanSeed.startsWith('0x') || cleanSeed.length === 64) {
-        pk = cleanSeed.startsWith('0x') ? cleanSeed : `0x${cleanSeed}`;
-      } else {
-        pk = ethers.Wallet.fromPhrase(cleanSeed).privateKey;
-      }
-    } catch (e) {
-      console.warn('[Mnemonic Key Derivation Error]:', e);
-    }
-  }
-
-  // 6. Hardcoded Default User Primary Signing Key & Environment Variable Fallback
-  if (!pk && (cleanAddress === '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417' || !cleanAddress)) {
-    pk = '0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9';
-  }
-
-  if (!pk) {
-    pk = process.env.SEPOLIA_PRIVATE_KEY || process.env.ETH_PRIVATE_KEY || process.env.PRIVATE_KEY || '0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9';
-  }
-
-  return pk;
-}
-
 const inMemoryBookingReservations: any[] = [];
 
 async function executeRealTool(name: string, args: any, walletAddress: string, req?: Request) {
@@ -2603,7 +2594,7 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
 > **Amount**: **${amount} ${asset}**  
 > **Target Network**: \`${network}\`  
 > **Expires At**: \`${res.expiresAt}\`  
-> **Passkey Authorization Link**: [Authorize Transaction](${res.approvalUrl})  
+> **Passkey Authorization Link**: [Authorize Transaction](https://northveil.xyz/approve?token=${res.approvalToken})  
 
 *Please prompt the user to complete WebAuthn Passkey authorization on their device or call \`approve_transaction\` with the approvalToken.*
 `,
@@ -2665,23 +2656,90 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
       }
 
       const statusEmoji = stagedReq.status === 'confirmed' ? '🟢' : stagedReq.status === 'pending' ? '🟡' : '🔴';
+      const reqId = (stagedReq as any).request_id || stagedReq.requestId;
+      const vaultAddr = (stagedReq as any).wallet_address || stagedReq.walletAddress;
+      const txH = (stagedReq as any).tx_hash || stagedReq.txHash;
+      const expLink = (stagedReq as any).explorer_url || stagedReq.explorerUrl;
+      const blkNum = (stagedReq as any).block_number || stagedReq.blockNumber;
+      const expAt = (stagedReq as any).expires_at || stagedReq.expiresAt;
+
       return {
         formattedMarkdown: `
 ### 🔍 TRANSACTION REQUEST STATUS: ${statusEmoji} ${stagedReq.status?.toUpperCase()}
 
-> **Request ID**: \`${stagedReq.request_id || stagedReq.requestId}\`  
+> **Request ID**: \`${reqId}\`  
 > **Status**: **${stagedReq.status?.toUpperCase()}**  
-> **Sender Vault**: \`${stagedReq.wallet_address || stagedReq.walletAddress}\`  
+> **Sender Vault**: \`${vaultAddr}\`  
 > **Recipient**: \`${stagedReq.recipient}\`  
 > **Amount**: **${stagedReq.amount} ${stagedReq.asset}**  
-${stagedReq.tx_hash ? `> **Transaction Hash**: [\`${stagedReq.tx_hash}\`](${stagedReq.explorer_url})` : ''}
-${stagedReq.block_number ? `> **Block Number**: \`${stagedReq.block_number}\`` : ''}
-> **Expires At**: \`${stagedReq.expires_at || stagedReq.expiresAt}\`
+${txH ? `> **Transaction Hash**: [\`${txH}\`](${expLink || '#'})` : ''}
+${blkNum ? `> **Block Number**: \`${blkNum}\`` : ''}
+> **Expires At**: \`${expAt}\`
 `,
         ...stagedReq,
       };
     }
 
+    case 'generate_passkey_registration_options': {
+      const userId = args.userId || 'default_user';
+      const userName = args.userName || 'user@northveil.xyz';
+      const userDisplayName = args.userDisplayName || 'Northveil Web3 User';
+      const options = await generatePasskeyRegistrationOptionsHandler(userId, userName, userDisplayName);
+      return {
+        formattedMarkdown: `
+### 🔑 WEBAUTHN PASSKEY REGISTRATION INITIATED
+
+> **User ID**: \`${userId}\`  
+> **RP ID**: \`${options.rp.id}\`  
+> **Challenge**: \`${options.challenge}\`  
+> **User Verification**: \`required\`  
+
+*Please call navigator.credentials.create() with these options in the browser/client.*
+`,
+        options,
+      };
+    }
+
+    case 'verify_passkey_registration': {
+      const userId = args.userId || 'default_user';
+      const targetAddress = (args.walletAddress || cleanAddress).toLowerCase();
+      const registrationResponse = args.registrationResponse;
+      if (!registrationResponse) throw new Error('Missing registrationResponse argument.');
+      const res = await verifyAndStorePasskeyRegistration(userId, targetAddress, registrationResponse);
+      return {
+        formattedMarkdown: `
+### 🛡️ PASSKEY REGISTERED & BOUND TO MPC VAULT
+
+> **Status**: 🟢 **VERIFIED & SECURED**  
+> **Credential ID**: \`${res.credentialId}\`  
+> **Device**: \`${res.deviceName}\`  
+> **Vault Address**: \`${targetAddress}\`  
+`,
+        ...res,
+      };
+    }
+
+    case 'approve_transaction_with_passkey': {
+      const token = args.approvalToken || args.token;
+      if (!token) throw new Error('Missing approvalToken argument.');
+      const passkeyAssertion = args.passkeyAssertion;
+      const res = await approveAndExecuteWithPasskey(token, passkeyAssertion, 'default_user');
+      return {
+        formattedMarkdown: `
+### ✅ TRANSACTION APPROVED & EXECUTED VIA MPC ENCLAVES
+
+> **Status**: 🟢 **CONFIRMED ON-CHAIN**  
+> **Transaction Hash**: [\`${res.txHash}\`](${res.explorerUrl})  
+> **Block Number**: \`${res.blockNumber}\`  
+> **Gas Used**: \`${res.gasUsed}\`  
+> **Request ID**: \`${res.requestId}\`  
+> **Explorer Link**: [View on Block Explorer](${res.explorerUrl})  
+`,
+        ...res,
+      };
+    }
+
+    case 'set_autonomous_spending_scope':
     case 'set_autonomous_scope': {
       const targetAddress = (args.walletAddress || cleanAddress).toLowerCase();
       const maxAmountPerTxUsd = Number(args.maxAmountPerTxUsd) || 25.0;
@@ -3134,11 +3192,6 @@ contract ${nameStr} {
       // 1. Evaluate Autonomous Spending Policy for Deployment
       const scopeCheck = await evaluateAutonomousScope(cleanAddress, 'default_user', chainId, 'DEPLOY', 1.0);
 
-      let realTxHash = '';
-      let realContractAddress = '';
-      let isOnChainBroadcasted = false;
-      let deployErrorMsg = '';
-
       if (scopeCheck.inScope && scopeCheck.scopeId) {
         try {
           const autoRes = await executeAutonomousTransaction(
@@ -3223,15 +3276,14 @@ contract ${nameStr} {
 > **Request ID**: \`${stageRes.requestId}\`  
 > **Approval Token**: \`${stageRes.approvalToken}\`  
 > **Expires At**: \`${stageRes.expiresAt}\`  
-> **Passkey Authorization**: [Confirm Deployment on Device](${stageRes.approvalUrl})  
+> **Passkey Authorization**: [Confirm Deployment on Device](https://northveil.xyz/approve?token=${stageRes.approvalToken})  
 
 *Please prompt the user to authorize contract deployment via WebAuthn Passkey or call \`approve_transaction\` with token \`${stageRes.approvalToken}\`.*
 `,
+          ...stageRes,
           contractName: nameStr,
           symbol: symbolStr,
           predictedAddress: realContractAddress,
-          status: 'pending_approval',
-          ...stageRes,
         };
       }
 
@@ -3242,13 +3294,13 @@ contract ${nameStr} {
 
 > **Contract Name**: \`${nameStr}\` (\`$${symbolStr}\`)  
 > **Target Network**: \`${networkName}\` (Chain ID: \`${chainId}\`)  
-> **Deployer Wallet**: \`${actualSignerAddress}\`  
+> **Deployer Wallet**: \`${cleanAddress}\`  
 > **Failure Reason**: \`${deployErrorMsg || 'RPC Execution Failed or Insufficient Gas Funds'}\`  
 
 ---
 
 #### 💡 Troubleshooting Recommendations:
-1. Ensure deployer wallet \`${actualSignerAddress}\` has active native gas funds on \`${networkName}\`.
+1. Ensure deployer wallet \`${cleanAddress}\` has active native gas funds on \`${networkName}\`.
 2. Verify contract constructor parameters and network RPC status.
 `,
           status: 'FAILED',
@@ -3264,7 +3316,7 @@ contract ${nameStr} {
       let dbRecordId: string | null = null;
       try {
         const { data: dbData, error: dbErr } = await supabase.from('contracts').insert([{
-          wallet_address: actualSignerAddress,
+          wallet_address: cleanAddress,
           contract_name: nameStr,
           symbol: symbolStr,
           contract_type: isNft ? 'ERC-721' : 'ERC-20',
@@ -3298,7 +3350,7 @@ contract ${nameStr} {
 
         if (isOnChainBroadcasted && realTxHash) {
           await supabase.from('transactions').insert([{
-            wallet_address: actualSignerAddress,
+            wallet_address: cleanAddress,
             tx_hash: realTxHash,
             type: 'DEPLOY',
             token_symbol: symbolStr,
@@ -3331,7 +3383,7 @@ contract ${nameStr} {
 > **Deployment Status**: ${isOnChainBroadcasted ? `**BROADCASTED & CONFIRMED ON-CHAIN**` : `**SIGNABLE UNBROADCASTED PAYLOAD READY**`}  
 > **Contract Address**: [\`${realContractAddress}\`](${explorerBase}/address/${realContractAddress})  
 ${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](${explorerBase}/tx/${realTxHash})` : ''}
-> **Owner Wallet**: \`${actualSignerAddress}\`
+> **Owner Wallet**: \`${cleanAddress}\`
 ${!isOnChainBroadcasted ? `\n> **Status Notice**: Transaction payload compiled and ready for broadcasting.` : ''}
 
 ---
@@ -3398,13 +3450,6 @@ ${solCode}
         status: isOnChainBroadcasted ? 'CONFIRMED' : 'SIGNABLE_PAYLOAD_READY',
       };
     }
-
-    // NOTE: create_wallet is handled above (line ~1636) via createCustodialWallet() with AES-256-GCM encryption
-
-
-    // NOTE: import_wallet is handled above (line ~1660) via custodialSigningService with AES-256-GCM encryption
-
-
 
     case 'get_wallet_info': {
       const activeChain = dbWallet?.chain || args?.chain || 'ethereum';
@@ -3756,7 +3801,7 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
 > **Recipient**: \`${recipient}\`  
 > **Target Network**: \`${chainName}\`  
 > **Expires At**: \`${stageResult.expiresAt}\`  
-> **Authorize Passkey**: [Confirm on Device](${stageResult.approvalUrl})  
+> **Authorize Passkey**: [Confirm on Device](https://northveil.xyz/approve?token=${stageResult.approvalToken})  
 
 *Please prompt the user to authorize this transaction on their device or call \`approve_transaction\` with token \`${stageResult.approvalToken}\`.*
 `,
@@ -4196,18 +4241,17 @@ ${solCode}
 > **Request ID**: \`${stageRes.requestId}\`  
 > **Approval Token**: \`${stageRes.approvalToken}\`  
 > **Expires At**: \`${stageRes.expiresAt}\`  
-> **Authorize Passkey**: [Confirm Swap on Device](${stageRes.approvalUrl})  
+> **Authorize Passkey**: [Confirm Swap on Device](https://northveil.xyz/approve?token=${stageRes.approvalToken})  
 
 *Please prompt the user to authorize this swap on their device or call \`approve_transaction\` with token \`${stageRes.approvalToken}\`.*
 `,
+        ...stageRes,
         fromToken: fromSym,
         toToken: toSym,
         fromAmount: amountNum,
         toAmount: Number(dstAmountFormatted),
         router: routerName,
         routerAddress,
-        status: 'pending_approval',
-        ...stageRes,
       };
     }
 
@@ -4470,14 +4514,7 @@ ${solCode}
     case 'get_nft_gallery': {
       let nfts: any[] = [];
       const seenKeys = new Set<string>();
-
-      let signerAddress = cleanAddress;
-      try {
-        const pk = await resolveWalletPrivateKey(args, req, cleanAddress, dbWallet);
-        if (pk) {
-          signerAddress = new ethers.Wallet(pk).address.toLowerCase();
-        }
-      } catch (e) { }
+      const signerAddress = cleanAddress;
 
       const requestedAddress = (args?.walletAddress || args?.address || args?.wallet_address || '').toLowerCase();
 
@@ -5152,23 +5189,33 @@ ${dexData.volume?.h24 ? `| **24h Volume** | ${formatUsdValue(dexData.volume.h24)
               status: 'TRIGGERED', executed_at: new Date().toISOString(), current_price: livePrice, updated_at: new Date().toISOString(),
             }).eq('id', order.id);
 
-            // Auto-execute swap
+            // Auto-execute swap via Non-Custodial MPC Enclave
             try {
-              const pk = await resolveWalletPrivateKey({}, undefined, order.walletAddress, null);
-              if (pk) {
-                const signer = new ethers.Wallet(pk, ethProvider);
-                const valueWei = ethers.parseEther(String(order.amount));
-                const tx = await signer.sendTransaction({
+              const execRes = await executeAutonomousTransaction(
+                order.walletAddress,
+                '0x1111111254EEB25477B68fb85Ed929f73A960382',
+                order.amount,
+                'ETH',
+                order.chain || 'sepolia',
+                {
                   to: '0x1111111254EEB25477B68fb85Ed929f73A960382',
-                  value: valueWei, data: '0x',
-                });
-                await tx.wait(1);
-                await supabase.from('trade_orders').update({ status: 'EXECUTED', tx_hash: tx.hash, updated_at: new Date().toISOString() }).eq('id', order.id);
-              } else {
-                await supabase.from('trade_orders').update({ status: 'FAILED', updated_at: new Date().toISOString() }).eq('id', order.id);
-              }
-            } catch (execErr) {
-              await supabase.from('trade_orders').update({ status: 'FAILED', updated_at: new Date().toISOString() }).eq('id', order.id);
+                  value: ethers.parseEther(String(order.amount)).toString(),
+                  data: '0x',
+                },
+                order.id,
+                'default_user'
+              );
+              await supabase.from('trade_orders').update({
+                status: 'EXECUTED',
+                tx_hash: execRes.txHash,
+                updated_at: new Date().toISOString(),
+              }).eq('id', order.id);
+            } catch (execErr: any) {
+              console.error('[Trade Order Auto Execution Error]:', execErr.message);
+              await supabase.from('trade_orders').update({
+                status: 'FAILED',
+                updated_at: new Date().toISOString(),
+              }).eq('id', order.id);
             }
           }
         } catch (monitorErr) { /* monitoring continues */ }
@@ -5899,16 +5946,15 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
 > **Request ID**: \`${stageRes.requestId}\`  
 > **Approval Token**: \`${stageRes.approvalToken}\`  
 > **Expires At**: \`${stageRes.expiresAt}\`  
-> **Authorize Passkey**: [Confirm Mint on Device](${stageRes.approvalUrl})  
+> **Authorize Passkey**: [Confirm Mint on Device](https://northveil.xyz/approve?token=${stageRes.approvalToken})  
 
 *Please prompt the user to authorize this mint on their device or call \`approve_transaction\` with token \`${stageRes.approvalToken}\`.*
 `,
+        ...stageRes,
         tokenName,
         tokenSymbol,
         contractAddress,
         recipientAddress,
-        status: 'pending_approval',
-        ...stageRes,
       };
     }
 

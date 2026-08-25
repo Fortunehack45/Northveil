@@ -46,7 +46,10 @@ CREATE INDEX IF NOT EXISTS idx_passkey_credential_id ON public.passkey_credentia
 
 ALTER TABLE public.passkey_credentials ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow public passkey operations" ON public.passkey_credentials;
-CREATE POLICY "Allow public passkey operations" ON public.passkey_credentials FOR ALL USING (true);
+DROP POLICY IF EXISTS "Users manage their own passkeys" ON public.passkey_credentials;
+CREATE POLICY "Users manage their own passkeys" ON public.passkey_credentials
+    FOR ALL USING (auth.uid()::text = user_id OR auth.role() = 'service_role')
+    WITH CHECK (auth.uid()::text = user_id OR auth.role() = 'service_role');
 
 -- =============================================================================
 -- 3. Table: public.autonomous_spending_scopes (Declarative Agent Policy Limits)
@@ -73,7 +76,10 @@ CREATE INDEX IF NOT EXISTS idx_scopes_user ON public.autonomous_spending_scopes(
 
 ALTER TABLE public.autonomous_spending_scopes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow public scope operations" ON public.autonomous_spending_scopes;
-CREATE POLICY "Allow public scope operations" ON public.autonomous_spending_scopes FOR ALL USING (true);
+DROP POLICY IF EXISTS "Users manage their own scopes" ON public.autonomous_spending_scopes;
+CREATE POLICY "Users manage their own scopes" ON public.autonomous_spending_scopes
+    FOR ALL USING (auth.uid()::text = user_id OR auth.role() = 'service_role')
+    WITH CHECK (auth.uid()::text = user_id OR auth.role() = 'service_role');
 
 -- =============================================================================
 -- 4. Table: public.kill_switch_records (Emergency Vault Lockouts & Revocations)
@@ -93,7 +99,10 @@ CREATE INDEX IF NOT EXISTS idx_kill_switch_user ON public.kill_switch_records(us
 
 ALTER TABLE public.kill_switch_records ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow public kill switch operations" ON public.kill_switch_records;
-CREATE POLICY "Allow public kill switch operations" ON public.kill_switch_records FOR ALL USING (true);
+DROP POLICY IF EXISTS "Users manage their own kill switches" ON public.kill_switch_records;
+CREATE POLICY "Users manage their own kill switches" ON public.kill_switch_records
+    FOR ALL USING (auth.uid()::text = user_id OR auth.role() = 'service_role')
+    WITH CHECK (auth.uid()::text = user_id OR auth.role() = 'service_role');
 
 -- =============================================================================
 -- 5. Update public.transaction_requests: Add receipt confirmations & passkey challenge

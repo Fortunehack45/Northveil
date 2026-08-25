@@ -134,11 +134,11 @@ Northveil/
 ├── mcp-server/                   # Primary Universal MCP Server (Node.js Express)
 │   ├── index.ts                  # Server entrypoint, SSE, HTTP & 38-tool router
 │   ├── tools.ts                  # Formal MCP Tool Schema Definitions
-│   ├── encryptionService.ts      # Hardware-grade AES-256-GCM cryptography
-│   └── custodialSigningService.ts# On-chain transaction execution engine
+│   └── mpcControlPlaneService.ts # Non-custodial Turnkey TEE MPC & WebAuthn engine
 ├── api/                          # Self-Contained Serverless Gateway for Vercel
 │   ├── index.ts                  # Serverless route dispatcher
-│   └── tools.ts                  # Embedded tool definitions
+│   ├── tools.ts                  # Embedded tool definitions
+│   └── mpcControlPlaneService.ts # Non-custodial Turnkey TEE MPC & WebAuthn engine
 ├── sdk/                          # Official TypeScript / JavaScript SDK
 │   ├── src/client.ts             # NorthveilClient class
 │   ├── src/types.ts              # SDK TypeScript types
@@ -169,8 +169,7 @@ Northveil/
   - `GET /openapi.json`: OpenAPI 3.0.3 schema for ChatGPT Actions.
   - `GET /api/v1/auth/me`: Identity, tier, and scope verification endpoint.
   - `POST /api/v1/tools/:toolName`: Direct REST tool execution endpoint.
-- `mcp-server/encryptionService.ts`: Implements AES-256-GCM cipher with random 12-byte IVs and 16-byte authentication tags.
-- `mcp-server/custodialSigningService.ts`: Derives private keys from Supabase or master vault and signs transactions via `ethers.Wallet(pk, provider)`.
+- `mcp-server/mpcControlPlaneService.ts`: Real non-custodial hardware-isolated Turnkey TEE MPC control plane and `@simplewebauthn/server` biometric passkey verification engine. Zero private key derivation on server.
 
 ### 2.4 Self-Contained Serverless Gateway (`api/`)
 Designed for zero-dependency deployment to Vercel Serverless Functions. Bundles all 38 tools into a single serverless handler capable of cold-starting in <150ms.

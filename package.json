@@ -8,15 +8,19 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:mpc": "npx tsx scratch/test_real_non_custodial_mpc.ts"
   },
   "dependencies": {
     "@bitcoinerlab/secp256k1": "^1.2.0",
     "@google/genai": "^2.4.0",
     "@openzeppelin/contracts": "^5.6.1",
+    "@simplewebauthn/server": "^13.3.2",
     "@solana/web3.js": "^1.98.4",
     "@supabase/supabase-js": "^2.112.0",
     "@tailwindcss/vite": "^4.1.14",
+    "@turnkey/api-key-stamper": "^0.6.12",
+    "@turnkey/http": "^6.2.1",
     "@types/bip39": "^2.4.2",
     "@vitejs/plugin-react": "^5.0.4",
     "bip32": "^5.0.1",

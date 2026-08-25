@@ -10,6 +10,7 @@ export interface MCPToolParameter {
   required?: boolean;
   enum?: string[];
   items?: { type: string };
+  properties?: Record<string, any>;
 }
 
 export interface MCPToolAnnotations {
@@ -1049,6 +1050,145 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         fileBase64: { type: 'string', description: 'Base64 encoded file string' },
       },
       required: ['fileBase64'],
+    },
+  },
+  {
+    name: 'generate_passkey_registration_options',
+    description: 'Generates WebAuthn registration options and challenge for registering a biometric passkey (TouchID, FaceID, Windows Hello, YubiKey) to authorize MPC vault transactions.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        userId: { type: 'string', description: 'User ID or wallet handle' },
+        userName: { type: 'string', description: 'User email or username' },
+        userDisplayName: { type: 'string', description: 'Display name for the passkey credential' },
+      },
+      required: ['userId'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        userId: { type: 'string', description: 'User ID or wallet handle' },
+      },
+      required: ['userId'],
+    },
+  },
+  {
+    name: 'verify_passkey_registration',
+    description: 'Verifies the client WebAuthn registration response and registers the passkey public key and counter in the MPC security module.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        userId: { type: 'string', description: 'User ID' },
+        walletAddress: { type: 'string', description: '0x-prefixed wallet address bound to this passkey' },
+        registrationResponse: { type: 'object', description: 'WebAuthn registration response object from navigator.credentials.create()' },
+      },
+      required: ['userId', 'walletAddress', 'registrationResponse'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        userId: { type: 'string', description: 'User ID' },
+        walletAddress: { type: 'string', description: 'Wallet address' },
+        registrationResponse: { type: 'object', description: 'Registration response' },
+      },
+      required: ['userId', 'walletAddress', 'registrationResponse'],
+    },
+  },
+  {
+    name: 'approve_transaction_with_passkey',
+    description: 'Cryptographically verifies a user biometric passkey assertion against the staged approval token and executes Turnkey TEE MPC signing and on-chain broadcast.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        approvalToken: { type: 'string', description: 'Single-use staged transaction approval token (tok_...)' },
+        passkeyAssertion: {
+          type: 'object',
+          description: 'WebAuthn authentication assertion from navigator.credentials.get() (credentialId, authenticatorData, clientDataJSON, signature)',
+        },
+        userId: { type: 'string', description: 'User identifier (default: default_user)' },
+      },
+      required: ['approvalToken'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        approvalToken: { type: 'string', description: 'Approval token' },
+        passkeyAssertion: { type: 'object', description: 'WebAuthn assertion object' },
+      },
+      required: ['approvalToken'],
+    },
+  },
+  {
+    name: 'set_autonomous_spending_scope',
+    description: 'Grants an autonomous spending limit policy to AI agents for automated trades, swaps, and transfers without individual passkey prompts up to defined per-tx and daily caps.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        walletAddress: { type: 'string', description: '0x-prefixed vault wallet address' },
+        asset: { type: 'string', description: 'Asset symbol (e.g. ETH, USDC, or ANY)' },
+        maxAmountPerTxUsd: { type: 'number', description: 'Maximum USD amount allowed per single autonomous transaction (default: 25.0)' },
+        maxDailyBudgetUsd: { type: 'number', description: 'Maximum 24-hour total USD budget (default: 100.0)' },
+        allowedChains: { type: 'array', items: { type: 'number' }, description: 'Array of allowed chain IDs (e.g. [11155111, 8453])' },
+        allowedContracts: { type: 'array', items: { type: 'string' }, description: 'Optional list of whitelisted contract addresses' },
+        userId: { type: 'string', description: 'User identifier (default: default_user)' },
+      },
+      required: ['walletAddress'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        walletAddress: { type: 'string', description: 'Vault wallet address' },
+        asset: { type: 'string', description: 'Asset symbol' },
+        maxAmountPerTxUsd: { type: 'number', description: 'Max per-tx USD cap' },
+        maxDailyBudgetUsd: { type: 'number', description: 'Daily USD budget' },
+      },
+      required: ['walletAddress'],
+    },
+  },
+  {
+    name: 'activate_kill_switch',
+    description: 'Emergency security lockout: Immediately revokes all active autonomous spending allowances, voids all pending approval tokens, and locks down the MPC vault against any AI agent execution.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        walletAddress: { type: 'string', description: '0x-prefixed wallet address to lock' },
+        userId: { type: 'string', description: 'User ID (default: default_user)' },
+        reason: { type: 'string', description: 'Reason for emergency lockout' },
+      },
+      required: ['walletAddress'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        walletAddress: { type: 'string', description: 'Wallet address' },
+        reason: { type: 'string', description: 'Reason' },
+      },
+      required: ['walletAddress'],
+    },
+  },
+  {
+    name: 'deactivate_kill_switch',
+    description: 'Restores MPC vault operations following an emergency lockout after identity verification.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        walletAddress: { type: 'string', description: '0x-prefixed wallet address to unlock' },
+        userId: { type: 'string', description: 'User ID (default: default_user)' },
+      },
+      required: ['walletAddress'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        walletAddress: { type: 'string', description: 'Wallet address' },
+      },
+      required: ['walletAddress'],
     },
   },
 ];
