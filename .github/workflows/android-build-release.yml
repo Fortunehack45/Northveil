@@ -38,10 +38,11 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Grant Execute Permission for Gradle Wrapper
-        run: |
-          cd android
-          chmod +x gradlew || true
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.9'
+          cache-disabled: false
 
       - name: Determine Versioning
         id: versioning
@@ -61,9 +62,9 @@ jobs:
           VERSION_NAME: ${{ env.VERSION_NAME }}
           VERSION_CODE: ${{ env.VERSION_CODE }}
         run: |
-          ./gradlew assembleDebug assembleRelease --stacktrace || gradle assembleDebug assembleRelease --stacktrace
+          gradle assembleDebug assembleRelease --stacktrace
 
-      - name: Rename APK Artifacts
+      - name: Collect APK Artifacts
         run: |
           mkdir -p output_apks
           find android/app/build/outputs/apk/debug/ -name "*.apk" -exec cp {} output_apks/Northveil-debug-v${{ env.VERSION_NAME }}.apk \; || true
