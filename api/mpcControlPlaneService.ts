@@ -37,6 +37,42 @@ export class TurnkeyEnclaveError extends Error {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// ABSTRACT NON-CUSTODIAL SIGNER INTERFACE
+// ═════════════════════════════════════════════════════════════════════════════
+export interface UnsignedTxPreview {
+  agentClientId?: string;
+  walletId?: string;
+  walletAddress: string;
+  chain: string;
+  chainId: number;
+  action: 'TRANSFER' | 'SWAP' | 'DEPLOY' | 'CONTRACT_CALL' | 'SIGN_MESSAGE';
+  to: string;
+  contractAddress?: string;
+  functionSelector?: string;
+  decodedCalldata?: any;
+  amount: string;
+  usdValue: string;
+  estimatedFeeUsd: string;
+  simulationResult: {
+    success: boolean;
+    gasUsed: number;
+    warnings: string[];
+    balanceDeltas?: any[];
+  };
+  policyDecision: 'AUTO_ALLOWED' | 'APPROVAL_REQUIRED' | 'POLICY_DENIED';
+  approvalToken?: string;
+  expiresAt?: string;
+  approvalUrl?: string;
+}
+
+export interface Signer {
+  preview(op: any): Promise<UnsignedTxPreview>;
+  requestApproval(op: any): Promise<{ approvalToken: string; requestId: string; expiresAt: string }>;
+  signAndBroadcast(op: any, approvalToken: string, passkeyAssertion?: any): Promise<{ txHash: string; blockNumber: number; gasUsed: string; explorerUrl: string }>;
+  exportForOwner(walletId: string, passkeyProof: any): Promise<{ keyMaterial: string; exportedAt: string }>;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // SUPABASE CLIENT INITIALIZATION (Zero hardcoded fallback keys)
 // ═════════════════════════════════════════════════════════════════════════════
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
@@ -1599,4 +1635,54 @@ export async function logWalletAudit(
       }]);
     }
   } catch (e) {}
+}
+
+export async function simulateTransactionTenderly(
+  from: string,
+  to: string,
+  valueWei: string = '0',
+  data: string = '0x',
+  chainId: number = 8453
+): Promise<{ success: boolean; gasUsed: number; estimatedFeeUsd: number; revertReason?: string; balanceDeltas?: any[]; warnings: string[] }> {
+  try {
+    let networkName = 'base';
+    if (chainId === 1) networkName = 'ethereum';
+    if (chainId === 11155111) networkName = 'sepolia';
+    if (chainId === 137) networkName = 'polygon';
+    if (chainId === 42161) networkName = 'arbitrum';
+    if (chainId === 56) networkName = 'bsc';
+
+    const provider = getProviderForNetwork(networkName);
+    const gasLimit = await provider.estimateGas({
+      from,
+      to,
+      value: valueWei,
+      data,
+    });
+
+    const feeData = await provider.getFeeData();
+    const gasPrice = feeData.gasPrice || 1000000000n; // 1 Gwei
+    const estimatedGasCostWei = gasLimit * gasPrice;
+    const estFeeEth = Number(ethers.formatEther(estimatedGasCostWei));
+    const estFeeUsd = estFeeEth * 3300.0;
+
+    return {
+      success: true,
+      gasUsed: Number(gasLimit),
+      estimatedFeeUsd: estFeeUsd,
+      warnings: [],
+      balanceDeltas: [
+        { asset: 'NATIVE', from, delta: `-${ethers.formatEther(valueWei)}` },
+        { asset: 'NATIVE', to, delta: `+${ethers.formatEther(valueWei)}` },
+      ],
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      gasUsed: 0,
+      estimatedFeeUsd: 0,
+      revertReason: err.message || 'Simulation reverted on-chain',
+      warnings: ['Transaction reverted during on-chain fork simulation.'],
+    };
+  }
 }

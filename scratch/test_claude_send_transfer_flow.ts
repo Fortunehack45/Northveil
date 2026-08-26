@@ -61,7 +61,7 @@ async function runClaudeFlowTests() {
         token: 'ETH',
         amount: 0.0005,
         recipientAddress: '0x59148d6a9dff263a772b5a84280bc88530f38636',
-        fromAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
+        fromAddress: '0x59148d6a9dff263a772b5a84280bc88530f38636',
         chain: 'sepolia',
       }),
     });
