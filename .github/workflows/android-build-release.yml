@@ -45,31 +45,37 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
 
-      - name: Determine Versioning
-        id: versioning
+      - name: Resolve Version Code & Name
+        id: version
         run: |
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             TAG_NAME="${GITHUB_REF#refs/tags/v}"
+            echo "version_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+            echo "version_code=${{ github.run_number }}" >> $GITHUB_OUTPUT
             echo "VERSION_NAME=${TAG_NAME}" >> $GITHUB_ENV
             echo "VERSION_CODE=${{ github.run_number }}" >> $GITHUB_ENV
           else
-            echo "VERSION_NAME=${{ github.event.inputs.version_name || '1.0.0' }}" >> $GITHUB_ENV
-            echo "VERSION_CODE=${{ github.event.inputs.version_code || github.run_number }}" >> $GITHUB_ENV
+            VNAME="${{ github.event.inputs.version_name || '1.0.0' }}"
+            VCODE="${{ github.event.inputs.version_code || github.run_number }}"
+            echo "version_name=${VNAME}" >> $GITHUB_OUTPUT
+            echo "version_code=${VCODE}" >> $GITHUB_OUTPUT
+            echo "VERSION_NAME=${VNAME}" >> $GITHUB_ENV
+            echo "VERSION_CODE=${VCODE}" >> $GITHUB_ENV
           fi
 
       - name: Build Debug & Release APKs
         working-directory: ./android
         env:
-          VERSION_NAME: ${{ env.VERSION_NAME }}
-          VERSION_CODE: ${{ env.VERSION_CODE }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
         run: |
           ./gradlew assembleDebug assembleRelease --no-daemon --stacktrace
 
       - name: Collect APK Artifacts
         run: |
           mkdir -p output_apks
-          find android/app/build/outputs/apk/debug/ -name "*.apk" -exec cp {} output_apks/Northveil-debug-v${{ env.VERSION_NAME }}.apk \; || true
-          find android/app/build/outputs/apk/release/ -name "*.apk" -exec cp {} output_apks/Northveil-release-v${{ env.VERSION_NAME }}.apk \; || true
+          find android/app/build/outputs/apk/debug/ -name "*.apk" -exec cp {} output_apks/Northveil-debug-v${{ steps.version.outputs.version_name }}.apk \; || true
+          find android/app/build/outputs/apk/release/ -name "*.apk" -exec cp {} output_apks/Northveil-release-v${{ steps.version.outputs.version_name }}.apk \; || true
           echo "=== Collected APKs ==="
           ls -lh output_apks/
 
@@ -87,8 +93,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: output_apks/*.apk
-          name: Northveil Mobile v${{ env.VERSION_NAME }}
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', env.VERSION_NAME) }}
+          name: Northveil Mobile v${{ steps.version.outputs.version_name }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', steps.version.outputs.version_name) }}
           draft: false
           prerelease: false
           make_latest: true

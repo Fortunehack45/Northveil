@@ -39,7 +39,7 @@ export const AgentsView: React.FC = () => {
   const [customAgentName, setCustomAgentName] = useState('');
   const [copiedConfig, setCopiedConfig] = useState(false);
   const [copiedSse, setCopiedSse] = useState(false);
-  const [mcpClientTab, setMcpClientTab] = useState<'claude' | 'cursor' | 'windsurf' | 'claudecode' | 'sse'>('claude');
+  const [mcpClientTab, setMcpClientTab] = useState<'claude' | 'chatgpt' | 'cursor' | 'windsurf' | 'claudecode' | 'sse'>('claude');
   const [mcpOnline, setMcpOnline] = useState(true);
 
   const isLocalhost =
@@ -65,7 +65,7 @@ export const AgentsView: React.FC = () => {
     return () => clearInterval(interval);
   }, [baseMcpUrl]);
 
-  const getClientConfigSnippet = (client: 'claude' | 'cursor' | 'windsurf' | 'claudecode' | 'sse') => {
+  const getClientConfigSnippet = (client: 'claude' | 'chatgpt' | 'cursor' | 'windsurf' | 'claudecode' | 'sse') => {
     switch (client) {
       case 'claude':
         return JSON.stringify(
@@ -79,6 +79,27 @@ export const AgentsView: React.FC = () => {
                   NORTHVEIL_API_URL: baseMcpUrl,
                 },
               },
+            },
+          },
+          null,
+          2
+        );
+      case 'chatgpt':
+        return JSON.stringify(
+          {
+            integration: 'OpenAI ChatGPT Custom Action / GPT Plugin',
+            schema_url: `${baseMcpUrl}/openapi.json`,
+            oauth_configuration: {
+              authorization_url: `${baseMcpUrl}/oauth/authorize`,
+              token_url: `${baseMcpUrl}/oauth/token`,
+              scope: 'tools:read tools:execute',
+              client_id: 'chatgpt_agent',
+              client_secret: 'northveil_secret',
+            },
+            alternative_api_key_auth: {
+              type: 'Custom Header',
+              header_name: 'X-API-Key',
+              header_value: 'Your Northveil API Key (from Agents tab)',
             },
           },
           null,
@@ -137,10 +158,12 @@ export const AgentsView: React.FC = () => {
     }
   };
 
-  const getClientFilePath = (client: 'claude' | 'cursor' | 'windsurf' | 'claudecode' | 'sse') => {
+  const getClientFilePath = (client: 'claude' | 'chatgpt' | 'cursor' | 'windsurf' | 'claudecode' | 'sse') => {
     switch (client) {
       case 'claude':
         return 'macOS: ~/Library/Application Support/Claude/claude_desktop_config.json | Windows: %APPDATA%\\Claude\\claude_desktop_config.json';
+      case 'chatgpt':
+        return 'ChatGPT Web UI > Explore GPTs > Create a GPT > Configure > Actions > "Create new action"';
       case 'cursor':
         return 'Project Root: .cursor/mcp.json or Settings -> Features -> MCP';
       case 'windsurf':
@@ -161,7 +184,7 @@ export const AgentsView: React.FC = () => {
     setSelectedWalletAddr(activeSubWallet?.address || subWallets[0]?.address || '');
     setSelectedDuration('7d');
     setCustomAgentName('');
-    setMcpClientTab(type === 'claude' ? 'claude' : 'sse');
+    setMcpClientTab(type === 'claude' ? 'claude' : type === 'chatgpt' ? 'chatgpt' : 'sse');
     setShowConnectModal(true);
   };
 
@@ -490,9 +513,10 @@ export const AgentsView: React.FC = () => {
                   </div>
                   
                   {/* Client Tabs */}
-                  <div className="mono-segmented-container w-full flex bg-black/[0.04] dark:bg-black p-1 rounded-xl border border-black/[0.06] dark:border-white/[0.08] mb-2.5">
+                  <div className="mono-segmented-container w-full flex flex-wrap bg-black/[0.04] dark:bg-black p-1 rounded-xl border border-black/[0.06] dark:border-white/[0.08] mb-2.5">
                     {[
                       { id: 'claude', label: 'Claude Desktop' },
+                      { id: 'chatgpt', label: 'ChatGPT' },
                       { id: 'cursor', label: 'Cursor' },
                       { id: 'windsurf', label: 'Windsurf' },
                       { id: 'claudecode', label: 'Claude Code' },
@@ -502,7 +526,7 @@ export const AgentsView: React.FC = () => {
                         key={client.id}
                         type="button"
                         onClick={() => setMcpClientTab(client.id as any)}
-                        className={`flex-1 py-1 text-[11px] font-medium rounded-lg transition-all cursor-pointer ${
+                        className={`flex-1 py-1 px-1.5 text-[11px] font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                           mcpClientTab === client.id
                             ? 'bg-black text-white dark:bg-white dark:text-black font-semibold shadow-sm'
                             : 'text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white'

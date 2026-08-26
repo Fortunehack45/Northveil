@@ -135,7 +135,7 @@ console.log('\nTest 7: parameters.type is transaction type, not activity type');
   });
   assert(body.parameters.type === 'TRANSACTION_TYPE_ETHEREUM', 
     `parameters.type is TRANSACTION_TYPE_ETHEREUM (not ACTIVITY_TYPE_*)`);
-  assert(body.parameters.type !== body.type, 
+  assert((body.parameters.type as string) !== (body.type as string), 
     `parameters.type != top-level type (they serve different purposes)`);
 }
 

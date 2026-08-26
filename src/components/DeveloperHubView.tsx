@@ -25,7 +25,9 @@ export const DeveloperHubView: React.FC = () => {
   const { activeSubWallet, activeNetwork } = useWallet();
 
   const [activeTab, setActiveTab] = useState<'mcp' | 'cli' | 'sdk' | 'webhooks' | 'playground'>('mcp');
-  const [selectedMcpClient, setSelectedMcpClient] = useState<'claude' | 'cursor' | 'windsurf' | 'claudecode' | 'sse'>('claude');
+  const [selectedMcpClient, setSelectedMcpClient] = useState<
+    'claude' | 'chatgpt' | 'claudecode' | 'cursor' | 'windsurf' | 'sse'
+  >('claude');
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
   const isLocalhost =
@@ -34,7 +36,7 @@ export const DeveloperHubView: React.FC = () => {
   const baseMcpUrl = isLocalhost ? 'http://localhost:3001' : 'https://mcp.northveil.xyz';
   const currentAddress = activeSubWallet?.address || '0x0000000000000000000000000000000000000000';
 
-  const getMcpSnippet = (client: 'claude' | 'cursor' | 'windsurf' | 'claudecode' | 'sse') => {
+  const getMcpSnippet = (client: 'claude' | 'chatgpt' | 'claudecode' | 'cursor' | 'windsurf' | 'sse') => {
     switch (client) {
       case 'claude':
         return JSON.stringify(
@@ -53,6 +55,30 @@ export const DeveloperHubView: React.FC = () => {
           null,
           2
         );
+      case 'chatgpt':
+        return JSON.stringify(
+          {
+            integration: 'OpenAI ChatGPT Custom Action / GPT Plugin',
+            schema_url: `${baseMcpUrl}/openapi.json`,
+            mcp_stream_url: `${baseMcpUrl}/mcp`,
+            oauth_configuration: {
+              authorization_url: `${baseMcpUrl}/oauth/authorize`,
+              token_url: `${baseMcpUrl}/oauth/token`,
+              scope: 'tools:read tools:execute',
+              client_id: 'chatgpt_agent',
+              client_secret: 'northveil_secret',
+            },
+            alternative_api_key_auth: {
+              type: 'Custom Header',
+              header_name: 'X-API-Key',
+              header_value: 'Your Northveil API Key (from Agents tab)',
+            },
+          },
+          null,
+          2
+        );
+      case 'claudecode':
+        return `claude mcp add northveil npx -y northveil-cli mcp`;
       case 'cursor':
         return JSON.stringify(
           {
@@ -87,8 +113,6 @@ export const DeveloperHubView: React.FC = () => {
           null,
           2
         );
-      case 'claudecode':
-        return `claude mcp add northveil npx -y northveil-cli mcp`;
       case 'sse':
         return JSON.stringify(
           {
@@ -106,18 +130,20 @@ export const DeveloperHubView: React.FC = () => {
     }
   };
 
-  const getMcpConfigPath = (client: 'claude' | 'cursor' | 'windsurf' | 'claudecode' | 'sse') => {
+  const getMcpConfigPath = (client: 'claude' | 'chatgpt' | 'claudecode' | 'cursor' | 'windsurf' | 'sse') => {
     switch (client) {
       case 'claude':
         return 'macOS: ~/Library/Application Support/Claude/claude_desktop_config.json | Windows: %APPDATA%\\Claude\\claude_desktop_config.json | Linux: ~/.config/Claude/claude_desktop_config.json';
+      case 'chatgpt':
+        return 'ChatGPT UI > Explore GPTs > Create a GPT > Configure > Actions > "Create new action"';
+      case 'claudecode':
+        return 'Terminal CLI command line execution';
       case 'cursor':
         return 'Project Root: .cursor/mcp.json (or Cursor Settings > Features > MCP Servers)';
       case 'windsurf':
         return 'Global Path: ~/.codeium/windsurf/mcp_config.json';
-      case 'claudecode':
-        return 'Terminal CLI command line execution';
       case 'sse':
-        return 'Remote SSE Transport Endpoint URL';
+        return 'Remote Streamable HTTP / SSE Endpoint URL';
       default:
         return '';
     }
@@ -643,16 +669,17 @@ export const DeveloperHubView: React.FC = () => {
               <div className="mono-segmented-container w-full flex flex-wrap bg-black/[0.04] dark:bg-black p-1 rounded-xl border border-black/[0.06] dark:border-white/[0.08]">
                 {[
                   { id: 'claude', label: 'Claude Desktop' },
+                  { id: 'chatgpt', label: 'ChatGPT / GPTs' },
+                  { id: 'claudecode', label: 'Claude Code' },
                   { id: 'cursor', label: 'Cursor IDE' },
                   { id: 'windsurf', label: 'Windsurf' },
-                  { id: 'claudecode', label: 'Claude Code' },
                   { id: 'sse', label: 'Remote SSE' },
                 ].map((client) => (
                   <button
                     key={client.id}
                     type="button"
                     onClick={() => setSelectedMcpClient(client.id as any)}
-                    className={`flex-1 py-1.5 px-2 text-xs font-medium rounded-lg transition-all cursor-pointer ${
+                    className={`flex-1 py-1.5 px-2 text-xs font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                       selectedMcpClient === client.id
                         ? 'bg-black text-white dark:bg-white dark:text-black font-semibold shadow-sm'
                         : 'text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white'
@@ -667,7 +694,7 @@ export const DeveloperHubView: React.FC = () => {
               <div className="p-3 bg-black/[0.02] dark:bg-black/50 border border-black/[0.04] dark:border-white/[0.04] rounded-2xl text-xs text-zinc-600 dark:text-zinc-400 font-mono flex items-start gap-2">
                 <span className="text-sm">📁</span>
                 <div>
-                  <span className="font-semibold text-zinc-900 dark:text-white">Target File:</span>{' '}
+                  <span className="font-semibold text-zinc-900 dark:text-white">Setup Location:</span>{' '}
                   <span className="break-all">{getMcpConfigPath(selectedMcpClient)}</span>
                 </div>
               </div>
@@ -697,12 +724,42 @@ export const DeveloperHubView: React.FC = () => {
 
               {/* Step By Step Guide */}
               <div className="space-y-2 pt-1 text-xs text-zinc-600 dark:text-zinc-400">
-                <h4 className="font-bold text-zinc-900 dark:text-white">How to connect in 3 steps:</h4>
-                <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed">
-                  <li>Open your AI client's configuration file at the path shown above.</li>
-                  <li>Paste the configuration block inside the <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">mcpServers</code> section.</li>
-                  <li>Restart your AI client (or reload MCP servers in Cursor/Windsurf). All 38 Northveil tools will load automatically!</li>
-                </ol>
+                <h4 className="font-bold text-zinc-900 dark:text-white">Step-by-Step Connection Guide:</h4>
+                {selectedMcpClient === 'claude' && (
+                  <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed">
+                    <li>Open your Claude Desktop config (<code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude_desktop_config.json</code>).</li>
+                    <li>Paste the snippet above inside the <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">mcpServers</code> dictionary.</li>
+                    <li>Restart Claude Desktop. All 38 Web3 MPC tools will appear in the 🔌 hammer icon.</li>
+                  </ol>
+                )}
+                {selectedMcpClient === 'chatgpt' && (
+                  <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed">
+                    <li>In ChatGPT, go to <strong>Explore GPTs</strong> &rarr; <strong>Create a GPT</strong> &rarr; <strong>Configure</strong> &rarr; <strong>Actions</strong> &rarr; <strong>Create new action</strong>.</li>
+                    <li>Click <strong>Import from URL</strong>, paste <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{baseMcpUrl}/openapi.json</code> and click <strong>Import</strong>.</li>
+                    <li>Under Authentication, select <strong>OAuth</strong> (Auth URL: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{baseMcpUrl}/oauth/authorize</code>, Token URL: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{baseMcpUrl}/oauth/token</code>, Scope: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">tools:read tools:execute</code>) or select <strong>API Key</strong> (Custom Header: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">X-API-Key</code>).</li>
+                    <li>Save your GPT! ChatGPT can now execute non-custodial swaps, check balances, and submit verified transactions.</li>
+                  </ol>
+                )}
+                {selectedMcpClient === 'claudecode' && (
+                  <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed">
+                    <li>Run <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude mcp add northveil npx -y northveil-cli mcp</code> in your terminal.</li>
+                    <li>Launch Claude Code with <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude</code>.</li>
+                    <li>Claude will automatically detect and invoke Northveil tools for on-chain intelligence.</li>
+                  </ol>
+                )}
+                {(selectedMcpClient === 'cursor' || selectedMcpClient === 'windsurf') && (
+                  <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed">
+                    <li>Create or open the configuration file at the path shown above.</li>
+                    <li>Paste the snippet inside the <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">mcpServers</code> section.</li>
+                    <li>Reload your IDE. Mention <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">@northveil</code> in agent chat.</li>
+                  </ol>
+                )}
+                {selectedMcpClient === 'sse' && (
+                  <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed">
+                    <li>Point your SSE-compatible LLM agent or framework (LangChain, LlamaIndex, AutoGPT) to the endpoint URL.</li>
+                    <li>Establish the real-time event stream via HTTP GET /sse and send requests via POST /message.</li>
+                  </ol>
+                )}
               </div>
             </div>
 

@@ -164,8 +164,6 @@ interface WalletContextType {
   restoreWalletFromSeed: (words: string[], name?: string) => boolean;
   restoreWalletFromPrivateKey: (privateKey: string, name?: string, chain?: string) => boolean;
   unlockVault: (password: string) => Promise<boolean>;
-  unlockWalletWithBiometrics: () => Promise<boolean>;
-  lockWallet: () => void;
   setupVault: (passwordOrSeed: any, passwordArgOrSeed?: any, walletName?: string) => Promise<boolean> | boolean;
   setupMpcVault: (walletName: string, address: string, mpcWalletId: string, userId: string, sessionToken: string) => Promise<boolean>;
   isVaultConfigured: boolean;
