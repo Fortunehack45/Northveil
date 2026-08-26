@@ -3806,16 +3806,16 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
     }
 
     case 'send_transfer': {
-      const token = (args.token || 'ETH').toUpperCase();
-      const recipient = (args.recipientAddress || args.to || args.recipient || '').toLowerCase();
-      const amountStr = String(args.amount || '0.001');
+      const token = (args.token || args.asset || args.symbol || args.tokenSymbol || 'ETH').toUpperCase();
+      const recipient = (args.recipientAddress || args.recipient || args.toAddress || args.to || args.targetAddress || '').toLowerCase();
+      const amountStr = String(args.amount ?? args.value ?? args.tokenAmount ?? '0.001');
       const amountNum = Number(amountStr) || 0;
 
       if (!recipient || !recipient.startsWith('0x') || recipient.length !== 42) {
         throw new Error('Valid 0x recipient public address is required.');
       }
 
-      const targetChainStr = (args.chain || args.network || 'sepolia').toLowerCase();
+      const targetChainStr = (args.chain || args.network || args.targetNetwork || 'sepolia').toLowerCase();
       let chainName = 'Ethereum Sepolia Testnet';
       let chainId = 11155111;
       let explorerBase = 'https://sepolia.etherscan.io';
@@ -3847,19 +3847,20 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
       const scopeCheck = await evaluateAutonomousScope(cleanAddress, 'default_user', chainId, token, approxUsd, recipient);
 
       if (scopeCheck.inScope && scopeCheck.scopeId) {
-        const autoResult = await executeAutonomousTransaction(
-          cleanAddress,
-          recipient,
-          amountNum,
-          token,
-          targetChainStr,
-          unsignedPayload,
-          scopeCheck.scopeId,
-          'default_user'
-        );
+        try {
+          const autoResult = await executeAutonomousTransaction(
+            cleanAddress,
+            recipient,
+            amountNum,
+            token,
+            targetChainStr,
+            unsignedPayload,
+            scopeCheck.scopeId,
+            'default_user'
+          );
 
-        return {
-          formattedMarkdown: `
+          return {
+            formattedMarkdown: `
 ### ⚡ AUTONOMOUS TRANSFER EXECUTED VIA MPC ENCLAVES
 
 > **Status**: 🟢 **CONFIRMED ON-CHAIN (Within Autonomous Scope)**  
@@ -3872,8 +3873,11 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
 > **Gas Used**: \`${autoResult.gasUsed}\`  
 > **Scope ID**: \`${scopeCheck.scopeId}\`  
 `,
-          ...autoResult,
-        };
+            ...autoResult,
+          };
+        } catch (autoErr: any) {
+          console.warn('[Autonomous Execution Notice]:', autoErr.message);
+        }
       }
 
       // 2. PASSKEY APPROVAL PATH (Outside limits / default requirement)
