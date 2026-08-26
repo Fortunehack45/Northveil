@@ -5137,10 +5137,17 @@ ${solCode}
       let dstAmountFormatted = (fromSym === 'ETH' ? amountNum * ethPrice : amountNum).toFixed(2);
       const approxUsd = fromSym === 'ETH' ? amountNum * ethPrice : amountNum;
 
+      let swapTo = routerAddress;
+      let swapData = '0x';
+      if (fromSym === 'ETH' && network === 'sepolia') {
+        swapTo = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9'; // Sepolia WETH9
+        swapData = '0xd0e30db0'; // deposit()
+      }
+
       const unsignedPayload = {
-        to: routerAddress,
+        to: swapTo,
         value: fromSym === 'ETH' ? ethers.parseEther(String(amountNum)) : 0n,
-        data: '0x',
+        data: swapData,
         chainId,
       };
 
@@ -6135,11 +6142,11 @@ ${dexData.volume?.h24 ? `| **24h Volume** | ${formatUsdValue(dexData.volume.h24)
     // SET TRADE ORDER (Stop-Loss / Take-Profit with Auto-Execution)
     // ═══════════════════════════════════════════════════════════════════
     case 'set_trade_order': {
-      const token = (args.token || '').toUpperCase();
-      const orderType = (args.orderType || 'stop_loss') as 'stop_loss' | 'take_profit';
-      const triggerPrice = Number(args.triggerPrice);
-      const amount = Number(args.amount);
-      const chain = (args.chain || 'ethereum').toLowerCase();
+      const token = (args.token || args.symbol || args.asset || 'ETH').toUpperCase();
+      const orderType = (args.orderType || 'stop_loss').toLowerCase().includes('profit') ? 'take_profit' : 'stop_loss';
+      const triggerPrice = Number(args.triggerPrice || args.targetPriceUsd || args.targetPrice || args.price || 0);
+      const amount = Number(args.amount || args.quantity || 0.1);
+      const chain = (args.chain || args.network || 'ethereum').toLowerCase();
       if (!token || !triggerPrice || !amount) throw new Error('Missing required: token, triggerPrice, amount');
 
       // Fetch current price
