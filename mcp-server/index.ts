@@ -966,7 +966,7 @@ inMemoryApiKeys.set('nv_live_9f82a17b09c82415d8a9', {
   apiKey: 'nv_live_9f82a17b09c82415d8a9',
   walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
   keyName: 'Production Developer Key',
-  permissions: ['tools:read', 'tools:execute'],
+  permissions: ['*'],
   allowedWallets: ['0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'],
   tier: 'developer',
   userId: 'dev_user',
@@ -976,7 +976,7 @@ inMemoryApiKeys.set('nv_test_7a12b99c43d21100e45b', {
   apiKey: 'nv_test_7a12b99c43d21100e45b',
   walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
   keyName: 'Sandbox Developer Key',
-  permissions: ['tools:read', 'tools:execute'],
+  permissions: ['*'],
   allowedWallets: ['0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'],
   tier: 'developer',
   userId: 'sandbox_user',
@@ -986,7 +986,7 @@ inMemoryApiKeys.set('nv_live_default_northveil_key', {
   apiKey: 'nv_live_default_northveil_key',
   walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
   keyName: 'Default Production Key',
-  permissions: ['tools:read', 'tools:execute'],
+  permissions: ['*'],
   allowedWallets: ['0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'],
   tier: 'developer',
   userId: 'default_user',
@@ -1133,7 +1133,11 @@ function checkToolPermission(toolName: string, permissions: string[]): { allowed
     permissions.includes('all') ||
     permissions.includes('admin') ||
     permissions.includes('developer') ||
-    permissions.includes('standard_mcp')
+    permissions.includes('standard_mcp') ||
+    permissions.includes('tools:execute') ||
+    permissions.includes('tools:write') ||
+    permissions.includes('tools:all') ||
+    permissions.includes('write')
   ) {
     return { allowed: true, requiredPermission: '' };
   }
@@ -2070,6 +2074,229 @@ app.post(['/auth/passkey/verify-register', '/api/v1/auth/passkey/verify-register
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(400).json({ error: 'passkey_verification_failed', message: err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════
+// INTERACTIVE ON-CHAIN TRANSACTION APPROVAL WEB INTERFACE
+// ═════════════════════════════════════════════════════════════
+app.get(['/approve', '/approve-transaction', '/approvals'], async (req: Request, res: Response) => {
+  const token = (req.query.token || req.query.approval_token || '').toString().trim();
+
+  let stagedReq: any = null;
+  if (token) {
+    stagedReq = inMemoryTxRequests.get(token);
+    if (!stagedReq) {
+      try {
+        if (supabase && typeof supabase.from === 'function') {
+          const { data } = await supabase
+            .from('transaction_requests')
+            .select('*')
+            .eq('approval_token', token)
+            .maybeSingle();
+          if (data) stagedReq = data;
+        }
+      } catch (e) {}
+    }
+  }
+
+  const reqId = stagedReq?.request_id || stagedReq?.requestId || '—';
+  const sender = stagedReq?.wallet_address || stagedReq?.walletAddress || '—';
+  const recipient = stagedReq?.recipient || '—';
+  const amount = stagedReq?.amount || '0';
+  const asset = (stagedReq?.asset || 'ETH').toUpperCase();
+  const network = (stagedReq?.network || 'Sepolia').toUpperCase();
+  const reason = stagedReq?.reason || stagedReq?.contract_summary || 'On-chain transaction execution via Northveil MPC';
+  const status = (stagedReq?.status || (token ? 'NOT_FOUND' : 'NO_TOKEN')).toUpperCase();
+  const txHash = stagedReq?.tx_hash || stagedReq?.txHash || '';
+  const explorerUrl = stagedReq?.explorer_url || stagedReq?.explorerUrl || (txHash ? `https://sepolia.etherscan.io/tx/${txHash}` : '#');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authorize Transaction — Northveil MPC</title>
+  <link rel="icon" type="image/png" href="https://iili.io/CDS9fvn.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, sans-serif; }
+    body { background: #090a0f; color: #f3f4f6; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: #121215; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 28px; max-width: 480px; width: 100%; padding: 28px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8); }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .logo-row { display: flex; align-items: center; gap: 10px; }
+    .logo-img { width: 32px; height: 32px; border-radius: 8px; }
+    .brand-title { font-weight: 700; font-size: 15px; color: #ffffff; letter-spacing: -0.01em; }
+    .status-badge { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); text-transform: uppercase; }
+    .status-badge.confirmed { background: rgba(16, 185, 129, 0.12); color: #10b981; border-color: rgba(16, 185, 129, 0.3); }
+    .status-badge.rejected { background: rgba(239, 68, 68, 0.12); color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
+    .amount-box { background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 20px; padding: 20px; text-align: center; margin-bottom: 20px; }
+    .amount-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; font-weight: 600; }
+    .amount-value { font-size: 28px; font-weight: 800; color: #ffffff; margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
+    .info-list { margin-bottom: 24px; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); font-size: 13px; }
+    .info-label { color: #9ca3af; }
+    .info-val { color: #ffffff; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 12px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-approve { width: 100%; padding: 14px; background: #ffffff; color: #000000; border: none; border-radius: 9999px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-approve:hover { background: #e5e7eb; transform: translateY(-1px); }
+    .btn-reject { width: 100%; padding: 12px; background: transparent; color: #9ca3af; border: none; font-size: 12px; cursor: pointer; }
+    .btn-reject:hover { color: #ef4444; }
+    .result-box { display: none; padding: 16px; border-radius: 16px; margin-top: 16px; text-align: center; font-size: 13px; }
+    .result-box.success { display: block; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); color: #10b981; }
+    .result-box.error { display: block; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; }
+    .explorer-link { display: inline-block; margin-top: 8px; color: #60a5fa; text-decoration: underline; font-family: 'JetBrains Mono', monospace; font-size: 11px; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="logo-row">
+        <img class="logo-img" src="https://iili.io/CDS9fvn.png" alt="Northveil">
+        <span class="brand-title">NORTHVEIL VAULT</span>
+      </div>
+      <div id="statusBadge" class="status-badge ${status === 'CONFIRMED' ? 'confirmed' : status === 'REJECTED' ? 'rejected' : ''}">${status}</div>
+    </div>
+
+    ${!token || status === 'NOT_FOUND' || status === 'NO_TOKEN' ? `
+      <div class="amount-box">
+        <div class="amount-label">REQUEST STATUS</div>
+        <div style="font-size: 15px; color: #ef4444; margin-top: 8px; font-weight: 600;">Transaction Request Not Found or Expired</div>
+        <p style="font-size: 12px; color: #9ca3af; margin-top: 8px; line-height: 1.5;">Single-use approval tokens are valid for 10 minutes. Please stage a new transaction or check your Northveil wallet dashboard.</p>
+      </div>
+      <a href="https://northveil.xyz" style="display: block; text-align: center; color: #60a5fa; font-size: 13px; text-decoration: none; margin-top: 10px;">Return to Northveil Wallet &rarr;</a>
+    ` : status === 'CONFIRMED' ? `
+      <div class="amount-box">
+        <div class="amount-label">TRANSACTION CONFIRMED</div>
+        <div class="amount-value">${amount} ${asset}</div>
+        <div style="font-size: 12px; color: #10b981; margin-top: 6px;">🟢 Finalized On Blockchain</div>
+      </div>
+      <div class="info-list">
+        <div class="info-row"><span class="info-label">Sender Vault:</span><span class="info-val">${sender}</span></div>
+        <div class="info-row"><span class="info-label">Recipient:</span><span class="info-val">${recipient}</span></div>
+        <div class="info-row"><span class="info-label">Network:</span><span class="info-val">${network}</span></div>
+        ${txHash ? `<div class="info-row"><span class="info-label">Tx Hash:</span><span class="info-val">${txHash.slice(0, 10)}...${txHash.slice(-6)}</span></div>` : ''}
+      </div>
+      ${txHash ? `<div style="text-align: center;"><a class="explorer-link" href="${explorerUrl}" target="_blank">View on Block Explorer &rarr;</a></div>` : ''}
+    ` : `
+      <div class="amount-box">
+        <div class="amount-label">AMOUNT TO BROADCAST</div>
+        <div class="amount-value">${amount} ${asset}</div>
+        <div style="font-size: 12px; color: #9ca3af; margin-top: 4px;">${reason}</div>
+      </div>
+
+      <div class="info-list">
+        <div class="info-row"><span class="info-label">Sender Vault:</span><span class="info-val">${sender}</span></div>
+        <div class="info-row"><span class="info-label">Recipient:</span><span class="info-val">${recipient}</span></div>
+        <div class="info-row"><span class="info-label">Target Network:</span><span class="info-val">${network}</span></div>
+        <div class="info-row"><span class="info-label">Request ID:</span><span class="info-val">${reqId}</span></div>
+      </div>
+
+      <button id="btnApprove" class="btn-approve" onclick="approveTx()">
+        <span>⚡</span> <span>Approve & Broadcast Transaction</span>
+      </button>
+
+      <button id="btnReject" class="btn-reject" onclick="rejectTx()">
+        Reject & Cancel
+      </button>
+
+      <div id="resultBox" class="result-box"></div>
+    `}
+  </div>
+
+  <script>
+    const token = "${token}";
+
+    async function approveTx() {
+      const btn = document.getElementById('btnApprove');
+      const box = document.getElementById('resultBox');
+      btn.disabled = true;
+      btn.innerHTML = 'Broadcasting via Turnkey TEE MPC...';
+
+      try {
+        const res = await fetch('/api/v1/approvals/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        const data = await res.json();
+
+        if (data.success && data.txHash) {
+          box.className = 'result-box success';
+          box.innerHTML = '<strong>🟢 Transaction Confirmed On-Chain!</strong><br><a class="explorer-link" href="' + (data.explorerUrl || '#') + '" target="_blank">View Tx: ' + data.txHash.slice(0, 10) + '...' + data.txHash.slice(-6) + ' &rarr;</a>';
+          document.getElementById('statusBadge').className = 'status-badge confirmed';
+          document.getElementById('statusBadge').innerText = 'CONFIRMED';
+          btn.style.display = 'none';
+          document.getElementById('btnReject').style.display = 'none';
+        } else {
+          box.className = 'result-box error';
+          box.innerText = 'Approval Failed: ' + (data.error || data.message || 'Unknown error');
+          btn.disabled = false;
+          btn.innerHTML = '⚡ Approve & Broadcast Transaction';
+        }
+      } catch (err) {
+        box.className = 'result-box error';
+        box.innerText = 'Execution Error: ' + err.message;
+        btn.disabled = false;
+        btn.innerHTML = '⚡ Approve & Broadcast Transaction';
+      }
+    }
+
+    async function rejectTx() {
+      try {
+        await fetch('/api/v1/approvals/reject', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        const box = document.getElementById('resultBox');
+        box.className = 'result-box error';
+        box.innerText = '❌ Transaction request rejected and voided.';
+        document.getElementById('statusBadge').className = 'status-badge rejected';
+        document.getElementById('statusBadge').innerText = 'REJECTED';
+        document.getElementById('btnApprove').style.display = 'none';
+        document.getElementById('btnReject').style.display = 'none';
+      } catch (e) {}
+    }
+  </script>
+</body>
+</html>`;
+
+  res.setHeader('Content-Type', 'text/html');
+  res.send(html);
+});
+
+// REST API for executing approvals
+app.post(['/api/v1/approvals/execute', '/api/approve', '/api/v1/approve'], async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  try {
+    const token = (req.body?.token || req.body?.approvalToken || req.query?.token || '').toString().trim();
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Missing approval token parameter.' });
+    }
+    const passkeyAssertion = req.body?.passkeyAssertion;
+    const result = await approveAndExecuteWithPasskey(token, passkeyAssertion, 'default_user');
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// REST API for rejecting approvals
+app.post(['/api/v1/approvals/reject', '/api/reject', '/api/v1/reject'], async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  try {
+    const token = (req.body?.token || req.body?.approvalToken || req.query?.token || '').toString().trim();
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Missing approval token parameter.' });
+    }
+    const result = await rejectTransactionRequest(token, 'default_user');
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -3022,7 +3249,7 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
 > **Amount**: **${amount} ${asset}**  
 > **Target Network**: \`${network}\`  
 > **Expires At**: \`${res.expiresAt}\`  
-> **Passkey Authorization Link**: [Authorize Transaction](https://northveil.xyz/approve?token=${res.approvalToken})  
+> **Passkey Authorization Link**: [Authorize Transaction](https://mcp.northveil.xyz/approve?token=${res.approvalToken})  
 
 *Please prompt the user to complete WebAuthn Passkey authorization on their device or call \`approve_transaction\` with the approvalToken.*
 `,
@@ -3704,7 +3931,7 @@ contract ${nameStr} {
 > **Request ID**: \`${stageRes.requestId}\`  
 > **Approval Token**: \`${stageRes.approvalToken}\`  
 > **Expires At**: \`${stageRes.expiresAt}\`  
-> **Passkey Authorization**: [Confirm Deployment on Device](https://northveil.xyz/approve?token=${stageRes.approvalToken})  
+> **Passkey Authorization**: [Confirm Deployment on Device](https://mcp.northveil.xyz/approve?token=${stageRes.approvalToken})  
 
 *Please prompt the user to authorize contract deployment via WebAuthn Passkey or call \`approve_transaction\` with token \`${stageRes.approvalToken}\`.*
 `,
@@ -4233,7 +4460,7 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
 > **Recipient**: \`${recipient}\`  
 > **Target Network**: \`${chainName}\`  
 > **Expires At**: \`${stageResult.expiresAt}\`  
-> **Authorize Passkey**: [Confirm on Device](https://northveil.xyz/approve?token=${stageResult.approvalToken})  
+> **Authorize Passkey**: [Confirm on Device](https://mcp.northveil.xyz/approve?token=${stageResult.approvalToken})  
 
 *Please prompt the user to authorize this transaction on their device or call \`approve_transaction\` with token \`${stageResult.approvalToken}\`.*
 `,
@@ -4673,7 +4900,7 @@ ${solCode}
 > **Request ID**: \`${stageRes.requestId}\`  
 > **Approval Token**: \`${stageRes.approvalToken}\`  
 > **Expires At**: \`${stageRes.expiresAt}\`  
-> **Authorize Passkey**: [Confirm Swap on Device](https://northveil.xyz/approve?token=${stageRes.approvalToken})  
+> **Authorize Passkey**: [Confirm Swap on Device](https://mcp.northveil.xyz/approve?token=${stageRes.approvalToken})  
 
 *Please prompt the user to authorize this swap on their device or call \`approve_transaction\` with token \`${stageRes.approvalToken}\`.*
 `,
@@ -6378,7 +6605,7 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
 > **Request ID**: \`${stageRes.requestId}\`  
 > **Approval Token**: \`${stageRes.approvalToken}\`  
 > **Expires At**: \`${stageRes.expiresAt}\`  
-> **Authorize Passkey**: [Confirm Mint on Device](https://northveil.xyz/approve?token=${stageRes.approvalToken})  
+> **Authorize Passkey**: [Confirm Mint on Device](https://mcp.northveil.xyz/approve?token=${stageRes.approvalToken})  
 
 *Please prompt the user to authorize this mint on their device or call \`approve_transaction\` with token \`${stageRes.approvalToken}\`.*
 `,
