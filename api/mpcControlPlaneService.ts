@@ -1387,9 +1387,40 @@ export async function approveAndExecuteWithPasskey(
   }
 
   if (!txHash) {
-    txHash = '0x' + crypto.randomBytes(32).toString('hex');
-    blockNumber = Math.floor(12048590 + Math.random() * 100);
-    gasUsed = '21000';
+    const fallbackKey = process.env.SEPOLIA_PRIVATE_KEY || process.env.PRIVATE_KEY;
+    if (fallbackKey && fallbackKey.startsWith('0x')) {
+      try {
+        const provider = getProviderForNetwork(req.network);
+        const wallet = new ethers.Wallet(fallbackKey, provider);
+
+        let rawVal = 0n;
+        if (unsigned.value) {
+          rawVal = BigInt(unsigned.value.toString());
+        } else if (req.amount > 0) {
+          rawVal = ethers.parseEther(String(req.amount));
+        }
+
+        const txResponse = await wallet.sendTransaction({
+          to: unsigned.to || req.recipient,
+          value: rawVal,
+          data: unsigned.data || '0x',
+        });
+
+        txHash = txResponse.hash;
+        const receipt = await txResponse.wait(1, 45000);
+        if (receipt) {
+          blockNumber = Number(receipt.blockNumber);
+          gasUsed = receipt.gasUsed ? receipt.gasUsed.toString() : '21000';
+          if (receipt.contractAddress) contractAddress = receipt.contractAddress;
+        }
+      } catch (broadcastErr: any) {
+        console.error('[Real On-Chain Broadcast Error]:', broadcastErr);
+        throw new Error(`Real on-chain transaction execution failed: ${broadcastErr.message || broadcastErr}`);
+      }
+    } else {
+      throw new Error('SIGNING_FAILED: No active Turnkey MPC credentials or private key relayer available to broadcast transaction.');
+    }
+  }
   // 5. Update Database Record
   const explorerUrl = getExplorerUrlForHash(req.network, txHash);
   try {
@@ -1570,9 +1601,39 @@ export async function executeAutonomousTransaction(
   }
 
   if (!txHash) {
-    txHash = '0x' + crypto.randomBytes(32).toString('hex');
-    blockNumber = Math.floor(12048590 + Math.random() * 100);
-    gasUsed = '21000';
+    const fallbackKey = process.env.SEPOLIA_PRIVATE_KEY || process.env.PRIVATE_KEY;
+    if (fallbackKey && fallbackKey.startsWith('0x')) {
+      try {
+        const provider = getProviderForNetwork(network);
+        const wallet = new ethers.Wallet(fallbackKey, provider);
+
+        let rawVal = 0n;
+        if (unsignedPayload.value) {
+          rawVal = BigInt(unsignedPayload.value.toString());
+        } else if (amount > 0) {
+          rawVal = ethers.parseEther(String(amount));
+        }
+
+        const txResponse = await wallet.sendTransaction({
+          to: unsignedPayload.to || recipient,
+          value: rawVal,
+          data: unsignedPayload.data || '0x',
+        });
+
+        txHash = txResponse.hash;
+        const receipt = await txResponse.wait(1, 45000);
+        if (receipt) {
+          blockNumber = Number(receipt.blockNumber);
+          gasUsed = receipt.gasUsed ? receipt.gasUsed.toString() : '21000';
+          if (receipt.contractAddress) contractAddress = receipt.contractAddress;
+        }
+      } catch (broadcastErr: any) {
+        console.error('[Real On-Chain Autonomous Broadcast Error]:', broadcastErr);
+        throw new Error(`Real on-chain autonomous transaction execution failed: ${broadcastErr.message || broadcastErr}`);
+      }
+    } else {
+      throw new Error('SIGNING_FAILED: No active Turnkey MPC credentials or private key relayer available to broadcast transaction.');
+    }
   }
 
   // Increment spent_last_24h_usd in scope
