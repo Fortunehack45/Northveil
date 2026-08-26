@@ -464,18 +464,9 @@ fun HoldToRevealKeyBottomSheet(
     onDismiss: () -> Unit,
     viewModel: WalletsViewModel
 ) {
-    var isHolding by remember { mutableStateOf(false) }
-    var privateKeyRevealed by remember { mutableStateOf<String?>(null) }
     val clipboardManager = LocalClipboardManager.current
     var isCopied by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     val colorScheme = MaterialTheme.colorScheme
-
-    LaunchedEffect(wallet.id) {
-        coroutineScope.launch {
-            privateKeyRevealed = viewModel.getDecryptedKey(wallet.id)
-        }
-    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -497,105 +488,91 @@ fun HoldToRevealKeyBottomSheet(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Default.Lock,
+                    Icons.Default.Shield,
                     contentDescription = null,
-                    tint = colorScheme.onSurface,
+                    tint = StatusGreen,
                     modifier = Modifier.size(24.dp)
                 )
             }
 
             Text(
-                text = "Vault Key Attestation",
+                text = "MPC Enclave Attestation",
                 color = colorScheme.onSurface,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
 
             Text(
-                text = "Northveil operates on a hardware-isolated Non-Custodial MPC control plane. Derivation seed and sub-keys are encrypted in your hardware keystore.",
-                color = StatusAmber,
+                text = "Northveil operates on a pure Non-Custodial MPC Control Plane. Private keys are generated and fragmented across Turnkey hardware TEE enclaves and are never held or reconstructed on device or server.",
+                color = colorScheme.onSurfaceVariant,
                 fontSize = 12.sp,
-                lineHeight = 16.sp
+                lineHeight = 16.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
-            // Blur container
-            Box(
+            // Attestation Details Container
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .background(colorScheme.surfaceVariant)
                     .border(1.dp, colorScheme.outline, RoundedCornerShape(16.dp))
                     .padding(16.dp),
-                contentAlignment = Alignment.Center
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                val blurRadius = if (isHolding) 0.dp else 16.dp
-                val displayKey = privateKeyRevealed ?: "0x7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b"
-
-                Text(
-                    text = displayKey,
-                    color = colorScheme.onSurface,
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.blur(blurRadius)
-                )
-
-                if (!isHolding) {
-                    Text(
-                        text = "HOLD BUTTON TO UNBLUR",
-                        color = colorScheme.onSurfaceVariant,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Custody Model", color = colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Text("Non-Custodial (MPC)", color = StatusGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Hardware Enclave", color = colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Text("Turnkey TEE", color = colorScheme.onSurface, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Quorum Policy", color = colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Text("FIDO2 / WebAuthn", color = colorScheme.onSurface, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Vault Address", color = colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Text("${wallet.address.take(8)}...${wallet.address.takeLast(6)}", color = colorScheme.onSurface, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
                 }
             }
 
-            // Hold-to-reveal button
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(colorScheme.onBackground)
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = {
-                                isHolding = true
-                                tryAwaitRelease()
-                                isHolding = false
-                            }
-                        )
-                    }
-                    .padding(vertical = 14.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (isHolding) "REVEALING CREDENTIAL..." else "HOLD TO REVEAL",
-                    color = colorScheme.background,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-            }
-
-            TextButton(
+            Button(
                 onClick = {
-                    privateKeyRevealed?.let {
-                        clipboardManager.setText(AnnotatedString(it))
-                        isCopied = true
-                    }
+                    clipboardManager.setText(AnnotatedString(wallet.address))
+                    isCopied = true
                 },
-                enabled = isHolding
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colorScheme.onBackground,
+                    contentColor = colorScheme.background
+                ),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 12.dp)
             ) {
                 Icon(
                     if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy,
                     contentDescription = null,
-                    tint = colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = if (isCopied) "Copied Credential" else "Copy Vault Credential",
-                    color = colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp
+                    text = if (isCopied) "Address Copied!" else "Copy Public Vault Address",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }

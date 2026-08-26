@@ -179,6 +179,9 @@ fun MainContainerScreen(
                     )
                 }
 
+                val overviewState by overviewViewModel.uiState.collectAsState()
+                val currentWalletAddress = overviewState.activeWallet?.address ?: ""
+
                 if (showSendSheet) {
                     SendBottomSheet(
                         onDismiss = { showSendSheet = false },
@@ -189,7 +192,7 @@ fun MainContainerScreen(
 
                 if (showReceiveSheet) {
                     ReceiveBottomSheet(
-                        walletAddress = "0x71C8891575B50D22e032d847847C234A413D4Cc8",
+                        walletAddress = currentWalletAddress,
                         onDismiss = { showReceiveSheet = false }
                     )
                 }

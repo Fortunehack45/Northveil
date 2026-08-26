@@ -45,13 +45,9 @@ class WalletsViewModel @Inject constructor(
 
     fun createNewAccount(name: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isCreatingAccount = true) }
+            _uiState.update { it.copy(isCreatingAccount = true, error = null) }
             val result = walletRepository.createSubAccount(name)
             _uiState.update { it.copy(isCreatingAccount = false, error = result.exceptionOrNull()?.message) }
         }
-    }
-
-    suspend fun getDecryptedKey(walletId: String): String {
-        return walletRepository.decryptPrivateKey(walletId)
     }
 }

@@ -70,6 +70,10 @@ const PORT = process.env.PORT || 3001;
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('[FATAL] SUPABASE_URL / SUPABASE_ANON_KEY are required and were not found in the environment.');
+}
+
 const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : ({} as any);
@@ -2035,14 +2039,18 @@ app.all(['/api/v1/tools/:toolName', '/api/v1/:toolName'], async (req: Request, r
     const result = await executeRealTool(toolName, toolArgs, auth.walletAddress, req);
 
     try {
-      await supabase.from('mcp_activity_logs').insert([{
-        api_key: rawKey.replace('Bearer ', ''),
-        tool_name: toolName,
-        status: 'SUCCESS',
-        parameters: { ...toolArgs, walletAddress: auth.walletAddress },
-        response: result,
-      }]);
-    } catch (e) {}
+      if (supabase && typeof supabase.from === 'function') {
+        await supabase.from('mcp_activity_logs').insert([{
+          api_key: rawKey.replace('Bearer ', ''),
+          tool_name: toolName,
+          status: 'SUCCESS',
+          parameters: { ...toolArgs, walletAddress: auth.walletAddress },
+          response: result,
+        }]);
+      }
+    } catch (logErr) {
+      console.error('[Activity Log] Failed to record tool call (non-fatal):', logErr);
+    }
 
     const formattedMarkdown = result?.formattedMarkdown || (typeof result === 'string' ? result : JSON.stringify(result, null, 2));
 
@@ -2176,13 +2184,19 @@ app.post('/messages', async (req: Request, res: Response) => {
         } else {
           const result = await executeRealTool(name, toolArgs, walletAddress, req);
 
-          await supabase.from('mcp_activity_logs').insert([{
-            api_key: apiKey,
-            tool_name: name,
-            status: 'SUCCESS',
-            parameters: { ...toolArgs, walletAddress },
-            response: result,
-          }]);
+          try {
+            if (supabase && typeof supabase.from === 'function') {
+              await supabase.from('mcp_activity_logs').insert([{
+                api_key: apiKey,
+                tool_name: name,
+                status: 'SUCCESS',
+                parameters: { ...toolArgs, walletAddress },
+                response: result,
+              }]);
+            }
+          } catch (logErr) {
+            console.error('[Activity Log] Failed to record tool call (non-fatal):', logErr);
+          }
 
           responsePayload = {
             jsonrpc: '2.0',
@@ -2316,13 +2330,19 @@ app.post('/mcp', async (req: Request, res: Response) => {
 
       const result = await executeRealTool(name, toolArgs, auth.walletAddress, req);
 
-      await supabase.from('mcp_activity_logs').insert([{
-        api_key: rawKey.replace('Bearer ', ''),
-        tool_name: name,
-        status: 'SUCCESS',
-        parameters: { ...toolArgs, walletAddress: auth.walletAddress },
-        response: result,
-      }]);
+      try {
+        if (supabase && typeof supabase.from === 'function') {
+          await supabase.from('mcp_activity_logs').insert([{
+            api_key: rawKey.replace('Bearer ', ''),
+            tool_name: name,
+            status: 'SUCCESS',
+            parameters: { ...toolArgs, walletAddress: auth.walletAddress },
+            response: result,
+          }]);
+        }
+      } catch (logErr) {
+        console.error('[Activity Log] Failed to record tool call (non-fatal):', logErr);
+      }
 
       return res.json({
         jsonrpc: '2.0',

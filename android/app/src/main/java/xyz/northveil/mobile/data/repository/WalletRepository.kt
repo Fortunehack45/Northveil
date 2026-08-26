@@ -8,6 +8,7 @@ import xyz.northveil.mobile.core.network.NorthveilApiService
 import xyz.northveil.mobile.core.network.dto.CreateWalletRequest
 import xyz.northveil.mobile.core.security.EncryptedKeystoreManager
 import xyz.northveil.mobile.domain.model.SubWallet
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -23,51 +24,60 @@ class WalletRepository @Inject constructor(
 
     val activeSubWallet: Flow<SubWallet?> = subWalletDao.getActiveSubWallet().map { it?.toDomain() }
 
-    suspend fun createInitialVault(seedPhrase: String, masterPassword: String): Boolean {
-        keystoreManager.saveEncryptedSeed(seedPhrase)
-        keystoreManager.saveMasterPasswordHash(masterPassword)
-
-        // Seed initial primary account
-        val initialWallet = SubWalletEntity(
-            id = "wallet-1",
-            name = "Primary Vault",
-            address = "0x71C8891575B50D22e032d847847C234A413D4Cc8",
-            derivationPath = "m/44'/60'/0'/0/0",
-            isActive = true,
-            createdAt = "Just now"
-        )
-        subWalletDao.insertSubWallet(initialWallet)
-        return true
+    suspend fun createInitialVault(name: String = "Primary Vault", masterPassword: String): Result<SubWallet> {
+        return try {
+            val response = apiService.createWallet(
+                CreateWalletRequest(
+                    walletName = name,
+                    userId = "mobile_user_${UUID.randomUUID().toString().take(8)}"
+                )
+            )
+            val body = response.body()
+            if (response.isSuccessful && body != null && body.address.isNotBlank()) {
+                val entity = SubWalletEntity(
+                    id = body.id ?: "wallet-${System.currentTimeMillis()}",
+                    name = body.name ?: body.walletName ?: name,
+                    address = body.address,
+                    derivationPath = body.derivationPath ?: "m/44'/60'/0'/0/0",
+                    isActive = true,
+                    createdAt = "Just now"
+                )
+                subWalletDao.insertSubWallet(entity)
+                keystoreManager.saveMasterPasswordHash(masterPassword)
+                keystoreManager.setVaultConfigured(true)
+                Result.success(entity.toDomain())
+            } else {
+                val errorMsg = response.errorBody()?.string() ?: "Failed to provision MPC wallet"
+                Result.failure(Exception("MPC_PROVISION_ERROR: $errorMsg"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun createSubAccount(name: String): Result<SubWallet> {
         return try {
-            val count = 2
-            val response = apiService.createCustodialWallet(CreateWalletRequest(name = name, derivationIndex = count))
+            val response = apiService.createWallet(
+                CreateWalletRequest(
+                    walletName = name,
+                    userId = "mobile_user_${UUID.randomUUID().toString().take(8)}"
+                )
+            )
             val body = response.body()
-            if (response.isSuccessful && body != null) {
+            if (response.isSuccessful && body != null && body.address.isNotBlank()) {
                 val entity = SubWalletEntity(
-                    id = body.id,
-                    name = body.name,
+                    id = body.id ?: "wallet-${System.currentTimeMillis()}",
+                    name = body.name ?: body.walletName ?: name,
                     address = body.address,
-                    derivationPath = body.derivationPath,
+                    derivationPath = body.derivationPath ?: "m/44'/60'/0'/0/1",
                     isActive = false,
                     createdAt = "Just now"
                 )
                 subWalletDao.insertSubWallet(entity)
                 Result.success(entity.toDomain())
             } else {
-                // Offline fallback derivation
-                val fallback = SubWalletEntity(
-                    id = "wallet-${System.currentTimeMillis()}",
-                    name = name,
-                    address = "0x" + (1..40).map { "0123456789abcdef".random() }.joinToString(""),
-                    derivationPath = "m/44'/60'/0'/0/$count",
-                    isActive = false,
-                    createdAt = "Just now"
-                )
-                subWalletDao.insertSubWallet(fallback)
-                Result.success(fallback.toDomain())
+                val errorMsg = response.errorBody()?.string() ?: "MPC enclave provisioning failed"
+                Result.failure(Exception("MPC_SUBACCOUNT_ERROR: $errorMsg"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -76,10 +86,6 @@ class WalletRepository @Inject constructor(
 
     suspend fun setActiveSubWallet(walletId: String) {
         subWalletDao.setActiveWallet(walletId)
-    }
-
-    suspend fun decryptPrivateKey(walletId: String): String {
-        return "0x" + (walletId.hashCode().toString(16) + System.currentTimeMillis().toString(16)).padStart(64, '0')
     }
 
     private fun SubWalletEntity.toDomain() = SubWallet(

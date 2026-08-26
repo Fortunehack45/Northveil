@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import xyz.northveil.mobile.core.biometrics.BiometricPromptManager
 import xyz.northveil.mobile.data.repository.ApprovalsRepository
+import xyz.northveil.mobile.data.repository.WalletRepository
 import xyz.northveil.mobile.domain.model.ApprovalRecord
 import javax.inject.Inject
 
@@ -20,12 +21,14 @@ data class ApprovalsUiState(
     val isRefreshing: Boolean = false,
     val isCreatingTest: Boolean = false,
     val actionProcessingId: String? = null,
+    val activeWalletAddress: String = "",
     val errorMessage: String? = null
 )
 
 @HiltViewModel
 class ApprovalsViewModel @Inject constructor(
     private val approvalsRepository: ApprovalsRepository,
+    private val walletRepository: WalletRepository,
     private val biometricPromptManager: BiometricPromptManager
 ) : ViewModel() {
 
@@ -34,7 +37,16 @@ class ApprovalsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            approvalsRepository.syncApprovals()
+            walletRepository.activeSubWallet.collect { active ->
+                val addr = active?.address ?: ""
+                _uiState.update { it.copy(activeWalletAddress = addr) }
+                if (addr.isNotBlank()) {
+                    approvalsRepository.syncApprovals(addr)
+                }
+            }
+        }
+
+        viewModelScope.launch {
             approvalsRepository.allApprovals.collect { list ->
                 _uiState.update { it.copy(approvals = list) }
             }
@@ -58,7 +70,6 @@ class ApprovalsViewModel @Inject constructor(
         _uiState.update { it.copy(actionProcessingId = record.id) }
 
         if (!biometricPromptManager.isBiometricAvailable(activity)) {
-            // Fallback direct execution if biometric hardware unavailable on test device
             viewModelScope.launch {
                 approvalsRepository.updateDecision(record.id, true)
                 _uiState.update { it.copy(actionProcessingId = null) }
@@ -104,7 +115,10 @@ class ApprovalsViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
-            approvalsRepository.syncApprovals()
+            val addr = _uiState.value.activeWalletAddress
+            if (addr.isNotBlank()) {
+                approvalsRepository.syncApprovals(addr)
+            }
             _uiState.update { it.copy(isRefreshing = false) }
         }
     }

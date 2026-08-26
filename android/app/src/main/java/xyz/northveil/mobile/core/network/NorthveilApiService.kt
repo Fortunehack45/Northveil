@@ -6,8 +6,8 @@ import xyz.northveil.mobile.core.network.dto.*
 
 interface NorthveilApiService {
 
-    @POST("api/wallet/create")
-    suspend fun createCustodialWallet(
+    @POST("api/v1/tools/create_wallet")
+    suspend fun createWallet(
         @Body request: CreateWalletRequest
     ): Response<WalletResponse>
 

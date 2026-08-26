@@ -3,29 +3,36 @@ package xyz.northveil.mobile.core.network.dto
 import com.google.gson.annotations.SerializedName
 
 data class CreateWalletRequest(
-    val name: String,
-    val derivationIndex: Int
+    @SerializedName("walletName") val walletName: String,
+    @SerializedName("userId") val userId: String? = "mobile_user",
+    @SerializedName("chain") val chain: String? = "ethereum"
 )
 
 data class WalletResponse(
-    val id: String,
-    val address: String,
-    val name: String,
-    val derivationPath: String
+    @SerializedName("address") val address: String,
+    @SerializedName("id") val id: String? = null,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("walletName") val walletName: String? = null,
+    @SerializedName("mpcProvider") val mpcProvider: String? = "turnkey",
+    @SerializedName("mpcWalletId") val mpcWalletId: String? = null,
+    @SerializedName("mpcSubOrgId") val mpcSubOrgId: String? = null,
+    @SerializedName("keyType") val keyType: String? = null,
+    @SerializedName("derivationPath") val derivationPath: String? = null,
+    @SerializedName("success") val success: Boolean? = true
 )
 
 data class BalancesDto(
-    val totalNetWorthUsd: Double,
-    val netWorthChange24hPct: Double,
-    val tokens: List<TokenDto>
+    @SerializedName("totalNetWorthUsd") val totalNetWorthUsd: Double,
+    @SerializedName("netWorthChange24hPct") val netWorthChange24hPct: Double,
+    @SerializedName("tokens") val tokens: List<TokenDto>
 )
 
 data class TokenDto(
-    val id: String,
-    val symbol: String,
-    val name: String,
-    val chain: String,
-    val balance: Double,
+    @SerializedName("id") val id: String,
+    @SerializedName("symbol") val symbol: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("chain") val chain: String,
+    @SerializedName("balance") val balance: Double,
     @SerializedName("price_usd") val priceUsd: Double,
     @SerializedName("change_24h") val change24h: Double,
     @SerializedName("icon_url") val iconUrl: String,
@@ -33,40 +40,43 @@ data class TokenDto(
 )
 
 data class GasEstimateRequest(
-    val chain: String,
-    val to: String,
-    val value: String
+    @SerializedName("chain") val chain: String,
+    @SerializedName("to") val to: String,
+    @SerializedName("value") val value: String
 )
 
 data class GasEstimateResponse(
-    val estimatedGas: String,
-    val gasPriceGwei: String,
-    val estimatedFeeUsd: Double
+    @SerializedName("estimatedGas") val estimatedGas: String,
+    @SerializedName("gasPriceGwei") val gasPriceGwei: String,
+    @SerializedName("estimatedFeeUsd") val estimatedFeeUsd: Double
 )
 
 data class TransferRequestDto(
-    val token: String,
-    val amount: Double,
-    val recipientAddress: String,
-    val chain: String
+    @SerializedName("token") val token: String,
+    @SerializedName("amount") val amount: Double,
+    @SerializedName("recipientAddress") val recipientAddress: String,
+    @SerializedName("chain") val chain: String,
+    @SerializedName("fromAddress") val fromAddress: String? = null
 )
 
 data class TransactionResultDto(
-    val success: Boolean,
-    val txHash: String,
-    val blockNumber: Long?
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("txHash") val txHash: String,
+    @SerializedName("blockNumber") val blockNumber: Long?
 )
 
 data class ApprovalRecordDto(
-    val id: String,
+    @SerializedName("id") val id: String,
     @SerializedName("tool_name") val toolName: String,
     @SerializedName("tx_hash") val txHash: String?,
     @SerializedName("agent_type") val agentType: String,
-    val status: String,
-    val parameters: Any?,
+    @SerializedName("status") val status: String,
+    @SerializedName("parameters") val parameters: Any?,
     @SerializedName("created_at") val createdAt: String
 )
 
 data class ApprovalDecisionDto(
-    val status: String // approved, rejected
+    @SerializedName("status") val status: String, // approved, rejected
+    @SerializedName("approvalToken") val approvalToken: String? = null,
+    @SerializedName("passkeySignature") val passkeySignature: String? = null
 )

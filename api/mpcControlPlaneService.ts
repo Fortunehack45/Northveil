@@ -1125,12 +1125,24 @@ export async function approveAndExecuteWithPasskey(
 
   const unsignedSerialized = ethers.Transaction.from(txToSign).unsignedSerialized;
 
-  const signResult: any = await (turnkey as any).signTransaction({
-    organizationId: turnkeyOrgId,
-    signWith: req.walletAddress,
-    type: 'TRANSACTION_TYPE_ETHEREUM',
-    unsignedTransaction: unsignedSerialized,
-  });
+  let signResult: any;
+  try {
+    signResult = await (turnkey as any).signTransaction({
+      type: 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2',
+      timestampMs: Date.now().toString(),
+      organizationId: turnkeyOrgId,
+      parameters: {
+        signWith: req.walletAddress,
+        unsignedTransaction: unsignedSerialized,
+        type: 'TRANSACTION_TYPE_ETHEREUM',
+      },
+    });
+  } catch (turnkeyErr: any) {
+    const errMsg = turnkeyErr?.message || turnkeyErr?.error?.message || JSON.stringify(turnkeyErr);
+    throw new TurnkeyEnclaveError(
+      `TURNKEY_SIGNING_ERROR: Turnkey hardware MPC signing failed for passkey-approved transaction: ${errMsg}`
+    );
+  }
 
   const signedTx = signResult.signedTransaction || signResult.activity?.result?.signTransactionResult?.signedTransaction;
   const broadcastRes = await provider.broadcastTransaction(signedTx);
@@ -1292,12 +1304,24 @@ export async function executeAutonomousTransaction(
 
   const unsignedSerialized = ethers.Transaction.from(txToSign).unsignedSerialized;
 
-  const signResult: any = await (turnkey as any).signTransaction({
-    organizationId: turnkeyOrgId,
-    signWith: normAddr,
-    type: 'TRANSACTION_TYPE_ETHEREUM',
-    unsignedTransaction: unsignedSerialized,
-  });
+  let signResult: any;
+  try {
+    signResult = await (turnkey as any).signTransaction({
+      type: 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2',
+      timestampMs: Date.now().toString(),
+      organizationId: turnkeyOrgId,
+      parameters: {
+        signWith: normAddr,
+        unsignedTransaction: unsignedSerialized,
+        type: 'TRANSACTION_TYPE_ETHEREUM',
+      },
+    });
+  } catch (turnkeyErr: any) {
+    const errMsg = turnkeyErr?.message || turnkeyErr?.error?.message || JSON.stringify(turnkeyErr);
+    throw new TurnkeyEnclaveError(
+      `TURNKEY_SIGNING_ERROR: Turnkey hardware MPC signing failed for autonomous transaction: ${errMsg}`
+    );
+  }
 
   const signedTx = signResult.signedTransaction || signResult.activity?.result?.signTransactionResult?.signedTransaction;
   const broadcastRes = await provider.broadcastTransaction(signedTx);

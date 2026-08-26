@@ -15,9 +15,6 @@ data class AuthUiState(
     val isLoading: Boolean = false,
     val isCreating: Boolean = false,
     val masterPassword: String = "",
-    val confirmPassword: String = "",
-    val generatedSeed: String = "",
-    val importSeedInput: String = "",
     val error: String? = null,
     val isComplete: Boolean = false
 )
@@ -30,11 +27,6 @@ class AuthViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    fun generateNewSeed() {
-        val wordList = listOf("abandon", "ability", "able", "about", "above", "absent", "absorb", "abstract", "absurd", "abuse", "access", "accident")
-        _uiState.update { it.copy(generatedSeed = wordList.shuffled().joinToString(" ")) }
-    }
-
     fun createVault(password: String) {
         viewModelScope.launch {
             if (password.length < 6) {
@@ -42,14 +34,20 @@ class AuthViewModel @Inject constructor(
                 return@launch
             }
             _uiState.update { it.copy(isLoading = true, isCreating = true, error = null) }
-            try {
-                walletRepository.createInitialVault(
-                    seedPhrase = _uiState.value.generatedSeed.ifBlank { "test seed phrase northveil multi chain custodial vault sample" },
-                    masterPassword = password
-                )
+            val result = walletRepository.createInitialVault(
+                name = "Primary MPC Vault",
+                masterPassword = password
+            )
+            if (result.isSuccess) {
                 _uiState.update { it.copy(isLoading = false, isCreating = false, isComplete = true) }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, isCreating = false, error = e.message ?: "Failed to create vault") }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isCreating = false,
+                        error = result.exceptionOrNull()?.message ?: "Failed to provision MPC Vault"
+                    )
+                }
             }
         }
     }

@@ -19,11 +19,12 @@ class TokenRepository @Inject constructor(
             list.map { it.toDomain() }
         }
 
-    suspend fun fetchLiveBalances(walletAddress: String = "0x71C8891575B50D22e032d847847C234A413D4Cc8") {
+    suspend fun fetchLiveBalances(walletAddress: String) {
+        if (walletAddress.isBlank() || !walletAddress.startsWith("0x")) return
         try {
             val response = apiService.getMultiChainBalances(walletAddress)
             val body = response.body()
-            if (response.isSuccessful && body != null) {
+            if (response.isSuccessful && body != null && body.tokens.isNotEmpty()) {
                 val entities = body.tokens.map { dto ->
                     TokenHoldingEntity(
                         id = dto.id,
@@ -40,23 +41,10 @@ class TokenRepository @Inject constructor(
                 }
                 tokenHoldingDao.clearHoldingsForWallet(walletAddress)
                 tokenHoldingDao.insertHoldings(entities)
-            } else {
-                seedDefaultHoldings(walletAddress)
             }
         } catch (e: Exception) {
-            seedDefaultHoldings(walletAddress)
+            // Non-fatal: Maintain existing Room DB cached records on network error
         }
-    }
-
-    private suspend fun seedDefaultHoldings(walletAddress: String) {
-        val defaults = listOf(
-            TokenHoldingEntity("eth-1", walletAddress, "ETH", "Ethereum", "ethereum", 1.45, 3420.50, 2.8, "https://iili.io/CDS9fvn.png", null),
-            TokenHoldingEntity("sol-1", walletAddress, "SOL", "Solana", "solana", 18.2, 142.30, -1.2, "https://iili.io/CDS9fvn.png", null),
-            TokenHoldingEntity("usdt-1", walletAddress, "USDT", "Tether USD", "base", 2500.0, 1.00, 0.01, "https://iili.io/CDS9fvn.png", null),
-            TokenHoldingEntity("arb-1", walletAddress, "ARB", "Arbitrum", "arbitrum", 620.0, 0.85, 4.1, "https://iili.io/CDS9fvn.png", null),
-            TokenHoldingEntity("sep-1", walletAddress, "SepoliaETH", "Sepolia Testnet", "sepolia", 4.25, 0.00, 0.0, "https://iili.io/CDS9fvn.png", null)
-        )
-        tokenHoldingDao.insertHoldings(defaults)
     }
 
     private fun TokenHoldingEntity.toDomain() = TokenHolding(
