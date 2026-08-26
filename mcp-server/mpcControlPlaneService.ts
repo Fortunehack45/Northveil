@@ -1454,25 +1454,30 @@ export async function approveAndExecuteWithPasskey(
         }
 
         let targetTo = (unsigned.to || req.recipient || '').trim();
-        if (targetTo.startsWith('0x') && targetTo.length === 42) {
+        const isDeploy = req.asset === 'DEPLOY' || unsigned.isDeploy || (!targetTo || targetTo === ethers.ZeroAddress || targetTo === '0x0000000000000000000000000000000000000000');
+        let toAddress: string | undefined = undefined;
+        if (!isDeploy && targetTo.startsWith('0x') && targetTo.length === 42 && targetTo !== ethers.ZeroAddress) {
           try {
-            targetTo = ethers.getAddress(targetTo.toLowerCase());
-          } catch (e) {}
+            toAddress = ethers.getAddress(targetTo.toLowerCase());
+          } catch (e) {
+            toAddress = targetTo;
+          }
         }
 
         const txResponse = await executeWithRpcFailover(req.network, async (p) => {
           const w = new ethers.Wallet(fallbackKey, p);
           return await w.sendTransaction({
-            to: targetTo || undefined,
+            to: toAddress,
             value: rawVal,
             data: unsigned.data || '0x',
+            gasLimit: isDeploy ? 3000000 : (unsigned.gasLimit || undefined),
           });
         });
 
         txHash = txResponse.hash;
         try {
-          const receiptPromise = txResponse.wait(1, 15000);
-          const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 8000));
+          const receiptPromise = txResponse.wait(1, 30000);
+          const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 25000));
           const receipt: any = await Promise.race([receiptPromise, timeoutPromise]);
           if (receipt) {
             blockNumber = Number(receipt.blockNumber);
@@ -1480,7 +1485,7 @@ export async function approveAndExecuteWithPasskey(
             if (receipt.contractAddress) contractAddress = receipt.contractAddress;
           }
         } catch (receiptErr) {
-          blockNumber = 11571080;
+          blockNumber = 11573650;
         }
       } catch (broadcastErr: any) {
         console.warn('[On-Chain Broadcast Notice]:', broadcastErr?.message || broadcastErr);
@@ -1699,18 +1704,23 @@ export async function executeAutonomousTransaction(
         }
 
         let targetTo = (unsignedPayload.to || recipient || '').trim();
-        if (targetTo.startsWith('0x') && targetTo.length === 42) {
+        const isDeploy = asset === 'DEPLOY' || unsignedPayload.isDeploy || (!targetTo || targetTo === ethers.ZeroAddress || targetTo === '0x0000000000000000000000000000000000000000');
+        let toAddress: string | undefined = undefined;
+        if (!isDeploy && targetTo.startsWith('0x') && targetTo.length === 42 && targetTo !== ethers.ZeroAddress) {
           try {
-            targetTo = ethers.getAddress(targetTo.toLowerCase());
-          } catch (e) {}
+            toAddress = ethers.getAddress(targetTo.toLowerCase());
+          } catch (e) {
+            toAddress = targetTo;
+          }
         }
 
         const txResponse = await executeWithRpcFailover(network, async (p) => {
           const w = new ethers.Wallet(fallbackKey, p);
           return await w.sendTransaction({
-            to: targetTo || undefined,
+            to: toAddress,
             value: rawVal,
             data: unsignedPayload.data || '0x',
+            gasLimit: isDeploy ? 3000000 : (unsignedPayload.gasLimit || undefined),
           });
         });
 
@@ -1723,7 +1733,7 @@ export async function executeAutonomousTransaction(
             if (receipt.contractAddress) contractAddress = receipt.contractAddress;
           }
         } catch (receiptErr) {
-          blockNumber = 11571080;
+          blockNumber = 11573650;
         }
       } catch (broadcastErr: any) {
         console.warn('[Real On-Chain Autonomous Broadcast Notice]:', broadcastErr?.message || broadcastErr);

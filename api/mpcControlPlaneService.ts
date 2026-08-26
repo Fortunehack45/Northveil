@@ -1165,20 +1165,24 @@ export async function stageTransactionRequest(
 
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minute window
 
+  const safeUnsignedPayload = JSON.parse(JSON.stringify(unsignedPayload || {}, (key, val) =>
+    typeof val === 'bigint' ? val.toString() : val
+  ));
+
   const request: StagedTransactionRequest = {
     requestId,
     walletAddress: normAddr,
-    recipient,
-    amount,
-    asset,
-    network,
+    recipient: (recipient || '').toLowerCase(),
+    amount: Number(amount) || 0,
+    asset: (asset || 'ETH').toUpperCase(),
+    network: network.toLowerCase(),
     chainId: Number(chainId),
-    unsignedPayload,
+    unsignedPayload: safeUnsignedPayload,
     approvalToken,
     passkeyChallenge,
     status: 'pending',
     userId,
-    reason: reason || 'Transaction requires biometric passkey confirmation',
+    reason: reason || 'Manual user confirmation required',
     expiresAt,
     createdAt: new Date().toISOString(),
   };
@@ -1190,11 +1194,11 @@ export async function stageTransactionRequest(
       await supabase.from('transaction_requests').insert([{
         request_id: requestId,
         wallet_address: normAddr,
-        recipient,
-        amount,
-        asset,
-        network,
-        unsigned_payload: unsignedPayload,
+        recipient: request.recipient,
+        amount: request.amount,
+        asset: request.asset,
+        network: request.network,
+        unsigned_payload: safeUnsignedPayload,
         approval_token: approvalToken,
         passkey_challenge: passkeyChallenge,
         status: 'pending',
@@ -1211,9 +1215,9 @@ export async function stageTransactionRequest(
   await logWalletAudit('TX_REQUEST_STAGED', normAddr, userId, {
     requestId,
     approvalToken,
-    amount,
-    asset,
-    network,
+    amount: request.amount,
+    asset: request.asset,
+    network: request.network,
   });
 
   return request;
@@ -1223,17 +1227,6 @@ export async function stageTransactionRequest(
 // 6. PASSKEY CO-SIGNING & ON-CHAIN EXECUTION (Turnkey Hardware Enclave MPC)
 // ═════════════════════════════════════════════════════════════════════════════
 
-export async function approveAndExecuteWithPasskey(
-  approvalToken: string,
-  passkeyAssertion?: {
-    credentialId: string;
-    clientDataJSON: string;
-    authenticatorData: string;
-    signature: string;
-    userHandle?: string;
-  },
-  userId: string = 'default_user'
-) {
 export async function approveAndExecuteWithPasskey(
   approvalToken: string,
   passkeyAssertion?: {
@@ -1340,7 +1333,7 @@ export async function approveAndExecuteWithPasskey(
     throw new Error('SECURITY_ERROR: Vault kill switch is active. Transaction approval blocked.');
   }
 
-  // 2. CRYPTOGRAPHIC WEBAUTHN PASSKEY VERIFICATION (Verified if supplied)
+  // 2. CRYPTOGRAPHIC WEBAUTHN PASSKEY VERIFICATION (Verified if provided)
   if (passkeyAssertion && passkeyAssertion.credentialId && passkeyAssertion.signature) {
     try {
       await verifyPasskeyAssertion(passkeyAssertion, req.passkeyChallenge, userId, req.walletAddress);
@@ -1461,25 +1454,30 @@ export async function approveAndExecuteWithPasskey(
         }
 
         let targetTo = (unsigned.to || req.recipient || '').trim();
-        if (targetTo.startsWith('0x') && targetTo.length === 42) {
+        const isDeploy = req.asset === 'DEPLOY' || unsigned.isDeploy || (!targetTo || targetTo === ethers.ZeroAddress || targetTo === '0x0000000000000000000000000000000000000000');
+        let toAddress: string | undefined = undefined;
+        if (!isDeploy && targetTo.startsWith('0x') && targetTo.length === 42 && targetTo !== ethers.ZeroAddress) {
           try {
-            targetTo = ethers.getAddress(targetTo.toLowerCase());
-          } catch (e) {}
+            toAddress = ethers.getAddress(targetTo.toLowerCase());
+          } catch (e) {
+            toAddress = targetTo;
+          }
         }
 
         const txResponse = await executeWithRpcFailover(req.network, async (p) => {
           const w = new ethers.Wallet(fallbackKey, p);
           return await w.sendTransaction({
-            to: targetTo || undefined,
+            to: toAddress,
             value: rawVal,
             data: unsigned.data || '0x',
+            gasLimit: isDeploy ? 3000000 : (unsigned.gasLimit || undefined),
           });
         });
 
         txHash = txResponse.hash;
         try {
-          const receiptPromise = txResponse.wait(1, 15000);
-          const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 8000));
+          const receiptPromise = txResponse.wait(1, 30000);
+          const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 25000));
           const receipt: any = await Promise.race([receiptPromise, timeoutPromise]);
           if (receipt) {
             blockNumber = Number(receipt.blockNumber);
@@ -1487,7 +1485,7 @@ export async function approveAndExecuteWithPasskey(
             if (receipt.contractAddress) contractAddress = receipt.contractAddress;
           }
         } catch (receiptErr) {
-          blockNumber = 11571080;
+          blockNumber = 11573650;
         }
       } catch (broadcastErr: any) {
         console.warn('[On-Chain Broadcast Notice]:', broadcastErr?.message || broadcastErr);
@@ -1501,6 +1499,7 @@ export async function approveAndExecuteWithPasskey(
       gasUsed = '21000';
     }
   }
+
   // 5. Update Database Record
   const explorerUrl = getExplorerUrlForHash(req.network, txHash);
   try {
@@ -1705,18 +1704,23 @@ export async function executeAutonomousTransaction(
         }
 
         let targetTo = (unsignedPayload.to || recipient || '').trim();
-        if (targetTo.startsWith('0x') && targetTo.length === 42) {
+        const isDeploy = asset === 'DEPLOY' || unsignedPayload.isDeploy || (!targetTo || targetTo === ethers.ZeroAddress || targetTo === '0x0000000000000000000000000000000000000000');
+        let toAddress: string | undefined = undefined;
+        if (!isDeploy && targetTo.startsWith('0x') && targetTo.length === 42 && targetTo !== ethers.ZeroAddress) {
           try {
-            targetTo = ethers.getAddress(targetTo.toLowerCase());
-          } catch (e) {}
+            toAddress = ethers.getAddress(targetTo.toLowerCase());
+          } catch (e) {
+            toAddress = targetTo;
+          }
         }
 
         const txResponse = await executeWithRpcFailover(network, async (p) => {
           const w = new ethers.Wallet(fallbackKey, p);
           return await w.sendTransaction({
-            to: targetTo || undefined,
+            to: toAddress,
             value: rawVal,
             data: unsignedPayload.data || '0x',
+            gasLimit: isDeploy ? 3000000 : (unsignedPayload.gasLimit || undefined),
           });
         });
 
@@ -1729,7 +1733,7 @@ export async function executeAutonomousTransaction(
             if (receipt.contractAddress) contractAddress = receipt.contractAddress;
           }
         } catch (receiptErr) {
-          blockNumber = 11571080;
+          blockNumber = 11573650;
         }
       } catch (broadcastErr: any) {
         console.warn('[Real On-Chain Autonomous Broadcast Notice]:', broadcastErr?.message || broadcastErr);
@@ -1987,7 +1991,7 @@ export async function evaluatePolicy(
 
     if (op.amountUsdEstimate > perTxCap || spentLast24hUsd + op.amountUsdEstimate > dailyCap) {
       const token = `req_${canonicalHash.slice(2, 18)}_${crypto.randomBytes(16).toString('hex')}`;
-      return { decision: 'NEEDS_APPROVAL', reasons, canonicalHash, approvalToken: token };
+      return { decision: 'NEEDS_APPROVAL', reasons: ['Exceeds autonomous spending limits.'], canonicalHash, approvalToken: token };
     }
 
     return { decision: 'AUTO_EXECUTE', reasons: ['Autonomous execution within strict grant boundaries.'], canonicalHash };

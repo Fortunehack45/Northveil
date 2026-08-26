@@ -7639,11 +7639,15 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
       };
     }
 
+    case 'mint_nft':
     case 'mint_tokens': {
       const contractAddress = (args.contractAddress || args.contract || args.tokenAddress || args.token || '').trim();
       const recipientAddress = (args.recipientAddress || args.recipient || args.to || args.toAddress || cleanAddress || '').trim().toLowerCase();
-      const amountStr = String(args.amount || args.tokenAmount || args.value || '0');
+      const amountStr = String(args.amount || args.tokenAmount || args.value || '1');
       const network = (args.network || args.chain || 'sepolia').toLowerCase();
+      const isExplicitNft = name === 'mint_nft' || Boolean(args.isNft || args.uri || args.tokenUri || args.metadataUrl || args.tokenId !== undefined);
+      const metadataUri = args.uri || args.tokenUri || args.metadataUrl || args.image || args.imageUrl || 'https://northveil.xyz/metadata/1.json';
+      const tokenId = args.tokenId !== undefined ? Number(args.tokenId) : undefined;
 
       if (!contractAddress || !contractAddress.startsWith('0x')) {
         throw new Error('Valid contract address (0x...) is required for minting');
@@ -7669,34 +7673,73 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
         chainName = 'BNB Smart Chain'; chainId = 56; explorerBase = 'https://bscscan.com';
       }
 
-      // Query token info via RPC failover
-      const mintInterface = new ethers.Interface([
-        'function mint(address to, uint256 amount) external',
-        'function decimals() view returns (uint8)',
+      // Comprehensive ABI supporting both ERC20 and ERC721 NFT mint functions
+      const tokenAbi = [
         'function name() view returns (string)',
         'function symbol() view returns (string)',
-      ]);
+        'function decimals() view returns (uint8)',
+        'function totalSupply() view returns (uint256)',
+        'function mint(address to, uint256 amount) returns (bool)',
+        'function safeMint(address to, string memory uri) returns (uint256)',
+        'function safeMint(address to) returns (uint256)',
+        'function mint(address to, uint256 tokenId)',
+        'function mint(address to)',
+        'function ownerOf(uint256 tokenId) view returns (address)',
+        'function supportsInterface(bytes4 interfaceId) view returns (bool)',
+      ];
+
+      const tokenInterface = new ethers.Interface(tokenAbi);
 
       let decimals = 18;
-      let tokenName = 'Token';
-      let tokenSymbol = 'TKN';
+      let tokenName = isExplicitNft ? 'NFT Collection' : 'Token';
+      let tokenSymbol = isExplicitNft ? 'NFT' : 'TKN';
+      let isNftContract = isExplicitNft;
 
       try {
-        const prov = network === 'ethereum' ? ethProvider : sepoliaProvider;
-        const c = new ethers.Contract(contractAddress, mintInterface, prov);
-        decimals = Number(await c.decimals().catch(() => 18));
-        tokenName = await c.name().catch(() => 'Token');
-        tokenSymbol = await c.symbol().catch(() => 'TKN');
+        await executeWithRpcFailover(network, async (prov) => {
+          const c = new ethers.Contract(contractAddress, tokenAbi, prov);
+          tokenName = await c.name().catch(() => tokenName);
+          tokenSymbol = await c.symbol().catch(() => tokenSymbol);
+          
+          if (!isExplicitNft) {
+            const is721 = await c.supportsInterface('0x80ac58cd').catch(() => false);
+            if (is721) {
+              isNftContract = true;
+            } else {
+              decimals = Number(await c.decimals().catch(() => 18));
+            }
+          }
+        });
       } catch (e) {}
 
-      const mintAmount = ethers.parseUnits(amountStr, decimals);
-      const callData = mintInterface.encodeFunctionData('mint', [recipientAddress, mintAmount]);
+      let callData = '0x';
+      let formattedAmount = amountStr;
+
+      if (isNftContract) {
+        // Encode ERC-721 NFT Mint calldata
+        try {
+          callData = tokenInterface.encodeFunctionData('safeMint(address,string)', [recipientAddress, metadataUri]);
+        } catch (e) {
+          try {
+            callData = tokenInterface.encodeFunctionData('mint(address,uint256)', [recipientAddress, tokenId !== undefined ? tokenId : 0]);
+          } catch (e2) {
+            callData = tokenInterface.encodeFunctionData('safeMint(address)', [recipientAddress]);
+          }
+        }
+        formattedAmount = '1 NFT';
+      } else {
+        // Encode ERC-20 Token Mint calldata
+        const mintAmount = ethers.parseUnits(amountStr, decimals);
+        callData = tokenInterface.encodeFunctionData('mint(address,uint256)', [recipientAddress, mintAmount]);
+        formattedAmount = `${Number(amountStr).toLocaleString()} ${tokenSymbol}`;
+      }
 
       const unsignedPayload = {
         to: contractAddress,
         data: callData,
         value: '0x0',
         chainId,
+        gasLimit: isNftContract ? 250000 : 150000,
       };
 
       // 1. Evaluate Autonomous Scope
@@ -7707,7 +7750,7 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
           const autoRes = await executeAutonomousTransaction(
             cleanAddress,
             contractAddress,
-            Number(amountStr),
+            isNftContract ? 1 : Number(amountStr),
             tokenSymbol,
             network,
             unsignedPayload,
@@ -7717,15 +7760,15 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
 
           return {
             formattedMarkdown: `
-### ⚡ AUTONOMOUS TOKEN MINT CONFIRMED ON-CHAIN
+### ⚡ AUTONOMOUS ${isNftContract ? 'NFT' : 'TOKEN'} MINT CONFIRMED ON-CHAIN
 
 > **Status**: 🟢 **CONFIRMED ON-CHAIN (Receipt Status: 1)**  
 > **Transaction Hash**: [\`${autoRes.txHash}\`](${autoRes.explorerUrl})  
-> **Token**: **${tokenName}** (\`$${tokenSymbol}\`)  
-> **Amount Minted**: \`${Number(amountStr).toLocaleString()} ${tokenSymbol}\`  
+> **${isNftContract ? 'Collection' : 'Token'}**: **${tokenName}** (\`$${tokenSymbol}\`)  
+> **Amount Minted**: \`${formattedAmount}\`  
 > **Recipient**: \`${recipientAddress}\`  
-> **Contract**: \`${contractAddress}\`  
-> **Network**: \`${chainName}\`  
+> **Contract Address**: \`${contractAddress}\`  
+${isNftContract ? `> **Metadata URI**: \`${metadataUri}\`  \n` : ''}> **Network**: \`${chainName}\`  
 > **Block Number**: \`${autoRes.blockNumber}\`  
 > **Gas Used**: \`${autoRes.gasUsed}\`  
 `,
@@ -7734,6 +7777,8 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
             tokenSymbol,
             recipientAddress,
             contractAddress,
+            isNft: isNftContract,
+            metadataUri: isNftContract ? metadataUri : undefined,
           };
         } catch (autoErr: any) {
           console.warn('[Autonomous Mint Notice]:', autoErr?.message || autoErr);
@@ -7744,23 +7789,23 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
       const stageRes = await stageTransactionRequest(
         cleanAddress,
         contractAddress,
-        Number(amountStr),
+        isNftContract ? 1 : Number(amountStr),
         tokenSymbol,
         network,
         unsignedPayload,
         'default_user',
-        `Mint ${amountStr} ${tokenSymbol} to ${recipientAddress}`
+        `Mint ${formattedAmount} to ${recipientAddress}`
       );
 
       return {
         formattedMarkdown: `
-### 📥 TOKEN MINT STAGED (PASSKEY APPROVAL REQUIRED)
+### 📥 ${isNftContract ? 'NFT' : 'TOKEN'} MINT STAGED (PASSKEY APPROVAL REQUIRED)
 
-> **Token**: **${tokenName}** (\`$${tokenSymbol}\`)  
-> **Amount**: \`${Number(amountStr).toLocaleString()} ${tokenSymbol}\`  
+> **${isNftContract ? 'Collection' : 'Token'}**: **${tokenName}** (\`$${tokenSymbol}\`)  
+> **Amount**: \`${formattedAmount}\`  
 > **Recipient**: \`${recipientAddress}\`  
 > **Contract**: \`${contractAddress}\`  
-> **Network**: \`${chainName}\`  
+${isNftContract ? `> **Metadata URI**: \`${metadataUri}\`  \n` : ''}> **Network**: \`${chainName}\`  
 > **Request ID**: \`${stageRes.requestId}\`  
 > **Approval Token**: \`${stageRes.approvalToken}\`  
 > **Expires At**: \`${stageRes.expiresAt}\`  
@@ -7773,6 +7818,8 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
         tokenSymbol,
         contractAddress,
         recipientAddress,
+        isNft: isNftContract,
+        metadataUri: isNftContract ? metadataUri : undefined,
       };
     }
 
