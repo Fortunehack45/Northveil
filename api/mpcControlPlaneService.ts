@@ -292,7 +292,7 @@ export interface NonCustodialWalletRecord {
   user_id: string;
   chain_id: string;
   name: string;
-  mpc_provider: 'turnkey';
+  mpc_provider: 'turnkey' | 'non-custodial-vault';
   mpc_wallet_id: string;
   mpc_sub_org_id: string;
   key_type: 'ecdsa_secp256k1';
@@ -319,6 +319,7 @@ export interface StagedTransactionRequest {
   txHash?: string;
   blockNumber?: number;
   gasUsed?: string;
+  contractAddress?: string;
   explorerUrl?: string;
 }
 
@@ -338,7 +339,7 @@ export interface AutonomousSpendingScope {
 }
 
 export const inMemoryPasskeyCredentials = new Map<string, PasskeyCredentialRecord>();
-export const inMemoryPasskeyChallenges = new Map<string, { challenge: string; userId: string; exp: number }>();
+export const inMemoryPasskeyChallenges = new Map<string, { challenge: string; userId: string; walletAddress?: string; exp: number }>();
 export const inMemoryTxRequests = new Map<string, StagedTransactionRequest>();
 export const inMemoryMpcWallets = new Map<string, NonCustodialWalletRecord>();
 export const inMemoryAutonomousScopes = new Map<string, AutonomousSpendingScope>();
@@ -1084,6 +1085,7 @@ export async function evaluateAutonomousScope(
       maxAmountPerTxUsd: 10000.0,
       maxDailyBudgetUsd: 50000.0,
       spentLast24hUsd: 0,
+      allowedContracts: [],
       isActive: true,
       expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
       createdAt: new Date().toISOString(),
@@ -1849,4 +1851,182 @@ export async function simulateTransactionTenderly(
       warnings: ['Transaction reverted during on-chain fork simulation.'],
     };
   }
+}
+
+// ═════════════════════════════════════════════════════════════
+// PAYBOX-PARITY POLICY ENGINE & CANONICAL HASH GENERATOR
+// ═════════════════════════════════════════════════════════════
+
+export interface PayboxCanonicalOperation {
+  clientId: string;
+  walletId: string;
+  walletAddress: string;
+  chainId: number;
+  from: string;
+  to: string;
+  value: string;
+  data: string;
+  operationType: string;
+  amountUsdEstimate: number;
+  deadline: number;
+  nonce: number;
+}
+
+export interface PayboxGrant {
+  grantId: string;
+  agentClientId: string;
+  userId: string;
+  allowedOperations: string[];
+  allowedChains: number[];
+  allowedContracts?: string[];
+  allowedSelectors?: string[];
+  allowedDestinations?: string[];
+  allowNewDestinations: boolean;
+  caps: {
+    perTxUsd: number;
+    dailyBudgetUsd: number;
+    weeklyBudgetUsd: number;
+  };
+  approvalMode: 'always_approve' | 'approve_above_limit' | 'autonomous_within_policy';
+  simulationRequired: boolean;
+  denyUnlimitedApprovals: boolean;
+  denySetApprovalForAll: boolean;
+  deployEnabled: boolean;
+  expiresAt: string;
+}
+
+export function computeCanonicalHash(op: PayboxCanonicalOperation): string {
+  const payload = [
+    op.clientId || 'agt_default',
+    op.walletId || 'wal_default',
+    (op.chainId || 8453).toString(),
+    (op.from || '').toLowerCase(),
+    (op.to || '').toLowerCase(),
+    op.value || '0',
+    (op.data || '0x').toLowerCase(),
+    op.operationType || 'transfer',
+    (op.deadline || 0).toString(),
+    (op.nonce || 0).toString(),
+  ].join('|');
+
+  return '0x' + crypto.createHash('sha256').update(payload).digest('hex');
+}
+
+export async function evaluatePolicy(
+  grant: PayboxGrant,
+  op: PayboxCanonicalOperation,
+  sim: { success: boolean; revertReason?: string; warnings: string[] },
+  spentLast24hUsd: number = 0,
+  isKnownDestination: boolean = false
+): Promise<{ decision: 'DENY' | 'AUTO_EXECUTE' | 'NEEDS_APPROVAL'; reasons: string[]; canonicalHash: string; approvalToken?: string }> {
+  const canonicalHash = computeCanonicalHash(op);
+  const reasons: string[] = [];
+
+  if (grant.expiresAt && new Date(grant.expiresAt).getTime() <= Date.now()) {
+    return { decision: 'DENY', reasons: ['POLICY_DENIED: Agent grant has expired.'], canonicalHash };
+  }
+
+  if (grant.allowedOperations && grant.allowedOperations.length > 0 && !grant.allowedOperations.includes(op.operationType)) {
+    return { decision: 'DENY', reasons: [`POLICY_DENIED: Operation '${op.operationType}' is not permitted.`], canonicalHash };
+  }
+
+  if (grant.allowedChains && grant.allowedChains.length > 0 && !grant.allowedChains.includes(op.chainId)) {
+    return { decision: 'DENY', reasons: [`POLICY_DENIED: Chain ID ${op.chainId} is not permitted.`], canonicalHash };
+  }
+
+  if (grant.simulationRequired && !sim.success) {
+    return { decision: 'DENY', reasons: [`SIMULATION_REVERTED: Transaction simulation failed: ${sim.revertReason || 'Reverted'}`], canonicalHash };
+  }
+
+  const isDeploy = op.operationType === 'deploy';
+  const isUnseenDestination = !isKnownDestination && !grant.allowNewDestinations;
+  const isUnlimitedApproval = grant.denyUnlimitedApprovals && op.data.startsWith('0x095ea7b3') && op.data.includes('ffffffffffffffff');
+  const isSetApprovalForAll = grant.denySetApprovalForAll && op.data.startsWith('0xa22c1134');
+
+  if (isDeploy) reasons.push('HARD_GATE: Contract deployment always requires human passkey approval.');
+  if (isUnseenDestination) reasons.push('HARD_GATE: First transfer to a new destination requires human approval.');
+  if (isUnlimitedApproval) reasons.push('HARD_GATE: Unlimited ERC-20 token allowances are blocked from autonomous execution.');
+  if (isSetApprovalForAll) reasons.push('HARD_GATE: setApprovalForAll calls require human verification.');
+
+  if (isDeploy || isUnseenDestination || isUnlimitedApproval || isSetApprovalForAll) {
+    const token = `req_${canonicalHash.slice(2, 18)}_${crypto.randomBytes(16).toString('hex')}`;
+    return { decision: 'NEEDS_APPROVAL', reasons, canonicalHash, approvalToken: token };
+  }
+
+  if (grant.approvalMode === 'always_approve') {
+    reasons.push('POLICY_MODE: Default Always Approve mode is active.');
+    const token = `req_${canonicalHash.slice(2, 18)}_${crypto.randomBytes(16).toString('hex')}`;
+    return { decision: 'NEEDS_APPROVAL', reasons, canonicalHash, approvalToken: token };
+  }
+
+  if (grant.approvalMode === 'approve_above_limit') {
+    const perTxCap = grant.caps?.perTxUsd || 25.0;
+    const dailyCap = grant.caps?.dailyBudgetUsd || 100.0;
+
+    if (op.amountUsdEstimate > perTxCap) {
+      reasons.push(`CAP_EXCEEDED: Requested $${op.amountUsdEstimate.toFixed(2)} exceeds per-tx limit of $${perTxCap.toFixed(2)}.`);
+      const token = `req_${canonicalHash.slice(2, 18)}_${crypto.randomBytes(16).toString('hex')}`;
+      return { decision: 'NEEDS_APPROVAL', reasons, canonicalHash, approvalToken: token };
+    }
+
+    if (spentLast24hUsd + op.amountUsdEstimate > dailyCap) {
+      reasons.push(`DAILY_BUDGET_EXCEEDED: Exceeds 24h budget ($${spentLast24hUsd.toFixed(2)} / $${dailyCap.toFixed(2)}).`);
+      const token = `req_${canonicalHash.slice(2, 18)}_${crypto.randomBytes(16).toString('hex')}`;
+      return { decision: 'NEEDS_APPROVAL', reasons, canonicalHash, approvalToken: token };
+    }
+
+    return { decision: 'AUTO_EXECUTE', reasons: ['In-scope small transaction under cap to known destination.'], canonicalHash };
+  }
+
+  if (grant.approvalMode === 'autonomous_within_policy') {
+    const perTxCap = grant.caps?.perTxUsd || 50.0;
+    const dailyCap = grant.caps?.dailyBudgetUsd || 250.0;
+
+    if (op.amountUsdEstimate > perTxCap || spentLast24hUsd + op.amountUsdEstimate > dailyCap) {
+      const token = `req_${canonicalHash.slice(2, 18)}_${crypto.randomBytes(16).toString('hex')}`;
+      return { decision: 'NEEDS_APPROVAL', reasons, canonicalHash, approvalToken: token };
+    }
+
+    return { decision: 'AUTO_EXECUTE', reasons: ['Autonomous execution within strict grant boundaries.'], canonicalHash };
+  }
+
+  return { decision: 'DENY', reasons: ['Unknown policy condition.'], canonicalHash };
+}
+
+export function formatHumanPreview(params: {
+  decision: 'deny' | 'auto_execute' | 'needs_approval';
+  agentClient: string;
+  wallet: { id: string; address: string; chain: string };
+  action: string;
+  to: string;
+  contract?: string | null;
+  functionName?: string;
+  decodedCalldata?: any;
+  amounts: { native: string; token: string; usd: string };
+  gas: { estimatedUnits: number; maxFeeGwei: string; estimatedCostUsd: string };
+  simulation: { ok: boolean; warnings: string[] };
+  policy: { mode: string; reasons: string[] };
+  approval?: { id: string; tokenHint: string; expiresAt: string } | null;
+  result?: { signature?: string; txHash?: string; blockNumber?: number; gasUsed?: string; explorerUrl?: string } | null;
+}) {
+  return {
+    decision: params.decision,
+    agent_client: params.agentClient,
+    wallet: params.wallet,
+    action: params.action,
+    to: params.to,
+    contract: params.contract || null,
+    function: params.functionName || 'transfer',
+    decoded_calldata: params.decodedCalldata || {},
+    amounts: params.amounts,
+    gas: {
+      estimated_units: params.gas.estimatedUnits,
+      max_fee_gwei: params.gas.maxFeeGwei,
+      estimated_cost_usd: params.gas.estimatedCostUsd,
+    },
+    simulation: params.simulation,
+    policy: params.policy,
+    approval: params.approval || null,
+    result: params.result || null,
+  };
 }
