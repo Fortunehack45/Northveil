@@ -19,7 +19,10 @@ data class TokenHolding(
     val change24h: Double,
     val iconUrl: String,
     val contractAddress: String? = null
-)
+) {
+    val network: String
+        get() = chain
+}
 
 data class TransactionRecord(
     val id: String,

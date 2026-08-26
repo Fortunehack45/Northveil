@@ -596,7 +596,7 @@ fun TokenHoldingRow(
                                 .padding(horizontal = 5.dp, vertical = 1.dp)
                         ) {
                             Text(
-                                text = token.network.uppercase(),
+                                text = token.chain.uppercase(),
                                 color = colorScheme.onSurfaceVariant,
                                 fontSize = 8.sp,
                                 fontFamily = FontFamily.Monospace,
