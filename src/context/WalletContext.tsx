@@ -36,8 +36,9 @@ import { SwapService } from '../services/SwapService';
 import { IndexerService } from '../services/IndexerService';
 import { VaultService } from '../services/VaultService';
 import { SupabaseService } from '../services/SupabaseService';
+import { WebAuthnService } from '../services/WebAuthnService';
 import { ethers } from 'ethers';
-import { Fingerprint } from 'lucide-react';
+import { Fingerprint, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 
 const DEFAULT_SUB_WALLETS: SubWalletAccount[] = [
   {
@@ -1954,7 +1955,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               {/* Badge Tag */}
               <div className="flex justify-center">
                 <span className="px-2.5 py-0.5 bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white font-mono text-xs font-medium rounded-full">
-                  WEBAUTHN SECURITY
+                  WEBAUTHN BIOMETRICS
                 </span>
               </div>
 
@@ -1965,10 +1966,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
               <div className="space-y-1.5">
                 <h3 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">
-                  Biometric Authorization
+                  Biometric Passkey Authorization
                 </h3>
                 <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed bg-black/[0.03] dark:bg-black/40 p-3 rounded-2xl border border-black/[0.04] dark:border-white/[0.04]">
-                  {biometricPromptReason || 'Touch sensor or Face ID authorization for encrypted vault access.'}
+                  {biometricPromptReason || 'Hardware Touch ID, Face ID, or Windows Hello passkey authorization for non-custodial vault access.'}
                 </p>
               </div>
 
@@ -1976,22 +1977,24 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 <button
                   type="button"
                   onClick={async () => {
+                    const currentAddress = activeSubWallet?.address || 'default-user';
                     try {
-                      if (typeof window !== 'undefined' && window.PublicKeyCredential) {
-                        const challenge = new Uint8Array(32);
-                        window.crypto.getRandomValues(challenge);
-
-                        // Trigger OS-native Face ID / Touch ID / Windows Hello WebAuthn Hardware Prompt
-                        await navigator.credentials.get({
-                          publicKey: {
-                            challenge,
-                            rpId: window.location.hostname || 'localhost',
-                            userVerification: 'preferred',
-                            timeout: 60000,
-                          },
-                        }).catch((e) => {
-                          console.warn('[WebAuthn Biometric Prompt Noticed]:', e);
-                        });
+                      if (WebAuthnService.isSupported()) {
+                        const existingPasskey = WebAuthnService.getRegisteredPasskey(currentAddress);
+                        if (existingPasskey) {
+                          const authRes = await WebAuthnService.authenticate(currentAddress);
+                          if (!authRes.success && authRes.error?.includes('cancelled')) {
+                            console.warn('[WebAuthn Notice]:', authRes.error);
+                            return;
+                          }
+                        } else {
+                          // Perform first-time hardware passkey registration
+                          const regRes = await WebAuthnService.registerPasskey(currentAddress, activeSubWallet?.name);
+                          if (!regRes.success && regRes.error?.includes('cancelled')) {
+                            console.warn('[WebAuthn Notice]:', regRes.error);
+                            return;
+                          }
+                        }
                       }
                     } catch (e) {
                       console.error('Biometric WebAuthn error:', e);
@@ -2006,11 +2009,18 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                   className="w-full py-3.5 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 active:scale-[0.98] transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Fingerprint className="w-4 h-4 stroke-[2]" />
-                  <span>Scan Biometrics</span>
+                  <span>
+                    {WebAuthnService.getRegisteredPasskey(activeSubWallet?.address)
+                      ? 'Verify Biometrics'
+                      : 'Scan Touch / Face ID'}
+                  </span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsBiometricModalOpen(false)}
+                  onClick={() => {
+                    setIsBiometricModalOpen(false);
+                    setPendingBiometricSuccess(null);
+                  }}
                   className="w-full py-2.5 bg-black/[0.04] dark:bg-white/[0.04] text-zinc-700 dark:text-zinc-300 font-medium text-xs rounded-full hover:bg-black/[0.08] dark:hover:bg-white/[0.08] cursor-pointer transition-all"
                 >
                   Cancel

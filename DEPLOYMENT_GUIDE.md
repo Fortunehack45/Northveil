@@ -207,30 +207,66 @@ Northveil dispatches automated webhooks whenever fund transfers, swaps, or smart
 
 ---
 
-## 🤖 STEP 5: Connecting AI Agents (Claude, Cursor, Devin)
+## 🤖 STEP 5: Connecting AI Agents (Claude, Cursor, Windsurf, Claude Code, Devin)
 
-Once deployed, connect your live Vercel URL to your AI tools:
+Once deployed, connect your MCP server to your AI tools and IDEs:
 
 ### A. Claude Desktop Integration (`claude_desktop_config.json`)
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
 ```json
 {
   "mcpServers": {
     "northveil": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-fetch",
-        "https://northveil-app.vercel.app/mcp"
-      ]
+      "args": ["-y", "northveil-cli", "mcp"],
+      "env": {
+        "NORTHVEIL_WALLET_ADDRESS": "0x1111111111111111111111111111111111111111",
+        "NORTHVEIL_API_URL": "https://mcp.northveil.xyz"
+      }
     }
   }
 }
 ```
 
-### B. Cursor / Windsurf / Devin (SSE Connection)
+### B. Cursor IDE (`.cursor/mcp.json` or Settings -> MCP)
+```json
+{
+  "mcpServers": {
+    "northveil": {
+      "command": "npx",
+      "args": ["-y", "northveil-cli", "mcp"],
+      "env": {
+        "NORTHVEIL_WALLET_ADDRESS": "0x1111111111111111111111111111111111111111"
+      }
+    }
+  }
+}
+```
+
+### C. Windsurf Editor (`~/.codeium/windsurf/mcp_config.json`)
+```json
+{
+  "mcpServers": {
+    "northveil": {
+      "command": "npx",
+      "args": ["-y", "northveil-cli", "mcp"]
+    }
+  }
+}
+```
+
+### D. Claude Code CLI
+```bash
+claude mcp add northveil npx -y northveil-cli mcp
+```
+
+### E. Remote Server-Sent Events (SSE) Transport
 - **Transport**: `SSE`
-- **URL**: `https://northveil-app.vercel.app/sse`
-- **Headers**: `X-API-Key: YOUR_API_KEY`
+- **URL**: `https://mcp.northveil.xyz/sse?wallet_address=0x1111111111111111111111111111111111111111`
+- **Headers**: `Authorization: Bearer YOUR_API_KEY`
 
 ---
 

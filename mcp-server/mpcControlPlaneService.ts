@@ -85,13 +85,33 @@ export function getTurnkeyClient(): TurnkeyClient {
 // ═════════════════════════════════════════════════════════════════════════════
 export const WEBAUTHN_RP_ID = process.env.WEBAUTHN_RP_ID || 'northveil.xyz';
 export const WEBAUTHN_RP_NAME = 'Northveil Autonomous Non-Custodial Vault';
-export const WEBAUTHN_EXPECTED_ORIGIN = [
+export const WEBAUTHN_PERMITTED_RP_IDS: string[] = [
+  process.env.WEBAUTHN_RP_ID || 'northveil.xyz',
+  'northveil.xyz',
+  'mcp.northveil.xyz',
+  'localhost',
+  '127.0.0.1',
+  'northveil.vercel.app',
+  'northveil-app.vercel.app',
+  'northveil-docs.vercel.app',
+];
+export const WEBAUTHN_EXPECTED_ORIGIN: string[] = [
   process.env.WEBAUTHN_ORIGIN || 'https://northveil.xyz',
+  'https://northveil.xyz',
   'https://mcp.northveil.xyz',
+  'https://northveil.vercel.app',
+  'https://northveil-app.vercel.app',
+  'https://northveil-docs.vercel.app',
   'http://localhost:3000',
   'http://localhost:3001',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:4173',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://127.0.0.1:4173',
 ];
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -516,7 +536,7 @@ export async function verifyAndStorePasskeyRegistration(
     response: registrationResponse,
     expectedChallenge: challengeRecord.challenge,
     expectedOrigin: WEBAUTHN_EXPECTED_ORIGIN,
-    expectedRPID: WEBAUTHN_RP_ID,
+    expectedRPID: WEBAUTHN_PERMITTED_RP_IDS,
     requireUserVerification: true,
   });
 
@@ -651,7 +671,7 @@ export async function verifyPasskeyAssertion(
       response: authResponse,
       expectedChallenge,
       expectedOrigin: WEBAUTHN_EXPECTED_ORIGIN,
-      expectedRPID: WEBAUTHN_RP_ID,
+      expectedRPID: WEBAUTHN_PERMITTED_RP_IDS,
       credential: {
         id: credentialRecord.credentialId,
         publicKey: credentialPublicKey,

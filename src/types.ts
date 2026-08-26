@@ -147,6 +147,8 @@ export interface SubWalletAccount {
   privateKey?: string;
   solanaAddress?: string;
   solanaDerivationPath?: string;
+  bitcoinAddress?: string;
+  bitcoinDerivationPath?: string;
   colorTag: string;
   isDefault?: boolean;
   createdAt: string;

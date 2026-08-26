@@ -2,6 +2,7 @@ package xyz.northveil.mobile.ui.agents
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -22,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import xyz.northveil.mobile.core.designsystem.theme.*
 import xyz.northveil.mobile.domain.model.McpAgent
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AgentsScreen(
     viewModel: AgentsViewModel,
@@ -31,6 +35,9 @@ fun AgentsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val colorScheme = MaterialTheme.colorScheme
+    val clipboardManager = LocalClipboardManager.current
+    var selectedModalAgentType by remember { mutableStateOf<String?>(null) }
+    var copiedConfig by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
@@ -81,94 +88,28 @@ fun AgentsScreen(
                 }
 
                 Text(
-                    text = "Connected AI Agents",
+                    text = "AI Agent Gateways",
                     color = colorScheme.onBackground,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Manage Claude Desktop, Cursor, ChatGPT Actions, and autonomous spending scopes.",
+                    text = "Grant controlled, non-custodial MCP tool execution permissions to autonomous AI agents with biometric authorization.",
                     color = colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp
                 )
             }
         }
 
-        // Emergency Kill Switch Banner Card (Web Parity)
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(colorScheme.surface)
-                    .border(1.dp, colorScheme.outline, RoundedCornerShape(20.dp))
-                    .padding(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(StatusAmberBg),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Shield,
-                                contentDescription = null,
-                                tint = StatusAmber,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "Autonomous Policy",
-                                color = colorScheme.onSurface,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Daily Budget: $100.00 | Max Tx: $25.00",
-                                color = colorScheme.onSurfaceVariant,
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(colorScheme.surfaceVariant)
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "ENFORCED",
-                            color = colorScheme.onSurface,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-            }
-        }
-
-        // Quick Connect Buttons
+        // Quick Connect Buttons (Opens Interactive Guide Modal)
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
-                    onClick = onConnectClaude,
+                    onClick = { selectedModalAgentType = "claude" },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = colorScheme.onBackground,
                         contentColor = colorScheme.background
@@ -183,7 +124,7 @@ fun AgentsScreen(
                 }
 
                 Button(
-                    onClick = onConnectChatGPT,
+                    onClick = { selectedModalAgentType = "chatgpt" },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = colorScheme.surface,
                         contentColor = colorScheme.onSurface
@@ -201,7 +142,7 @@ fun AgentsScreen(
                 }
 
                 Button(
-                    onClick = onConnectCustom,
+                    onClick = { selectedModalAgentType = "custom" },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = colorScheme.surface,
                         contentColor = colorScheme.onSurface
@@ -216,6 +157,39 @@ fun AgentsScreen(
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Custom", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
+            }
+        }
+
+        // How MCP Works Infobox
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(colorScheme.surface)
+                    .border(1.dp, colorScheme.outline, RoundedCornerShape(16.dp))
+                    .padding(14.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(text = "🛡️", fontSize = 14.sp)
+                        Text(
+                            text = "Non-Custodial MCP Execution",
+                            color = colorScheme.onSurface,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        text = "1. AI reads on-chain portfolio via MCP stdio/SSE stream.\n2. When requesting a swap or transfer, a pending ticket is created.\n3. You confirm with your mobile biometric passkey to sign in Turnkey TEE.",
+                        color = colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp
+                    )
                 }
             }
         }
@@ -237,6 +211,142 @@ fun AgentsScreen(
                 agent = agent,
                 onRevoke = { viewModel.revokeAgentSession(agent.id) }
             )
+        }
+    }
+
+    // Connect Agent Bottom Sheet Dialog
+    selectedModalAgentType?.let { type ->
+        val agentName = when (type) {
+            "claude" -> "Claude Desktop Agent"
+            "chatgpt" -> "ChatGPT Custom Action"
+            else -> "Custom MCP Agent"
+        }
+        val configSnippet = when (type) {
+            "claude" -> """
+{
+  "mcpServers": {
+    "northveil": {
+      "command": "npx",
+      "args": ["-y", "northveil-cli", "mcp"],
+      "env": {
+        "NORTHVEIL_API_URL": "https://mcp.northveil.xyz"
+      }
+    }
+  }
+}
+            """.trimIndent()
+            "chatgpt" -> "OpenAPI SSE Endpoint: https://mcp.northveil.xyz/sse"
+            else -> "Endpoint: https://mcp.northveil.xyz/sse"
+        }
+
+        ModalBottomSheet(
+            onDismissRequest = { selectedModalAgentType = null },
+            containerColor = colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Connect $agentName",
+                            color = colorScheme.onSurface,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Model Context Protocol Configuration",
+                            color = colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    }
+                    IconButton(onClick = { selectedModalAgentType = null }) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                Text(
+                    text = "Add this snippet to your Claude Desktop config (claude_desktop_config.json) or Cursor IDE (.cursor/mcp.json):",
+                    color = colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(colorScheme.surfaceVariant)
+                        .padding(12.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "CONFIGURATION SNIPPET",
+                                color = colorScheme.onSurfaceVariant,
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                            IconButton(
+                                onClick = {
+                                    clipboardManager.setText(AnnotatedString(configSnippet))
+                                    copiedConfig = true
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (copiedConfig) Icons.Default.Check else Icons.Default.ContentCopy,
+                                    contentDescription = "Copy",
+                                    tint = if (copiedConfig) StatusGreen else colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            text = configSnippet,
+                            color = colorScheme.onSurface,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        when (type) {
+                            "claude" -> viewModel.connectAgent("Claude Desktop", "claude", 500.0, 60)
+                            "chatgpt" -> viewModel.connectAgent("ChatGPT Action", "chatgpt", 250.0, 30)
+                            else -> viewModel.connectAgent("Custom Agent", "custom", 100.0, 15)
+                        }
+                        selectedModalAgentType = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorScheme.onBackground,
+                        contentColor = colorScheme.background
+                    ),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 12.dp)
+                ) {
+                    Text("Authorize & Activate Agent Gateway", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
     }
 }

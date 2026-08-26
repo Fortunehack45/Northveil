@@ -39,6 +39,7 @@ export const AgentsView: React.FC = () => {
   const [customAgentName, setCustomAgentName] = useState('');
   const [copiedConfig, setCopiedConfig] = useState(false);
   const [copiedSse, setCopiedSse] = useState(false);
+  const [mcpClientTab, setMcpClientTab] = useState<'claude' | 'cursor' | 'windsurf' | 'claudecode' | 'sse'>('claude');
   const [mcpOnline, setMcpOnline] = useState(true);
 
   const isLocalhost =
@@ -46,7 +47,8 @@ export const AgentsView: React.FC = () => {
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
   const baseMcpUrl = isLocalhost ? 'http://localhost:3001' : 'https://mcp.northveil.xyz';
-  const generatedSseUrl = `${baseMcpUrl}/sse?wallet_address=${selectedWalletAddr || activeSubWallet?.address}`;
+  const targetWallet = selectedWalletAddr || activeSubWallet?.address || '0x0000000000000000000000000000000000000000';
+  const generatedSseUrl = `${baseMcpUrl}/sse?wallet_address=${targetWallet}`;
 
   // Live MCP Health Check
   useEffect(() => {
@@ -63,28 +65,103 @@ export const AgentsView: React.FC = () => {
     return () => clearInterval(interval);
   }, [baseMcpUrl]);
 
-  const claudeDesktopConfigJson = JSON.stringify(
-    {
-      mcpServers: {
-        northveil: {
-          command: 'node',
-          args: ['C:/Users/USER PC/Desktop/Northveil/mcp-server/dist/index.js'],
-          env: {
-            WALLET_ADDRESS: selectedWalletAddr || activeSubWallet?.address,
-            PORT: '3001',
+  const getClientConfigSnippet = (client: 'claude' | 'cursor' | 'windsurf' | 'claudecode' | 'sse') => {
+    switch (client) {
+      case 'claude':
+        return JSON.stringify(
+          {
+            mcpServers: {
+              northveil: {
+                command: 'npx',
+                args: ['-y', 'northveil-cli', 'mcp'],
+                env: {
+                  NORTHVEIL_WALLET_ADDRESS: targetWallet,
+                  NORTHVEIL_API_URL: baseMcpUrl,
+                },
+              },
+            },
           },
-        },
-      },
-    },
-    null,
-    2
-  );
+          null,
+          2
+        );
+      case 'cursor':
+        return JSON.stringify(
+          {
+            mcpServers: {
+              northveil: {
+                command: 'npx',
+                args: ['-y', 'northveil-cli', 'mcp'],
+                env: {
+                  NORTHVEIL_WALLET_ADDRESS: targetWallet,
+                  NORTHVEIL_API_URL: baseMcpUrl,
+                },
+              },
+            },
+          },
+          null,
+          2
+        );
+      case 'windsurf':
+        return JSON.stringify(
+          {
+            mcpServers: {
+              northveil: {
+                command: 'npx',
+                args: ['-y', 'northveil-cli', 'mcp'],
+                env: {
+                  NORTHVEIL_WALLET_ADDRESS: targetWallet,
+                  NORTHVEIL_API_URL: baseMcpUrl,
+                },
+              },
+            },
+          },
+          null,
+          2
+        );
+      case 'claudecode':
+        return `claude mcp add northveil npx -y northveil-cli mcp`;
+      case 'sse':
+        return JSON.stringify(
+          {
+            mcpServers: {
+              northveil: {
+                url: generatedSseUrl,
+              },
+            },
+          },
+          null,
+          2
+        );
+      default:
+        return '';
+    }
+  };
+
+  const getClientFilePath = (client: 'claude' | 'cursor' | 'windsurf' | 'claudecode' | 'sse') => {
+    switch (client) {
+      case 'claude':
+        return 'macOS: ~/Library/Application Support/Claude/claude_desktop_config.json | Windows: %APPDATA%\\Claude\\claude_desktop_config.json';
+      case 'cursor':
+        return 'Project Root: .cursor/mcp.json or Settings -> Features -> MCP';
+      case 'windsurf':
+        return 'Global: ~/.codeium/windsurf/mcp_config.json';
+      case 'claudecode':
+        return 'Terminal CLI command';
+      case 'sse':
+        return 'Remote SSE Transport Endpoint URL';
+      default:
+        return '';
+    }
+  };
+
+  const claudeDesktopConfigJson = getClientConfigSnippet(mcpClientTab);
 
   const handleOpenConnect = (type: 'claude' | 'chatgpt' | 'custom') => {
     setConnectType(type);
     setSelectedWalletAddr(activeSubWallet?.address || subWallets[0]?.address || '');
     setSelectedDuration('7d');
     setCustomAgentName('');
+    setMcpClientTab(type === 'claude' ? 'claude' : 'sse');
     setShowConnectModal(true);
   };
 
@@ -404,60 +481,85 @@ export const AgentsView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Step 3: SSE Endpoint URL */}
+                {/* Step 3: MCP Client Configuration Guide */}
                 <div>
-                  <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
-                    3. SSE Stream Endpoint URL
-                  </label>
-                  <div className="p-3 bg-black/[0.03] dark:bg-black border border-black/[0.06] dark:border-white/[0.08] rounded-2xl flex items-center justify-between gap-2">
-                    <span className="font-mono text-xs text-zinc-800 dark:text-zinc-200 truncate">
-                      {generatedSseUrl}
-                    </span>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(generatedSseUrl);
-                        setCopiedSse(true);
-                        setTimeout(() => setCopiedSse(false), 2000);
-                      }}
-                      className="p-1.5 rounded-xl bg-black/[0.06] dark:bg-white/[0.06] hover:bg-black/[0.12] dark:hover:bg-white/[0.12] text-zinc-900 dark:text-white transition-colors cursor-pointer shrink-0"
-                      title="Copy SSE URL"
-                    >
-                      {copiedSse ? <Check className="w-4 h-4 text-zinc-900 dark:text-white" /> : <Copy className="w-4 h-4" />}
-                    </button>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      3. Select AI Client / IDE Configuration
+                    </label>
                   </div>
-                </div>
+                  
+                  {/* Client Tabs */}
+                  <div className="mono-segmented-container w-full flex bg-black/[0.04] dark:bg-black p-1 rounded-xl border border-black/[0.06] dark:border-white/[0.08] mb-2.5">
+                    {[
+                      { id: 'claude', label: 'Claude Desktop' },
+                      { id: 'cursor', label: 'Cursor' },
+                      { id: 'windsurf', label: 'Windsurf' },
+                      { id: 'claudecode', label: 'Claude Code' },
+                      { id: 'sse', label: 'Remote SSE' },
+                    ].map((client) => (
+                      <button
+                        key={client.id}
+                        type="button"
+                        onClick={() => setMcpClientTab(client.id as any)}
+                        className={`flex-1 py-1 text-[11px] font-medium rounded-lg transition-all cursor-pointer ${
+                          mcpClientTab === client.id
+                            ? 'bg-black text-white dark:bg-white dark:text-black font-semibold shadow-sm'
+                            : 'text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white'
+                        }`}
+                      >
+                        {client.label}
+                      </button>
+                    ))}
+                  </div>
 
-                {/* Step 4: Configuration Snippet */}
-                <div>
-                  <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
-                    4. Configuration File Snippet
-                  </label>
+                  {/* Config File Location Hint */}
+                  <div className="p-2.5 bg-black/[0.02] dark:bg-black/50 border border-black/[0.04] dark:border-white/[0.04] rounded-xl text-[10px] text-zinc-500 dark:text-zinc-400 font-mono mb-2">
+                    📁 <span className="text-zinc-700 dark:text-zinc-300 font-semibold">Config Location:</span> {getClientFilePath(mcpClientTab)}
+                  </div>
+
+                  {/* Code Snippet Box */}
                   <div className="relative">
-                    <pre className="p-3.5 bg-black/[0.03] dark:bg-black border border-black/[0.06] dark:border-white/[0.08] rounded-2xl font-mono text-[11px] text-zinc-800 dark:text-zinc-200 overflow-x-auto max-h-36 leading-relaxed">
-                      {connectType === 'claude'
-                        ? claudeDesktopConfigJson
-                        : `OpenAPI Endpoint: ${baseMcpUrl}/openapi.json\nAuthorization: Bearer <API_KEY>`}
+                    <pre className="p-3.5 bg-black/[0.03] dark:bg-black border border-black/[0.06] dark:border-white/[0.08] rounded-2xl font-mono text-[11px] text-zinc-800 dark:text-zinc-200 overflow-x-auto max-h-40 leading-relaxed">
+                      {claudeDesktopConfigJson}
                     </pre>
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText(
-                          connectType === 'claude'
-                            ? claudeDesktopConfigJson
-                            : `${baseMcpUrl}/openapi.json`
-                        );
+                        navigator.clipboard.writeText(claudeDesktopConfigJson);
                         setCopiedConfig(true);
                         setTimeout(() => setCopiedConfig(false), 2000);
                       }}
-                      className="absolute top-2.5 right-2.5 p-1.5 rounded-lg bg-black/[0.06] dark:bg-white/[0.08] hover:bg-black/[0.12] dark:hover:bg-white/[0.16] text-zinc-900 dark:text-white transition-colors cursor-pointer"
-                      title="Copy Snippet"
+                      className="absolute top-2.5 right-2.5 p-1.5 rounded-lg bg-black/[0.06] dark:bg-white/[0.08] hover:bg-black/[0.12] dark:hover:bg-white/[0.16] text-zinc-900 dark:text-white transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-medium"
+                      title="Copy Configuration"
                     >
-                      {copiedConfig ? <Check className="w-3.5 h-3.5 text-zinc-900 dark:text-white" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedConfig ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-zinc-900 dark:text-white" />
+                          <span>Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
 
+                {/* Step 4: Non-Custodial Security & Approval Flow Guide */}
+                <div className="p-3.5 bg-black/[0.02] dark:bg-black/40 border border-black/[0.06] dark:border-white/[0.06] rounded-2xl space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-white">
+                    <span>🛡️</span>
+                    <span>Hardware Non-Custodial MPC Security</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                    AI agents connect with read-only query capabilities by default. Whenever an agent requests a write action (transfers, DEX swaps, contract deployments), a cryptographic approval ticket is routed to your web dashboard and mobile wallet for biometric authorization.
+                  </p>
+                </div>
+
                 {/* Action Buttons */}
-                <div className="flex gap-3 pt-3 pb-1">
+                <div className="flex gap-3 pt-2 pb-1">
                   <button
                     type="button"
                     onClick={() => setShowConnectModal(false)}
@@ -470,7 +572,7 @@ export const AgentsView: React.FC = () => {
                     onClick={handleSaveConnection}
                     className="flex-1 py-2.5 rounded-full bg-black text-white dark:bg-white dark:text-black hover:opacity-85 text-xs font-semibold transition-colors cursor-pointer shadow-sm"
                   >
-                    Register Agent
+                    Save & Activate Connection
                   </button>
                 </div>
               </div>
