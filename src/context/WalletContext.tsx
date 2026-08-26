@@ -37,6 +37,7 @@ import { IndexerService } from '../services/IndexerService';
 import { VaultService } from '../services/VaultService';
 import { SupabaseService } from '../services/SupabaseService';
 import { WebAuthnService } from '../services/WebAuthnService';
+import { MpcWalletService } from '../services/MpcWalletService';
 import { ethers } from 'ethers';
 import { Fingerprint, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 
@@ -163,8 +164,12 @@ interface WalletContextType {
   restoreWalletFromSeed: (words: string[], name?: string) => boolean;
   restoreWalletFromPrivateKey: (privateKey: string, name?: string, chain?: string) => boolean;
   unlockVault: (password: string) => Promise<boolean>;
+  unlockWalletWithBiometrics: () => Promise<boolean>;
+  lockWallet: () => void;
   setupVault: (passwordOrSeed: any, passwordArgOrSeed?: any, walletName?: string) => Promise<boolean> | boolean;
+  setupMpcVault: (walletName: string, address: string, mpcWalletId: string, userId: string, sessionToken: string) => Promise<boolean>;
   isVaultConfigured: boolean;
+  vaultType: 'mpc' | 'imported';
   addCustomToken: (token: CryptoAsset) => void;
   refreshBalances: () => Promise<void>;
   logOut: () => void;
@@ -218,8 +223,16 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setCustomNetworks((prev) => [...prev, network]);
   };
 
+  const [vaultType, setVaultType] = useState<'mpc' | 'imported'>(() => {
+    return MpcWalletService.getVaultType();
+  });
+
   const [isVaultConfigured, setIsVaultConfigured] = useState<boolean>(() => {
-    return !!localStorage.getItem('northveil_v3_encrypted_vault');
+    return (
+      !!localStorage.getItem('northveil_v3_mpc_vault') ||
+      !!localStorage.getItem('northveil_v3_encrypted_vault') ||
+      VaultService.hasVault()
+    );
   });
 
   const [isLocked, setIsLocked] = useState<boolean>(false);
@@ -447,6 +460,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const getDecryptedPrivateKey = async (walletId: string, password?: string): Promise<string | null> => {
     const targetWallet = subWallets.find(w => w.id === walletId);
     if (!targetWallet) return null;
+    if (targetWallet.derivationPath?.includes('turnkey')) return null;
 
     // 1. If seed phrase is already decrypted in session, derive directly
     if (seedPhrase && seedPhrase.length >= 12) {
@@ -669,14 +683,129 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Auto-initialize vault state on mount
   useEffect(() => {
-    if (VaultService.hasVault()) {
+    const hasMpcStorage = !!localStorage.getItem('northveil_v3_mpc_vault');
+    const hasMpcSession = !!MpcWalletService.getSessionToken();
+    const hasLocalVault = VaultService.hasVault();
+
+    if (hasMpcStorage) {
       setIsVaultConfigured(true);
+      setVaultType('mpc');
+      if (hasMpcSession) {
+        setIsLocked(false);
+      } else {
+        setIsLocked(true);
+      }
+    } else if (hasLocalVault) {
+      setIsVaultConfigured(true);
+      setVaultType('imported');
       setIsLocked(true);
     } else {
       setIsVaultConfigured(false);
       setIsLocked(false);
     }
   }, []);
+
+  const lockWallet = () => {
+    setIsLocked(true);
+  };
+
+  const unlockWalletWithBiometrics = async (): Promise<boolean> => {
+    try {
+      const mpcVaultRaw = localStorage.getItem('northveil_v3_mpc_vault');
+      let targetAddress: string | undefined;
+      let targetUserId: string | undefined;
+      if (mpcVaultRaw) {
+        try {
+          const parsed = JSON.parse(mpcVaultRaw);
+          targetAddress = parsed.walletAddress;
+          targetUserId = parsed.userId;
+        } catch {}
+      }
+
+      const res = await WebAuthnService.authenticate(targetAddress, undefined, targetUserId);
+      if (res.success) {
+        if (res.sessionToken) {
+          MpcWalletService.saveSession(res.sessionToken, targetUserId, 'mpc');
+        }
+        setIsLocked(false);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Biometric unlock error:', err);
+      return false;
+    }
+  };
+
+  const setupMpcVault = async (
+    walletName: string = 'Primary Vault',
+    address: string,
+    mpcWalletId: string,
+    userId: string,
+    sessionToken: string
+  ): Promise<boolean> => {
+    try {
+      const chosenName = walletName?.trim() || 'Primary Vault';
+      const mpcPrimaryWallet: SubWalletAccount = {
+        id: 'acc-0',
+        name: chosenName,
+        accountIndex: 0,
+        address: address.toLowerCase(),
+        derivationPath: 'turnkey://tee-nitro-enclave',
+        colorTag: '#00f0ff',
+        isDefault: true,
+        createdAt: new Date().toISOString().split('T')[0],
+        balanceMultiplier: 1.0,
+      };
+
+      setSubWallets([mpcPrimaryWallet]);
+      setActiveWalletIdState('acc-0');
+      localStorage.setItem('northveil_v3_subwallets', JSON.stringify([mpcPrimaryWallet]));
+      localStorage.setItem('northveil_v3_active_subwallet', 'acc-0');
+
+      localStorage.setItem(
+        'northveil_v3_mpc_vault',
+        JSON.stringify({
+          version: 3,
+          type: 'mpc_turnkey',
+          walletAddress: address.toLowerCase(),
+          mpcWalletId,
+          userId,
+          walletName: chosenName,
+          createdAt: new Date().toISOString(),
+        })
+      );
+
+      MpcWalletService.saveSession(sessionToken, userId, 'mpc');
+      setVaultType('mpc');
+
+      // Purge old cached data from previous wallet
+      localStorage.removeItem('northveil_v3_assets');
+      localStorage.removeItem('northveil_v3_transactions');
+      localStorage.removeItem('northveil_v3_staking');
+      setTransactions([]);
+      setStakingPositions([]);
+      setOwnedNFTs([]);
+      setAssets(INITIAL_ASSETS.map((a) => ({ ...a, balance: 0 })));
+
+      setIsVaultConfigured(true);
+      setIsLocked(false);
+
+      // Auto-sync MPC address to Supabase
+      SupabaseService.syncWallet(
+        address.toLowerCase(),
+        chosenName,
+        'ethereum',
+        undefined,
+        undefined
+      );
+
+      return true;
+    } catch (e) {
+      console.error('MPC Vault setup failed:', e);
+      return false;
+    }
+  };
 
   const unlockVault = async (password: string): Promise<boolean> => {
     const decryptedSeed = await VaultService.decrypt(password);
@@ -1224,26 +1353,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setBiometricPromptReason(reason);
     setPendingBiometricSuccess(() => onSuccess);
     setIsBiometricModalOpen(true);
-  };
-
-  const unlockWalletWithBiometrics = async (): Promise<boolean> => {
-    return new Promise((resolve) => {
-      setBiometricPromptReason('Unlock Northveil Vault');
-      setPendingBiometricSuccess(() => () => {
-        setIsLocked(false);
-        resolve(true);
-      });
-      setIsBiometricModalOpen(true);
-    });
-  };
-
-
-
-  const lockWallet = () => {
-    if (isVaultConfigured) {
-      setSeedPhrase([]); // Clear from memory!
-      setIsLocked(true);
-    }
   };
 
   // Execute Swap & Bridge (100% Real Live On-Chain Execution)
@@ -1853,12 +1962,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const logOut = () => {
+    localStorage.removeItem('northveil_v3_mpc_vault');
     localStorage.removeItem('northveil_v3_encrypted_vault');
     localStorage.removeItem('northveil_v3_subwallets');
     localStorage.removeItem('northveil_v3_active_subwallet');
     localStorage.removeItem('northveil_v3_assets');
     localStorage.removeItem('northveil_v3_transactions');
     localStorage.removeItem('northveil_v3_staking');
+    MpcWalletService.clearSession();
     setSeedPhrase([]);
     setIsVaultConfigured(false);
     setIsLocked(false);
@@ -1932,7 +2043,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         restoreWalletFromPrivateKey,
         unlockVault,
         setupVault,
+        setupMpcVault,
         isVaultConfigured,
+        vaultType,
         addCustomToken: (token: CryptoAsset) => {
           setAssets((prev) => {
             // Prevent duplicates

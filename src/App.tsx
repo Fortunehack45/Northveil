@@ -13,10 +13,10 @@ import { OnboardingAuthModal } from './components/OnboardingAuthModal';
 import { AdminPanelView } from './components/AdminPanelView';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { InteractiveTourModal } from './components/InteractiveTourModal';
-import { Lock } from 'lucide-react';
+import { Lock, Fingerprint } from 'lucide-react';
 
 const MainContent: React.FC = () => {
-  const { isVaultConfigured, isLocked, unlockWalletWithBiometrics, unlockVault } = useWallet();
+  const { isVaultConfigured, isLocked, unlockWalletWithBiometrics, unlockVault, vaultType } = useWallet();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
   const [modalMode, setModalMode] = useState<'send' | 'receive' | null>(null);
@@ -77,6 +77,7 @@ const MainContent: React.FC = () => {
 
   // If vault is locked, render Lock & Decrypt screen
   if (isLocked) {
+    const isMpcVault = vaultType === 'mpc';
     return (
       <div className="min-h-screen bg-[#f8f8fa] dark:bg-black text-zinc-900 dark:text-white flex items-center justify-center p-4">
         <div className="bg-white dark:bg-[#0f0f12] border border-black/[0.06] dark:border-white/[0.06] p-8 max-w-sm w-full text-center space-y-6 shadow-2xl rounded-3xl relative z-10 mono-animate-in">
@@ -91,51 +92,73 @@ const MainContent: React.FC = () => {
 
           <div className="space-y-1">
             <span className="px-2.5 py-0.5 bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white text-xs font-mono font-medium rounded-full">
-              VAULT ENCRYPTED
+              {isMpcVault ? 'MPC HARDWARE VAULT LOCKED' : 'VAULT ENCRYPTED'}
             </span>
             <h2 className="text-2xl font-bold text-zinc-900 dark:text-white tracking-tight font-sans pt-1">
               Northveil Security
             </h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Enter your vault password to decrypt credentials.
+              {isMpcVault
+                ? 'Authenticate with your device biometric passkey to unlock.'
+                : 'Enter your vault password to decrypt credentials.'}
             </p>
           </div>
 
-          <div className="space-y-3">
-            <input
-              type="password"
-              placeholder="Vault Password"
-              value={unlockPassword}
-              onChange={(e) => {
-                setUnlockPassword(e.target.value);
-                setUnlockError(false);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleUnlockPassword();
-                }
-              }}
-              disabled={isUnlocking}
-              className="w-full bg-black/[0.04] dark:bg-black border border-black/[0.08] dark:border-white/[0.08] rounded-xl p-3 text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-black dark:focus:border-white disabled:opacity-50"
-              autoFocus
-            />
-            {unlockError && <p className="text-xs text-red-500 font-medium">Incorrect password</p>}
-            <button
-              onClick={handleUnlockPassword}
-              disabled={isUnlocking || !unlockPassword}
-              className="w-full py-3 bg-black text-white dark:bg-white dark:text-black font-semibold rounded-full text-xs hover:bg-zinc-800 dark:hover:bg-zinc-200 active:scale-[0.98] cursor-pointer transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isUnlocking ? 'Decrypting Vault...' : 'Decrypt Vault & Unlock'}
-            </button>
+          {isMpcVault ? (
+            <div className="space-y-3">
+              <button
+                onClick={async () => {
+                  setIsUnlocking(true);
+                  setUnlockError(false);
+                  const ok = await unlockWalletWithBiometrics();
+                  if (!ok) setUnlockError(true);
+                  setIsUnlocking(false);
+                }}
+                disabled={isUnlocking}
+                className="w-full py-3.5 bg-black text-white dark:bg-white dark:text-black font-semibold rounded-full text-xs hover:bg-zinc-800 dark:hover:bg-zinc-200 active:scale-[0.98] cursor-pointer transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Fingerprint className="w-4 h-4 stroke-[2]" />
+                {isUnlocking ? 'Scanning Passkey...' : 'Unlock with Biometric Passkey'}
+              </button>
+              {unlockError && <p className="text-xs text-red-500 font-medium">Passkey verification failed or cancelled</p>}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <input
+                type="password"
+                placeholder="Vault Password"
+                value={unlockPassword}
+                onChange={(e) => {
+                  setUnlockPassword(e.target.value);
+                  setUnlockError(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleUnlockPassword();
+                  }
+                }}
+                disabled={isUnlocking}
+                className="w-full bg-black/[0.04] dark:bg-black border border-black/[0.08] dark:border-white/[0.08] rounded-xl p-3 text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-black dark:focus:border-white disabled:opacity-50"
+                autoFocus
+              />
+              {unlockError && <p className="text-xs text-red-500 font-medium">Incorrect password</p>}
+              <button
+                onClick={handleUnlockPassword}
+                disabled={isUnlocking || !unlockPassword}
+                className="w-full py-3 bg-black text-white dark:bg-white dark:text-black font-semibold rounded-full text-xs hover:bg-zinc-800 dark:hover:bg-zinc-200 active:scale-[0.98] cursor-pointer transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isUnlocking ? 'Decrypting Vault...' : 'Decrypt Vault & Unlock'}
+              </button>
 
-            <button
-              onClick={() => unlockWalletWithBiometrics()}
-              disabled={isUnlocking}
-              className="w-full py-2.5 bg-black/[0.04] dark:bg-white/[0.04] text-zinc-700 dark:text-white font-medium rounded-full text-xs hover:bg-black/[0.08] dark:hover:bg-white/[0.08] cursor-pointer transition-all disabled:opacity-50"
-            >
-              Unlock with Biometrics
-            </button>
-          </div>
+              <button
+                onClick={() => unlockWalletWithBiometrics()}
+                disabled={isUnlocking}
+                className="w-full py-2.5 bg-black/[0.04] dark:bg-white/[0.04] text-zinc-700 dark:text-white font-medium rounded-full text-xs hover:bg-black/[0.08] dark:hover:bg-white/[0.08] cursor-pointer transition-all disabled:opacity-50"
+              >
+                Unlock with Biometrics
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );

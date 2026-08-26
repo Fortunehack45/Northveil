@@ -9,9 +9,13 @@ import {
   EyeOff,
   Lock,
   ShieldCheck,
+  Fingerprint,
+  Sparkles,
+  Key,
 } from 'lucide-react';
 import { useWallet } from '../context/WalletContext';
-import { WalletService } from '../services/WalletService';
+import { MpcWalletService } from '../services/MpcWalletService';
+import { WebAuthnService } from '../services/WebAuthnService';
 
 interface OnboardingAuthModalProps {
   onClose?: () => void;
@@ -23,22 +27,20 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
   isFullscreen = false,
 }) => {
   const {
-    seedPhrase,
-    setSeedPhrase,
     restoreWalletFromSeed,
     restoreWalletFromPrivateKey,
     setupVault,
+    setupMpcVault,
   } = useWallet();
 
   const [step, setStep] = useState<
-    'welcome' | 'createName' | 'createSeed' | 'createVerify' | 'createVault' | 'importWallet' | 'importPassword' | 'processing'
+    'welcome' | 'createName' | 'createPasskey' | 'createdSuccess' | 'importWallet' | 'importPassword' | 'processing'
   >('welcome');
 
   const [walletNameInput, setWalletNameInput] = useState('My Northveil Vault');
-  const [vaultPassword, setVaultPassword] = useState('');
-  const [confirmVaultPassword, setConfirmVaultPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [passwordError, setPasswordError] = useState('');
+  const [createdVaultAddress, setCreatedVaultAddress] = useState('');
+  const [passkeyError, setPasskeyError] = useState('');
+  const [copiedAddress, setCopiedAddress] = useState(false);
 
   const [importWalletName, setImportWalletName] = useState('Primary Vault');
   const [importType, setImportType] = useState<'seed' | 'privateKey'>('seed');
@@ -52,71 +54,60 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
   const [showImportPassword, setShowImportPassword] = useState(false);
   const [importPasswordError, setImportPasswordError] = useState('');
 
-  const [quizWord3, setQuizWord3] = useState('');
-  const [quizWord7, setQuizWord7] = useState('');
-  const [quizVerified, setQuizVerified] = useState(false);
-  const [quizError, setQuizError] = useState('');
-  const [copiedSeed, setCopiedSeed] = useState(false);
   const [processingMsg, setProcessingMsg] = useState('');
 
-  const handleCopySeed = () => {
-    if (seedPhrase.length > 0) {
-      navigator.clipboard.writeText(seedPhrase.join(' '));
-      setCopiedSeed(true);
-      setTimeout(() => setCopiedSeed(false), 2000);
+  const handleCopyAddress = () => {
+    if (createdVaultAddress) {
+      navigator.clipboard.writeText(createdVaultAddress);
+      setCopiedAddress(true);
+      setTimeout(() => setCopiedAddress(false), 2000);
     }
   };
 
-  const handleCreateWallet = async () => {
+  /**
+   * Genuine Turnkey Hardware MPC Vault Creation & Mandatory Passkey Registration Flow
+   */
+  const handleCreateMpcVaultWithPasskey = async () => {
+    setPasskeyError('');
     setStep('processing');
-    setProcessingMsg('Generating BIP-39 Mnemonic...');
-    await new Promise((r) => setTimeout(r, 400));
+    setProcessingMsg('Provisioning Turnkey Nitro TEE Enclave Vault...');
 
     try {
-      const newSeed = WalletService.generateSeedPhrase();
-      if (!newSeed || newSeed.length < 12) {
-        alert('Generated seed is invalid.');
-        setStep('createName');
-        return;
+      // 1. Backend provisions Turnkey MPC Hardware Enclave Wallet
+      const userId = MpcWalletService.getUserId();
+      const vaultResult = await MpcWalletService.createMpcVault(walletNameInput, userId);
+
+      setProcessingMsg('Prompting Biometric Passkey Registration (Touch ID / Face ID)...');
+
+      // 2. Mandatory WebAuthn Passkey Registration
+      const passkeyResult = await WebAuthnService.registerPasskey(
+        vaultResult.address,
+        walletNameInput,
+        userId
+      );
+
+      if (!passkeyResult.success) {
+        throw new Error(passkeyResult.error || 'Passkey registration was cancelled or failed.');
       }
-      setSeedPhrase(newSeed);
-      setStep('createSeed');
-    } catch (e: any) {
-      alert('Seed generation error: ' + e.message);
-      setStep('createName');
-    }
-  };
 
-  const handleVerifySeed = () => {
-    setQuizError('');
-    if (quizWord3.toLowerCase().trim() !== (seedPhrase[2] || '').toLowerCase()) {
-      setQuizError('Word #3 is incorrect.');
-      return;
-    }
-    if (quizWord7.toLowerCase().trim() !== (seedPhrase[6] || '').toLowerCase()) {
-      setQuizError('Word #7 is incorrect.');
-      return;
-    }
-    setQuizVerified(true);
-  };
+      setProcessingMsg('Securing Hardware Vault Session...');
 
-  const handleFinalizeCreatedVault = async () => {
-    setPasswordError('');
-    if (vaultPassword.length < 6) {
-      setPasswordError('Password must be at least 6 characters.');
-      return;
-    }
-    if (vaultPassword !== confirmVaultPassword) {
-      setPasswordError('Passwords do not match.');
-      return;
-    }
+      // 3. Setup MPC Vault in Wallet Context & save session token
+      const sessionToken = passkeyResult.sessionToken || MpcWalletService.getSessionToken() || '';
+      await setupMpcVault(
+        walletNameInput,
+        vaultResult.address,
+        vaultResult.mpcWalletId,
+        userId,
+        sessionToken
+      );
 
-    setStep('processing');
-    setProcessingMsg('Encrypting Vault Keychain...');
-    await new Promise((r) => setTimeout(r, 400));
-
-    await setupVault(vaultPassword, seedPhrase, walletNameInput);
-    if (onClose) onClose();
+      setCreatedVaultAddress(vaultResult.address);
+      setStep('createdSuccess');
+    } catch (err: any) {
+      setPasskeyError(err.message || 'Failed to create Turnkey MPC Vault with Passkey.');
+      setStep('createPasskey');
+    }
   };
 
   const handleProceedToImportPassword = () => {
@@ -207,28 +198,28 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
 
           <div className="space-y-1.5">
             <span className="px-2.5 py-0.5 bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white text-xs font-mono font-medium rounded-full">
-              AUTHENTICATION & VAULT GATEWAY
+              NON-CUSTODIAL HARDWARE MPC
             </span>
             <h2 className="text-2xl font-bold text-zinc-900 dark:text-white tracking-tight pt-1">
               Welcome to Northveil
             </h2>
             <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-xs mx-auto">
-              Secure multi-chain DeFi vault with real on-chain execution and MCP integration.
+              Hardware Enclave Multi-Chain Vault with Biometric Passkeys & AI MCP Tools.
             </p>
           </div>
 
           <div className="space-y-3 pt-2">
             <button
               onClick={() => setStep('createName')}
-              className="w-full py-3 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer transition-all shadow-md flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer transition-all shadow-md flex items-center justify-center gap-2"
             >
-              Create New Vault <ArrowRight className="w-4 h-4" />
+              <Fingerprint className="w-4 h-4" /> Create MPC Vault (Passkey Secured) <ArrowRight className="w-4 h-4" />
             </button>
             <button
               onClick={() => setStep('importWallet')}
-              className="w-full py-3 bg-black/[0.04] dark:bg-white/[0.04] text-zinc-900 dark:text-white font-medium text-xs rounded-full border border-black/[0.08] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] cursor-pointer transition-all"
+              className="w-full py-3 bg-black/[0.04] dark:bg-white/[0.04] text-zinc-900 dark:text-white font-medium text-xs rounded-full border border-black/[0.08] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] cursor-pointer transition-all flex items-center justify-center gap-2"
             >
-              Import Existing Wallet
+              <Key className="w-3.5 h-3.5" /> Import External Seed / Key
             </button>
             {!isFullscreen && onClose && (
               <button
@@ -252,34 +243,34 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Back
             </button>
-            <span className="text-[10px] font-mono text-zinc-500">STEP 1 OF 3</span>
+            <span className="text-[10px] font-mono text-zinc-500">STEP 1 OF 2</span>
           </div>
 
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Name Your Vault</h3>
-            <p className="text-xs text-zinc-600 dark:text-zinc-400">Choose a label for this account container.</p>
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Name Your MPC Vault</h3>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400">Choose a label for this non-custodial hardware account.</p>
           </div>
 
           <input
             type="text"
             value={walletNameInput}
             onChange={(e) => setWalletNameInput(e.target.value)}
-            placeholder="e.g. Primary Vault"
+            placeholder="e.g. Primary Trading Vault"
             className="w-full bg-black/[0.03] dark:bg-black border border-black/[0.1] dark:border-white/[0.1] rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-black dark:focus:border-white"
             autoFocus
           />
 
           <button
-            onClick={handleCreateWallet}
-            className="w-full py-3 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer transition-all shadow-md"
+            onClick={() => setStep('createPasskey')}
+            className="w-full py-3 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer transition-all shadow-md flex items-center justify-center gap-2"
           >
-            Generate Seed Phrase
+            Continue to Passkey Registration <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Step: Seed Display */}
-      {step === 'createSeed' && (
+      {/* Step: Mandatory Passkey Registration */}
+      {step === 'createPasskey' && (
         <div className="space-y-5">
           <div className="flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.06] pb-3">
             <button
@@ -288,171 +279,92 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Back
             </button>
-            <span className="text-[10px] font-mono text-zinc-500">STEP 2 OF 3</span>
+            <span className="text-[10px] font-mono text-emerald-500 font-semibold">HARDWARE SECURITY</span>
           </div>
 
-          <div className="space-y-1">
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Write Down Your Recovery Phrase</h3>
-            <p className="text-xs text-zinc-600 dark:text-zinc-400">
-              These 12 words are the ONLY way to recover your vault.
+          <div className="space-y-2 text-center py-2">
+            <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto text-emerald-500">
+              <Fingerprint className="w-7 h-7 stroke-[2]" />
+            </div>
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Register Device Passkey</h3>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-xs mx-auto leading-relaxed">
+              Your hardware biometric (Touch ID, Face ID, or Windows Hello) will be cryptographically bound to your Turnkey TEE Enclave. No seed phrases to lose.
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 p-3.5 bg-black/[0.02] dark:bg-black border border-black/[0.08] dark:border-white/[0.08] rounded-2xl">
-            {seedPhrase.map((w, idx) => (
-              <div
-                key={idx}
-                className="p-2 rounded-xl bg-black/[0.03] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04] text-xs font-mono flex items-center justify-between text-zinc-900 dark:text-zinc-200"
-              >
-                <span className="text-zinc-500 text-[10px]">{idx + 1}.</span>
-                <span className="font-semibold">{w}</span>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={handleCopySeed}
-            className="w-full py-2 bg-black/[0.04] hover:bg-black/[0.08] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] border border-black/[0.08] dark:border-white/[0.08] text-zinc-900 dark:text-white text-xs font-medium rounded-full flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            {copiedSeed ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            {copiedSeed ? 'Copied Phrase' : 'Copy All 12 Words'}
-          </button>
-
-          <button
-            onClick={() => setStep('createVerify')}
-            className="w-full py-3 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer transition-all shadow-md"
-          >
-            I Have Saved My Phrase
-          </button>
-        </div>
-      )}
-
-      {/* Step: Verify Seed Phrase */}
-      {step === 'createVerify' && (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.06] pb-3">
-            <button
-              onClick={() => setStep('createSeed')}
-              className="text-xs text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white flex items-center gap-1 cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" /> Back
-            </button>
-            <span className="text-[10px] font-mono text-zinc-500">VERIFICATION</span>
-          </div>
-
-          <div className="space-y-1">
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Confirm Secret Phrase</h3>
-            <p className="text-xs text-zinc-600 dark:text-zinc-400">Verify word #3 and word #7 from your saved list.</p>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Word #3</label>
-              <input
-                type="text"
-                value={quizWord3}
-                onChange={(e) => setQuizWord3(e.target.value)}
-                className="w-full bg-black/[0.03] dark:bg-black border border-black/[0.1] dark:border-white/[0.1] rounded-xl p-2.5 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-black dark:focus:border-white"
-              />
+          <div className="bg-black/[0.03] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] rounded-2xl p-4 space-y-2 text-left">
+            <div className="text-[11px] font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" /> Non-Custodial Architecture
             </div>
-
-            <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Word #7</label>
-              <input
-                type="text"
-                value={quizWord7}
-                onChange={(e) => setQuizWord7(e.target.value)}
-                className="w-full bg-black/[0.03] dark:bg-black border border-black/[0.1] dark:border-white/[0.1] rounded-xl p-2.5 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-black dark:focus:border-white"
-              />
-            </div>
-
-            {quizError && (
-              <p className="text-xs text-red-600 dark:text-red-400 bg-red-500/10 p-2.5 rounded-xl border border-red-500/20">
-                {quizError}
-              </p>
-            )}
+            <ul className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1 list-disc list-inside">
+              <li>Protected inside AWS Nitro Enclaves</li>
+              <li>Biometric authentication on every sign action</li>
+              <li>Seamlessly shared with authorized AI Agents</li>
+            </ul>
           </div>
 
-          {!quizVerified ? (
-            <button
-              onClick={handleVerifySeed}
-              className="w-full py-3 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer transition-all shadow-md"
-            >
-              Verify Words
-            </button>
-          ) : (
-            <button
-              onClick={() => setStep('createVault')}
-              className="w-full py-3 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer transition-all shadow-md"
-            >
-              Continue to Password Setup
-            </button>
+          {passkeyError && (
+            <div className="text-xs text-red-500 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+              {passkeyError}
+            </div>
           )}
+
+          <button
+            onClick={handleCreateMpcVaultWithPasskey}
+            className="w-full py-3.5 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer transition-all shadow-md flex items-center justify-center gap-2"
+          >
+            <Fingerprint className="w-4 h-4" /> Create MPC Vault & Register Passkey
+          </button>
         </div>
       )}
 
-      {/* Step: Password Protection for Creation */}
-      {step === 'createVault' && (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.06] pb-3">
-            <span className="text-xs font-semibold text-zinc-900 dark:text-white">SET VAULT PASSWORD</span>
-            <span className="text-[10px] font-mono text-zinc-500">FINAL STEP</span>
+      {/* Step: Created Success */}
+      {step === 'createdSuccess' && (
+        <div className="space-y-5 text-center py-2">
+          <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto text-emerald-500">
+            <Check className="w-7 h-7 stroke-[3]" />
           </div>
 
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Choose Your Vault Password</h3>
+            <span className="px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-mono font-semibold rounded-full">
+              MPC VAULT READY
+            </span>
+            <h3 className="text-xl font-bold text-zinc-900 dark:text-white pt-1">
+              Vault Successfully Created
+            </h3>
             <p className="text-xs text-zinc-600 dark:text-zinc-400">
-              This password locally encrypts your credentials using AES-256-GCM.
+              Secured by Turnkey Nitro TEE Enclave and device biometric passkey.
             </p>
           </div>
 
-          <div className="space-y-3">
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={vaultPassword}
-                onChange={(e) => setVaultPassword(e.target.value)}
-                placeholder="Vault Password (min. 6 characters)"
-                className="w-full bg-black/[0.03] dark:bg-black border border-black/[0.1] dark:border-white/[0.1] rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-black dark:focus:border-white"
-                autoFocus
-              />
+          <div className="bg-black/[0.03] dark:bg-black border border-black/[0.08] dark:border-white/[0.1] rounded-2xl p-4 text-left space-y-2">
+            <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Vault Address</div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-mono text-zinc-900 dark:text-white break-all">
+                {createdVaultAddress}
+              </span>
               <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white cursor-pointer"
+                onClick={handleCopyAddress}
+                className="p-1.5 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-all cursor-pointer"
+                title="Copy Address"
               >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {copiedAddress ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
               </button>
             </div>
-
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={confirmVaultPassword}
-                onChange={(e) => setConfirmVaultPassword(e.target.value)}
-                placeholder="Confirm Password"
-                className="w-full bg-black/[0.03] dark:bg-black border border-black/[0.1] dark:border-white/[0.1] rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-black dark:focus:border-white"
-              />
-            </div>
-
-            {passwordError && (
-              <p className="text-xs text-red-600 dark:text-red-400 bg-red-500/10 p-2.5 rounded-xl border border-red-500/20">
-                {passwordError}
-              </p>
-            )}
           </div>
 
           <button
-            onClick={handleFinalizeCreatedVault}
-            className="w-full py-3 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer transition-all shadow-md flex items-center justify-center gap-2"
+            onClick={() => {
+              if (onClose) onClose();
+            }}
+            className="w-full py-3.5 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer transition-all shadow-md flex items-center justify-center gap-2"
           >
-            <Lock className="w-4 h-4" />
-            Complete Setup & Open Vault
+            Launch Vault Dashboard <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Step: Import Existing Wallet (Step 1: Enter Secret) */}
+      {/* Step: Import Wallet */}
       {step === 'importWallet' && (
         <div className="space-y-5">
           <div className="flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.06] pb-3">
@@ -462,83 +374,91 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Back
             </button>
-            <span className="text-[10px] font-mono text-zinc-500">IMPORT (1/2)</span>
+            <span className="text-[10px] font-mono text-zinc-500">IMPORT EXTERNAL</span>
           </div>
 
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Import Existing Wallet</h3>
-            <p className="text-xs text-zinc-600 dark:text-zinc-400">Enter your 12–24 word seed phrase or 64-char private key.</p>
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Import External Wallet</h3>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400">
+              Restore an existing 12/24-word seed phrase or private key (Locally Secured).
+            </p>
           </div>
 
-          <div className="mono-segmented-container w-full flex">
+          <div className="flex gap-2">
             <button
-              type="button"
-              onClick={() => setImportType('seed')}
-              className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer ${
-                importType === 'seed' ? 'bg-black text-white dark:bg-white dark:text-black font-semibold shadow' : 'text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white'
+              onClick={() => {
+                setImportType('seed');
+                setImportText('');
+                setImportError('');
+              }}
+              className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                importType === 'seed'
+                  ? 'bg-black text-white dark:bg-white dark:text-black border-transparent shadow-sm'
+                  : 'bg-black/[0.03] dark:bg-white/[0.03] text-zinc-600 dark:text-zinc-400 border-black/[0.06] dark:border-white/[0.06]'
               }`}
             >
               Seed Phrase
             </button>
             <button
-              type="button"
-              onClick={() => setImportType('privateKey')}
-              className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer ${
-                importType === 'privateKey' ? 'bg-black text-white dark:bg-white dark:text-black font-semibold shadow' : 'text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white'
+              onClick={() => {
+                setImportType('privateKey');
+                setImportText('');
+                setImportError('');
+              }}
+              className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                importType === 'privateKey'
+                  ? 'bg-black text-white dark:bg-white dark:text-black border-transparent shadow-sm'
+                  : 'bg-black/[0.03] dark:bg-white/[0.03] text-zinc-600 dark:text-zinc-400 border-black/[0.06] dark:border-white/[0.06]'
               }`}
             >
               Private Key
             </button>
           </div>
 
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                Vault Name / Label (Optional)
-              </label>
-              <input
-                type="text"
-                value={importWalletName}
-                onChange={(e) => setImportWalletName(e.target.value)}
-                placeholder="e.g. Primary Vault"
-                className="w-full bg-black/[0.03] dark:bg-black border border-black/[0.1] dark:border-white/[0.1] rounded-xl p-2.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-black dark:focus:border-white"
-              />
-            </div>
+          <div className="space-y-2">
+            <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">Account Label</label>
+            <input
+              type="text"
+              value={importWalletName}
+              onChange={(e) => setImportWalletName(e.target.value)}
+              placeholder="e.g. Imported Alpha"
+              className="w-full bg-black/[0.03] dark:bg-black border border-black/[0.1] dark:border-white/[0.1] rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-black dark:focus:border-white"
+            />
+          </div>
 
-            <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                {importType === 'seed' ? 'Recovery Seed Phrase' : 'Private Key (Hex)'}
-              </label>
-              <textarea
-                rows={3}
-                placeholder={
-                  importType === 'seed'
-                    ? 'apple banana cherry dragon eagle falcon grape harbor island jungle knife lemon'
-                    : '0x1234567890abcdef...'
-                }
-                value={importText}
-                onChange={(e) => setImportText(e.target.value)}
-                className="w-full bg-black/[0.03] dark:bg-black border border-black/[0.1] dark:border-white/[0.1] rounded-xl p-3 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-black dark:focus:border-white resize-none"
-              />
-            </div>
+          <div className="space-y-2">
+            <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+              {importType === 'seed' ? 'Recovery Words (space-separated)' : 'Hex Private Key (0x...)'}
+            </label>
+            <textarea
+              rows={3}
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder={
+                importType === 'seed'
+                  ? 'apple banana cherry dragon eagle feather grape...'
+                  : '0x4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f36fe3b'
+              }
+              className="w-full bg-black/[0.03] dark:bg-black border border-black/[0.1] dark:border-white/[0.1] rounded-xl p-3 text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-black dark:focus:border-white resize-none"
+            />
           </div>
 
           {importError && (
-            <p className="text-xs text-red-600 dark:text-red-400 bg-red-500/10 p-2.5 rounded-xl border border-red-500/20">
+            <div className="text-xs text-red-500 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
               {importError}
-            </p>
+            </div>
           )}
 
           <button
             onClick={handleProceedToImportPassword}
             className="w-full py-3 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer transition-all shadow-md flex items-center justify-center gap-2"
           >
-            Continue to Password Setup <ArrowRight className="w-4 h-4" />
+            Continue <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Step: Import Existing Wallet (Step 2: Choose Password) */}
+      {/* Step: Import Password */}
       {step === 'importPassword' && (
         <div className="space-y-5">
           <div className="flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.06] pb-3">
@@ -548,13 +468,13 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Back
             </button>
-            <span className="text-[10px] font-mono text-zinc-500">IMPORT (2/2)</span>
+            <span className="text-[10px] font-mono text-zinc-500">ENCRYPTION KEY</span>
           </div>
 
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Choose Your Vault Password</h3>
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Local Encryption Password</h3>
             <p className="text-xs text-zinc-600 dark:text-zinc-400">
-              Create a secure password to encrypt your imported credentials on this device.
+              Set a local password to encrypt this imported key in browser storage.
             </p>
           </div>
 
@@ -564,51 +484,48 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
                 type={showImportPassword ? 'text' : 'password'}
                 value={importPassword}
                 onChange={(e) => setImportPassword(e.target.value)}
-                placeholder="Vault Password (min. 6 characters)"
-                className="w-full bg-black/[0.03] dark:bg-black border border-black/[0.1] dark:border-white/[0.1] rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-black dark:focus:border-white"
+                placeholder="Vault Password (min. 6 chars)"
+                className="w-full bg-black/[0.03] dark:bg-black border border-black/[0.1] dark:border-white/[0.1] rounded-xl p-3 pr-10 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-black dark:focus:border-white"
                 autoFocus
               />
               <button
                 type="button"
                 onClick={() => setShowImportPassword(!showImportPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white cursor-pointer"
+                className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-200 cursor-pointer"
               >
                 {showImportPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
 
-            <div className="relative">
-              <input
-                type={showImportPassword ? 'text' : 'password'}
-                value={confirmImportPassword}
-                onChange={(e) => setConfirmImportPassword(e.target.value)}
-                placeholder="Confirm Password"
-                className="w-full bg-black/[0.03] dark:bg-black border border-black/[0.1] dark:border-white/[0.1] rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-black dark:focus:border-white"
-              />
-            </div>
-
-            {importPasswordError && (
-              <p className="text-xs text-red-600 dark:text-red-400 bg-red-500/10 p-2.5 rounded-xl border border-red-500/20">
-                {importPasswordError}
-              </p>
-            )}
+            <input
+              type={showImportPassword ? 'text' : 'password'}
+              value={confirmImportPassword}
+              onChange={(e) => setConfirmImportPassword(e.target.value)}
+              placeholder="Confirm Vault Password"
+              className="w-full bg-black/[0.03] dark:bg-black border border-black/[0.1] dark:border-white/[0.1] rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-black dark:focus:border-white"
+            />
           </div>
+
+          {importPasswordError && (
+            <div className="text-xs text-red-500 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+              {importPasswordError}
+            </div>
+          )}
 
           <button
             onClick={handleFinalizeImportedVault}
             className="w-full py-3 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer transition-all shadow-md flex items-center justify-center gap-2"
           >
-            <ShieldCheck className="w-4 h-4" />
-            Encrypt Vault & Open Wallet
+            <Lock className="w-4 h-4" /> Encrypt & Import Vault
           </button>
         </div>
       )}
 
       {/* Step: Processing */}
       {step === 'processing' && (
-        <div className="text-center space-y-4 py-8">
-          <Loader2 className="w-8 h-8 text-zinc-900 dark:text-white animate-spin mx-auto" />
-          <p className="text-xs font-mono text-zinc-700 dark:text-zinc-300">{processingMsg}</p>
+        <div className="text-center py-10 space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-zinc-900 dark:text-white" />
+          <p className="text-xs font-mono text-zinc-600 dark:text-zinc-400">{processingMsg}</p>
         </div>
       )}
     </div>
@@ -616,14 +533,14 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
 
   if (isFullscreen) {
     return (
-      <div className="min-h-screen bg-[#f8f8fa] dark:bg-black flex items-center justify-center p-4 sm:p-6 mono-animate-in">
+      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
         {cardContent}
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/80 p-4 mono-animate-in">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
       {cardContent}
     </div>
   );

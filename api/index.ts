@@ -59,6 +59,8 @@ import {
   executeWithRpcFailover,
   generatePasskeyRegistrationOptionsHandler,
   verifyAndStorePasskeyRegistration,
+  generatePasskeyAuthenticationOptionsHandler,
+  verifyPasskeyAuthentication,
   inMemoryTxRequests,
   inMemoryMpcWallets,
 } from './mpcControlPlaneService.js';
@@ -1569,48 +1571,59 @@ const handleAuthorize = async (req: Request, res: Response) => {
   const codeChallenge = (req.query.code_challenge as string) || (req.body?.code_challenge as string) || '';
   const codeChallengeMethod = (req.query.code_challenge_method as string) || (req.body?.code_challenge_method as string) || 'plain';
   const requestedScope = (req.query.scope as string) || (req.body?.scope as string) || 'tools:read tools:execute';
+  const isConfirmed = req.query.confirmed === 'true' || req.body?.confirmed === true || req.method === 'POST';
 
-  // 1. Check credentials from headers or query/body parameters
+  // 1. Check credentials from session cookie, headers, or parameters
   const authHeader = (req.headers.authorization || '').trim();
+  const rawCookie = req.headers.cookie || '';
+  const cookieMatch = rawCookie.match(/northveil_session=([^;]+)/);
+  const cookieSession = cookieMatch ? cookieMatch[1] : '';
+  const sessionHeader = ((req.headers['x-session-token'] || req.query.session_token || req.body?.session_token || cookieSession) as string || '').trim();
   const apiKeyHeader = ((req.headers['x-api-key'] || req.query.api_key || req.query.apiKey) as string || '').trim();
-  const walletParam = ((req.query.wallet_address || req.query.wallet || req.query.address || req.body?.wallet_address || req.body?.wallet || req.body?.address) as string || '').trim();
-  let authenticatedUser: { id: string; walletAddress: string } | null = null;
+  let authenticatedUser: { id: string; walletAddress: string; name?: string } | null = null;
+  let activeSessionToken: string = '';
 
-  if (apiKeyHeader) {
+  if (sessionHeader.startsWith('nv_sess_')) {
+    const verified = verifyOAuthPayload(sessionHeader.replace('nv_sess_', ''));
+    if (verified && verified.walletAddress) {
+      authenticatedUser = { id: verified.userId || 'user_default', walletAddress: verified.walletAddress.toLowerCase() };
+      activeSessionToken = sessionHeader;
+    }
+  } else if (apiKeyHeader) {
     const keyRec = inMemoryApiKeys.get(apiKeyHeader);
     if (keyRec) {
-      authenticatedUser = { id: keyRec.userId || 'api_user', walletAddress: keyRec.walletAddress };
+      authenticatedUser = { id: keyRec.userId || 'api_user', walletAddress: keyRec.walletAddress.toLowerCase() };
     }
   } else if (authHeader.startsWith('Bearer ')) {
     const tokenStr = authHeader.replace(/^Bearer\s+/i, '').trim();
-    if (tokenStr.startsWith('nv_oauth_')) {
+    if (tokenStr.startsWith('nv_sess_')) {
+      const verified = verifyOAuthPayload(tokenStr.replace('nv_sess_', ''));
+      if (verified && verified.walletAddress) {
+        authenticatedUser = { id: verified.userId || 'user_default', walletAddress: verified.walletAddress.toLowerCase() };
+        activeSessionToken = tokenStr;
+      }
+    } else if (tokenStr.startsWith('nv_oauth_')) {
       const verified = verifyOAuthPayload(tokenStr.replace('nv_oauth_', ''));
       if (verified && verified.walletAddress) {
-        authenticatedUser = { id: verified.userId || 'oauth_user', walletAddress: verified.walletAddress };
+        authenticatedUser = { id: verified.userId || 'oauth_user', walletAddress: verified.walletAddress.toLowerCase() };
       }
     } else if (inMemoryApiKeys.has(tokenStr)) {
       const keyRec = inMemoryApiKeys.get(tokenStr)!;
-      authenticatedUser = { id: keyRec.userId || 'api_user', walletAddress: keyRec.walletAddress };
+      authenticatedUser = { id: keyRec.userId || 'api_user', walletAddress: keyRec.walletAddress.toLowerCase() };
     }
-  } else if (walletParam) {
-    authenticatedUser = {
-      id: ((req.query.user_id || req.body?.user_id || `user_${walletParam.slice(0, 10)}`) as string),
-      walletAddress: walletParam.toLowerCase(),
-    };
   }
 
-  // 2. If no user session/wallet provided, render interactive consent HTML page if requested by browser
+  // 2. If unauthenticated, render interactive passkey login page or return 401
   if (!authenticatedUser) {
     const acceptsHtml = req.headers.accept?.includes('text/html') || !req.xhr;
     if (req.method === 'GET' && acceptsHtml) {
-      const defaultWallet = '0x71C56830EC737A4Cacf8F485458Cc2040f394073';
       const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Northveil | Authorize AI Agent</title>
-  <link rel="icon" type="image/png" href="https://iili.io/CD1CVJ2.png">
+  <title>Northveil | Sign In to Authorize AI Agent</title>
+  <link rel="icon" type="image/png" href="https://iili.io/CDj46zl.png">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
     body { background-color: #000000; color: #FFFFFF; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -1619,13 +1632,139 @@ const handleAuthorize = async (req: Request, res: Response) => {
     .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; background: rgba(255, 255, 255, 0.08); color: #FFFFFF; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 12px; }
     h1 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
     p { font-size: 13px; color: #A1A1AA; line-height: 1.5; margin-bottom: 20px; }
+    .btn-primary { width: 100%; background: #FFFFFF; color: #000000; border: none; border-radius: 9999px; padding: 14px; font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity 0.2s; margin-bottom: 10px; display: flex; items-center; justify-content: center; gap: 8px; }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary { width: 100%; background: rgba(255, 255, 255, 0.04); color: #A1A1AA; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 9999px; padding: 12px; font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.08); color: #FFFFFF; }
+    .footer { margin-top: 16px; font-size: 11px; color: #52525B; }
+    #status-msg { margin-top: 12px; font-size: 12px; color: #EF4444; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="https://iili.io/CDj46zl.png" alt="Northveil Logo" class="logo">
+    <span class="badge">SECURE MPC VAULT AUTHENTICATION</span>
+    <h1>Sign In with Passkey</h1>
+    <p>Please authenticate using your device passkey (Touch ID, Face ID, or Windows Hello) to authorize this AI application.</p>
+    
+    <button id="btn-passkey" class="btn-primary" onclick="loginWithPasskey()">
+      🛡️ Authenticate with Biometric Passkey
+    </button>
+    <a href="${redirectUri ? `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}error=access_denied&state=${encodeURIComponent(state)}` : '/'}" class="btn-secondary">Cancel</a>
+
+    <div id="status-msg"></div>
+    <div class="footer">Secured by Turnkey Nitro TEE Enclaves & Hardware Passkeys</div>
+  </div>
+
+  <script>
+    function bufferToBase64URL(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=/g, '');
+    }
+    function base64URLToBuffer(base64url) {
+      const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+      const padLen = (4 - (base64.length % 4)) % 4;
+      const padded = base64 + '='.repeat(padLen);
+      const binary = atob(padded);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    }
+
+    async function loginWithPasskey() {
+      const status = document.getElementById('status-msg');
+      status.textContent = 'Prompting biometric passkey...';
+      try {
+        const optRes = await fetch('/api/v1/auth/passkey/auth-options', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        const optJson = await optRes.json();
+        if (!optJson.success || !optJson.options) throw new Error(optJson.error || 'Failed to retrieve auth options');
+        
+        const options = optJson.options;
+        options.challenge = base64URLToBuffer(options.challenge);
+        if (options.allowCredentials) {
+          options.allowCredentials = options.allowCredentials.map(c => ({
+            ...c,
+            id: base64URLToBuffer(c.id)
+          }));
+        }
+
+        const assertion = await navigator.credentials.get({ publicKey: options });
+        if (!assertion) throw new Error('Biometric authorization cancelled.');
+
+        const verifyRes = await fetch('/api/v1/auth/passkey/verify-authentication', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            authenticationResponse: {
+              id: assertion.id,
+              rawId: bufferToBase64URL(assertion.rawId),
+              type: assertion.type,
+              response: {
+                clientDataJSON: bufferToBase64URL(assertion.response.clientDataJSON),
+                authenticatorData: bufferToBase64URL(assertion.response.authenticatorData),
+                signature: bufferToBase64URL(assertion.response.signature),
+                userHandle: assertion.response.userHandle ? bufferToBase64URL(assertion.response.userHandle) : undefined,
+              }
+            }
+          })
+        });
+
+        const verifyJson = await verifyRes.json();
+        if (!verifyJson.success || !verifyJson.sessionToken) throw new Error(verifyJson.error || 'Passkey verification failed');
+
+        status.style.color = '#10B981';
+        status.textContent = 'Authenticated! Redirecting to authorization...';
+
+        const sep = window.location.href.includes('?') ? '&' : '?';
+        window.location.href = window.location.href + sep + 'session_token=' + encodeURIComponent(verifyJson.sessionToken);
+      } catch (err) {
+        status.style.color = '#EF4444';
+        status.textContent = err.message || 'Passkey authentication failed';
+      }
+    }
+  </script>
+</body>
+</html>`;
+      return res.status(200).send(html);
+    }
+
+    return res.status(401).json({
+      error: 'unauthorized',
+      error_description: 'User session authentication required before granting an OAuth authorization code. Pass valid Authorization: Bearer <session_token>, X-API-Key header, or passkey session cookie.',
+      consent_url: `/oauth/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}&scope=${encodeURIComponent(requestedScope)}`,
+    });
+  }
+
+  // 3. Authenticated: Render consent confirmation screen if not yet confirmed
+  const acceptsHtml = req.headers.accept?.includes('text/html') || !req.xhr;
+  if (req.method === 'GET' && acceptsHtml && !isConfirmed) {
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Northveil | Authorize AI Agent</title>
+  <link rel="icon" type="image/png" href="https://iili.io/CDj46zl.png">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
+    body { background-color: #000000; color: #FFFFFF; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background-color: #0F0F12; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; padding: 32px; max-width: 440px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.8); text-align: center; }
+    .logo { width: 56px; height: 56px; border-radius: 14px; margin: 0 auto 16px; display: block; border: 1px solid rgba(255, 255, 255, 0.1); }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; background: rgba(16, 185, 129, 0.15); color: #10B981; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 12px; border: 1px solid rgba(16, 185, 129, 0.3); }
+    h1 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+    p { font-size: 13px; color: #A1A1AA; line-height: 1.5; margin-bottom: 20px; }
     .scope-box { background: #141418; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 14px; text-align: left; margin-bottom: 20px; font-size: 12px; }
     .scope-title { color: #71717A; font-size: 10px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; }
     .scope-item { color: #FFFFFF; display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-    .form-group { text-align: left; margin-bottom: 20px; }
-    label { display: block; font-size: 11px; font-weight: 600; color: #A1A1AA; margin-bottom: 6px; text-transform: uppercase; }
-    input[type="text"] { width: 100%; background: #18181D; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 12px 14px; color: #FFFFFF; font-size: 13px; font-family: monospace; outline: none; transition: border-color 0.2s; }
-    input[type="text"]:focus { border-color: #FFFFFF; }
+    .vault-box { background: #18181D; border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 14px; padding: 12px 14px; text-align: left; margin-bottom: 20px; }
+    .vault-label { font-size: 10px; font-weight: 700; color: #10B981; text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+    .vault-addr { font-size: 13px; font-family: monospace; color: #FFFFFF; word-break: break-all; }
     .btn-primary { width: 100%; background: #FFFFFF; color: #000000; border: none; border-radius: 9999px; padding: 14px; font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity 0.2s; margin-bottom: 10px; }
     .btn-primary:hover { opacity: 0.9; }
     .btn-secondary { width: 100%; background: rgba(255, 255, 255, 0.04); color: #A1A1AA; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 9999px; padding: 12px; font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
@@ -1635,10 +1774,15 @@ const handleAuthorize = async (req: Request, res: Response) => {
 </head>
 <body>
   <div class="card">
-    <img src="https://iili.io/CD1CVJ2.png" alt="Northveil Logo" class="logo">
-    <span class="badge">OAUTH 2.0 AUTHORIZATION</span>
+    <img src="https://iili.io/CDj46zl.png" alt="Northveil Logo" class="logo">
+    <span class="badge">🟢 VERIFIED MPC VAULT ACTIVE</span>
     <h1>Connect AI Agent</h1>
     <p>An external AI application is requesting non-custodial read and execution access to your Northveil vault.</p>
+
+    <div class="vault-box">
+      <div class="vault-label">🛡️ Authenticated MPC Vault (Read-Only)</div>
+      <div class="vault-addr">${escapeHtml(authenticatedUser.walletAddress)}</div>
+    </div>
 
     <div class="scope-box">
       <div class="scope-title">Client Application</div>
@@ -1654,11 +1798,8 @@ const handleAuthorize = async (req: Request, res: Response) => {
       <input type="hidden" name="code_challenge" value="${escapeHtml(codeChallenge)}">
       <input type="hidden" name="code_challenge_method" value="${escapeHtml(codeChallengeMethod)}">
       <input type="hidden" name="scope" value="${escapeHtml(requestedScope)}">
-
-      <div class="form-group">
-        <label for="wallet_address">Vault Wallet Address</label>
-        <input type="text" id="wallet_address" name="wallet_address" placeholder="0x..." required value="${escapeHtml(defaultWallet)}">
-      </div>
+      <input type="hidden" name="session_token" value="${escapeHtml(activeSessionToken)}">
+      <input type="hidden" name="confirmed" value="true">
 
       <button type="submit" class="btn-primary">Authorize & Connect</button>
       <a href="${redirectUri ? `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}error=access_denied&state=${encodeURIComponent(state)}` : '/'}" class="btn-secondary">Cancel Request</a>
@@ -1668,17 +1809,10 @@ const handleAuthorize = async (req: Request, res: Response) => {
   </div>
 </body>
 </html>`;
-      return res.status(200).send(html);
-    }
-
-    return res.status(401).json({
-      error: 'unauthorized',
-      error_description: 'User session authentication required before granting an OAuth authorization code. Pass valid Authorization: Bearer <session_token>, X-API-Key header, or append wallet_address=<address> parameter.',
-      consent_url: `/oauth/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}&scope=${encodeURIComponent(requestedScope)}`,
-    });
+    return res.status(200).send(html);
   }
 
-  // Generate stateless HMAC-signed authorization code bound to authenticated user's ID & wallet
+  // 4. Issue HMAC-signed authorization code bound to verified user ID and wallet address
   const authPayload = {
     type: 'auth_code',
     clientId,
@@ -1694,7 +1828,7 @@ const handleAuthorize = async (req: Request, res: Response) => {
 
   const code = 'nv_code_' + signOAuthPayload(authPayload);
 
-  // Cache in memory for single-instance fast lookup
+  // Cache in memory for fast single-instance lookup
   inMemoryAuthCodes.set(code, {
     code,
     clientId,
@@ -2001,6 +2135,153 @@ app.get(['/openapi.yaml', '/api/v1/openapi.yaml'], (req: Request, res: Response)
   res.setHeader('Content-Type', 'text/yaml');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.send(JSON.stringify(spec, null, 2));
+});
+
+// DEDICATED REST API FOR MPC WALLETS & PASSKEY AUTHENTICATION
+app.post('/api/v1/wallets/create-mpc', async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  try {
+    const { userId = `user_${Date.now()}`, walletName = 'Primary Vault' } = req.body || {};
+    const wallet = await createMpcWallet(userId, walletName);
+    return res.json({
+      success: true,
+      wallet,
+      address: wallet.address,
+      mpcWalletId: wallet.mpcWalletId,
+      mpcProvider: wallet.mpcProvider,
+      userId,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post(['/api/v1/auth/passkey/register-options', '/api/v1/passkey/register-options'], async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  try {
+    const { userId = `user_${Date.now()}`, userName, userDisplayName } = req.body || {};
+    const options = await generatePasskeyRegistrationOptionsHandler(userId, userName, userDisplayName);
+    return res.json({ success: true, options });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post(['/api/v1/auth/passkey/verify-registration', '/api/v1/passkey/verify-registration'], async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  try {
+    const { userId = 'user_default', walletAddress, registrationResponse } = req.body || {};
+    if (!registrationResponse) {
+      return res.status(400).json({ success: false, error: 'Missing registrationResponse' });
+    }
+    const result = await verifyAndStorePasskeyRegistration(userId, walletAddress, registrationResponse);
+
+    const sessionPayload = {
+      type: 'user_session',
+      userId,
+      walletAddress: (walletAddress || '').toLowerCase(),
+      credentialId: result.credentialId,
+      exp: Date.now() + 30 * 24 * 60 * 60 * 1000,
+    };
+    const sessionToken = 'nv_sess_' + signOAuthPayload(sessionPayload);
+
+    res.cookie('northveil_session', sessionToken, {
+      httpOnly: true,
+      secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.json({
+      success: true,
+      verified: true,
+      credentialId: result.credentialId,
+      deviceName: result.deviceName,
+      walletAddress: (walletAddress || '').toLowerCase(),
+      userId,
+      sessionToken,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post(['/api/v1/auth/passkey/auth-options', '/api/v1/passkey/auth-options'], async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  try {
+    const { userId = 'default_user', walletAddress } = req.body || {};
+    const options = await generatePasskeyAuthenticationOptionsHandler(userId, walletAddress);
+    return res.json({ success: true, options });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post(['/api/v1/auth/passkey/verify-authentication', '/api/v1/passkey/verify-authentication'], async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  try {
+    const { userId = 'default_user', walletAddress, authenticationResponse } = req.body || {};
+    if (!authenticationResponse) {
+      return res.status(400).json({ success: false, error: 'Missing authenticationResponse' });
+    }
+    const result = await verifyPasskeyAuthentication(userId, walletAddress, authenticationResponse);
+
+    const sessionPayload = {
+      type: 'user_session',
+      userId: result.userId,
+      walletAddress: result.walletAddress.toLowerCase(),
+      credentialId: result.credentialId,
+      exp: Date.now() + 30 * 24 * 60 * 60 * 1000,
+    };
+    const sessionToken = 'nv_sess_' + signOAuthPayload(sessionPayload);
+
+    res.cookie('northveil_session', sessionToken, {
+      httpOnly: true,
+      secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.json({
+      success: true,
+      verified: true,
+      sessionToken,
+      walletAddress: result.walletAddress,
+      userId,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/v1/auth/session', async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  const authHeader = (req.headers.authorization || '').trim();
+  const rawCookie = req.headers.cookie || '';
+  const cookieMatch = rawCookie.match(/northveil_session=([^;]+)/);
+  const sessionToken = authHeader.replace(/^Bearer\s+/i, '') || req.headers['x-session-token'] as string || (cookieMatch ? cookieMatch[1] : '') || req.query.session_token as string || '';
+
+  if (sessionToken.startsWith('nv_sess_')) {
+    const verified = verifyOAuthPayload(sessionToken.replace('nv_sess_', ''));
+    if (verified && verified.walletAddress) {
+      return res.json({
+        authenticated: true,
+        user: {
+          id: verified.userId,
+          walletAddress: verified.walletAddress,
+          exp: verified.exp,
+        },
+      });
+    }
+  }
+
+  return res.status(401).json({ authenticated: false, error: 'No active session found' });
 });
 
 // UNIVERSAL REST API ENDPOINTS FOR CHATGPT ACTIONS & REST CLIENTS

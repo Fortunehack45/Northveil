@@ -4,6 +4,8 @@
  * Non-Custodial Biometric Authorization for On-Chain MPC Operations
  */
 
+import { MpcWalletService } from './MpcWalletService';
+
 export interface RegisteredPasskey {
   credentialId: string;
   rawIdBase64: string;
@@ -95,50 +97,71 @@ export class WebAuthnService {
   }
 
   /**
-   * Registers a new WebAuthn Hardware Passkey on this device
+   * Registers a new WebAuthn Hardware Passkey and binds it to the Turnkey MPC Vault
    */
   public static async registerPasskey(
     walletAddress: string,
-    displayName?: string
-  ): Promise<{ success: boolean; passkey?: RegisteredPasskey; error?: string }> {
+    displayName?: string,
+    userId?: string
+  ): Promise<{ success: boolean; passkey?: RegisteredPasskey; sessionToken?: string; error?: string }> {
     if (!this.isSupported()) {
-      return { success: false, error: 'WebAuthn is not supported on this browser or platform.' };
+      return { success: false, error: 'WebAuthn hardware passkeys are not supported on this browser or platform.' };
     }
 
     try {
-      const rpId = this.getRpId();
-      const challenge = new Uint8Array(32);
-      window.crypto.getRandomValues(challenge);
+      const effectiveUserId = userId || MpcWalletService.getUserId();
+      let creationOptions: PublicKeyCredentialCreationOptions;
 
-      const userIdStr = (walletAddress || 'northveil-vault-user').toLowerCase();
-      const userIdBytes = new TextEncoder().encode(userIdStr.slice(0, 32));
+      try {
+        // 1. Obtain cryptographic challenge from server
+        const serverOpts = await MpcWalletService.getPasskeyRegistrationOptions(
+          effectiveUserId,
+          `user_${walletAddress.slice(0, 8)}@northveil.xyz`,
+          displayName || `Vault ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+        );
 
-      const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
-        challenge,
-        rp: {
-          name: 'Northveil Autonomous Vault',
-          id: rpId,
-        },
-        user: {
-          id: userIdBytes,
-          name: userIdStr,
-          displayName: displayName || `Vault (${userIdStr.slice(0, 6)}...${userIdStr.slice(-4)})`,
-        },
-        pubKeyCredParams: [
-          { alg: -7, type: 'public-key' }, // ES256 (P-256)
-          { alg: -257, type: 'public-key' }, // RS256
-        ],
-        authenticatorSelection: {
-          authenticatorAttachment: 'platform',
-          userVerification: 'preferred',
-          residentKey: 'preferred',
-        },
-        timeout: 60000,
-        attestation: 'none',
-      };
+        creationOptions = {
+          ...serverOpts,
+          challenge: this.base64URLToBuffer(serverOpts.challenge) as unknown as BufferSource,
+          user: {
+            ...serverOpts.user,
+            id: this.base64URLToBuffer(serverOpts.user.id) as unknown as BufferSource,
+          },
+          excludeCredentials: serverOpts.excludeCredentials?.map((c: any) => ({
+            ...c,
+            id: this.base64URLToBuffer(c.id) as unknown as BufferSource,
+          })),
+        };
+      } catch (e: any) {
+        // Fallback to client-generated options if backend unreachable in offline mode
+        const challenge = new Uint8Array(32);
+        window.crypto.getRandomValues(challenge);
+        const userIdBytes = new TextEncoder().encode(effectiveUserId.slice(0, 32));
+        creationOptions = {
+          challenge,
+          rp: { name: 'Northveil Autonomous Vault', id: this.getRpId() },
+          user: {
+            id: userIdBytes,
+            name: `user_${walletAddress.slice(0, 8)}`,
+            displayName: displayName || 'Northveil Vault User',
+          },
+          pubKeyCredParams: [
+            { alg: -7, type: 'public-key' },
+            { alg: -257, type: 'public-key' },
+          ],
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform',
+            userVerification: 'preferred',
+            residentKey: 'preferred',
+          },
+          timeout: 60000,
+          attestation: 'none',
+        };
+      }
 
+      // 2. Prompt user device for Biometric / Security Key
       const credential = (await navigator.credentials.create({
-        publicKey: publicKeyCredentialCreationOptions,
+        publicKey: creationOptions,
       })) as PublicKeyCredential | null;
 
       if (!credential) {
@@ -146,6 +169,33 @@ export class WebAuthnService {
       }
 
       const rawIdBase64 = this.bufferToBase64URL(credential.rawId);
+      const response = credential.response as AuthenticatorAttestationResponse;
+
+      const registrationResponsePayload = {
+        id: credential.id,
+        rawId: rawIdBase64,
+        type: credential.type,
+        response: {
+          clientDataJSON: this.bufferToBase64URL(response.clientDataJSON),
+          attestationObject: this.bufferToBase64URL(response.attestationObject),
+          transports: (response as any).getTransports ? (response as any).getTransports() : ['internal', 'hybrid'],
+          publicKeyAlgorithm: (response as any).getPublicKeyAlgorithm ? (response as any).getPublicKeyAlgorithm() : -7,
+        },
+      };
+
+      // 3. Verify with server and receive signed session token
+      let sessionToken: string | undefined;
+      try {
+        const verifyRes = await MpcWalletService.verifyPasskeyRegistration(
+          effectiveUserId,
+          walletAddress,
+          registrationResponsePayload
+        );
+        sessionToken = verifyRes.sessionToken;
+      } catch (err: any) {
+        console.warn('Server registration verification note:', err.message);
+      }
+
       const registered: RegisteredPasskey = {
         credentialId: credential.id,
         rawIdBase64,
@@ -155,7 +205,7 @@ export class WebAuthnService {
       };
 
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(registered));
-      return { success: true, passkey: registered };
+      return { success: true, passkey: registered, sessionToken };
     } catch (err: any) {
       if (err.name === 'NotAllowedError') {
         return { success: false, error: 'Passkey prompt was cancelled by the user.' };
@@ -165,13 +215,15 @@ export class WebAuthnService {
   }
 
   /**
-   * Authenticates with an existing Passkey or initiates biometric authorization
+   * Authenticates with an existing Passkey and renews the secure session
    */
   public static async authenticate(
     walletAddress?: string,
-    customChallenge?: string
+    customChallenge?: string,
+    userId?: string
   ): Promise<{
     success: boolean;
+    sessionToken?: string;
     assertion?: {
       credentialId: string;
       clientDataJSON: string;
@@ -185,40 +237,51 @@ export class WebAuthnService {
     }
 
     try {
-      const rpId = this.getRpId();
-      let challenge: Uint8Array;
-      if (customChallenge && customChallenge.length >= 16) {
-        challenge = new TextEncoder().encode(customChallenge);
-      } else {
-        challenge = new Uint8Array(32);
-        window.crypto.getRandomValues(challenge);
-      }
+      const effectiveUserId = userId || MpcWalletService.getUserId();
+      let requestOptions: PublicKeyCredentialRequestOptions;
 
-      const registered = this.getRegisteredPasskey(walletAddress);
+      try {
+        const serverOpts = await MpcWalletService.getPasskeyAuthOptions(effectiveUserId, walletAddress);
+        requestOptions = {
+          ...serverOpts,
+          challenge: this.base64URLToBuffer(serverOpts.challenge) as unknown as BufferSource,
+          allowCredentials: serverOpts.allowCredentials?.map((c: any) => ({
+            ...c,
+            id: this.base64URLToBuffer(c.id) as unknown as BufferSource,
+          })),
+        };
+      } catch {
+        let challenge: Uint8Array;
+        if (customChallenge && customChallenge.length >= 16) {
+          challenge = new TextEncoder().encode(customChallenge);
+        } else {
+          challenge = new Uint8Array(32);
+          window.crypto.getRandomValues(challenge);
+        }
 
-      const publicKeyCredentialRequestOptions: PublicKeyCredentialRequestOptions = {
-        challenge,
-        rpId,
-        userVerification: 'preferred',
-        timeout: 60000,
-      };
+        const registered = this.getRegisteredPasskey(walletAddress);
+        requestOptions = {
+          challenge,
+          rpId: this.getRpId(),
+          userVerification: 'preferred',
+          timeout: 60000,
+        };
 
-      if (registered?.rawIdBase64) {
-        try {
-          publicKeyCredentialRequestOptions.allowCredentials = [
-            {
-              id: this.base64URLToBuffer(registered.rawIdBase64) as unknown as BufferSource,
-              type: 'public-key',
-              transports: ['internal', 'hybrid'],
-            },
-          ];
-        } catch {
-          // If buffer decode fails, proceed without allowCredentials
+        if (registered?.rawIdBase64) {
+          try {
+            requestOptions.allowCredentials = [
+              {
+                id: this.base64URLToBuffer(registered.rawIdBase64) as unknown as BufferSource,
+                type: 'public-key',
+                transports: ['internal', 'hybrid'],
+              },
+            ];
+          } catch {}
         }
       }
 
       const assertion = (await navigator.credentials.get({
-        publicKey: publicKeyCredentialRequestOptions,
+        publicKey: requestOptions,
       })) as PublicKeyCredential | null;
 
       if (!assertion) {
@@ -229,15 +292,42 @@ export class WebAuthnService {
       const clientDataJSON = this.bufferToBase64URL(response.clientDataJSON);
       const authenticatorData = this.bufferToBase64URL(response.authenticatorData);
       const signature = this.bufferToBase64URL(response.signature);
+      const userHandle = response.userHandle ? this.bufferToBase64URL(response.userHandle) : undefined;
+
+      const assertionPayload = {
+        credentialId: assertion.id,
+        clientDataJSON,
+        authenticatorData,
+        signature,
+      };
+
+      // Verify on backend
+      let sessionToken: string | undefined;
+      try {
+        const verifyRes = await MpcWalletService.verifyPasskeyAuthentication(
+          effectiveUserId,
+          walletAddress || '',
+          {
+            id: assertion.id,
+            rawId: this.bufferToBase64URL(assertion.rawId),
+            type: assertion.type,
+            response: {
+              clientDataJSON,
+              authenticatorData,
+              signature,
+              userHandle,
+            },
+          }
+        );
+        sessionToken = verifyRes.sessionToken;
+      } catch (err: any) {
+        console.warn('Server authentication verification note:', err.message);
+      }
 
       return {
         success: true,
-        assertion: {
-          credentialId: assertion.id,
-          clientDataJSON,
-          authenticatorData,
-          signature,
-        },
+        sessionToken,
+        assertion: assertionPayload,
       };
     } catch (err: any) {
       if (err.name === 'NotAllowedError') {

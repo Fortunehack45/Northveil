@@ -76,6 +76,10 @@ export const WalletsView: React.FC = () => {
     setRevealPassword('');
     setRevealError('');
     setIsKeyVisible(false);
+    if (wallet.derivationPath?.includes('turnkey')) {
+      setRevealedKeyText('This vault is secured by Turnkey Hardware Nitro TEE Enclaves & Biometric Passkeys. Non-custodial key shares are never stored or exposed as raw text in the browser.');
+      setIsKeyVisible(true);
+    }
     setShowRevealModal(true);
   };
 
