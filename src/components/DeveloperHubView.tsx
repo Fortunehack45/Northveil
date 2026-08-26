@@ -727,9 +727,9 @@ export const DeveloperHubView: React.FC = () => {
                 <h4 className="font-bold text-zinc-900 dark:text-white">Step-by-Step Connection Guide:</h4>
                 {selectedMcpClient === 'claude' && (
                   <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed">
-                    <li>Open your Claude Desktop config (<code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude_desktop_config.json</code>).</li>
-                    <li>Paste the snippet above inside the <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">mcpServers</code> dictionary.</li>
-                    <li>Restart Claude Desktop. All 38 Web3 MPC tools will appear in the 🔌 hammer icon.</li>
+                    <li><strong>Zero-JSON Method (Fastest)</strong>: Run <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude mcp add northveil {baseMcpUrl}/sse</code> in your terminal — no config file editing needed!</li>
+                    <li><strong>Claude Settings UI</strong>: Open Claude Desktop &rarr; <strong>Settings</strong> &rarr; <strong>Connectors / Developer</strong> &rarr; Click <strong>Add MCP Server</strong> &rarr; Enter URL <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{baseMcpUrl}/sse</code>.</li>
+                    <li><strong>Config File (Optional)</strong>: Or paste the snippet above into <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude_desktop_config.json</code>.</li>
                   </ol>
                 )}
                 {selectedMcpClient === 'chatgpt' && (

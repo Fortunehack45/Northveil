@@ -11,6 +11,10 @@ import {
   Sparkles,
   Trash2,
   Wallet,
+  Eye,
+  EyeOff,
+  Key,
+  ExternalLink,
 } from 'lucide-react';
 import { AgentConnection } from '../types';
 import { CustomSelect } from './CustomSelect';
@@ -39,8 +43,28 @@ export const AgentsView: React.FC = () => {
   const [customAgentName, setCustomAgentName] = useState('');
   const [copiedConfig, setCopiedConfig] = useState(false);
   const [copiedSse, setCopiedSse] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({});
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+  const [connectionMode, setConnectionMode] = useState<'zero_json' | 'json_config'>('zero_json');
   const [mcpClientTab, setMcpClientTab] = useState<'claude' | 'chatgpt' | 'cursor' | 'windsurf' | 'claudecode' | 'sse'>('claude');
   const [mcpOnline, setMcpOnline] = useState(true);
+
+  const toggleRevealKey = (id: string) => {
+    setRevealedKeys((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleCopyKey = (keyText: string, id: string) => {
+    navigator.clipboard.writeText(keyText);
+    setCopiedKeyId(id);
+    setTimeout(() => setCopiedKeyId(null), 2000);
+  };
+
+  const handleCopyText = (text: string, fieldId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldId);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   const isLocalhost =
     typeof window !== 'undefined' &&
@@ -381,6 +405,40 @@ export const AgentsView: React.FC = () => {
                   </div>
                 </div>
 
+                {/* API Key Box with Reveal & Copy */}
+                <div className="p-3 bg-black/[0.03] dark:bg-black/40 rounded-2xl space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
+                    <span className="flex items-center gap-1 font-medium text-zinc-700 dark:text-zinc-300">
+                      <Key className="w-3 h-3 text-zinc-400" />
+                      <span>Agent API Key</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-400">Bearer / Header</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 p-1.5 px-2.5 bg-white dark:bg-[#18181c] rounded-xl border border-black/[0.04] dark:border-white/[0.06]">
+                    <span className="font-mono text-xs text-zinc-900 dark:text-zinc-200 truncate">
+                      {revealedKeys[agent.id]
+                        ? (agent.apiKey || 'nv_live_key_active')
+                        : (agent.apiKey ? `${agent.apiKey.slice(0, 10)}••••••••${agent.apiKey.slice(-4)}` : 'nv_live_••••••••••••')}
+                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => toggleRevealKey(agent.id)}
+                        className="p-1 rounded text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                        title={revealedKeys[agent.id] ? "Hide Key" : "Reveal Key"}
+                      >
+                        {revealedKeys[agent.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        onClick={() => handleCopyKey(agent.apiKey || 'nv_live_key_active', agent.id)}
+                        className="p-1 rounded text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                        title="Copy Key"
+                      >
+                        {copiedKeyId === agent.id ? <Check className="w-3.5 h-3.5 text-zinc-900 dark:text-white" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Metrics */}
                 <div className="grid grid-cols-2 gap-2 text-center font-mono">
                   <div className="p-2.5 bg-black/[0.03] dark:bg-black/40 rounded-xl">
@@ -504,71 +562,204 @@ export const AgentsView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Step 3: MCP Client Configuration Guide */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
+                {/* Step 3: Connection Mode & Guided Walkthrough */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
                     <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                      3. Select AI Client / IDE Configuration
+                      3. Connection Method
                     </label>
-                  </div>
-                  
-                  {/* Client Tabs */}
-                  <div className="mono-segmented-container w-full flex flex-wrap bg-black/[0.04] dark:bg-black p-1 rounded-xl border border-black/[0.06] dark:border-white/[0.08] mb-2.5">
-                    {[
-                      { id: 'claude', label: 'Claude Desktop' },
-                      { id: 'chatgpt', label: 'ChatGPT' },
-                      { id: 'cursor', label: 'Cursor' },
-                      { id: 'windsurf', label: 'Windsurf' },
-                      { id: 'claudecode', label: 'Claude Code' },
-                      { id: 'sse', label: 'Remote SSE' },
-                    ].map((client) => (
+                    <div className="flex items-center gap-1 bg-black/[0.04] dark:bg-black p-0.5 rounded-lg border border-black/[0.06] dark:border-white/[0.08]">
                       <button
-                        key={client.id}
                         type="button"
-                        onClick={() => setMcpClientTab(client.id as any)}
-                        className={`flex-1 py-1 px-1.5 text-[11px] font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                          mcpClientTab === client.id
+                        onClick={() => setConnectionMode('zero_json')}
+                        className={`px-2 py-0.5 text-[10px] font-medium rounded-md transition-all cursor-pointer ${
+                          connectionMode === 'zero_json'
                             ? 'bg-black text-white dark:bg-white dark:text-black font-semibold shadow-sm'
                             : 'text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white'
                         }`}
                       >
-                        {client.label}
+                        ⚡ Zero-JSON (UI Only)
                       </button>
-                    ))}
+                      <button
+                        type="button"
+                        onClick={() => setConnectionMode('json_config')}
+                        className={`px-2 py-0.5 text-[10px] font-medium rounded-md transition-all cursor-pointer ${
+                          connectionMode === 'json_config'
+                            ? 'bg-black text-white dark:bg-white dark:text-black font-semibold shadow-sm'
+                            : 'text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white'
+                        }`}
+                      >
+                        📄 Config File
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Config File Location Hint */}
-                  <div className="p-2.5 bg-black/[0.02] dark:bg-black/50 border border-black/[0.04] dark:border-white/[0.04] rounded-xl text-[10px] text-zinc-500 dark:text-zinc-400 font-mono mb-2">
-                    📁 <span className="text-zinc-700 dark:text-zinc-300 font-semibold">Config Location:</span> {getClientFilePath(mcpClientTab)}
-                  </div>
+                  {connectionMode === 'zero_json' ? (
+                    <div className="space-y-3">
+                      {/* Zero-JSON Claude Guide */}
+                      {(connectType === 'claude' || mcpClientTab === 'claude') && (
+                        <div className="p-3.5 bg-black/[0.02] dark:bg-black/40 border border-black/[0.06] dark:border-white/[0.06] rounded-2xl space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                              <Bot className="w-4 h-4" /> Claude Zero-JSON Direct Connect
+                            </span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 font-semibold">
+                              NO FILE EDITING
+                            </span>
+                          </div>
 
-                  {/* Code Snippet Box */}
-                  <div className="relative">
-                    <pre className="p-3.5 bg-black/[0.03] dark:bg-black border border-black/[0.06] dark:border-white/[0.08] rounded-2xl font-mono text-[11px] text-zinc-800 dark:text-zinc-200 overflow-x-auto max-h-40 leading-relaxed">
-                      {claudeDesktopConfigJson}
-                    </pre>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(claudeDesktopConfigJson);
-                        setCopiedConfig(true);
-                        setTimeout(() => setCopiedConfig(false), 2000);
-                      }}
-                      className="absolute top-2.5 right-2.5 p-1.5 rounded-lg bg-black/[0.06] dark:bg-white/[0.08] hover:bg-black/[0.12] dark:hover:bg-white/[0.16] text-zinc-900 dark:text-white transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-medium"
-                      title="Copy Configuration"
-                    >
-                      {copiedConfig ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-zinc-900 dark:text-white" />
-                          <span>Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy</span>
-                        </>
+                          {/* Method 1: 1-Click Terminal Command */}
+                          <div className="space-y-1.5">
+                            <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 block">
+                              Method A: 1-Click Command (Claude Code / Desktop)
+                            </span>
+                            <div className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-[#18181c] rounded-xl border border-black/[0.04] dark:border-white/[0.06]">
+                              <code className="font-mono text-[11px] text-zinc-900 dark:text-zinc-200 truncate">
+                                claude mcp add northveil {generatedSseUrl}
+                              </code>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(`claude mcp add northveil ${generatedSseUrl}`, 'claude-cmd')}
+                                className="px-2 py-1 rounded-lg bg-black/[0.06] dark:bg-white/[0.08] hover:bg-black/[0.12] dark:hover:bg-white/[0.16] text-zinc-900 dark:text-white text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                              >
+                                {copiedField === 'claude-cmd' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                                {copiedField === 'claude-cmd' ? 'Copied' : 'Copy'}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Method 2: Claude Desktop Settings UI */}
+                          <div className="space-y-1.5 pt-1">
+                            <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 block">
+                              Method B: Claude Desktop UI Settings (No config file)
+                            </span>
+                            <ol className="list-decimal list-inside space-y-1 text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed pl-0.5">
+                              <li>Open <strong>Claude Desktop</strong> &rarr; Click <strong>Settings</strong> (or Avatar) &rarr; <strong>Connectors / Developer</strong>.</li>
+                              <li>Click <strong>Add MCP Server</strong>.</li>
+                              <li>
+                                Set <strong>Name</strong> to <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[10px]">Northveil</code> and <strong>Server URL</strong> to:
+                                <div className="flex items-center justify-between gap-2 p-1.5 my-1 bg-white dark:bg-[#18181c] rounded-lg border border-black/[0.04] dark:border-white/[0.06]">
+                                  <span className="font-mono text-[10px] text-zinc-800 dark:text-zinc-200 truncate">{generatedSseUrl}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyText(generatedSseUrl, 'claude-url')}
+                                    className="p-1 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-zinc-700 dark:text-zinc-300 cursor-pointer shrink-0"
+                                    title="Copy URL"
+                                  >
+                                    {copiedField === 'claude-url' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                                  </button>
+                                </div>
+                              </li>
+                              <li>Click <strong>Save</strong>! All 38 Web3 tools will load immediately.</li>
+                            </ol>
+                          </div>
+                        </div>
                       )}
-                    </button>
-                  </div>
+
+                      {/* Zero-JSON ChatGPT Guide */}
+                      {(connectType === 'chatgpt' || mcpClientTab === 'chatgpt') && (
+                        <div className="p-3.5 bg-black/[0.02] dark:bg-black/40 border border-black/[0.06] dark:border-white/[0.06] rounded-2xl space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                              <Sparkles className="w-4 h-4" /> ChatGPT Custom Action / GPT Plugin
+                            </span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 font-semibold">
+                              NO FILE EDITING
+                            </span>
+                          </div>
+
+                          <div className="space-y-2 text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                            <div className="p-2 bg-white dark:bg-[#18181c] rounded-xl border border-black/[0.04] dark:border-white/[0.06] space-y-1">
+                              <span className="font-semibold text-zinc-900 dark:text-white block text-[10px]">
+                                1. Schema Import URL (Copy & paste into ChatGPT)
+                              </span>
+                              <div className="flex items-center justify-between gap-2">
+                                <code className="font-mono text-[10px] text-zinc-800 dark:text-zinc-200 truncate">
+                                  {baseMcpUrl}/openapi.json
+                                </code>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyText(`${baseMcpUrl}/openapi.json`, 'gpt-schema')}
+                                  className="px-2 py-0.5 rounded bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white text-[10px] font-medium cursor-pointer shrink-0"
+                                >
+                                  {copiedField === 'gpt-schema' ? 'Copied' : 'Copy URL'}
+                                </button>
+                              </div>
+                            </div>
+
+                            <ol className="list-decimal list-inside space-y-1 pl-0.5">
+                              <li>In ChatGPT, open <strong>Explore GPTs</strong> &rarr; <strong>+ Create</strong> &rarr; <strong>Configure</strong> &rarr; <strong>Actions</strong> &rarr; <strong>Create new action</strong>.</li>
+                              <li>Click <strong>Import from URL</strong>, paste the schema URL copied above and click <strong>Import</strong>.</li>
+                              <li>
+                                Under <strong>Authentication</strong>, select <strong>OAuth</strong> (Auth URL: <code className="font-mono text-[10px]">{baseMcpUrl}/oauth/authorize</code>, Token URL: <code className="font-mono text-[10px]">{baseMcpUrl}/oauth/token</code>, Scope: <code className="font-mono text-[10px]">tools:read tools:execute</code>) or select <strong>API Key</strong> with Header <code className="font-mono text-[10px]">X-API-Key</code>.
+                              </li>
+                              <li>Click <strong>Save</strong>! Your GPT can now perform on-chain operations with hardware MPC security.</li>
+                            </ol>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      {/* Client Tabs for JSON mode */}
+                      <div className="mono-segmented-container w-full flex flex-wrap bg-black/[0.04] dark:bg-black p-1 rounded-xl border border-black/[0.06] dark:border-white/[0.08] mb-2.5">
+                        {[
+                          { id: 'claude', label: 'Claude Desktop' },
+                          { id: 'chatgpt', label: 'ChatGPT' },
+                          { id: 'cursor', label: 'Cursor' },
+                          { id: 'windsurf', label: 'Windsurf' },
+                          { id: 'claudecode', label: 'Claude Code' },
+                          { id: 'sse', label: 'Remote SSE' },
+                        ].map((client) => (
+                          <button
+                            key={client.id}
+                            type="button"
+                            onClick={() => setMcpClientTab(client.id as any)}
+                            className={`flex-1 py-1 px-1.5 text-[11px] font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                              mcpClientTab === client.id
+                                ? 'bg-black text-white dark:bg-white dark:text-black font-semibold shadow-sm'
+                                : 'text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white'
+                            }`}
+                          >
+                            {client.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Config File Location Hint */}
+                      <div className="p-2.5 bg-black/[0.02] dark:bg-black/50 border border-black/[0.04] dark:border-white/[0.04] rounded-xl text-[10px] text-zinc-500 dark:text-zinc-400 font-mono mb-2">
+                        📁 <span className="text-zinc-700 dark:text-zinc-300 font-semibold">Config Location:</span> {getClientFilePath(mcpClientTab)}
+                      </div>
+
+                      {/* Code Snippet Box */}
+                      <div className="relative">
+                        <pre className="p-3.5 bg-black/[0.03] dark:bg-black border border-black/[0.06] dark:border-white/[0.08] rounded-2xl font-mono text-[11px] text-zinc-800 dark:text-zinc-200 overflow-x-auto max-h-40 leading-relaxed">
+                          {claudeDesktopConfigJson}
+                        </pre>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(claudeDesktopConfigJson);
+                            setCopiedConfig(true);
+                            setTimeout(() => setCopiedConfig(false), 2000);
+                          }}
+                          className="absolute top-2.5 right-2.5 p-1.5 rounded-lg bg-black/[0.06] dark:bg-white/[0.08] hover:bg-black/[0.12] dark:hover:bg-white/[0.16] text-zinc-900 dark:text-white transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-medium"
+                          title="Copy Configuration"
+                        >
+                          {copiedConfig ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-zinc-900 dark:text-white" />
+                              <span>Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Step 4: Non-Custodial Security & Approval Flow Guide */}
@@ -632,6 +823,42 @@ export const AgentsView: React.FC = () => {
               </div>
 
               <div className="p-6 pt-2 overflow-y-auto no-scrollbar space-y-4 flex-1">
+                {/* Agent API Key in Details */}
+                <div className="p-4 bg-black/[0.02] dark:bg-black/40 border border-black/[0.04] dark:border-transparent rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-700 dark:text-zinc-300 font-semibold flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5 text-zinc-400" />
+                      Agent API Key
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-400">Header: X-API-Key</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-[#18181c] rounded-xl border border-black/[0.04] dark:border-white/[0.06]">
+                    <span className="font-mono text-xs text-zinc-900 dark:text-zinc-200 truncate">
+                      {revealedKeys[selectedAgent.id]
+                        ? (selectedAgent.apiKey || 'nv_live_key_active')
+                        : (selectedAgent.apiKey ? `${selectedAgent.apiKey.slice(0, 12)}••••••••${selectedAgent.apiKey.slice(-4)}` : 'nv_live_••••••••••••')}
+                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => toggleRevealKey(selectedAgent.id)}
+                        className="p-1 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                        title={revealedKeys[selectedAgent.id] ? "Hide Key" : "Reveal Key"}
+                      >
+                        {revealedKeys[selectedAgent.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyKey(selectedAgent.apiKey || 'nv_live_key_active', selectedAgent.id)}
+                        className="p-1 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                        title="Copy Key"
+                      >
+                        {copiedKeyId === selectedAgent.id ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Access expiration manager */}
                 <div className="p-4 bg-black/[0.02] dark:bg-black/40 border border-black/[0.04] dark:border-transparent rounded-2xl space-y-3">
                   <div className="flex items-center justify-between">
