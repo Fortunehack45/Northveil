@@ -70,8 +70,17 @@ async function testAll35McpToolsClean() {
   });
   const approvalToken3 = stageRes3.result?.approvalToken || stageRes3.result?.token || '';
 
-  // Tailored argument map for all 35 tools
+  // Tailored argument map for all tools
   const toolArgs: Record<string, any> = {
+    northveil_prepare_transfer: { to: testRecipient, amount: 0.0001, asset: 'ETH', network: 'sepolia', walletAddress: testWallet },
+    northveil_prepare_swap: { fromToken: 'ETH', toToken: 'USDC', amount: 0.0001, network: 'sepolia' },
+    northveil_prepare_bridge: { source_chain: 'sepolia', destination_chain: 'base', asset: 'ETH', amount: 0.001 },
+    northveil_prepare_contract_call: { contractAddress: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', method: 'decimals', args: [], network: 'sepolia' },
+    northveil_prepare_deploy: { contractName: 'TestToken', symbol: 'TTK', contractType: 'erc20', network: 'sepolia' },
+    northveil_request_signature: { message: 'Hello Northveil' },
+    northveil_request_broadcast: { approval_id: approvalToken1 },
+    northveil_list_pending_approvals: {},
+    northveil_get_approval_status: { approval_id: approvalToken1 },
     create_wallet: { walletName: 'Exhaustive Test Vault', chain: 'sepolia' },
     import_wallet: { address: testWallet, walletName: 'Imported Vault' },
     send_transfer: { token: 'ETH', amount: 0.0001, recipient: testRecipient, network: 'sepolia', walletAddress: testWallet },

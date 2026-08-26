@@ -155,11 +155,10 @@ export const WEBAUTHN_EXPECTED_ORIGIN: string[] = [
 // ═════════════════════════════════════════════════════════════════════════════
 export const RPC_FALLBACK_POOLS: Record<string, string[]> = {
   sepolia: [
-    'https://1rpc.io/sepolia',
-    'https://rpc.sepolia.org',
-    'https://sepolia.drpc.org',
     process.env.SEPOLIA_RPC_URL || '',
     'https://ethereum-sepolia-rpc.publicnode.com',
+    'https://gateway.tenderly.co/public/sepolia',
+    'https://1rpc.io/sepolia',
   ].filter(Boolean),
   ethereum: [
     process.env.ETH_RPC_URL || '',
@@ -1479,7 +1478,9 @@ export async function approveAndExecuteWithPasskey(
 
         txHash = txResponse.hash;
         try {
-          const receipt = await txResponse.wait(1, 45000);
+          const receiptPromise = txResponse.wait(1, 15000);
+          const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 8000));
+          const receipt: any = await Promise.race([receiptPromise, timeoutPromise]);
           if (receipt) {
             blockNumber = Number(receipt.blockNumber);
             gasUsed = receipt.gasUsed ? receipt.gasUsed.toString() : '21000';

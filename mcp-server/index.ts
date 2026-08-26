@@ -64,6 +64,7 @@ import {
   verifyPasskeyAuthentication,
   inMemoryTxRequests,
   inMemoryMpcWallets,
+  executeWithRpcFailover,
 } from './mpcControlPlaneService.js';
 
 const app = express();
@@ -3244,7 +3245,7 @@ function parsePromptParameters(promptStr: string, args: any) {
 
 const inMemoryBookingReservations: any[] = [];
 
-async function executeRealTool(name: string, args: any, walletAddress: string, req?: Request) {
+export async function executeRealTool(name: string, args: any, walletAddress: string, req?: Request) {
   const toolName = name;
 
   const explicitWallet = (args?.walletAddress || args?.userWallet || args?.ownerAddress || args?.fromAddress || args?.from || args?.address || args?.account || args?.solanaAddress || '').toString().trim();
@@ -3841,6 +3842,79 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
       };
     }
 
+    case 'northveil_estimate_gas': {
+      return executeRealTool('get_gas_estimate', args, walletAddress, req);
+    }
+
+    case 'northveil_prepare_bridge': {
+      return executeRealTool('stage_cross_chain_intent', args, walletAddress, req);
+    }
+
+    case 'northveil_request_signature': {
+      const message = (args?.message || args?.data || '').toString();
+      const address = (args?.walletAddress || walletAddress || cleanAddress).toLowerCase();
+      const requestId = `sig_${Date.now().toString(36)}_${crypto.randomBytes(4).toString('hex')}`;
+      const approvalToken = `tok_${crypto.randomBytes(24).toString('hex')}`;
+      const passkeyChallenge = crypto.randomBytes(32).toString('base64url');
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+      const staged = {
+        requestId,
+        walletAddress: address,
+        recipient: address,
+        amount: 0,
+        asset: 'SIGNATURE',
+        network: 'offchain',
+        chainId: 1,
+        unsignedPayload: { message },
+        approvalToken,
+        passkeyChallenge,
+        status: 'pending',
+        userId: args?.userId || 'default_user',
+        reason: args?.reason || 'Sign off-chain message',
+        expiresAt,
+        createdAt: new Date().toISOString(),
+      };
+      inMemoryTxRequests.set(approvalToken, staged as any);
+
+      return {
+        ok: true,
+        decision: 'needs_device_approval',
+        action: 'signature',
+        preview_id: requestId,
+        wallet: { id: 'vault_primary', address, chain: 'offchain' },
+        message,
+        approval: { id: approvalToken, approval_id: approvalToken, expires_at: expiresAt },
+        formattedMarkdown: `### ✍️ OFF-CHAIN SIGNATURE PREVIEW (DEVICE CONFIRMATION REQUIRED)\n\n> **Vault**: \`${address}\`  \n> **Message**: \`${message}\`  \n> **Approval ID**: \`${approvalToken}\`  \n> **Decision**: 📱 **Awaiting Biometric Confirmation on Device**`,
+      };
+    }
+
+    case 'northveil_list_pending_approvals': {
+      const targetAddr = (args?.walletAddress || walletAddress || cleanAddress).toLowerCase();
+      const pendingList: any[] = [];
+      for (const [tok, staged] of inMemoryTxRequests.entries()) {
+        if (staged.status === 'pending' && (!targetAddr || staged.walletAddress.toLowerCase() === targetAddr)) {
+          pendingList.push({
+            approval_id: tok,
+            request_id: staged.requestId,
+            action: staged.asset === 'DEPLOY' ? 'deploy' : staged.asset === 'SIGNATURE' ? 'signature' : 'transfer',
+            amount: staged.amount,
+            asset: staged.asset,
+            network: staged.network,
+            recipient: staged.recipient,
+            reason: staged.reason,
+            expires_at: staged.expiresAt,
+          });
+        }
+      }
+      return {
+        ok: true,
+        count: pendingList.length,
+        approvals: pendingList,
+        formattedMarkdown: `### 📋 PENDING BIOMETRIC APPROVALS (${pendingList.length})\n\n${pendingList.length === 0 ? '> No unexpired approvals pending device confirmation.' : pendingList.map(p => `> **[${p.action.toUpperCase()}]** \`${p.amount} ${p.asset}\` to \`${p.recipient}\` (Approval ID: \`${p.approval_id}\`)`).join('\n')}`,
+      };
+    }
+
     case 'list_wallets':
     case 'get_wallets':
     case 'get_wallet_list': {
@@ -4216,9 +4290,9 @@ ${simulation.revertReason ? `> **Revert Reason**: \`${simulation.revertReason}\`
       const statusEmoji = stagedReq.status === 'confirmed' ? '🟢' : stagedReq.status === 'pending' ? '🟡' : '🔴';
       const reqId = (stagedReq as any).request_id || stagedReq.requestId || 'req_latest';
       const vaultAddr = (stagedReq as any).wallet_address || stagedReq.walletAddress || cleanAddress;
-      const txH = (stagedReq as any).tx_hash || stagedReq.txHash || '0x7da0c343e3e8a4c3f58d4c2be9b148946d51dcc92c47892b364b0564284cea1c';
-      const expLink = (stagedReq as any).explorer_url || stagedReq.explorerUrl || `https://sepolia.etherscan.io/tx/${txH}`;
-      const blkNum = (stagedReq as any).block_number || stagedReq.blockNumber || 12048592;
+      const txH = (stagedReq as any).tx_hash || stagedReq.txHash || null;
+      const expLink = txH ? ((stagedReq as any).explorer_url || stagedReq.explorerUrl || `https://sepolia.etherscan.io/tx/${txH}`) : null;
+      const blkNum = (stagedReq as any).block_number || stagedReq.blockNumber || null;
       const expAt = (stagedReq as any).expires_at || stagedReq.expiresAt || new Date().toISOString();
 
       return {
@@ -5849,6 +5923,12 @@ ${solCode}
       if (fromSym === 'ETH' && network === 'sepolia') {
         swapTo = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9'; // Sepolia WETH9
         swapData = '0xd0e30db0'; // deposit()
+      } else if (network === 'sepolia' && (fromSym === 'WETH' || toSym === 'ETH')) {
+        swapTo = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9'; // Sepolia WETH9
+        swapData = '0xd0e30db0';
+      } else if (fromSym !== 'ETH') {
+        const erc20Iface = new ethers.Interface(['function approve(address spender, uint256 amount) returns (bool)']);
+        swapData = erc20Iface.encodeFunctionData('approve', [routerAddress, ethers.parseUnits(String(amountNum), 6)]);
       }
 
       const unsignedPayload = {
@@ -5862,19 +5942,20 @@ ${solCode}
       const scopeCheck = await evaluateAutonomousScope(cleanAddress, 'default_user', chainId, fromSym, approxUsd, routerAddress);
 
       if (scopeCheck.inScope && scopeCheck.scopeId) {
-        const autoResult = await executeAutonomousTransaction(
-          cleanAddress,
-          routerAddress,
-          amountNum,
-          fromSym,
-          network,
-          unsignedPayload,
-          scopeCheck.scopeId,
-          'default_user'
-        );
+        try {
+          const autoResult = await executeAutonomousTransaction(
+            cleanAddress,
+            swapTo,
+            amountNum,
+            fromSym,
+            network,
+            unsignedPayload,
+            scopeCheck.scopeId,
+            'default_user'
+          );
 
-        return {
-          formattedMarkdown: `
+          return {
+            formattedMarkdown: `
 ### ⚡ AUTONOMOUS DEX SWAP CONFIRMED ON-CHAIN
 
 > **Status**: 🟢 **CONFIRMED ON-CHAIN (Receipt Status: 1)**  
@@ -5886,13 +5967,16 @@ ${solCode}
 > **Block Number**: \`${autoResult.blockNumber}\`  
 > **Gas Used**: \`${autoResult.gasUsed}\`  
 `,
-          ...autoResult,
-          fromToken: fromSym,
-          toToken: toSym,
-          fromAmount: amountNum,
-          toAmount: Number(dstAmountFormatted),
-          router: routerName,
-        };
+            ...autoResult,
+            fromToken: fromSym,
+            toToken: toSym,
+            fromAmount: amountNum,
+            toAmount: Number(dstAmountFormatted),
+            router: routerName,
+          };
+        } catch (autoErr: any) {
+          console.warn('[Autonomous Swap Fallback to Staging]:', autoErr?.message || autoErr);
+        }
       }
 
       // 2. Passkey Staging Flow
@@ -7619,19 +7703,20 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
       const scopeCheck = await evaluateAutonomousScope(cleanAddress, 'default_user', chainId, tokenSymbol, 1.0, contractAddress);
 
       if (scopeCheck.inScope && scopeCheck.scopeId) {
-        const autoRes = await executeAutonomousTransaction(
-          cleanAddress,
-          contractAddress,
-          Number(amountStr),
-          tokenSymbol,
-          network,
-          unsignedPayload,
-          scopeCheck.scopeId,
-          'default_user'
-        );
+        try {
+          const autoRes = await executeAutonomousTransaction(
+            cleanAddress,
+            contractAddress,
+            Number(amountStr),
+            tokenSymbol,
+            network,
+            unsignedPayload,
+            scopeCheck.scopeId,
+            'default_user'
+          );
 
-        return {
-          formattedMarkdown: `
+          return {
+            formattedMarkdown: `
 ### ⚡ AUTONOMOUS TOKEN MINT CONFIRMED ON-CHAIN
 
 > **Status**: 🟢 **CONFIRMED ON-CHAIN (Receipt Status: 1)**  
@@ -7644,12 +7729,15 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
 > **Block Number**: \`${autoRes.blockNumber}\`  
 > **Gas Used**: \`${autoRes.gasUsed}\`  
 `,
-          ...autoRes,
-          tokenName,
-          tokenSymbol,
-          recipientAddress,
-          contractAddress,
-        };
+            ...autoRes,
+            tokenName,
+            tokenSymbol,
+            recipientAddress,
+            contractAddress,
+          };
+        } catch (autoErr: any) {
+          console.warn('[Autonomous Mint Notice]:', autoErr?.message || autoErr);
+        }
       }
 
       // 2. Passkey Staging Flow
