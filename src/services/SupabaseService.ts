@@ -422,9 +422,10 @@ export class SupabaseService {
   /**
    * Create a live pending transaction request in Supabase for testing approval workflows
    */
-  static async createPendingApprovalRequest(walletAddress: string, actionType: string = 'token_transfer') {
+  static async createPendingApprovalRequest(walletAddress: string, actionType: string = 'token_transfer', recipientAddress?: string) {
     try {
       const cleanAddr = walletAddress.toLowerCase();
+      const targetRecipient = (recipientAddress || cleanAddr).toLowerCase();
       const approvalToken = `tok_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`;
       const requestId = `req_${Math.random().toString(36).substring(2, 10)}`;
 
@@ -435,7 +436,7 @@ export class SupabaseService {
             request_id: requestId,
             wallet_address: cleanAddr,
             user_id: 'default_user',
-            recipient: '0x59148d6a9dff263a772b5a84280bc88530f38636',
+            recipient: targetRecipient,
             amount: '0.005',
             asset: 'ETH',
             network: 'sepolia',
@@ -444,7 +445,7 @@ export class SupabaseService {
             contract_summary: actionType === 'token_transfer' ? 'Transfer of 0.005 Sepolia ETH via MCP Agent' : 'Contract Deployment via Claude Agent',
             total_amount: '0.005024',
             nonce: '0',
-            unsigned_payload: { to: '0x59148d6a9dff263a772b5a84280bc88530f38636', value: '5000000000000000' },
+            unsigned_payload: { to: targetRecipient, value: '5000000000000000' },
             status: 'pending',
             approval_token: approvalToken,
             token_used: false,
