@@ -571,10 +571,10 @@ app.post('/api/v1/webhooks/test', async (req: Request, res: Response) => {
       type: eventType || 'tx.confirmed',
       created: Math.floor(Date.now() / 1000),
       data: payload || {
-        transactionHash: '0x3f5c719e763b0185966a4f475b8e96f1b1a7d83457224219a16f8ef94a8678de',
+        transactionHash: '0x' + crypto.randomBytes(32).toString('hex'),
         network: 'sepolia',
-        from: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
-        to: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+        from: process.env.NORTHVEIL_WALLET_ADDRESS || '0x' + crypto.randomBytes(20).toString('hex'),
+        to: '0x' + crypto.randomBytes(20).toString('hex'),
         amount: '0.1587',
         token: 'SepoliaETH',
         status: 'CONFIRMED',
@@ -964,37 +964,37 @@ export const inMemoryApiKeys = new Map<string, ApiKeyRecord>();
 // Pre-seed known developer and integration keys in memory
 inMemoryApiKeys.set('nv_live_9f82a17b09c82415d8a9', {
   apiKey: 'nv_live_9f82a17b09c82415d8a9',
-  walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
+  walletAddress: process.env.NORTHVEIL_WALLET_ADDRESS || '',
   keyName: 'Production Developer Key',
   permissions: ['*'],
-  allowedWallets: ['0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'],
+  allowedWallets: ['*'],
   tier: 'developer',
   userId: 'dev_user',
 });
 
 inMemoryApiKeys.set('nv_test_7a12b99c43d21100e45b', {
   apiKey: 'nv_test_7a12b99c43d21100e45b',
-  walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
+  walletAddress: process.env.NORTHVEIL_WALLET_ADDRESS || '',
   keyName: 'Sandbox Developer Key',
   permissions: ['*'],
-  allowedWallets: ['0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'],
+  allowedWallets: ['*'],
   tier: 'developer',
   userId: 'sandbox_user',
 });
 
 inMemoryApiKeys.set('nv_live_default_northveil_key', {
   apiKey: 'nv_live_default_northveil_key',
-  walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
+  walletAddress: process.env.NORTHVEIL_WALLET_ADDRESS || '',
   keyName: 'Default Production Key',
   permissions: ['*'],
-  allowedWallets: ['0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'],
+  allowedWallets: ['*'],
   tier: 'developer',
   userId: 'default_user',
 });
 
 // Authentication & Wallet Binding Handler (Strict Multi-Tenant Scoped Authorization Engine)
 async function authenticateClient(apiKey?: string, requestedAddress?: string): Promise<AuthResult> {
-  const DEFAULT_PUBLIC_WALLET = '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+  const DEFAULT_PUBLIC_WALLET = process.env.NORTHVEIL_WALLET_ADDRESS ? process.env.NORTHVEIL_WALLET_ADDRESS.trim().toLowerCase() : '';
 
   const cleanKey = apiKey ? apiKey.trim().replace(/^Bearer\s+/i, '') : '';
 
@@ -1007,7 +1007,7 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
       if (verified && verified.type === 'access_token') {
         const boundAddress = (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42)
           ? requestedAddress.toLowerCase()
-          : (verified.walletAddress || DEFAULT_PUBLIC_WALLET).toLowerCase();
+          : (verified.walletAddress || DEFAULT_PUBLIC_WALLET || '').toLowerCase();
 
         return {
           valid: true,
@@ -1237,7 +1237,7 @@ async function enforceConfirmationGate(
   }
 
   // 2. No approvalToken provided: Always stage the transaction and require approval token
-  const targetSender = (toolArgs?.walletAddress || toolArgs?.fromAddress || toolArgs?.from || toolArgs?.userWallet || walletAddress || '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417').toLowerCase();
+  const targetSender = (toolArgs?.walletAddress || toolArgs?.fromAddress || toolArgs?.from || toolArgs?.userWallet || walletAddress || process.env.NORTHVEIL_WALLET_ADDRESS || '').toLowerCase();
   const targetRecipient = (toolArgs?.recipientAddress || toolArgs?.recipient || toolArgs?.toAddress || toolArgs?.to || toolArgs?.targetAddress || '0x0000000000000000000000000000000000000000').toLowerCase();
   const targetAsset = (toolArgs?.tokenSymbol || toolArgs?.symbol || toolArgs?.token || toolArgs?.asset || 'ETH').toUpperCase();
   const targetAmount = toolArgs?.amount || toolArgs?.tokenAmount || toolArgs?.value || 0;
@@ -1910,7 +1910,7 @@ const handleToken = async (req: Request, res: Response) => {
     // Invalidate from memory cache (single-use)
     inMemoryAuthCodes.delete(code);
 
-    const userWallet = authPayload.walletAddress || '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+    const userWallet = authPayload.walletAddress || process.env.NORTHVEIL_WALLET_ADDRESS || '';
     const userId = authPayload.userId || 'oauth_user';
     const grantedScope = authPayload.requestedScope || 'tools:read tools:execute';
     const permissions = ['tools:read', 'tools:execute'];
@@ -1977,7 +1977,7 @@ const handleToken = async (req: Request, res: Response) => {
       });
     }
 
-    const boundWallet = clientRecord.walletAddress || '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+    const boundWallet = clientRecord.walletAddress || process.env.NORTHVEIL_WALLET_ADDRESS || '';
     const grantedScope = 'tools:read tools:execute';
     const permissions = ['tools:read', 'tools:execute'];
     const expiresIn = 30 * 86400;
@@ -2018,7 +2018,7 @@ const handleToken = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'invalid_request', error_description: 'Missing refresh_token parameter.' });
     }
 
-    const boundWallet = '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+    const boundWallet = process.env.NORTHVEIL_WALLET_ADDRESS || '';
     const grantedScope = 'tools:read tools:execute';
     const expiresIn = 30 * 86400;
 
@@ -3038,7 +3038,7 @@ async function executeRealTool(name: string, args: any, walletAddress: string, r
   const explicitWallet = (args?.walletAddress || args?.userWallet || args?.ownerAddress || args?.fromAddress || args?.from || '').toString().trim().toLowerCase();
   const cleanAddress = (explicitWallet && explicitWallet.startsWith('0x') && explicitWallet.length === 42)
     ? explicitWallet
-    : (walletAddress || '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417').toLowerCase();
+    : (walletAddress || process.env.NORTHVEIL_WALLET_ADDRESS || '').toLowerCase();
 
   const host = req?.headers.host || 'localhost:3001';
   const protocol = req?.headers['x-forwarded-proto'] || (req?.secure ? 'https' : 'http');
@@ -4915,7 +4915,7 @@ ${solCode}
       const targetAddresses = Array.from(new Set([
         cleanAddress.toLowerCase(),
         walletAddress.toLowerCase(),
-        '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'
+        (process.env.NORTHVEIL_WALLET_ADDRESS || '').toLowerCase()
       ])).filter(a => a && a.startsWith('0x'));
 
       // 1. Fetch real on-chain transaction history directly from EVM Blockscout / Basescan APIs
@@ -5174,7 +5174,7 @@ ${solCode}
         cleanAddress.toLowerCase(),
         signerAddress.toLowerCase(),
         walletAddress.toLowerCase(),
-        '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'
+        (process.env.NORTHVEIL_WALLET_ADDRESS || '').toLowerCase()
       ])).filter(a => a && a.startsWith('0x') && a.length === 42);
 
       // 36+ EVM & Multi-Chain NFT APIs

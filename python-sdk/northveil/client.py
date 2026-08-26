@@ -8,7 +8,7 @@ from urllib.error import HTTPError
 
 DEFAULT_BASE_URL = os.getenv("NORTHVEIL_API_URL", "https://mcp.northveil.xyz")
 DEFAULT_API_KEY = os.getenv("NORTHVEIL_API_KEY", "nv_live_9f82a17b09c82415d8a9")
-DEFAULT_WALLET = os.getenv("NORTHVEIL_WALLET_ADDRESS", "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417")
+DEFAULT_WALLET = os.getenv("NORTHVEIL_WALLET_ADDRESS", "")
 
 class NorthveilException(Exception):
     """Base exception for Northveil API errors."""

@@ -157,7 +157,7 @@ export const DeveloperHubView: React.FC = () => {
 
   // Update default arguments when selected tool or active wallet changes
   useEffect(() => {
-    const currentAddress = activeSubWallet?.address || '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+    const currentAddress = activeSubWallet?.address || '';
     switch (selectedTool) {
       case 'get_balance':
         setPlaygroundArgs(
@@ -213,7 +213,7 @@ export const DeveloperHubView: React.FC = () => {
         setPlaygroundArgs(
           JSON.stringify(
             {
-              recipient: '0x71C56830EC737A4Cacf8F485458Cc2040f394073',
+              recipient: '',
               amount: '0.01',
               asset: 'ETH',
               network: 'sepolia',
@@ -301,7 +301,7 @@ export const DeveloperHubView: React.FC = () => {
       return;
     }
 
-    const currentWallet = parsedArgs.walletAddress || activeSubWallet?.address || '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+    const currentWallet = parsedArgs.walletAddress || activeSubWallet?.address || '';
     const network = parsedArgs.network || activeNetwork?.id || 'sepolia';
 
     try {
@@ -447,7 +447,7 @@ export const DeveloperHubView: React.FC = () => {
       }
       // 5. Live Transfer / Transaction Request Creation
       else if (selectedTool === 'send_transfer') {
-        const recipient = parsedArgs.recipient || '0x71C56830EC737A4Cacf8F485458Cc2040f394073';
+        const recipient = parsedArgs.recipient || parsedArgs.recipientAddress || parsedArgs.to || '';
         const amount = parsedArgs.amount || '0.01';
         const asset = parsedArgs.asset || 'ETH';
 

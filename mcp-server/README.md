@@ -45,7 +45,7 @@ Edit your Claude Desktop configuration file:
       "args": ["-y", "northveil-cli", "mcp"],
       "env": {
         "NORTHVEIL_API_KEY": "nv_live_9f82a17b09c82415d8a9",
-        "NORTHVEIL_WALLET_ADDRESS": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417",
+        "NORTHVEIL_WALLET_ADDRESS": "0xYOUR_VAULT_ADDRESS",
         "NORTHVEIL_API_URL": "https://mcp.northveil.xyz"
       }
     }

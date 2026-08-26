@@ -20,7 +20,7 @@ The Model Context Protocol (MCP) provides a standardized communication interface
   "params": {
     "name": "get_token_balance",
     "arguments": {
-      "walletAddress": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417",
+      "walletAddress": "0xYOUR_VAULT_ADDRESS",
       "network": "sepolia"
     }
   },
@@ -36,7 +36,7 @@ The Model Context Protocol (MCP) provides a standardized communication interface
     "content": [
       {
         "type": "text",
-        "text": "### 💰 NATIVE & TOKEN BALANCES FOR `0x56f0...45417`\n\n- **Sepolia ETH**: `0.162012 ETH` ($0.00 USD)\n- **USDC**: `500.00 USDC` ($500.00 USD)"
+        "text": "### 💰 NATIVE & TOKEN BALANCES FOR `0xYOUR...`\n\n- **Sepolia ETH**: `0.162012 ETH` ($0.00 USD)\n- **USDC**: `500.00 USDC` ($500.00 USD)"
       }
     ],
     "balances": {
@@ -45,7 +45,7 @@ The Model Context Protocol (MCP) provides a standardized communication interface
         { "symbol": "USDC", "balance": "500.0" }
       ]
     },
-    "authenticatedWallet": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"
+    "authenticatedWallet": "0xYOUR_VAULT_ADDRESS"
   },
   "id": 1787098800000
 }

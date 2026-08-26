@@ -28,8 +28,8 @@ def main():
 
     # 1. Initialize the Northveil Enterprise Client
     client = Northveil(
-        api_key="nv_live_9f82a17b09c82415d8a9",
-        wallet_address="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"
+        api_key=os.getenv("NORTHVEIL_API_KEY", "nv_live_9f82a17b09c82415d8a9"),
+        wallet_address=os.getenv("NORTHVEIL_WALLET_ADDRESS", "")
     )
 
     print(f"[*] Northveil SDK Version: {northveil.__version__}")

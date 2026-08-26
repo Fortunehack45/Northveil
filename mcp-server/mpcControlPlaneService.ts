@@ -1228,7 +1228,7 @@ export async function approveAndExecuteWithPasskey(
       success: true,
       status: 'confirmed',
       requestId: cleanToken.startsWith('req_') ? cleanToken : 'req_' + crypto.randomBytes(12).toString('hex'),
-      walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
+      walletAddress: process.env.NORTHVEIL_WALLET_ADDRESS || '',
       recipient: '0x0000000000000000000000000000000000000000',
       amount: 0.001,
       asset: 'ETH',

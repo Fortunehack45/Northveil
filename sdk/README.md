@@ -34,7 +34,7 @@ import { NorthveilClient } from 'northveil-sdk';
 
 const client = new NorthveilClient({
   apiKey: process.env.NORTHVEIL_API_KEY || 'nv_live_9f82a17b09c82415d8a9',
-  walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'
+  walletAddress: process.env.NORTHVEIL_WALLET_ADDRESS || '0xYOUR_VAULT_ADDRESS'
 });
 
 async function run() {
@@ -68,8 +68,8 @@ import northveil
 from northveil import Northveil
 
 client = Northveil(
-    api_key="nv_live_9f82a17b09c82415d8a9",
-    wallet_address="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"
+    api_key=os.getenv("NORTHVEIL_API_KEY", "nv_live_9f82a17b09c82415d8a9"),
+    wallet_address=os.getenv("NORTHVEIL_WALLET_ADDRESS", "0xYOUR_VAULT_ADDRESS")
 )
 
 # Search Flights
@@ -102,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
     headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer nv_live_9f82a17b09c82415d8a9"));
     headers.insert("X-API-Key", HeaderValue::from_static("nv_live_9f82a17b09c82415d8a9"));
-    headers.insert("x-wallet-address", HeaderValue::from_static("0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"));
+    headers.insert("x-wallet-address", HeaderValue::from_static("0xYOUR_VAULT_ADDRESS"));
 
     let res = client.post("https://mcp.northveil.xyz/api/v1/tools/search_flights")
         .headers(headers)
@@ -148,7 +148,7 @@ func main() {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer nv_live_9f82a17b09c82415d8a9")
 	req.Header.Set("X-API-Key", "nv_live_9f82a17b09c82415d8a9")
-	req.Header.Set("x-wallet-address", "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417")
+	req.Header.Set("x-wallet-address", "0xYOUR_VAULT_ADDRESS")
 
 	client := &http.Client{}
 	resp, _ := client.Do(req)
@@ -176,7 +176,7 @@ public class NorthveilSDKTest {
             .header("Content-Type", "application/json")
             .header("Authorization", "Bearer nv_live_9f82a17b09c82415d8a9")
             .header("X-API-Key", "nv_live_9f82a17b09c82415d8a9")
-            .header("x-wallet-address", "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417")
+            .header("x-wallet-address", "0xYOUR_VAULT_ADDRESS")
             .POST(HttpRequest.BodyPublishers.ofString(json))
             .build();
 
@@ -204,7 +204,7 @@ class Program {
         );
         client.DefaultRequestHeaders.Add("Authorization", "Bearer nv_live_9f82a17b09c82415d8a9");
         client.DefaultRequestHeaders.Add("X-API-Key", "nv_live_9f82a17b09c82415d8a9");
-        client.DefaultRequestHeaders.Add("x-wallet-address", "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417");
+        client.DefaultRequestHeaders.Add("x-wallet-address", "0xYOUR_VAULT_ADDRESS");
 
         var response = await client.PostAsync("https://mcp.northveil.xyz/api/v1/tools/search_flights", content);
         Console.WriteLine(await response.Content.ReadAsStringAsync());
@@ -233,7 +233,7 @@ int main() {
         headers = curl_slist_append(headers, "Content-Type: application/json");
         headers = curl_slist_append(headers, "Authorization: Bearer nv_live_9f82a17b09c82415d8a9");
         headers = curl_slist_append(headers, "X-API-Key: nv_live_9f82a17b09c82415d8a9");
-        headers = curl_slist_append(headers, "x-wallet-address: 0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417");
+        headers = curl_slist_append(headers, "x-wallet-address: 0xYOUR_VAULT_ADDRESS");
 
         std::string payload = "{\"origin\":\"LHR\",\"destination\":\"JFK\",\"departureDate\":\"2026-09-20\",\"cabinClass\":\"business\",\"currency\":\"ETH\"}";
 
@@ -266,7 +266,7 @@ $res = $client->post('/api/v1/tools/search_flights', [
         'Content-Type'     => 'application/json',
         'Authorization'    => 'Bearer nv_live_9f82a17b09c82415d8a9',
         'X-API-Key'        => 'nv_live_9f82a17b09c82415d8a9',
-        'x-wallet-address' => '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
+        'x-wallet-address' => '0xYOUR_VAULT_ADDRESS',
     ],
     'json' => [
         'origin'        => 'LHR',
@@ -291,7 +291,7 @@ res = conn.post('/api/v1/tools/search_flights') do |req|
   req.headers['Content-Type'] = 'application/json'
   req.headers['Authorization'] = 'Bearer nv_live_9f82a17b09c82415d8a9'
   req.headers['X-API-Key'] = 'nv_live_9f82a17b09c82415d8a9'
-  req.headers['x-wallet-address'] = '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'
+  req.headers['x-wallet-address'] = '0xYOUR_VAULT_ADDRESS'
   req.body = '{"origin":"LHR","destination":"JFK","departureDate":"2026-09-20","cabinClass":"business","currency":"ETH"}'
 end
 
@@ -310,7 +310,7 @@ func searchFlights() async throws {
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
     req.setValue("Bearer nv_live_9f82a17b09c82415d8a9", forHTTPHeaderField: "Authorization")
     req.setValue("nv_live_9f82a17b09c82415d8a9", forHTTPHeaderField: "X-API-Key")
-    req.setValue("0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417", forHTTPHeaderField: "x-wallet-address")
+    req.setValue("0xYOUR_VAULT_ADDRESS", forHTTPHeaderField: "x-wallet-address")
     req.httpBody = "{\"origin\":\"LHR\",\"destination\":\"JFK\",\"departureDate\":\"2026-09-20\",\"cabinClass\":\"business\",\"currency\":\"ETH\"}".data(using: .utf8)
 
     let (data, _) = try await URLSession.shared.data(for: req)
