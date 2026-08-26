@@ -214,4 +214,184 @@ export class MpcWalletService {
       return { authenticated: false };
     }
   }
+
+  /**
+   * Fetch pending approval requests for human review
+   */
+  public static async getPendingApprovals(userId?: string): Promise<any[]> {
+    const effectiveUserId = userId || this.getUserId();
+    const token = this.getSessionToken();
+    try {
+      const res = await fetch(`${this.getBaseUrl()}/api/v1/dashboard/approvals/pending?userId=${effectiveUserId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        return [];
+      }
+      return json.data || [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Approve a staged transaction request with WebAuthn Passkey biometric assertion
+   */
+  public static async approveTransactionRequestWithPasskey(
+    requestIdOrToken: string,
+    passkeyAssertion?: any,
+    userId?: string
+  ): Promise<{
+    success: boolean;
+    txHash?: string;
+    blockNumber?: number;
+    explorerUrl?: string;
+    gasUsed?: string;
+    error?: string;
+  }> {
+    const effectiveUserId = userId || this.getUserId();
+    const token = this.getSessionToken();
+    const res = await fetch(`${this.getBaseUrl()}/api/v1/dashboard/approvals/${encodeURIComponent(requestIdOrToken)}/approve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        userId: effectiveUserId,
+        passkeyAssertion,
+      }),
+    });
+
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || 'Failed to approve transaction request');
+    }
+    return json;
+  }
+
+  /**
+   * Reject and void a staged transaction request, immediately killing the single-use token
+   */
+  public static async rejectTransactionRequest(
+    requestIdOrToken: string,
+    reason?: string,
+    userId?: string
+  ): Promise<{ success: boolean; status: string; error?: string }> {
+    const effectiveUserId = userId || this.getUserId();
+    const token = this.getSessionToken();
+    const res = await fetch(`${this.getBaseUrl()}/api/v1/dashboard/approvals/${encodeURIComponent(requestIdOrToken)}/reject`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        userId: effectiveUserId,
+        reason: reason || 'Rejected by user',
+      }),
+    });
+
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || 'Failed to reject transaction request');
+    }
+    return json;
+  }
+
+  /**
+   * Fetch authorized agent clients and active grants
+   */
+  public static async getAgentClients(userId?: string): Promise<any[]> {
+    const effectiveUserId = userId || this.getUserId();
+    const token = this.getSessionToken();
+    try {
+      const res = await fetch(`${this.getBaseUrl()}/api/v1/dashboard/clients?userId=${effectiveUserId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) return [];
+      return json.data || [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Create an agent client with custom policy grant
+   */
+  public static async createAgentClient(
+    clientName: string,
+    initialGrant?: any,
+    userId?: string
+  ): Promise<{ success: boolean; client?: any; secretKey?: string; error?: string }> {
+    const effectiveUserId = userId || this.getUserId();
+    const token = this.getSessionToken();
+    const res = await fetch(`${this.getBaseUrl()}/api/v1/dashboard/clients`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        userId: effectiveUserId,
+        clientName,
+        initialGrant,
+      }),
+    });
+
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || 'Failed to create agent client');
+    }
+    return json;
+  }
+
+  /**
+   * Revoke an agent client's access immediately
+   */
+  public static async revokeAgentClient(clientId: string, userId?: string): Promise<boolean> {
+    const effectiveUserId = userId || this.getUserId();
+    const token = this.getSessionToken();
+    const res = await fetch(`${this.getBaseUrl()}/api/v1/dashboard/clients/${encodeURIComponent(clientId)}/revoke`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ userId: effectiveUserId }),
+    });
+    const json = await res.json();
+    return !!json.success;
+  }
+
+  /**
+   * Emergency Kill-Switch: Instantly revoke all agent execution privileges
+   */
+  public static async activateKillSwitch(
+    walletAddress: string,
+    reason: string = 'Emergency lockout activated by user',
+    userId?: string
+  ): Promise<{ success: boolean; status: string; error?: string }> {
+    const effectiveUserId = userId || this.getUserId();
+    const token = this.getSessionToken();
+    const res = await fetch(`${this.getBaseUrl()}/api/v1/dashboard/kill-switch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        userId: effectiveUserId,
+        walletAddress,
+        reason,
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || 'Failed to activate kill switch');
+    }
+    return json;
+  }
 }

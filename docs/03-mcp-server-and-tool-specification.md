@@ -1,48 +1,101 @@
 # Volume 3: Model Context Protocol (MCP) & Signer Specification
-**Northveil Control Plane Architecture**
+**Northveil AI Non-Custodial Control Plane Architecture**
 
 ---
 
-## 1. Architectural Model
+## 1. Architectural Model & Core Tenets
+
+Northveil establishes a strict separation between model context, policy evaluation, and non-custodial cryptographic signing:
 
 ```
-[ AI Agent / Claude / ChatGPT ] ──(MCP JSON-RPC)──► [ Northveil Policy Engine ] ──► [ MPC Signer Enclave ] ──► [ Blockchain RPC ]
+[ AI Agent / Claude / Cursor / ChatGPT ] ──(MCP JSON-RPC / SSE)──► [ Northveil Policy Engine & Fork Simulator ]
+                                                                                │
+                                                                   (Single-Use Approval Token)
+                                                                                ▼
+[ Blockchain RPC ] ◄──(Raw Tx Broadcast)── [ MPC Signer Enclave ] ◄── [ Human Biometric Passkey (WebAuthn) ]
 ```
 
-- **MCP is the bus**: The model uses MCP tools to read balances, inspect state, and propose transactions.
-- **MPC is the signer**: No raw keys, mnemonic seed phrases, or private key shares are ever exposed to the agent or MCP logs.
-- **Payload-bound single-use approvals**: Every state-changing transaction requires single-use cryptographic approval tokens bound to the canonical hash of the transaction parameters.
+### The 5 Immutable Axioms:
+1. **"Agents operate wallets. They do not hold wallets."**
+   - The AI agent never holds, sees, or extracts raw private keys or seed phrases.
+2. **"Keys never enter the model context."**
+   - No private key shares or signing credentials ever pass through prompts, tool arguments, or logs.
+3. **"MCP requests. The signer signs. The agent never holds the key."**
+   - MCP tools only request, stage, simulate, and prepare transactions. Non-custodial signers execute signatures.
+4. **"Every approval is single-use and payload-bound."**
+   - Approval tokens (`tok_...` / `req_...`) are cryptographically bound to the canonical hash of the transaction parameters (recipient, amount, calldata, chain ID, nonce) and expire after 10 minutes.
+5. **"Autonomy is a grant, not a blank check."**
+   - Agents operate strictly within user-configured policies (per-transaction caps, daily budgets, whitelisted contracts).
 
 ---
 
-## 2. Core Security & Policy Rules
+## 2. Policy Engine Evaluation Modes
 
-1. **Deny by Default for Value Movement**: Value transfers require explicit human approval via WebAuthn biometric passkey unless covered by an active Autonomous Grant within sub-cap limits.
-2. **Re-checked on Every Call**: Grant parameters (daily budget, per-tx ceiling, target allowlist, chain whitelist) are evaluated dynamically on every single tool execution.
-3. **Simulation Pre-Flight**: Value-moving contract calls and token transfers are dry-run via fork simulation before an approval card is presented to the user.
-4. **Token Invalidation**: Approval tokens expire after 10 minutes. If rejected, the token is burned immediately with zero retries.
+The Northveil Policy Engine evaluates every staged transaction against the active agent grant:
 
----
+### Mode 1: Always Approve (Default)
+- **Behavior**: Every state-changing transaction (value transfer, contract call, swap, deploy) pauses execution and returns `decision: "needs_approval"` with a single-use token and human-readable preview.
+- **Ceremony**: Requires user biometric confirmation via WebAuthn Passkey (Touch ID, Face ID, Windows Hello, FIDO2 key) before the MPC enclave signs and broadcasts.
 
-## 3. Tool Catalog Reference
+### Mode 2: Approve Above Limit
+- **Behavior**: In-scope transactions below `perTxUsd` and within `dailyBudgetUsd` to known contracts/destinations execute autonomously.
+- **Gating**: Any transaction exceeding either cap pauses for human approval.
 
-### Read Tools (Zero Signing Authority)
-- `list_wallets`: Lists user-authorized non-custodial vaults.
-- `get_portfolio`: Multi-chain portfolio dashboard across EVM and Solana with USD valuations.
-- `get_token_balance`: Direct on-chain balance query for specific tokens.
-- `list_nfts`: Queries 37+ EVM and Solana chains for digital collectibles.
-- `simulate_transaction`: Fork simulation with balance delta and revert diagnostics.
-- `audit_smart_contract`: Automated static AST security audit for Solidity contracts.
+### Mode 3: Autonomous Within Policy
+- **Behavior**: Agent operates autonomously across pre-approved actions and contract addresses.
 
-### Write Tools (Gated by Policy Engine)
-- `prepare_transfer`: Prepares transfer payload, calculates fees, checks policy, and generates approval tokens.
-- `approve_transaction`: Consumes approval token with Passkey assertion, triggers enclave threshold signature, and broadcasts on-chain.
-- `reject_transaction`: Invalidate and burn an outstanding approval token.
-- `prepare_swap`: Generates DEX swap route (Uniswap v3 / Aerodrome / 1inch).
-- `prepare_deploy`: Compiles Solidity source code with solc v0.8.24 and stages deployment request.
-- `set_autonomous_scope`: Configures time-boxed spend caps ($25/tx, $100/day default).
-- `activate_kill_switch`: Immediate emergency revocation of all agent grants and freezing of signing.
+### 🚫 Deterministic Hard Gates (Always Require Human Approval):
+Regardless of the policy mode or grant limits, the following operations **ALWAYS** require human approval:
+- 🚫 **Deploying Smart Contracts** (`operationType: 'deploy'`)
+- 🚫 **First Transfer to Unseen Address** (`isKnownDestination: false`)
+- 🚫 **Unlimited ERC-20 Allowances** (`denyUnlimitedApprovals`)
+- 🚫 **`setApprovalForAll` NFT/Token Delegations** (`denySetApprovalForAll`)
 
 ---
 
-For full architecture details, data schemas, sequence diagrams, and threat models, refer to [NORTHVEIL_TARGET_ARCHITECTURE_SPEC.md](file:///c:/Users/USER%20PC/Desktop/Northveil/docs/NORTHVEIL_TARGET_ARCHITECTURE_SPEC.md).
+## 3. Canonical 18 `northveil_*` MCP Tool Catalog
+
+| Tool Name | Category | Policy Mode Gate | Description |
+|---|---|---|---|
+| `northveil_list_wallets` | Read | Autonomous | Lists authorized non-custodial vaults |
+| `northveil_get_balances` | Read | Autonomous | Real-time multi-chain native & ERC-20 token balances |
+| `northveil_get_portfolio` | Read | Autonomous | Aggregated multi-chain valuation and asset breakdown |
+| `northveil_list_nfts` | Read | Autonomous | Verified digital collectibles gallery across EVM & Solana |
+| `northveil_get_tx` | Read | Autonomous | Transaction request status and verified block explorer URL |
+| `northveil_simulate_tx` | Simulate | Autonomous | Dry-run fork simulation with balance deltas & revert check |
+| `northveil_estimate_gas` | Simulate | Autonomous | Calculates gas units, priority fees, and USD estimates |
+| `northveil_inspect_contract` | Audit | Autonomous | Bytecode decompilation & verified source code inspection |
+| `northveil_audit_contract` | Audit | Autonomous | Static AST security audit for honeypots & vulnerabilities |
+| `northveil_prepare_transfer` | Action | Evaluated | Stages transfer payload, computes canonical hash, and enforces policy |
+| `northveil_prepare_swap` | Action | Evaluated | Stages DEX swap route with slippage protection |
+| `northveil_prepare_bridge` | Action | Evaluated | Stages cross-chain intent |
+| `northveil_prepare_contract_call`| Action | Evaluated | Stages contract invocation calldata |
+| `northveil_prepare_deploy` | Action | Hard Gate (Always Pauses) | Stages smart contract deployment |
+| `northveil_request_signature` | Sign | Human Approval | Requests human passkey signing ceremony |
+| `northveil_request_broadcast` | Broadcast | Enclave Hardware Signer | Broadcasts verified signed payload on-chain |
+| `northveil_list_pending_approvals`| Approvals | Autonomous | Lists active requests awaiting human sign-off |
+| `northveil_get_approval_status` | Approvals | Autonomous | Checks status of single-use approval token |
+
+---
+
+## 4. Control Plane REST API Endpoints
+
+The Northveil Control Plane exposes dashboard and lifecycle management routes:
+
+- `GET /api/v1/dashboard/clients` — Lists authorized agent clients and active grants.
+- `POST /api/v1/dashboard/clients` — Registers a new agent client with granular initial grant.
+- `POST /api/v1/dashboard/clients/:id/revoke` — Revokes an agent client's access immediately.
+- `GET /api/v1/dashboard/approvals/pending` — Retrieves transactions awaiting human approval.
+- `POST /api/v1/dashboard/approvals/:id/approve` — Validates passkey biometric assertion, signs, and broadcasts on-chain.
+- `POST /api/v1/dashboard/approvals/:id/reject` — Voids and destroys the single-use token immediately.
+- `GET /api/v1/dashboard/audit` — Immutable log trail of all agent intents, simulation results, approvals, and broadcasts.
+- `POST /api/v1/dashboard/kill-switch` — Emergency lockout revoking all agent execution rights instantly.
+
+---
+
+## 5. Client Transports Supported
+
+1. **HTTP JSON-RPC**: `POST /mcp`
+2. **Server-Sent Events (SSE)**: `GET /sse?wallet_address=...` & `POST /message`
+3. **OpenAPI 3.0**: `GET /openapi.json`
+4. **OAuth 2.0 Flow**: `GET /oauth/authorize` & `POST /oauth/token`
