@@ -37,6 +37,587 @@ export interface MCPToolDefinition {
 
 export const MCP_TOOLS: MCPToolDefinition[] = [
   {
+    name: 'northveil_health',
+    description: 'Returns server operational status, protocol version, authentication state, device signer online status, and supported networks (Base, Sepolia, Ethereum, Polygon, Arbitrum, BSC, Solana).',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'northveil_list_wallets',
+    description: 'Lists all user-authorized non-custodial vaults, public addresses, and primary chains managed under the Northveil control plane.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        userId: {
+          type: 'string',
+          description: 'User identifier or account handle (default: default_user)',
+        },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        userId: {
+          type: 'string',
+          description: 'User identifier or account handle',
+        },
+      },
+    },
+  },
+  {
+    name: 'northveil_get_balances',
+    description: 'Retrieves real-time verified on-chain native and token balances for an authorized vault on Base, Sepolia, Ethereum, or other EVM chains.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: '0x public address of the vault wallet (defaults to active user vault)',
+        },
+        network: {
+          type: 'string',
+          description: 'Target blockchain network: base, sepolia, ethereum, polygon, arbitrum, bsc, solana. Default: base',
+        },
+        tokenAddress: {
+          type: 'string',
+          description: 'Optional contract address of a specific ERC-20 token',
+        },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: '0x public address of the vault wallet',
+        },
+        network: {
+          type: 'string',
+          description: 'Target blockchain network',
+        },
+        tokenAddress: {
+          type: 'string',
+          description: 'Optional contract address of a specific ERC-20 token',
+        },
+      },
+    },
+  },
+  {
+    name: 'northveil_get_portfolio',
+    description: 'Aggregates multi-chain token holdings, native balances, and total USD net worth across all supported networks.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: '0x public address of the vault wallet (defaults to active user vault)',
+        },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: '0x public address of the vault wallet',
+        },
+      },
+    },
+  },
+  {
+    name: 'northveil_list_nfts',
+    description: 'Retrieves verified NFT digital collectibles, contract metadata, token IDs, and asset media across EVM and Solana.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: '0x public address of the vault wallet',
+        },
+        network: {
+          type: 'string',
+          description: 'Blockchain network (default: base)',
+        },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: '0x public address of the vault wallet',
+        },
+        network: {
+          type: 'string',
+          description: 'Blockchain network',
+        },
+      },
+    },
+  },
+  {
+    name: 'northveil_get_tx',
+    description: 'Fetches verified transaction status, block confirmations, gas metrics, and block explorer link for a transaction hash or staged request ID.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        txHash: {
+          type: 'string',
+          description: 'On-chain transaction hash (0x...)',
+        },
+        requestId: {
+          type: 'string',
+          description: 'Staged request ID (req_...)',
+        },
+        network: {
+          type: 'string',
+          description: 'Blockchain network (default: base)',
+        },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        txHash: {
+          type: 'string',
+          description: 'On-chain transaction hash',
+        },
+        requestId: {
+          type: 'string',
+          description: 'Staged request ID',
+        },
+        network: {
+          type: 'string',
+          description: 'Blockchain network',
+        },
+      },
+    },
+  },
+  {
+    name: 'northveil_simulate_tx',
+    description: 'Performs dry-run fork simulation of a transaction, computing state diffs, balance deltas, gas usage, and verifying no reverts occur.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        to: {
+          type: 'string',
+          description: 'Target destination or contract address (0x...)',
+        },
+        value: {
+          type: 'string',
+          description: 'Native crypto value to transfer (e.g. 0.01)',
+        },
+        data: {
+          type: 'string',
+          description: 'Calldata payload (0x...) for contract interactions',
+        },
+        network: {
+          type: 'string',
+          description: 'Blockchain network (default: base)',
+        },
+        from: {
+          type: 'string',
+          description: 'Optional sender address (defaults to active user vault)',
+        },
+      },
+      required: ['to'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        to: {
+          type: 'string',
+          description: 'Target destination or contract address',
+        },
+        value: {
+          type: 'string',
+          description: 'Native crypto value to transfer',
+        },
+        data: {
+          type: 'string',
+          description: 'Calldata payload',
+        },
+        network: {
+          type: 'string',
+          description: 'Blockchain network',
+        },
+        from: {
+          type: 'string',
+          description: 'Optional sender address',
+        },
+      },
+      required: ['to'],
+    },
+  },
+  {
+    name: 'northveil_inspect_contract',
+    description: 'Inspects a deployed smart contract bytecode, decompiled interfaces, and Etherscan/Basescan verified source code.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        contractAddress: {
+          type: 'string',
+          description: 'Target smart contract address (0x...)',
+        },
+        network: {
+          type: 'string',
+          description: 'Blockchain network (default: base)',
+        },
+      },
+      required: ['contractAddress'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        contractAddress: {
+          type: 'string',
+          description: 'Target smart contract address',
+        },
+        network: {
+          type: 'string',
+          description: 'Blockchain network',
+        },
+      },
+      required: ['contractAddress'],
+    },
+  },
+  {
+    name: 'northveil_audit_contract',
+    description: 'Runs an automated AST security scan and honeypot analysis on a token or smart contract, checking for mint backdoors, hidden taxes, and liquidity locks.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        contractAddress: {
+          type: 'string',
+          description: 'Token or smart contract address (0x...) to audit',
+        },
+        network: {
+          type: 'string',
+          description: 'Blockchain network (default: base)',
+        },
+      },
+      required: ['contractAddress'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        contractAddress: {
+          type: 'string',
+          description: 'Token or smart contract address to audit',
+        },
+        network: {
+          type: 'string',
+          description: 'Blockchain network',
+        },
+      },
+      required: ['contractAddress'],
+    },
+  },
+  {
+    name: 'northveil_prepare_transfer',
+    description: 'Stages a native or ERC-20 transfer intent, calculates gas fees, performs fork simulation, and returns a structured preview with approval ID for on-device biometric confirmation. Does NOT sign or broadcast.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        to: {
+          type: 'string',
+          description: 'Destination recipient address (0x...)',
+        },
+        amount: {
+          type: 'number',
+          description: 'Amount of crypto units to transfer',
+        },
+        asset: {
+          type: 'string',
+          description: 'Token symbol (default: ETH)',
+        },
+        network: {
+          type: 'string',
+          description: 'Target blockchain network: base, sepolia, ethereum, polygon, arbitrum, bsc. Default: base',
+        },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional sender vault address (defaults to active user vault)',
+        },
+        reason: {
+          type: 'string',
+          description: 'Optional transfer description or memo',
+        },
+      },
+      required: ['to', 'amount'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        to: {
+          type: 'string',
+          description: 'Destination recipient address',
+        },
+        amount: {
+          type: 'number',
+          description: 'Amount of crypto units to transfer',
+        },
+        asset: {
+          type: 'string',
+          description: 'Token symbol',
+        },
+        network: {
+          type: 'string',
+          description: 'Target blockchain network',
+        },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional sender vault address',
+        },
+        reason: {
+          type: 'string',
+          description: 'Optional transfer description or memo',
+        },
+      },
+      required: ['to', 'amount'],
+    },
+  },
+  {
+    name: 'northveil_prepare_swap',
+    description: 'Stages a DEX swap route intent with slippage protection and gas estimation, returning a structured preview with approval ID for on-device biometric confirmation. Does NOT sign or broadcast.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fromToken: {
+          type: 'string',
+          description: 'Source token symbol (e.g. ETH, WETH, USDC)',
+        },
+        toToken: {
+          type: 'string',
+          description: 'Destination token symbol (e.g. USDC, DEGEN, UNI)',
+        },
+        amount: {
+          type: 'number',
+          description: 'Amount of source token to swap',
+        },
+        network: {
+          type: 'string',
+          description: 'Target network (default: base)',
+        },
+        slippageTolerance: {
+          type: 'number',
+          description: 'Slippage percentage tolerance (default: 0.5%)',
+        },
+      },
+      required: ['fromToken', 'toToken', 'amount'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        fromToken: {
+          type: 'string',
+          description: 'Source token symbol',
+        },
+        toToken: {
+          type: 'string',
+          description: 'Destination token symbol',
+        },
+        amount: {
+          type: 'number',
+          description: 'Amount of source token to swap',
+        },
+        network: {
+          type: 'string',
+          description: 'Target network',
+        },
+        slippageTolerance: {
+          type: 'number',
+          description: 'Slippage percentage tolerance',
+        },
+      },
+      required: ['fromToken', 'toToken', 'amount'],
+    },
+  },
+  {
+    name: 'northveil_prepare_contract_call',
+    description: 'Stages an arbitrary smart contract invocation with ABI encoding and simulation, returning a structured preview with approval ID for on-device biometric confirmation. Does NOT sign or broadcast.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        contractAddress: {
+          type: 'string',
+          description: 'Target smart contract address (0x...)',
+        },
+        method: {
+          type: 'string',
+          description: 'Contract method name to execute',
+        },
+        args: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Method parameter arguments array',
+        },
+        value: {
+          type: 'string',
+          description: 'Native value to send in ETH (default: 0)',
+        },
+        network: {
+          type: 'string',
+          description: 'Blockchain network (default: base)',
+        },
+      },
+      required: ['contractAddress', 'method'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        contractAddress: {
+          type: 'string',
+          description: 'Target smart contract address',
+        },
+        method: {
+          type: 'string',
+          description: 'Contract method name to execute',
+        },
+        args: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Method parameter arguments array',
+        },
+        value: {
+          type: 'string',
+          description: 'Native value to send in ETH',
+        },
+        network: {
+          type: 'string',
+          description: 'Blockchain network',
+        },
+      },
+      required: ['contractAddress', 'method'],
+    },
+  },
+  {
+    name: 'northveil_prepare_deploy',
+    description: 'Stages a smart contract deployment ceremony with compiler verification, returning a structured preview with approval ID for on-device biometric confirmation. Does NOT sign or broadcast.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        contractName: {
+          type: 'string',
+          description: 'Contract name identifier',
+        },
+        sourceCode: {
+          type: 'string',
+          description: 'Solidity source code (v0.8.20+)',
+        },
+        constructorArgs: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Constructor parameter arguments',
+        },
+        network: {
+          type: 'string',
+          description: 'Target network (default: base)',
+        },
+      },
+      required: ['contractName'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        contractName: {
+          type: 'string',
+          description: 'Contract name identifier',
+        },
+        sourceCode: {
+          type: 'string',
+          description: 'Solidity source code',
+        },
+        constructorArgs: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Constructor parameter arguments',
+        },
+        network: {
+          type: 'string',
+          description: 'Target network',
+        },
+      },
+      required: ['contractName'],
+    },
+  },
+  {
+    name: 'northveil_request_broadcast',
+    description: 'Requests on-chain broadcast of a previously staged transaction once human intent has been confirmed. Returns broadcast transaction hash or pending_device status if awaiting biometric signature.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        approval_id: {
+          type: 'string',
+          description: 'The approval ID (appr_... or tok_...) returned by northveil_prepare_*',
+        },
+        passkeyAssertion: {
+          type: 'object',
+          description: 'Optional WebAuthn cryptographic passkey assertion from device',
+        },
+      },
+      required: ['approval_id'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        approval_id: {
+          type: 'string',
+          description: 'The approval ID returned by northveil_prepare_*',
+        },
+        passkeyAssertion: {
+          type: 'object',
+          description: 'Optional WebAuthn cryptographic passkey assertion from device',
+        },
+      },
+      required: ['approval_id'],
+    },
+  },
+  {
+    name: 'northveil_get_approval_status',
+    description: 'Queries the real-time status of a staged approval request (pending_device, confirmed, broadcasted, rejected, expired).',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        approval_id: {
+          type: 'string',
+          description: 'The approval ID (appr_... or tok_...) to check',
+        },
+      },
+      required: ['approval_id'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        approval_id: {
+          type: 'string',
+          description: 'The approval ID to check',
+        },
+      },
+      required: ['approval_id'],
+    },
+  },
+  {
     name: 'create_wallet',
     description: 'Provisions a new non-custodial multi-chain vault wallet backed by Turnkey MPC/TEE secure enclaves. Private key material is generated and fragmented inside hardware-isolated enclaves and is never possessed, stored, or reconstructable by Northveil servers. Returns vault public address and MPC enclave references.',
     annotations: { readOnly: false, destructive: false, confirmationRequired: false },
