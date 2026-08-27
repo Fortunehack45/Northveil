@@ -26,21 +26,31 @@ import { MCP_TOOLS } from './tools.js';
 function findImports(importPath: string) {
   try {
     const cleanPath = importPath.replace(/^@openzeppelin\/contracts\//, '');
-    const ozCandidates = [
-      path.resolve('node_modules', importPath),
-      path.resolve('node_modules', '@openzeppelin', 'contracts', cleanPath),
-      path.resolve('node_modules', '@openzeppelin', 'contracts', 'token', 'ERC20', cleanPath),
-      path.resolve('node_modules', '@openzeppelin', 'contracts', 'token', 'ERC721', cleanPath),
-      path.resolve('node_modules', '@openzeppelin', 'contracts', 'token', 'ERC20', 'extensions', cleanPath),
-      path.resolve('node_modules', '@openzeppelin', 'contracts', 'token', 'ERC721', 'extensions', cleanPath),
-      path.resolve('node_modules', '@openzeppelin', 'contracts', 'utils', cleanPath),
-      path.resolve('node_modules', '@openzeppelin', 'contracts', 'access', cleanPath),
-      path.resolve('node_modules', '@openzeppelin', importPath)
+    const candidateBases = [
+      path.resolve(__dirname_local, '..', 'node_modules'),
+      path.resolve(__dirname_local, 'node_modules'),
+      path.resolve(process.cwd(), 'node_modules'),
+      path.resolve(process.cwd(), '..', 'node_modules'),
     ];
 
-    for (const cand of ozCandidates) {
-      if (fs.existsSync(cand) && fs.statSync(cand).isFile()) {
-        return { contents: fs.readFileSync(cand, 'utf8') };
+    for (const base of candidateBases) {
+      const candidates = [
+        path.resolve(base, importPath),
+        path.resolve(base, '@openzeppelin', 'contracts', cleanPath),
+        path.resolve(base, '@openzeppelin', 'contracts', 'token', 'ERC20', cleanPath),
+        path.resolve(base, '@openzeppelin', 'contracts', 'token', 'ERC721', cleanPath),
+        path.resolve(base, '@openzeppelin', 'contracts', 'token', 'ERC20', 'extensions', cleanPath),
+        path.resolve(base, '@openzeppelin', 'contracts', 'token', 'ERC721', 'extensions', cleanPath),
+        path.resolve(base, '@openzeppelin', 'contracts', 'utils', cleanPath),
+        path.resolve(base, '@openzeppelin', 'contracts', 'access', cleanPath),
+        path.resolve(base, '@openzeppelin', 'contracts', 'interfaces', cleanPath),
+        path.resolve(base, '@openzeppelin', importPath),
+      ];
+
+      for (const cand of candidates) {
+        if (fs.existsSync(cand) && fs.statSync(cand).isFile()) {
+          return { contents: fs.readFileSync(cand, 'utf8') };
+        }
       }
     }
   } catch (e) { }
@@ -4540,10 +4550,12 @@ ${blkNum ? `> **Block Number**: \`${blkNum}\`` : ''}
     case 'deploy_smart_contract': {
       const promptStr = (args.prompt || '').toLowerCase();
       const parsed = parsePromptParameters(promptStr, args);
-      const nameStr = (args.contractName || args.name || 'NorthveilToken').replace(/[^a-zA-Z0-9_]/g, '');
+      const rawName = (args.contractName || args.name || 'NorthveilToken').toString().trim();
+      const nameStr = rawName || 'NorthveilToken';
+      const safeContractName = nameStr.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^([0-9])/, '_$1') || 'NorthveilToken';
       const typeStr = (args.contractType || args.type || 'erc20').toLowerCase();
       const network = (args.network || args.chain || 'sepolia').toLowerCase();
-      const symbolStr = (args.symbol || args.ticker || args.tokenSymbol || nameStr.slice(0, 4)).toUpperCase();
+      const symbolStr = (args.symbol || args.ticker || args.tokenSymbol || safeContractName.slice(0, 4)).toUpperCase();
       const isNft = typeStr.includes('nft') || typeStr.includes('721') || promptStr.includes('nft');
 
       const totalSupplyNum = parsed.totalSupplyNum;
@@ -4598,7 +4610,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * @dev Owner: ${walletAddress} | Website: ${websiteStr}
  * Max Collection Supply: ${totalSupplyNum.toLocaleString()} NFTs | Owner Reserve: ${ownerAllocNum.toLocaleString()} NFTs
  */
-contract ${nameStr} is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
+contract ${safeContractName} is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
     uint256 private _nextTokenId;
     uint256 public immutable maxSupply = ${totalSupplyNum};
     string private _baseTokenURI = "${imageUrlStr}";
@@ -4620,7 +4632,7 @@ contract ${nameStr} is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
     }
 
     function safeMint(address to, string memory uri) public onlyOwner returns (uint256) {
-        require(_nextTokenId < maxSupply, "${nameStr}: Max NFT collection supply reached");
+        require(_nextTokenId < maxSupply, "${safeContractName}: Max NFT collection supply reached");
         uint256 tokenId = _nextTokenId++;
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, uri);
@@ -4657,7 +4669,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract ${nameStr} is ERC20, ERC20Burnable, Ownable {
+contract ${safeContractName} is ERC20, ERC20Burnable, Ownable {
     uint256 public immutable maxSupply;
 
     constructor() ERC20("${nameStr}", "${symbolStr}") Ownable(msg.sender) {
@@ -4671,7 +4683,7 @@ contract ${nameStr} is ERC20, ERC20Burnable, Ownable {
     }
 
     function mint(address to, uint256 amount) public onlyOwner {
-        require(totalSupply() + amount <= maxSupply, "${nameStr}: Exceeds max supply limit");
+        require(totalSupply() + amount <= maxSupply, "${safeContractName}: Exceeds max supply limit");
         _mint(to, amount);
     }
 }`;
@@ -4717,32 +4729,34 @@ contract ${nameStr} is ERC20, ERC20Burnable, Ownable {
         };
         let compOutput = JSON.parse(solc.compile(JSON.stringify(input), { import: findImports }));
 
-        let targetContractKey = nameStr;
+        if (compOutput.errors && Array.isArray(compOutput.errors)) {
+          const errs = compOutput.errors.filter((e: any) => e.severity === 'error');
+          if (errs.length > 0) {
+            solcErrorMsg = errs.map((e: any) => e.formattedMessage || e.message).join('\n');
+            console.warn('[Solc Compiler Errors]:', solcErrorMsg);
+          }
+        }
+
+        let targetContractKey = safeContractName;
         if (compOutput.contracts?.['Contract.sol']) {
-          const keys = Object.keys(compOutput.contracts['Contract.sol']);
+          const contracts = compOutput.contracts['Contract.sol'];
+          const keys = Object.keys(contracts);
           if (keys.length > 0) {
-            targetContractKey = keys.find(k => k.toLowerCase() === nameStr.toLowerCase()) || keys[keys.length - 1];
+            targetContractKey = keys.find(k => k.toLowerCase() === safeContractName.toLowerCase() || k.toLowerCase() === nameStr.toLowerCase())
+              || keys.find(k => contracts[k]?.evm?.bytecode?.object && contracts[k].evm.bytecode.object.length > 0)
+              || keys[keys.length - 1];
           }
         }
 
         let contractRes = compOutput.contracts?.['Contract.sol']?.[targetContractKey];
-
-        if (!contractRes || !contractRes.evm?.bytecode?.object) {
-          if (compOutput.errors && Array.isArray(compOutput.errors)) {
-            const errs = compOutput.errors.filter((e: any) => e.severity === 'error');
-            if (errs.length > 0) {
-              solcErrorMsg = errs.map((e: any) => e.formattedMessage || e.message).join('\n');
-            }
-          }
-        }
 
         if (contractRes && contractRes.evm?.bytecode?.object) {
           compiledBytecode = '0x' + contractRes.evm.bytecode.object;
           compiledAbi = contractRes.abi;
           solCode = solCodeToCompile;
         }
-      } catch (solcErr) {
-        console.warn('[Solc Compiler] Compile warning:', solcErr);
+      } catch (solcErr: any) {
+        console.warn('[Solc Compiler] Compile warning:', solcErr?.message || solcErr);
       }
 
       let realTxHash = '';
@@ -4751,7 +4765,7 @@ contract ${nameStr} is ERC20, ERC20Burnable, Ownable {
       let deployErrorMsg = '';
 
       if (!compiledBytecode) {
-        throw new Error(`SOLC COMPILATION FAILURE: Failed to compile Solidity bytecode for contract ${nameStr}.`);
+        throw new Error(`SOLC COMPILATION FAILURE: Failed to compile Solidity bytecode for contract ${nameStr}.${solcErrorMsg ? `\nDetails: ${solcErrorMsg}` : ''}`);
       }
 
       const unsignedPayload = {
