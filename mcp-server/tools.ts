@@ -707,7 +707,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'create_wallet',
-    description: 'Provisions a new non-custodial multi-chain vault wallet backed by Turnkey MPC/TEE secure enclaves. Private key material is generated and fragmented inside hardware-isolated enclaves and is never possessed, stored, or reconstructable by Northveil servers. Returns vault public address and MPC enclave references.',
+    description: 'Provisions a new self-sovereign multi-chain vault wallet. Generates a fresh BIP-39 12-word recovery seed phrase and private key for full self-custody and control. Returns the public wallet address, 12-word seed phrase, and private key.',
     annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
@@ -731,33 +731,33 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         userId: {
           type: 'string',
-          description: 'User identifier or account handle',
+          description: 'User identifier',
         },
         walletName: {
           type: 'string',
-          description: 'Human-readable label for the vault wallet',
+          description: 'Wallet label',
         },
         chain: {
           type: 'string',
-          description: 'Primary blockchain network',
+          description: 'Blockchain network',
         },
       },
     },
   },
   {
     name: 'import_wallet',
-    description: 'Registers an existing non-custodial address or provisions an MPC enclave reference for multi-chain operations under the non-custodial control plane.',
+    description: 'Imports and registers an existing non-custodial wallet into Northveil. The user signs an initial ownership challenge to prove possession, binding the address to the non-custodial control plane.',
     annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
         address: {
           type: 'string',
-          description: '0x-prefixed public address of the wallet to track and coordinate.',
+          description: 'The public address of the existing wallet to import',
         },
         walletName: {
           type: 'string',
-          description: 'Optional custom label for the vault wallet.',
+          description: 'Optional label for the imported wallet (e.g. Cold Storage / Ledger)',
         },
         chain: {
           type: 'string',
@@ -771,11 +771,11 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         address: {
           type: 'string',
-          description: '0x-prefixed public address of the wallet.',
+          description: 'Public address to import',
         },
         walletName: {
           type: 'string',
-          description: 'Custom name for the wallet.',
+          description: 'Wallet label',
         },
         chain: {
           type: 'string',
@@ -787,64 +787,56 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'send_transfer',
-    description: 'Initiates a native or ERC-20 token transfer from the vault wallet. If the transfer is within the user-configured autonomous spending limits, signs via Turnkey MPC enclaves and broadcasts immediately. Otherwise, stages an unsigned transaction request and returns a single-use token and Passkey approval URL for human confirmation.',
+    description: 'Sends native cryptocurrency (ETH, MATIC, BNB) or ERC-20 tokens (USDC, USDT, WBT) from a user vault. Checks autonomous spending policies; if within policy limits, triggers MPC co-signing and returns the transaction hash. If outside policy limits, stages the transfer and returns a WebAuthn Passkey approval request.',
     annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
-        token: {
+        toAddress: {
           type: 'string',
-          description: 'Token symbol to transfer (e.g. ETH, USDT, USDC, SOL)',
+          description: 'Destination EVM 0x address',
         },
         amount: {
           type: 'number',
-          description: 'Amount of crypto units to transfer',
+          description: 'Amount to send in human-readable units (e.g. 0.1)',
         },
-        recipientAddress: {
+        asset: {
           type: 'string',
-          description: 'Destination blockchain recipient public address (0x...)',
+          description: 'Asset symbol to transfer (e.g. ETH, USDC, USDT, WBT). Default: ETH',
         },
-        chain: {
+        network: {
           type: 'string',
-          description: 'Target network: sepolia, base, ethereum, polygon, arbitrum, bsc',
-        },
-        fromAddress: {
-          type: 'string',
-          description: 'Optional sender vault address (defaults to active user vault)',
+          description: 'Target EVM network: sepolia, base, ethereum, polygon, arbitrum, bsc. Default: sepolia',
         },
       },
-      required: ['token', 'amount', 'recipientAddress'],
+      required: ['toAddress', 'amount'],
     },
     parameters: {
       type: 'object',
       properties: {
-        token: {
+        toAddress: {
           type: 'string',
-          description: 'Token symbol to transfer (e.g. ETH, USDT, USDC, SOL)',
+          description: 'Destination address',
         },
         amount: {
           type: 'number',
-          description: 'Amount of crypto units to transfer',
+          description: 'Amount to send',
         },
-        recipientAddress: {
+        asset: {
           type: 'string',
-          description: 'Destination blockchain recipient public address',
+          description: 'Asset symbol',
         },
-        chain: {
+        network: {
           type: 'string',
-          description: 'Target network',
-        },
-        fromAddress: {
-          type: 'string',
-          description: 'Optional sender vault address',
+          description: 'Target EVM network',
         },
       },
-      required: ['token', 'amount', 'recipientAddress'],
+      required: ['toAddress', 'amount'],
     },
   },
   {
     name: 'execute_swap',
-    description: 'Executes a DEX token swap via 1inch/Uniswap/Aerodrome router. If within autonomous spending limits, signs via MPC enclave quorum and broadcasts. Otherwise, stages an unsigned transaction request requiring Passkey confirmation.',
+    description: 'Executes a token swap via DEX aggregators (Uniswap, 1inch, PancakeSwap). Evaluates autonomous spending limits before triggering MPC signing or staging a Passkey approval request.',
     annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
@@ -926,14 +918,14 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'sell_tokens',
-    description: 'Sells a token on DEX for ETH or stablecoins. Evaluates autonomous spending limits before triggering MPC co-signing or staging a Passkey approval request.',
+    description: 'Sells a held token on DEX for native ETH or stablecoins. Evaluates autonomous spending limits before triggering MPC co-signing or staging a Passkey approval request.',
     annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
-        token: { type: 'string', description: 'Token symbol or contract address to sell' },
-        amount: { type: 'number', description: 'Amount of token units to sell' },
-        toToken: { type: 'string', description: 'Target token symbol to receive (default: ETH)' },
+        token: { type: 'string', description: 'Token symbol or contract address to sell (e.g. WBT, UNI)' },
+        amount: { type: 'number', description: 'Amount of token to sell' },
+        toToken: { type: 'string', description: 'Destination asset symbol (default: ETH)' },
         network: { type: 'string', description: 'Blockchain network (default: sepolia)' },
       },
       required: ['token', 'amount'],
@@ -942,8 +934,8 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       type: 'object',
       properties: {
         token: { type: 'string', description: 'Token symbol or contract address to sell' },
-        amount: { type: 'number', description: 'Amount of token units to sell' },
-        toToken: { type: 'string', description: 'Target token symbol to receive' },
+        amount: { type: 'number', description: 'Amount to sell' },
+        toToken: { type: 'string', description: 'Destination asset symbol' },
         network: { type: 'string', description: 'Blockchain network' },
       },
       required: ['token', 'amount'],
@@ -951,35 +943,35 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'deploy_smart_contract',
-    description: 'Compiles and stages a smart contract deployment payload (ERC-20, ERC-721 NFT, or custom). Produces an unsigned deployment transaction and approval request requiring Passkey confirmation.',
-    annotations: { readOnly: false, destructive: false, confirmationRequired: true },
+    description: 'Compiles and deploys an ERC-20 token, ERC-721 NFT collection, or custom contract directly on-chain. Allows users to choose any arbitrary owner allocation percentage (0% to 100%) or exact amount.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
         contractName: {
           type: 'string',
-          description: 'Name of the smart contract (e.g. WorkBaseToken, GalacticNFT).',
+          description: 'Name of the smart contract (e.g. CyberVeil, AlphaGov).',
         },
         symbol: {
           type: 'string',
-          description: 'Token ticker symbol (e.g. WBT, ARG). Recommended: 3-5 uppercase characters.',
+          description: 'Token ticker symbol (e.g. CVNFT, AGOV).',
         },
         contractType: {
           type: 'string',
-          description: 'Template category: erc20, erc721, nft, erc1155, staking, dao, custom',
+          description: 'Contract template category: erc20, erc721, nft, erc1155, staking, dao, custom. Default: erc20.',
           enum: ['erc20', 'erc721', 'nft', 'erc1155', 'staking', 'dao', 'custom'],
         },
         totalSupply: {
           type: 'number',
-          description: 'Total token supply (e.g. 1000000000) or total max NFT collection size (e.g. 10000).',
+          description: 'Total token supply (or max NFT collection size). Default: 1,000,000,000 for tokens, 10,000 for NFTs.',
         },
-        initialSupply: {
+        ownerAllocationPercentage: {
           type: 'number',
-          description: 'Alias for totalSupply.',
+          description: 'Percentage of total supply to allocate directly to owner wallet at deployment (0 to 100). Remaining supply can be minted on demand.',
         },
         ownerAllocation: {
           type: 'number',
-          description: 'Amount allocated directly to owner wallet at deployment.',
+          description: 'Exact token count or percentage allocated directly to owner wallet at deployment.',
         },
         description: {
           type: 'string',
@@ -1016,9 +1008,9 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
           type: 'number',
           description: 'Total token supply.',
         },
-        initialSupply: {
+        ownerAllocationPercentage: {
           type: 'number',
-          description: 'Alias for totalSupply.',
+          description: 'Owner allocation percentage (0-100).',
         },
         ownerAllocation: {
           type: 'number',

@@ -3169,7 +3169,7 @@ async function uploadImageToSupabase(imageInput?: string, fileNamePrefix: string
   }
 }
 
-// Dynamic prompt parameter parser (extracts pragma, total supply, owner allocation, and socials)
+// Dynamic prompt parameter parser (extracts pragma, total supply, owner allocation percentage/amount, and socials)
 function parsePromptParameters(promptStr: string, args: any) {
   const text = (promptStr || '').toLowerCase();
 
@@ -3186,8 +3186,8 @@ function parsePromptParameters(promptStr: string, args: any) {
     pragmaVersion = `^${pragmaVersion}`;
   }
 
-  // 2. Extract Total Supply
-  let totalSupplyNum = Number(args?.totalSupply || args?.initialSupply || 0);
+  // 2. Extract Total / Max Supply
+  let totalSupplyNum = Number(args?.totalSupply || args?.initialSupply || args?.maxSupply || 0);
   if (!totalSupplyNum) {
     const supplyMatch = text.match(/(\d+(?:,\d+)*(?:\.\d+)?)\s*(billion|million|k|tokens)?\s*(?:supply|total|max|tokens)?/i);
     if (supplyMatch) {
@@ -3203,22 +3203,57 @@ function parsePromptParameters(promptStr: string, args: any) {
     totalSupplyNum = text.includes('nft') || text.includes('721') ? 10000 : 1000000000;
   }
 
-  // 3. Extract Owner Allocation Percentage or Amount
-  let ownerAllocNum = args?.ownerAllocation !== undefined ? Number(args.ownerAllocation) : -1;
-  if (ownerAllocNum < 0) {
-    if (text.includes('100%') || text.includes('all to owner') || text.includes('entire supply') || text.includes('mint all') || text.includes('owner allocation 100%')) {
-      ownerAllocNum = totalSupplyNum;
-    } else if (text.includes('50%')) {
-      ownerAllocNum = Math.floor(totalSupplyNum * 0.5);
-    } else if (text.includes('90%')) {
-      ownerAllocNum = Math.floor(totalSupplyNum * 0.9);
-    } else if (text.includes('80%')) {
-      ownerAllocNum = Math.floor(totalSupplyNum * 0.8);
+  // 3. Extract Owner Allocation Percentage or Amount (supports ANY arbitrary percentage 0-100% or token count)
+  let ownerAllocNum = -1;
+
+  if (args?.ownerAllocationPercentage !== undefined) {
+    const pct = parseFloat(String(args.ownerAllocationPercentage).replace('%', ''));
+    if (!isNaN(pct)) ownerAllocNum = Math.floor((totalSupplyNum * Math.max(0, Math.min(100, pct))) / 100);
+  } else if (args?.allocationPercentage !== undefined) {
+    const pct = parseFloat(String(args.allocationPercentage).replace('%', ''));
+    if (!isNaN(pct)) ownerAllocNum = Math.floor((totalSupplyNum * Math.max(0, Math.min(100, pct))) / 100);
+  } else if (args?.ownerPercentage !== undefined) {
+    const pct = parseFloat(String(args.ownerPercentage).replace('%', ''));
+    if (!isNaN(pct)) ownerAllocNum = Math.floor((totalSupplyNum * Math.max(0, Math.min(100, pct))) / 100);
+  } else if (args?.ownerAllocation !== undefined) {
+    const rawAlloc = String(args.ownerAllocation).trim();
+    if (rawAlloc.endsWith('%')) {
+      const pct = parseFloat(rawAlloc.replace('%', ''));
+      if (!isNaN(pct)) ownerAllocNum = Math.floor((totalSupplyNum * Math.max(0, Math.min(100, pct))) / 100);
     } else {
-      ownerAllocNum = Math.floor(totalSupplyNum * 0.8);
+      const numAlloc = Number(rawAlloc);
+      if (!isNaN(numAlloc)) {
+        if (numAlloc <= 100 && numAlloc > 0 && totalSupplyNum > 100 && !text.includes('exact')) {
+          ownerAllocNum = Math.floor((totalSupplyNum * numAlloc) / 100);
+        } else {
+          ownerAllocNum = numAlloc;
+        }
+      }
     }
   }
-  ownerAllocNum = Math.min(ownerAllocNum, totalSupplyNum);
+
+  if (ownerAllocNum < 0) {
+    const pctMatch = text.match(/(\d+(?:\.\d+)?)\s*%\s*(?:owner|allocation|allocated|to\s+owner|to\s+creator|to\s+deployer|initial|minted|reserve)?/i)
+      || text.match(/(?:owner|creator|deployer|initial|allocation|minted)\s*(?:allocation|percent|percentage)?\s*[:=]?\s*(\d+(?:\.\d+)?)\s*%/i);
+    
+    if (pctMatch && pctMatch[1]) {
+      const pct = parseFloat(pctMatch[1]);
+      if (!isNaN(pct)) {
+        ownerAllocNum = Math.floor((totalSupplyNum * Math.max(0, Math.min(100, pct))) / 100);
+      }
+    } else if (text.includes('100%') || text.includes('all to owner') || text.includes('entire supply') || text.includes('mint all') || text.includes('mint everything')) {
+      ownerAllocNum = totalSupplyNum;
+    } else if (text.includes('0%') || text.includes('no initial mint') || text.includes('mint on demand') || text.includes('zero initial')) {
+      ownerAllocNum = 0;
+    } else {
+      ownerAllocNum = text.includes('nft') || text.includes('721') ? 0 : Math.floor(totalSupplyNum * 0.2);
+    }
+  }
+
+  ownerAllocNum = Math.max(0, Math.min(ownerAllocNum, totalSupplyNum));
+  const ownerAllocPercentage = totalSupplyNum > 0 ? ((ownerAllocNum / totalSupplyNum) * 100).toFixed(2) : '0';
+  const reserveNum = Math.max(0, totalSupplyNum - ownerAllocNum);
+  const reservePercentage = totalSupplyNum > 0 ? ((reserveNum / totalSupplyNum) * 100).toFixed(2) : '0';
 
   // 4. Extract Socials & Website (IF NOT PROVIDED BY USER, LEAVE BLANK "")
   const extractUrl = (pattern: RegExp) => {
@@ -3235,7 +3270,9 @@ function parsePromptParameters(promptStr: string, args: any) {
     pragmaVersion,
     totalSupplyNum,
     ownerAllocNum,
-    reserveNum: Math.max(0, totalSupplyNum - ownerAllocNum),
+    ownerAllocPercentage,
+    reserveNum,
+    reservePercentage,
     websiteStr,
     twitterStr,
     telegramStr,
@@ -4141,17 +4178,17 @@ ${simulation.revertReason ? `> **Revert Reason**: \`${simulation.revertReason}\`
       const walletName = args?.walletName || args?.name || 'Northveil Vault Wallet';
       const userId = args?.userId || 'default_user';
       const result = await createMpcWallet(userId, walletName);
+      const seedPhrase = result.mnemonic || result.seedPhrase || '';
       return {
         formattedMarkdown: `
-### 🔐 NON-CUSTODIAL MPC VAULT PROVISIONED
+### 🔐 NON-CUSTODIAL VAULT WALLET GENERATED
 
 > **Vault Address**: \`${result.address}\`  
-> **MPC Provider**: \`${result.mpcProvider.toUpperCase()} (Hardware-Isolated TEE Enclaves)\`  
+${seedPhrase ? `> **Recovery Seed Phrase (12 Words)**: \`${seedPhrase}\`  \n` : ''}${result.privateKey ? `> **Private Key**: \`${result.privateKey}\`  \n` : ''}> **Derivation Path**: \`${result.derivationPath || "m/44'/60'/0'/0/0"}\`  
 > **Key Type**: \`${result.keyType}\`  
-> **Enclave Wallet ID**: \`${result.mpcWalletId}\`  
-> **Enclave Sub-Org ID**: \`${result.mpcSubOrgId}\`  
-> **Custody Architecture**: 🟢 **NON-CUSTODIAL CONTROL PLANE (PayBox-Style)**  
-> **Security Protocol**: Private keys generated and fragmented across hardware enclaves. ZERO raw or reconstructable key material is stored on Northveil servers.
+> **Custody Architecture**: 🟢 **SELF-SOVEREIGN CONTROL PLANE**  
+
+⚠️ **CRITICAL BACKUP INSTRUCTIONS**: Write down your 12-word seed phrase and store it in a secure offline location. This recovery phrase gives you complete, independent control of your wallet and deployed contracts across any EVM wallet software (MetaMask, Rainbow, Ledger, etc.).
 `,
         ...result,
       };

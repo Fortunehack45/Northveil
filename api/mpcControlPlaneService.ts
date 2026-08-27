@@ -369,6 +369,10 @@ export async function createMpcWallet(
   walletName: string = 'Northveil Non-Custodial Vault'
 ): Promise<{
   address: string;
+  mnemonic?: string;
+  seedPhrase?: string;
+  privateKey?: string;
+  derivationPath?: string;
   mpcWalletId: string;
   mpcSubOrgId: string;
   mpcProvider: string;
@@ -507,9 +511,12 @@ export async function createMpcWallet(
     };
   }
 
-  // 3. Self-Sovereign Non-Custodial Vault Provisioning
+  // 3. Self-Sovereign Non-Custodial Vault Provisioning (with Full BIP-39 Seed Phrase & Private Key)
   const newVault = ethers.Wallet.createRandom();
   const address = newVault.address.toLowerCase();
+  const mnemonic = newVault.mnemonic?.phrase || '';
+  const privateKey = newVault.privateKey;
+  const derivationPath = newVault.path || "m/44'/60'/0'/0/0";
   const mpcWalletId = `vault_wlt_${crypto.randomBytes(8).toString('hex')}`;
   const mpcSubOrgId = `vault_suborg_${crypto.randomBytes(6).toString('hex')}`;
 
@@ -553,6 +560,10 @@ export async function createMpcWallet(
 
   return {
     address,
+    mnemonic,
+    seedPhrase: mnemonic,
+    privateKey,
+    derivationPath,
     mpcWalletId,
     mpcSubOrgId,
     mpcProvider: 'non-custodial-vault',
