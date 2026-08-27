@@ -3337,9 +3337,13 @@ export async function executeRealTool(name: string, args: any, walletAddress: st
   const isExplicitEvm = explicitWallet.toLowerCase().startsWith('0x') && explicitWallet.length === 42;
   const isExplicitSol = !explicitWallet.startsWith('0x') && explicitWallet.length >= 32 && explicitWallet.length <= 44;
 
+  const rawWalletStr = typeof walletAddress === 'string'
+    ? walletAddress
+    : (walletAddress && typeof (walletAddress as any).walletAddress === 'string' ? (walletAddress as any).walletAddress : (process.env.NORTHVEIL_WALLET_ADDRESS || ''));
+
   const cleanAddress = (isExplicitEvm || isExplicitSol)
     ? (isExplicitEvm ? explicitWallet.toLowerCase() : explicitWallet)
-    : (walletAddress || process.env.NORTHVEIL_WALLET_ADDRESS || '').trim();
+    : String(rawWalletStr || '').trim();
 
   const isEvm = cleanAddress.startsWith('0x') && cleanAddress.length === 42;
   const isSol = !cleanAddress.startsWith('0x') && cleanAddress.length >= 32 && cleanAddress.length <= 44;
