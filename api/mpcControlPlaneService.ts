@@ -1584,18 +1584,17 @@ export async function approveAndExecuteWithPasskey(
             if (receipt.contractAddress) contractAddress = receipt.contractAddress;
           }
         } catch (receiptErr) {
-          blockNumber = 11573650;
+          try {
+            const p = getProviderForNetwork(req.network);
+            blockNumber = await p.getBlockNumber();
+          } catch (e) {}
         }
       } catch (broadcastErr: any) {
-        console.warn('[On-Chain Broadcast Notice]:', broadcastErr?.message || broadcastErr);
-        txHash = ethers.keccak256(ethers.toUtf8Bytes(`${req.requestId}_${Date.now()}_confirmed`));
-        blockNumber = Math.floor(12048590 + Math.random() * 100);
-        gasUsed = '21000';
+        console.error('[On-Chain Broadcast Failure]:', broadcastErr);
+        throw new Error(`Real On-Chain Broadcast Failed: ${broadcastErr?.reason || broadcastErr?.shortMessage || broadcastErr?.message || broadcastErr}`);
       }
     } else {
-      txHash = ethers.keccak256(ethers.toUtf8Bytes(`${req.requestId}_${Date.now()}_confirmed`));
-      blockNumber = Math.floor(12048590 + Math.random() * 100);
-      gasUsed = '21000';
+      throw new Error('On-Chain Signing Failed: No valid private key or Turnkey hardware enclave configured. Please set SEPOLIA_PRIVATE_KEY or TURNKEY credentials.');
     }
   }
 
@@ -1848,18 +1847,17 @@ export async function executeAutonomousTransaction(
             if (receipt.contractAddress) contractAddress = receipt.contractAddress;
           }
         } catch (receiptErr) {
-          blockNumber = 11573650;
+          try {
+            const p = getProviderForNetwork(network);
+            blockNumber = await p.getBlockNumber();
+          } catch (e) {}
         }
       } catch (broadcastErr: any) {
-        console.warn('[Real On-Chain Autonomous Broadcast Notice]:', broadcastErr?.message || broadcastErr);
-        txHash = ethers.keccak256(ethers.toUtf8Bytes(`${scopeId}_${Date.now()}_autonomous_confirmed`));
-        blockNumber = Math.floor(12048590 + Math.random() * 100);
-        gasUsed = '21000';
+        console.error('[Autonomous On-Chain Broadcast Failure]:', broadcastErr);
+        throw new Error(`Autonomous On-Chain Broadcast Failed: ${broadcastErr?.reason || broadcastErr?.shortMessage || broadcastErr?.message || broadcastErr}`);
       }
     } else {
-      txHash = ethers.keccak256(ethers.toUtf8Bytes(`${scopeId}_${Date.now()}_autonomous_confirmed`));
-      blockNumber = Math.floor(12048590 + Math.random() * 100);
-      gasUsed = '21000';
+      throw new Error('On-Chain Signing Failed: No valid private key or Turnkey hardware enclave configured. Please set SEPOLIA_PRIVATE_KEY or TURNKEY credentials.');
     }
   }
 
