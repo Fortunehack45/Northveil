@@ -236,7 +236,7 @@ export const App: React.FC = () => {
       <header className="w-full h-20 px-4 sm:px-8 border-b-3 border-white bg-[#141419] flex items-center justify-between gap-4 sticky top-0 z-40">
         <div className="flex items-center gap-3">
           <img
-            src="https://iili.io/CDS9fvn.png"
+            src="https://iili.io/CDj46zl.png"
             alt="Northveil MCP Logo"
             className="w-10 h-10 object-contain rounded-lg border-2 border-white shadow-[2px_2px_0px_0px_#ccff00] bg-black"
           />
