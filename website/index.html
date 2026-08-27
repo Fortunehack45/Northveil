@@ -1451,7 +1451,7 @@
     </nav>
 
     <div class="header-right">
-      <a href="#tools" class="btn btn-solid header-cta appear appear--scale" style="--d: 0.34s;">Connect Agent</a>
+      <a href="/" class="btn btn-solid header-cta appear appear--scale" style="--d: 0.34s;" onclick="if(window.location.port==='3002'){window.location.href='http://localhost:5173';return false;}">Launch Wallet</a>
       <button class="burger appear appear--scale" style="--d: 0.34s;" aria-controls="site-nav" aria-expanded="false" aria-label="Open menu">
         <span class="burger-bar"></span>
         <span class="burger-bar"></span>
@@ -1483,8 +1483,14 @@
         </p>
 
         <div class="hero-actions">
-          <a href="#tools" class="btn btn-solid btn-hero appear appear--btn" style="--d: 0.96s;">Deploy Agent Vault</a>
-          <a href="#how-it-works" class="btn btn-ghost btn-hero appear appear--side" style="--d: 1.10s;">Explore MCP Protocol</a>
+          <a href="/" class="btn btn-solid btn-hero appear appear--btn" style="--d: 0.96s; display: inline-flex; align-items: center; justify-content: center; gap: 8px;" onclick="if(window.location.port==='3002'){window.location.href='http://localhost:5173';return false;}">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+              <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+            </svg>
+            Launch Web3 Wallet
+          </a>
+          <a href="#tools" class="btn btn-ghost btn-hero appear appear--side" style="--d: 1.10s;">Explore MCP Protocol</a>
         </div>
       </div>
     </main>
@@ -1882,7 +1888,7 @@
     <h2 style="font-size: 34px; font-weight: 500; letter-spacing: -0.035em; margin-bottom: 14px;">Ready to empower your <em>AI agents</em> with on-chain vaults?</h2>
     <p style="color: var(--muted); font-size: 15.5px; max-width: 540px; margin-bottom: 28px; line-height: 1.55;">Connect Northveil MCP to your local Claude Desktop or backend runtime in less than 2 minutes.</p>
     <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
-      <a href="#tools" class="btn btn-solid btn-hero">Launch Web App</a>
+      <a href="/" class="btn btn-solid btn-hero" onclick="if(window.location.port==='3002'){window.location.href='http://localhost:5173';return false;}">Open Web3 Wallet</a>
       <a href="#how-it-works" class="btn btn-ghost btn-hero">Read Documentation</a>
     </div>
   </div>
@@ -1900,6 +1906,7 @@
       <div class="footer-col">
         <h4>Protocol</h4>
         <ul>
+          <li><a href="/" onclick="if(window.location.port==='3002'){window.location.href='http://localhost:5173';return false;}">Web3 Wallet App</a></li>
           <li><a href="#benefits">Why Northveil</a></li>
           <li><a href="#how-it-works">Architecture</a></li>
           <li><a href="#tools">30+ MCP Tools</a></li>
