@@ -1639,25 +1639,25 @@
 
     <div class="arch-container">
       <div class="step-list">
-        <div class="step-item" onclick="selectStep(0, 'mcp', this)">
+        <div class="step-item is-selected" onclick="selectStep('step_dispatch', this)">
           <div class="step-num">01 // DISPATCH</div>
           <div class="step-name">Agent Dispatches MCP Tool Call</div>
           <div class="step-desc">Claude or AutoGPT executes tools like <code>deploy_smart_contract</code>, <code>mint_tokens</code>, or <code>send_transfer</code> via standard JSON-RPC.</div>
         </div>
 
-        <div class="step-item" onclick="selectStep(1, 'policy', this)">
+        <div class="step-item" onclick="selectStep('step_policy', this)">
           <div class="step-num">02 // POLICY EVALUATION</div>
           <div class="step-name">Cryptographic Guardrail Verification</div>
           <div class="step-desc">Northveil validates daily velocity limits, whitelisted destination contracts, and checks active kill switches.</div>
         </div>
 
-        <div class="step-item" onclick="selectStep(2, 'passkey', this)">
+        <div class="step-item" onclick="selectStep('step_passkey', this)">
           <div class="step-num">03 // TEE / PASSKEY SIGNING</div>
           <div class="step-name">Hardware Enclave or Biometric Sign</div>
           <div class="step-desc">In-scope actions execute autonomously in the TEE. Out-of-scope transactions generate a secure biometric passkey challenge.</div>
         </div>
 
-        <div class="step-item" onclick="selectStep(3, 'broadcast', this)">
+        <div class="step-item" onclick="selectStep('step_broadcast', this)">
           <div class="step-num">04 // MULTI-CHAIN SETTLEMENT</div>
           <div class="step-name">On-Chain Broadcast with Failover</div>
           <div class="step-desc">Transaction broadcasts to Ethereum, Base, Polygon, Arbitrum, BSC, or Solana with multi-node RPC failover and receipt logging.</div>
@@ -1672,9 +1672,9 @@
             <span class="code-dot"></span>
           </div>
           <div class="code-tabs">
-            <button class="code-tab-btn active" id="tab-btn-mcp" onclick="switchCodeTab('mcp')">claude_desktop.json</button>
-            <button class="code-tab-btn" id="tab-btn-python" onclick="switchCodeTab('python')">sdk.py</button>
-            <button class="code-tab-btn" id="tab-btn-ts" onclick="switchCodeTab('ts')">wallet.ts</button>
+            <button class="code-tab-btn active" id="tab-btn-config" onclick="switchCodeLang('config')">claude_desktop.json</button>
+            <button class="code-tab-btn" id="tab-btn-python" onclick="switchCodeLang('python')">sdk.py</button>
+            <button class="code-tab-btn" id="tab-btn-ts" onclick="switchCodeLang('ts')">wallet.ts</button>
           </div>
           <div class="code-actions-top">
             <button class="copy-btn" onclick="copyActiveCode(this)">
@@ -2073,71 +2073,149 @@
       }
     }
 
-    // 5. Code Snippets Data
-    const codeSnippets = {
-      mcp: `{\n  "mcpServers": {\n    "northveil": {\n      "command": "npx",\n      "args": ["-y", "@northveil/mcp-server"],\n      "env": {\n        "NORTHVEIL_WALLET_ADDRESS": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"\n      }\n    }\n  }\n}`,
-      python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(wallet_address="0x56f0fdbe1b...")\n\n# Deploy smart contract autonomously\nresult = client.deploy_contract(\n    name="FIRE",\n    symbol="FIRE",\n    total_supply=100_000_000,\n    network="sepolia"\n)\nprint(f"Deployed Contract: {result.contract_address}")`,
-      ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({\n  walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'\n});\n\n// Send autonomous micro-transfer within $50 daily scope\nconst tx = await vault.sendTransfer({\n  to: '0xcd80170f0aaec2b71c8df0163717f1856bec0dac',\n  amount: '0.001',\n  token: 'ETH',\n  network: 'sepolia'\n});\nconsole.log('Confirmed Tx:', tx.txHash);`,
-      policy: `// 24-Hour Autonomous Spending Policy\nconst policy = {\n  maxDailySpendUsd: 50.00,\n  whitelistedNetworks: ['ethereum', 'sepolia', 'base', 'solana'],\n  allowedActions: ['DEPLOY', 'TRANSFER', 'SWAP'],\n  requirePasskeyAboveUsd: 100.00,\n  killSwitchActive: false\n};`,
-      passkey: `// WebAuthn Biometric Passkey Ceremony\nconst challenge = await northveil.generatePasskeyChallenge({\n  walletAddress: '0x56f0fdbe...',\n  action: 'DEPLOY_CONTRACT'\n});\n\n// Triggers Touch ID / Face ID on User Device\nconst signature = await navigator.credentials.get({\n  publicKey: challenge.options\n});`,
-      broadcast: `// Multi-Chain Broadcast Receipt\n{\n  "status": "confirmed",\n  "txHash": "0xfd36af3edb8a6248b1bcfa7a8ea5abfef1941315cd999cf62452ea96d8dab00e",\n  "network": "sepolia",\n  "blockNumber": 12048592,\n  "explorerUrl": "https://sepolia.etherscan.io/tx/0xfd36af..."\n}`
+    // 5. Rich Architecture & Tool Inspector Data
+    const architectureData = {
+      step_dispatch: {
+        label: 'claude_desktop.json',
+        config: `{\n  "mcpServers": {\n    "northveil": {\n      "command": "npx",\n      "args": ["-y", "@northveil/mcp-server"],\n      "env": {\n        "NORTHVEIL_WALLET_ADDRESS": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"\n      }\n    }\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\n# Initialize autonomous client runtime\nclient = NorthveilClient(\n    wallet_address="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417",\n    network="sepolia"\n)\n\n# Agent dispatches smart contract deployment via MCP\ntx = client.deploy_contract(\n    name="WATER",\n    symbol="WAR",\n    total_supply=100_000_000,\n    recipient="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"\n)\nprint(f"Contract Dispatched: {tx.contract_address}")`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({\n  walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',\n  network: 'sepolia'\n});\n\n// Autonomous MCP tool dispatch from LLM agent\nconst result = await vault.tools.deployContract({\n  name: 'WATER',\n  symbol: 'WAR',\n  initialSupply: 100_000_000,\n  decimals: 18\n});\nconsole.log('Contract Dispatched:', result.contractAddress);`
+      },
+      step_policy: {
+        label: 'policy_guardrails.json',
+        config: `{\n  "policyId": "pol_daily_autonomous_v2",\n  "rules": {\n    "maxDailySpendUsd": 50.00,\n    "maxSingleTxUsd": 20.00,\n    "whitelistedNetworks": ["sepolia", "ethereum", "base", "polygon"],\n    "allowedActions": ["DEPLOY_CONTRACT", "SEND_TRANSFER", "EXECUTE_SWAP"],\n    "requirePasskeyAboveUsd": 100.00,\n    "emergencyKillSwitch": false\n  }\n}`,
+        python: `from northveil import NorthveilClient, SpendingPolicy\n\nclient = NorthveilClient(wallet_address="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417")\n\n# Verify transaction intent against autonomous spending rules\npolicy = SpendingPolicy(\n    max_daily_usd=50.00,\n    allowed_networks=["sepolia", "base"],\n    restricted_contracts=["0xDef1C0ded9bec7F1a1670819833240f027b25EfF"]\n)\n\ncheck = client.policies.evaluate(\n    action="SEND_TRANSFER",\n    amount_usd=12.50,\n    network="sepolia"\n)\nassert check.is_allowed is True, "Guardrail velocity limit triggered"`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ walletAddress: '0x56f0fdbe1b...' });\n\n// Real-time cryptographic policy evaluation\nconst policyGate = await vault.policy.verify({\n  action: 'SEND_TRANSFER',\n  amountUsd: 12.50,\n  token: 'ETH',\n  destination: '0x2de14bb9264acd0346e122c4bb2f0614f79a1670'\n});\n\nif (!policyGate.passed) {\n  throw new Error(\`Policy violation: \${policyGate.rejectionReason}\`);\n}\nconsole.log('Policy Passed. Remaining Daily Quota:', policyGate.dailyRemainingUsd);`
+      },
+      step_passkey: {
+        label: 'tee_attestation.json',
+        config: `{\n  "attestation": {\n    "enclaveType": "AWS_NITRO_TEE",\n    "pcr0": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",\n    "turnkeySubOrgId": "d982ab71-923f-4e02-b362-e93297a7e112",\n    "authMode": "WEBAUTHN_PASSKEY_BIOMETRIC",\n    "signatureType": "ECDSA_SECP256K1"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(wallet_address="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417")\n\n# Autonomous signing inside AWS Nitro Enclave (Turnkey MPC)\nsigned_payload = client.enclave.sign_transaction(\n    tx_params={\n        "to": "0x2de14bb9264acd0346e122c4bb2f0614f79a1670",\n        "value": 5000000000000000, # 0.005 ETH\n        "chainId": 11155111\n    },\n    enclave_proof=True\n)\nprint("TEE Enclave Signature Generated (Zero Key Exposure)")`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ walletAddress: '0x56f0fdbe1b...' });\n\n// Generate WebAuthn FIDO2 biometric challenge for high-value actions\nconst challenge = await vault.passkey.createChallenge({\n  action: 'DEPLOY_CONTRACT',\n  walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'\n});\n\n// Triggers native Touch ID / Face ID hardware prompt on user device\nconst assertion = await navigator.credentials.get({\n  publicKey: challenge.publicKeyOptions\n});\nconst signedTx = await vault.passkey.submitAssertion(assertion);\nconsole.log('Biometric Passkey Attested:', signedTx.attestationId);`
+      },
+      step_broadcast: {
+        label: 'broadcast_receipt.json',
+        config: `{\n  "status": "confirmed",\n  "txHash": "0x2446b57559b47aa478e9c8cb5c7ddcfc8de6dccc6dc04a6624f5a98bdc4ec089",\n  "network": "sepolia",\n  "blockNumber": 11578671,\n  "gasUsed": "847291",\n  "explorerUrl": "https://sepolia.etherscan.io/tx/0x2446b57559b47aa478e9c8cb5c7ddcfc8de6dccc6dc04a6624f5a98bdc4ec089"\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(network="sepolia")\n\n# Broadcast signed transaction with automatic multi-RPC failover\nreceipt = client.broadcast(\n    signed_tx_raw="0x02f8730182...",\n    wait_confirmations=1,\n    rpc_nodes=["sepolia.drpc.org", "rpc.sepolia.org"]\n)\nprint(f"Transaction Confirmed on Block: {receipt.block_number}")\nprint(f"Etherscan: {receipt.explorer_url}")`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ network: 'sepolia' });\n\n// Broadcast to decentralized RPC network with automatic receipt tracking\nconst receipt = await vault.broadcast({\n  rawTransaction: signedTx.rawBytes,\n  confirmations: 1,\n  timeoutMs: 30000\n});\nconsole.log('Mined in Block:', receipt.blockNumber);\nconsole.log('Explorer URL:', receipt.explorerUrl);`
+      },
+      tool_deploy_smart_contract: {
+        label: 'deploy_contract.json',
+        config: `// Tool Call: deploy_smart_contract\n{\n  "tool": "deploy_smart_contract",\n  "params": {\n    "name": "WATER",\n    "symbol": "WAR",\n    "initialSupply": 100000000,\n    "network": "sepolia"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(network="sepolia")\ncontract = client.deploy_contract(\n    name="WATER",\n    symbol="WAR",\n    total_supply=100_000_000\n)\nprint(f"Deployed Contract Address: {contract.address}")`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ network: 'sepolia' });\nconst tx = await vault.deployContract({\n  name: 'WATER',\n  symbol: 'WAR',\n  initialSupply: 100_000_000\n});\nconsole.log('Deployed at:', tx.contractAddress);`
+      },
+      tool_mint_tokens: {
+        label: 'mint_tokens.json',
+        config: `// Tool Call: mint_tokens\n{\n  "tool": "mint_tokens",\n  "params": {\n    "contractAddress": "0x1F52ED32f567A01d3E65DB3807f1889D546B6A98",\n    "to": "0x2de14bb9264acd0346e122c4bb2f0614f79a1670",\n    "amount": "1000000",\n    "network": "sepolia"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(network="sepolia")\nmint_tx = client.mint_tokens(\n    contract_address="0x1F52ED32f567A01d3E65DB3807f1889D546B6A98",\n    recipient="0x2de14bb9264acd0346e122c4bb2f0614f79a1670",\n    amount=1_000_000\n)\nprint("Mint receipt:", mint_tx.tx_hash)`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ network: 'sepolia' });\nconst receipt = await vault.mintTokens({\n  contractAddress: '0x1F52ED32f567A01d3E65DB3807f1889D546B6A98',\n  to: '0x2de14bb9264acd0346e122c4bb2f0614f79a1670',\n  amount: 1000000\n});\nconsole.log('Minted tokens tx:', receipt.txHash);`
+      },
+      tool_send_transfer: {
+        label: 'send_transfer.json',
+        config: `// Tool Call: send_transfer\n{\n  "tool": "send_transfer",\n  "params": {\n    "to": "0x2de14bb9264acd0346e122c4bb2f0614f79a1670",\n    "amount": "0.005",\n    "token": "ETH",\n    "network": "sepolia"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(network="sepolia")\ntransfer = client.send_transfer(\n    recipient="0x2de14bb9264acd0346e122c4bb2f0614f79a1670",\n    amount="0.005",\n    token="ETH"\n)\nprint("Transfer broadcasted:", transfer.tx_hash)`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ network: 'sepolia' });\nconst tx = await vault.sendTransfer({\n  to: '0x2de14bb9264acd0346e122c4bb2f0614f79a1670',\n  amount: '0.005',\n  token: 'ETH'\n});\nconsole.log('Transfer confirmed:', tx.txHash);`
+      },
+      tool_execute_swap: {
+        label: 'execute_swap.json',
+        config: `// Tool Call: execute_swap\n{\n  "tool": "execute_swap",\n  "params": {\n    "fromToken": "USDC",\n    "toToken": "ETH",\n    "amount": "100.0",\n    "network": "base"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(network="base")\nswap = client.execute_swap(\n    from_token="USDC",\n    to_token="ETH",\n    amount=100.0,\n    slippage_tolerance=0.5\n)\nprint("Swap complete:", swap.tx_hash)`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ network: 'base' });\nconst swapResult = await vault.executeSwap({\n  fromToken: 'USDC',\n  toToken: 'ETH',\n  amount: '100.0',\n  slippage: 0.5\n});\nconsole.log('Swap executed:', swapResult.txHash);`
+      },
+      tool_create_wallet: {
+        label: 'create_wallet.json',
+        config: `// Tool Call: create_wallet\n{\n  "tool": "create_wallet",\n  "params": {\n    "vaultType": "NON_CUSTODIAL_TEE",\n    "network": "all"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient()\nnew_vault = client.create_wallet(\n    vault_type="NON_CUSTODIAL_TEE",\n    enable_passkey=True\n)\nprint(f"New Vault Address: {new_vault.address}")`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vaultManager = new NorthveilSDK();\nconst newVault = await vaultManager.createWallet({\n  vaultType: 'NON_CUSTODIAL_TEE',\n  chains: ['ethereum', 'polygon', 'base', 'solana']\n});\nconsole.log('Created Vault Address:', newVault.address);`
+      },
+      tool_get_wallet_info: {
+        label: 'get_wallet_info.json',
+        config: `// Tool Call: get_wallet_info\n{\n  "tool": "get_wallet_info",\n  "params": {\n    "address": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient()\ninfo = client.get_wallet_info("0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417")\nprint(f"Vault Balances: {info.balances}")\nprint(f"Daily Spend Remaining: \${info.spending_remaining_usd}")`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK();\nconst info = await vault.getWalletInfo('0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417');\nconsole.log('Balances:', info.balances);\nconsole.log('Daily Limit USD Remaining:', info.dailyLimitRemainingUsd);`
+      },
+      tool_activate_kill_switch: {
+        label: 'activate_kill_switch.json',
+        config: `// Tool Call: activate_kill_switch\n{\n  "tool": "activate_kill_switch",\n  "params": {\n    "reason": "Emergency Halt Request",\n    "walletAddress": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(wallet_address="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417")\nclient.kill_switch.activate(reason="Security Incident Detected")\nprint("Vault frozen across all chains immediately.")`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ walletAddress: '0x56f0fdbe1b...' });\nawait vault.emergency.activateKillSwitch({\n  reason: 'Security Incident Detected'\n});\nconsole.log('Vault operations halted immediately.');`
+      },
+      tool_create_booking_deposit: {
+        label: 'create_booking_deposit.json',
+        config: `// Tool Call: create_booking_deposit\n{\n  "tool": "create_booking_deposit",\n  "params": {\n    "merchantId": "MERCH_88291",\n    "amount": "25.00",\n    "network": "base"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(network="base")\ndeposit = client.create_booking_deposit(\n    merchant_id="MERCH_88291",\n    amount_usd=25.00\n)\nprint("Deposit locked in escrow contract:", deposit.escrow_id)`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ network: 'base' });\nconst deposit = await vault.escrow.createBookingDeposit({\n  merchantId: 'MERCH_88291',\n  amountUsd: 25.00\n});\nconsole.log('Escrow deposit created:', deposit.escrowId);`
+      }
     };
 
-    let activeCodeType = 'mcp';
+    let currentContext = 'step_dispatch';
+    let currentLang = 'config';
 
-    function switchCodeTab(type) {
-      activeCodeType = type;
+    function renderCodeWindow() {
+      const data = architectureData[currentContext] || architectureData['step_dispatch'];
       const codeEl = document.getElementById('code-content');
-      if (codeEl && codeSnippets[type]) {
+      const configTabBtn = document.getElementById('tab-btn-config');
+      
+      if (configTabBtn && data.label) {
+        configTabBtn.textContent = data.label;
+      }
+      
+      if (codeEl) {
         codeEl.style.opacity = '0';
         codeEl.style.transform = 'translateY(4px)';
         setTimeout(() => {
-          codeEl.textContent = codeSnippets[type];
+          const codeText = data[currentLang] || data.config;
+          codeEl.textContent = codeText;
           codeEl.style.opacity = '1';
           codeEl.style.transform = 'translateY(0)';
         }, 120);
       }
+
       document.querySelectorAll('.code-tab-btn').forEach(btn => btn.classList.remove('active'));
-      const activeBtn = document.getElementById(`tab-btn-${type}`);
+      const activeBtn = document.getElementById(`tab-btn-${currentLang}`);
       if (activeBtn) activeBtn.classList.add('active');
     }
 
+    function switchCodeLang(lang) {
+      currentLang = lang;
+      renderCodeWindow();
+    }
+
     // 6. Interactive Step Selector (Click Effect for all step cards)
-    function selectStep(index, type, element) {
+    function selectStep(stepKey, element) {
+      currentContext = stepKey;
       document.querySelectorAll('.step-item').forEach(item => item.classList.remove('is-selected'));
       if (element) {
         element.classList.add('is-selected');
       }
-      switchCodeTab(type);
+      renderCodeWindow();
     }
 
     // 7. Benefits Card Click Interaction
-    function selectBenefit(cardEl, type) {
+    function selectBenefit(cardEl, benefitType) {
       document.querySelectorAll('.grid-3 .card').forEach(c => c.style.borderColor = 'var(--border-soft)');
-      cardEl.style.borderColor = 'rgba(255, 255, 255, 0.45)';
-      if (type === 'tee') switchCodeTab('mcp');
-      else if (type === 'passkey') switchCodeTab('passkey');
-      else if (type === 'policy') switchCodeTab('policy');
+      if (cardEl) cardEl.style.borderColor = 'rgba(255, 255, 255, 0.45)';
+      
+      const stepMap = {
+        tee: 'step_dispatch',
+        passkey: 'step_passkey',
+        policy: 'step_policy'
+      };
+      currentContext = stepMap[benefitType] || 'step_dispatch';
+      renderCodeWindow();
+      const howItWorks = document.getElementById('how-it-works');
+      if (howItWorks) {
+        howItWorks.scrollIntoView({ behavior: 'smooth' });
+      }
     }
 
     // 8. Tool Preview Interactive Click
     function previewTool(toolName) {
-      const codeEl = document.getElementById('code-content');
-      if (!codeEl) return;
-      
-      const toolMap = {
-        deploy_smart_contract: `// Tool Call: deploy_smart_contract\n{\n  "tool": "deploy_smart_contract",\n  "params": {\n    "name": "FIRE",\n    "symbol": "FIRE",\n    "initialSupply": 100000000,\n    "network": "sepolia"\n  }\n}`,
-        mint_tokens: `// Tool Call: mint_tokens\n{\n  "tool": "mint_tokens",\n  "params": {\n    "contractAddress": "0x2aFffd9e55a3753Af8E40561d2f5E4fd4265573f",\n    "to": "0xcd80170f0aaec2b71c8df0163717f1856bec0dac",\n    "amount": "97000000",\n    "network": "sepolia"\n  }\n}`,
-        send_transfer: `// Tool Call: send_transfer\n{\n  "tool": "send_transfer",\n  "params": {\n    "to": "0xcd80170f0aaec2b71c8df0163717f1856bec0dac",\n    "amount": "0.05",\n    "token": "ETH",\n    "network": "sepolia"\n  }\n}`,
-        execute_swap: `// Tool Call: execute_swap\n{\n  "tool": "execute_swap",\n  "params": {\n    "fromToken": "USDC",\n    "toToken": "ETH",\n    "amount": "100.0",\n    "network": "base"\n  }\n}`,
-        create_wallet: `// Tool Call: create_wallet\n{\n  "tool": "create_wallet",\n  "params": {\n    "vaultType": "NON_CUSTODIAL_TEE"\n  }\n}`,
-        get_wallet_info: `// Tool Call: get_wallet_info\n{\n  "tool": "get_wallet_info",\n  "params": {\n    "address": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"\n  }\n}`,
-        activate_kill_switch: `// Tool Call: activate_kill_switch\n{\n  "tool": "activate_kill_switch",\n  "params": {\n    "reason": "Emergency Halt Request"\n  }\n}`,
-        create_booking_deposit: `// Tool Call: create_booking_deposit\n{\n  "tool": "create_booking_deposit",\n  "params": {\n    "merchantId": "MERCH_88291",\n    "amount": "25.00",\n    "network": "base"\n  }\n}`
-      };
-
-      if (toolMap[toolName]) {
-        codeEl.textContent = toolMap[toolName];
+      const key = `tool_${toolName}`;
+      if (architectureData[key]) {
+        currentContext = key;
+        renderCodeWindow();
         const howItWorks = document.getElementById('how-it-works');
         if (howItWorks) {
           howItWorks.scrollIntoView({ behavior: 'smooth' });
