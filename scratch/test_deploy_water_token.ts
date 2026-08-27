@@ -58,7 +58,7 @@ function findImports(importPath: string) {
 }
 
 async function main() {
-  const rpcUrl = 'https://1rpc.io/sepolia';
+  const rpcUrl = 'https://ethereum-sepolia-rpc.publicnode.com';
   const provider = new ethers.JsonRpcProvider(rpcUrl);
 
   const wallet1 = '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
