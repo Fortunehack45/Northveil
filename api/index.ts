@@ -4771,7 +4771,7 @@ contract ${nameStr} is ERC20, ERC20Burnable, Ownable {
             scopeCheck.scopeId,
             'default_user'
           );
-          realTxHash = autoRes.txHash;
+          realTxHash = autoRes.txHash || '';
           realContractAddress = autoRes.contractAddress || ethers.getCreateAddress({ from: cleanAddress, nonce: 0 });
           isOnChainBroadcasted = true;
         } catch (e: any) {

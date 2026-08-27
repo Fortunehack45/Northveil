@@ -3,8 +3,9 @@ import solc from 'solc';
 import fs from 'fs';
 import path from 'path';
 
-const sepoliaProvider = new ethers.JsonRpcProvider('https://ethereum-sepolia-rpc.publicnode.com');
-const pk = '0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9'; // PK of 0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417
+// NOTE: Hardcoded fallback key removed. Set LOCAL_TEST_PRIVATE_KEY in your environment for live testing.
+// Any previously committed test key in repo history is public and must be treated as permanently compromised.
+const pk = process.env.LOCAL_TEST_PRIVATE_KEY || '';
 
 function findImports(importPath) {
   try {

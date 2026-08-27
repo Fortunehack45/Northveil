@@ -1,8 +1,10 @@
 import { ethers } from 'ethers';
 import solc from 'solc';
 
-const RELAYER_KEY = '0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9';
-const RPC_URL = 'https://ethereum-sepolia-rpc.publicnode.com';
+// NOTE: Hardcoded fallback key removed. Set LOCAL_TEST_PRIVATE_KEY in your environment for live testing.
+// Any previously committed test key in repo history is public and must be treated as permanently compromised.
+const RELAYER_KEY = process.env.LOCAL_TEST_PRIVATE_KEY || '';
+const RPC_URL = process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
 
 const erc20Source = `// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;

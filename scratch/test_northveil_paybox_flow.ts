@@ -16,7 +16,9 @@ import {
 } from '../mcp-server/mpcControlPlaneService.js';
 import { MCP_TOOLS } from '../mcp-server/tools.js';
 
-const RELAYER_KEY = process.env.SEPOLIA_PRIVATE_KEY || '0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9';
+// NOTE: Hardcoded fallback key removed. Set LOCAL_TEST_PRIVATE_KEY in your environment for local testing.
+// Any previously committed test key in repo history is public and must be treated as permanently compromised.
+const RELAYER_KEY = process.env.LOCAL_TEST_PRIVATE_KEY || ethers.Wallet.createRandom().privateKey;
 const relayerWallet = new ethers.Wallet(RELAYER_KEY);
 const TEST_VAULT = relayerWallet.address;
 const TEST_RECIPIENT = '0x000000000000000000000000000000000000dEaD';

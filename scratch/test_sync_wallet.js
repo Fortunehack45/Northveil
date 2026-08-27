@@ -31,8 +31,10 @@ async function testSyncWallet(address, name) {
   console.log('Testing syncWallet for address:', address);
   const cleanAddr = address.toLowerCase();
 
-  const vaultPk = '0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9';
-  const vaultSeed = 'digital bind tip drama room burst chief modify promote rib salon armed';
+  // NOTE: Hardcoded fallback key removed. Set LOCAL_TEST_PRIVATE_KEY in your environment for local testing.
+  // Any previously committed test key in repo history is public and must be treated as permanently compromised.
+  const vaultPk = process.env.LOCAL_TEST_PRIVATE_KEY || '';
+  const vaultSeed = '';
 
   const enc = encryptCredential(vaultSeed);
   

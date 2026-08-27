@@ -33,6 +33,8 @@ async function encryptCredentialClient(plaintext) {
   }
 }
 
-encryptCredentialClient('0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9')
+// NOTE: Hardcoded fallback key removed. Use non-sensitive dummy string for cipher testing.
+// Any previously committed test key in repo history is public and must be treated as permanently compromised.
+encryptCredentialClient('dummy_test_credential_payload_for_web_crypto')
   .then(res => console.log('Web Crypto Encrypted:', res))
   .catch(console.error);
