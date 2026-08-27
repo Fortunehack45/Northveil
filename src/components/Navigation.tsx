@@ -148,9 +148,9 @@ export const Navigation: React.FC<NavigationProps> = ({
               className="flex items-center gap-1 cursor-pointer hover:opacity-85 transition-opacity text-left"
             >
               <img
-                src="https://iili.io/CDj46zl.png"
+                src="https://iili.io/CDS9fvn.png"
                 alt="Northveil Logo"
-                className="h-12 w-auto object-contain shrink-0 northveil-logo dark:brightness-100 brightness-0 transition-all"
+                className="h-10 w-auto object-contain shrink-0 northveil-logo transition-all"
               />
               <span className="text-xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
                 Northveil

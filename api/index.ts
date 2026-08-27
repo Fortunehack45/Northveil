@@ -1714,12 +1714,12 @@ const handleAuthorize = async (req: Request, res: Response) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Northveil | Sign In to Authorize AI Agent</title>
-  <link rel="icon" type="image/png" href="https://iili.io/CDj46zl.png">
+  <link rel="icon" type="image/png" href="https://iili.io/CDS9fvn.png">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
     body { background-color: #000000; color: #FFFFFF; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
     .card { background-color: #0F0F12; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; padding: 32px; max-width: 440px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.8); text-align: center; }
-    .logo { width: 56px; height: 56px; border-radius: 14px; margin: 0 auto 16px; display: block; border: 1px solid rgba(255, 255, 255, 0.1); }
+    .logo { width: 56px; height: 56px; border-radius: 14px; margin: 0 auto 16px; display: block; border: 1px solid rgba(255, 255, 255, 0.1); object-fit: contain; }
     .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; background: rgba(255, 255, 255, 0.08); color: #FFFFFF; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 12px; }
     h1 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
     p { font-size: 13px; color: #A1A1AA; line-height: 1.5; margin-bottom: 20px; }
@@ -1733,7 +1733,7 @@ const handleAuthorize = async (req: Request, res: Response) => {
 </head>
 <body>
   <div class="card">
-    <img src="https://iili.io/CDj46zl.png" alt="Northveil Logo" class="logo">
+    <img src="https://iili.io/CDS9fvn.png" alt="Northveil Logo" class="logo">
     <span class="badge">SECURE MPC VAULT AUTHENTICATION</span>
     <h1>Sign In with Passkey</h1>
     <p>Please authenticate using your device passkey (Touch ID, Face ID, or Windows Hello) to authorize this AI application.</p>
@@ -1841,12 +1841,12 @@ const handleAuthorize = async (req: Request, res: Response) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Northveil | Authorize AI Agent</title>
-  <link rel="icon" type="image/png" href="https://iili.io/CDj46zl.png">
+  <link rel="icon" type="image/png" href="https://iili.io/CDS9fvn.png">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
     body { background-color: #000000; color: #FFFFFF; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
     .card { background-color: #0F0F12; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; padding: 32px; max-width: 440px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.8); text-align: center; }
-    .logo { width: 56px; height: 56px; border-radius: 14px; margin: 0 auto 16px; display: block; border: 1px solid rgba(255, 255, 255, 0.1); }
+    .logo { width: 56px; height: 56px; border-radius: 14px; margin: 0 auto 16px; display: block; border: 1px solid rgba(255, 255, 255, 0.1); object-fit: contain; }
     .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; background: rgba(16, 185, 129, 0.15); color: #10B981; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 12px; border: 1px solid rgba(16, 185, 129, 0.3); }
     h1 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
     p { font-size: 13px; color: #A1A1AA; line-height: 1.5; margin-bottom: 20px; }
@@ -1865,7 +1865,7 @@ const handleAuthorize = async (req: Request, res: Response) => {
 </head>
 <body>
   <div class="card">
-    <img src="https://iili.io/CDj46zl.png" alt="Northveil Logo" class="logo">
+    <img src="https://iili.io/CDS9fvn.png" alt="Northveil Logo" class="logo">
     <span class="badge">🟢 VERIFIED MPC VAULT ACTIVE</span>
     <h1>Connect AI Agent</h1>
     <p>An external AI application is requesting non-custodial read and execution access to your Northveil vault.</p>
