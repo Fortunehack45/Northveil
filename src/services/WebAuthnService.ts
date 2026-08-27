@@ -1,7 +1,7 @@
 /**
  * Northveil Client-Side WebAuthn & Hardware Passkey Service
  * Supports Touch ID, Face ID, Windows Hello, and FIDO2 Hardware Security Keys
- * Non-Custodial Biometric Authorization for On-Chain MPC Operations
+ * STRICT 1-TO-1 Non-Custodial Biometric Authorization for On-Chain MPC Operations
  */
 
 import { MpcWalletService } from './MpcWalletService';
@@ -17,6 +17,7 @@ export interface RegisteredPasskey {
 
 export class WebAuthnService {
   private static STORAGE_KEY = 'northveil_registered_passkey';
+  private static MAP_STORAGE_KEY = 'northveil_passkeys_by_wallet';
 
   /**
    * Check if the current browser and platform support WebAuthn
@@ -49,20 +50,71 @@ export class WebAuthnService {
   }
 
   /**
-   * Retrieves any previously registered passkey from localStorage
+   * Internal helper to load the 1-to-1 map of passkeys keyed by wallet address
+   */
+  public static listRegisteredPasskeys(): Record<string, RegisteredPasskey> {
+    if (typeof window === 'undefined') return {};
+    const map: Record<string, RegisteredPasskey> = {};
+
+    // 1. Read modern map storage
+    try {
+      const rawMap = localStorage.getItem(this.MAP_STORAGE_KEY);
+      if (rawMap) {
+        const parsed = JSON.parse(rawMap);
+        if (typeof parsed === 'object' && parsed !== null) {
+          for (const [addr, cred] of Object.entries(parsed)) {
+            if (cred && typeof cred === 'object') {
+              map[addr.toLowerCase()] = cred as RegisteredPasskey;
+            }
+          }
+        }
+      }
+    } catch {}
+
+    // 2. Migrate legacy single-passkey storage if present
+    try {
+      const legacyRaw = localStorage.getItem(this.STORAGE_KEY);
+      if (legacyRaw) {
+        const legacy: RegisteredPasskey = JSON.parse(legacyRaw);
+        if (legacy && legacy.walletAddress) {
+          const norm = legacy.walletAddress.toLowerCase();
+          if (!map[norm]) {
+            map[norm] = legacy;
+            localStorage.setItem(this.MAP_STORAGE_KEY, JSON.stringify(map));
+          }
+        }
+      }
+    } catch {}
+
+    return map;
+  }
+
+  /**
+   * Retrieves the passkey registered strictly for a specific wallet address
    */
   public static getRegisteredPasskey(walletAddress?: string): RegisteredPasskey | null {
     if (typeof window === 'undefined') return null;
+    const map = this.listRegisteredPasskeys();
+    if (walletAddress) {
+      return map[walletAddress.toLowerCase()] || null;
+    }
+    const values = Object.values(map);
+    return values.length > 0 ? values[0] : null;
+  }
+
+  /**
+   * Removes a passkey bound to a specific wallet address
+   */
+  public static removePasskey(walletAddress: string): boolean {
+    if (typeof window === 'undefined' || !walletAddress) return false;
+    const norm = walletAddress.toLowerCase();
+    const map = this.listRegisteredPasskeys();
+    delete map[norm];
     try {
-      const raw = localStorage.getItem(this.STORAGE_KEY);
-      if (!raw) return null;
-      const parsed: RegisteredPasskey = JSON.parse(raw);
-      if (walletAddress && parsed.walletAddress && parsed.walletAddress.toLowerCase() !== walletAddress.toLowerCase()) {
-        return null;
-      }
-      return parsed;
+      localStorage.setItem(this.MAP_STORAGE_KEY, JSON.stringify(map));
+      return true;
     } catch {
-      return null;
+      return false;
     }
   }
 
@@ -97,7 +149,7 @@ export class WebAuthnService {
   }
 
   /**
-   * Registers a new WebAuthn Hardware Passkey and binds it to the Turnkey MPC Vault
+   * Registers a new WebAuthn Hardware Passkey and binds it 1-to-1 to a specific MPC Vault
    */
   public static async registerPasskey(
     walletAddress: string,
@@ -107,17 +159,22 @@ export class WebAuthnService {
     if (!this.isSupported()) {
       return { success: false, error: 'WebAuthn hardware passkeys are not supported on this browser or platform.' };
     }
+    const normAddr = (walletAddress || '').toLowerCase();
+    if (!normAddr) {
+      return { success: false, error: 'A valid wallet address is required for 1-to-1 passkey binding.' };
+    }
 
     try {
       const effectiveUserId = userId || MpcWalletService.getUserId();
       let creationOptions: PublicKeyCredentialCreationOptions;
 
       try {
-        // 1. Obtain cryptographic challenge from server
+        // 1. Obtain cryptographic challenge from server for this specific wallet
         const serverOpts = await MpcWalletService.getPasskeyRegistrationOptions(
           effectiveUserId,
-          `user_${walletAddress.slice(0, 8)}@northveil.xyz`,
-          displayName || `Vault ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+          `user_${normAddr.slice(0, 8)}@northveil.xyz`,
+          displayName || `Vault ${normAddr.slice(0, 6)}...${normAddr.slice(-4)}`,
+          normAddr
         );
 
         creationOptions = {
@@ -142,7 +199,7 @@ export class WebAuthnService {
           rp: { name: 'Northveil Autonomous Vault', id: this.getRpId() },
           user: {
             id: userIdBytes,
-            name: `user_${walletAddress.slice(0, 8)}`,
+            name: `user_${normAddr.slice(0, 8)}`,
             displayName: displayName || 'Northveil Vault User',
           },
           pubKeyCredParams: [
@@ -188,7 +245,7 @@ export class WebAuthnService {
       try {
         const verifyRes = await MpcWalletService.verifyPasskeyRegistration(
           effectiveUserId,
-          walletAddress,
+          normAddr,
           registrationResponsePayload
         );
         sessionToken = verifyRes.sessionToken;
@@ -201,10 +258,15 @@ export class WebAuthnService {
         rawIdBase64,
         createdAt: new Date().toISOString(),
         deviceName: 'Biometric Touch ID / Face ID',
-        walletAddress: (walletAddress || '').toLowerCase(),
+        walletAddress: normAddr,
       };
 
+      // 4. Save strictly to the per-wallet map (1-to-1 binding)
+      const map = this.listRegisteredPasskeys();
+      map[normAddr] = registered;
+      localStorage.setItem(this.MAP_STORAGE_KEY, JSON.stringify(map));
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(registered));
+
       return { success: true, passkey: registered, sessionToken };
     } catch (err: any) {
       if (err.name === 'NotAllowedError') {
@@ -215,7 +277,7 @@ export class WebAuthnService {
   }
 
   /**
-   * Authenticates with an existing Passkey and renews the secure session
+   * Authenticates with an existing Passkey strictly bound to this wallet
    */
   public static async authenticate(
     walletAddress?: string,
@@ -236,12 +298,14 @@ export class WebAuthnService {
       return { success: false, error: 'WebAuthn hardware biometrics not supported on this platform.' };
     }
 
+    const normAddr = (walletAddress || '').toLowerCase();
+
     try {
       const effectiveUserId = userId || MpcWalletService.getUserId();
       let requestOptions: PublicKeyCredentialRequestOptions;
 
       try {
-        const serverOpts = await MpcWalletService.getPasskeyAuthOptions(effectiveUserId, walletAddress);
+        const serverOpts = await MpcWalletService.getPasskeyAuthOptions(effectiveUserId, normAddr);
         requestOptions = {
           ...serverOpts,
           challenge: this.base64URLToBuffer(serverOpts.challenge) as unknown as BufferSource,
@@ -259,7 +323,7 @@ export class WebAuthnService {
           window.crypto.getRandomValues(challenge);
         }
 
-        const registered = this.getRegisteredPasskey(walletAddress);
+        const registered = this.getRegisteredPasskey(normAddr);
         requestOptions = {
           challenge,
           rpId: this.getRpId(),
@@ -306,7 +370,7 @@ export class WebAuthnService {
       try {
         const verifyRes = await MpcWalletService.verifyPasskeyAuthentication(
           effectiveUserId,
-          walletAddress || '',
+          normAddr || '',
           {
             id: assertion.id,
             rawId: this.bufferToBase64URL(assertion.rawId),

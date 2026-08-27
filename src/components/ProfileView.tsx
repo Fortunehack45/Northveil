@@ -13,9 +13,14 @@ import {
   LifeBuoy,
   Link as LinkIcon,
   RefreshCw,
+  Fingerprint,
+  Shield,
+  Trash2,
+  Key,
 } from 'lucide-react';
 import { SmartContractRecord } from '../types';
 import { supabase } from '../services/SupabaseService';
+import { WebAuthnService } from '../services/WebAuthnService';
 
 export const ProfileView: React.FC = () => {
   const {
@@ -33,6 +38,52 @@ export const ProfileView: React.FC = () => {
 
   const [socialModalProvider, setSocialModalProvider] = useState<'google' | 'github' | 'twitter' | null>(null);
   const [socialHandleInput, setSocialHandleInput] = useState('');
+
+  // 1-to-1 Passkey Security Management State
+  const [activePasskey, setActivePasskey] = useState<any>(null);
+  const [isRegisteringPasskey, setIsRegisteringPasskey] = useState(false);
+  const [passkeyNotice, setPasskeyNotice] = useState<string | null>(null);
+
+  const refreshPasskeyState = () => {
+    if (activeSubWallet?.address) {
+      const p = WebAuthnService.getRegisteredPasskey(activeSubWallet.address);
+      setActivePasskey(p);
+    } else {
+      setActivePasskey(null);
+    }
+  };
+
+  useEffect(() => {
+    refreshPasskeyState();
+  }, [activeSubWallet?.address]);
+
+  const handleRegisterPasskey = async () => {
+    if (!activeSubWallet?.address) return;
+    setIsRegisteringPasskey(true);
+    setPasskeyNotice('Prompting device for biometric passkey registration...');
+    try {
+      const res = await WebAuthnService.registerPasskey(activeSubWallet.address, activeSubWallet.name);
+      if (res.success && res.passkey) {
+        setPasskeyNotice('✅ Biometric passkey successfully registered and bound to this vault!');
+        refreshPasskeyState();
+      } else {
+        setPasskeyNotice(`⚠️ Registration notice: ${res.error || 'Cancelled or failed'}`);
+      }
+    } catch (e: any) {
+      setPasskeyNotice(`❌ Error: ${e.message}`);
+    } finally {
+      setIsRegisteringPasskey(false);
+      setTimeout(() => setPasskeyNotice(null), 5000);
+    }
+  };
+
+  const handleRemovePasskey = () => {
+    if (!activeSubWallet?.address) return;
+    WebAuthnService.removePasskey(activeSubWallet.address);
+    refreshPasskeyState();
+    setPasskeyNotice('Passkey unbound from this vault.');
+    setTimeout(() => setPasskeyNotice(null), 3000);
+  };
 
   const fetchContracts = async () => {
     setIsLoadingContracts(true);
@@ -276,6 +327,108 @@ export const ProfileView: React.FC = () => {
               </button>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* BIOMETRIC PASSKEY SECURITY (STRICT 1-TO-1 VAULT PROTECTION) */}
+      <div className="rounded-3xl bg-white dark:bg-[#0f0f12] border border-black/[0.06] dark:border-white/[0.06] p-6 sm:p-7 space-y-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-2xl bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white">
+              <Fingerprint className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">
+                  Vault Biometric Passkey
+                </h2>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white font-medium">
+                  1-TO-1 BOUND
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Hardware Touch ID, Face ID, or Windows Hello passkey bound exclusively to {activeSubWallet?.name || 'this vault'}.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {activePasskey ? (
+              <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white flex items-center gap-1.5 font-medium">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> SECURED
+              </span>
+            ) : (
+              <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center gap-1.5 font-medium">
+                <Shield className="w-3.5 h-3.5" /> UNBOUND
+              </span>
+            )}
+          </div>
+        </div>
+
+        {passkeyNotice && (
+          <div className="p-3 bg-black/[0.03] dark:bg-black/50 border border-black/[0.06] dark:border-white/[0.06] rounded-2xl text-xs text-zinc-700 dark:text-zinc-300 font-mono">
+            {passkeyNotice}
+          </div>
+        )}
+
+        <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-black/40 border border-black/[0.04] dark:border-transparent space-y-3">
+          {activePasskey ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-zinc-500 block text-[11px]">Device Name</span>
+                  <span className="font-semibold text-zinc-900 dark:text-white flex items-center gap-1.5 mt-0.5">
+                    <Key className="w-3.5 h-3.5 text-zinc-400" />
+                    {activePasskey.deviceName || 'Biometric Passkey'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-zinc-500 block text-[11px]">Registered Date</span>
+                  <span className="font-mono text-zinc-700 dark:text-zinc-300 mt-0.5 block">
+                    {new Date(activePasskey.createdAt).toLocaleDateString()} {new Date(activePasskey.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <div className="sm:col-span-2">
+                  <span className="text-zinc-500 block text-[11px]">Credential ID</span>
+                  <span className="font-mono text-[11px] text-zinc-600 dark:text-zinc-400 break-all block mt-0.5">
+                    {activePasskey.credentialId}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                <button
+                  onClick={handleRegisterPasskey}
+                  disabled={isRegisteringPasskey}
+                  className="flex-1 py-2.5 px-4 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs hover:opacity-85 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                >
+                  <Fingerprint className="w-3.5 h-3.5" />
+                  {isRegisteringPasskey ? 'Scanning...' : 'Re-Register / Update Passkey'}
+                </button>
+                <button
+                  onClick={handleRemovePasskey}
+                  className="py-2.5 px-4 rounded-full bg-black/[0.04] dark:bg-white/[0.04] hover:bg-red-500/10 hover:text-red-500 text-zinc-600 dark:text-zinc-400 text-xs font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Unbind Passkey
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                No passkey is currently bound to <strong>{activeSubWallet?.name || 'this vault'}</strong> ({activeSubWallet?.address?.slice(0, 6)}...{activeSubWallet?.address?.slice(-4)}). Registering a passkey allows you to authorize on-chain transfers, smart contracts, and token mints with your fingerprint or face scan.
+              </p>
+              <button
+                onClick={handleRegisterPasskey}
+                disabled={isRegisteringPasskey}
+                className="w-full sm:w-auto py-2.5 px-6 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs hover:opacity-85 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                <Fingerprint className="w-4 h-4" />
+                {isRegisteringPasskey ? 'Prompting Device...' : 'Register Biometric Passkey for this Vault'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

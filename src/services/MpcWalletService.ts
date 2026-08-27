@@ -99,7 +99,12 @@ export class MpcWalletService {
   /**
    * Request WebAuthn Registration Challenge & Options
    */
-  public static async getPasskeyRegistrationOptions(userId: string, userName?: string, displayName?: string) {
+  public static async getPasskeyRegistrationOptions(
+    userId: string,
+    userName?: string,
+    displayName?: string,
+    walletAddress?: string
+  ) {
     const res = await fetch(`${this.getBaseUrl()}/api/v1/auth/passkey/register-options`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -107,14 +112,16 @@ export class MpcWalletService {
         userId,
         userName: userName || `user_${userId.slice(0, 8)}@northveil.xyz`,
         userDisplayName: displayName || 'Northveil Vault User',
+        walletAddress: (walletAddress || '').toLowerCase(),
       }),
     });
 
     const json = await res.json();
-    if (!res.ok || !json.success || !json.options) {
-      throw new Error(json.error || 'Failed to generate WebAuthn registration options');
+    const opts = json.options || (json.challenge ? json : null);
+    if (!res.ok || !opts) {
+      throw new Error(json.error || json.message || 'Failed to generate WebAuthn registration options');
     }
-    return json.options;
+    return opts;
   }
 
   /**
@@ -130,14 +137,14 @@ export class MpcWalletService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId,
-        walletAddress,
+        walletAddress: (walletAddress || '').toLowerCase(),
         registrationResponse,
       }),
     });
 
     const json = await res.json();
-    if (!res.ok || !json.success || !json.verified) {
-      throw new Error(json.error || 'Biometric passkey registration verification failed');
+    if (!res.ok || (!json.verified && !json.success)) {
+      throw new Error(json.error || json.message || 'Biometric passkey registration verification failed');
     }
 
     if (json.sessionToken) {
@@ -156,15 +163,16 @@ export class MpcWalletService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId,
-        walletAddress,
+        walletAddress: (walletAddress || '').toLowerCase(),
       }),
     });
 
     const json = await res.json();
-    if (!res.ok || !json.success || !json.options) {
-      throw new Error(json.error || 'Failed to generate WebAuthn authentication options');
+    const opts = json.options || (json.challenge ? json : null);
+    if (!res.ok || !opts) {
+      throw new Error(json.error || json.message || 'Failed to generate WebAuthn authentication options');
     }
-    return json.options;
+    return opts;
   }
 
   /**
@@ -180,14 +188,14 @@ export class MpcWalletService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId,
-        walletAddress,
+        walletAddress: (walletAddress || '').toLowerCase(),
         authenticationResponse,
       }),
     });
 
     const json = await res.json();
-    if (!res.ok || !json.success || !json.verified) {
-      throw new Error(json.error || 'Biometric passkey authentication failed');
+    if (!res.ok || (!json.verified && !json.success)) {
+      throw new Error(json.error || json.message || 'Biometric passkey authentication failed');
     }
 
     if (json.sessionToken) {

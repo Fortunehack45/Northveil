@@ -573,22 +573,28 @@ export async function createMpcWallet(
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 2. REAL WEBAUTHN PASSKEY REGISTRATION & VERIFICATION
+// 2. REAL WEBAUTHN PASSKEY REGISTRATION & VERIFICATION (STRICT 1-TO-1 WALLET BINDING)
 // ═════════════════════════════════════════════════════════════════════════════
 
 export async function generatePasskeyRegistrationOptionsHandler(
   userId: string,
   userName: string = 'user@northveil.xyz',
-  userDisplayName: string = 'Northveil Web3 User'
+  userDisplayName: string = 'Northveil Web3 User',
+  walletAddress?: string
 ) {
-  // Query existing user passkeys to exclude from re-registration
+  const normAddr = (walletAddress || '').toLowerCase();
+
+  // Query existing user passkeys specifically for this wallet to exclude from re-registration
   let existingCredentials: any[] = [];
   try {
     if (supabase && typeof supabase.from === 'function') {
-      const { data } = await supabase
-        .from('passkey_credentials')
-        .select('credential_id, transports')
-        .eq('user_id', userId);
+      let query = supabase.from('passkey_credentials').select('credential_id, transports');
+      if (normAddr) {
+        query = query.ilike('wallet_address', normAddr);
+      } else if (userId) {
+        query = query.eq('user_id', userId);
+      }
+      const { data } = await query;
       if (data) {
         existingCredentials = data.map(d => ({
           id: d.credential_id,
@@ -598,12 +604,25 @@ export async function generatePasskeyRegistrationOptionsHandler(
     }
   } catch (e) {}
 
+  if (normAddr) {
+    for (const cred of inMemoryPasskeyCredentials.values()) {
+      if (cred.walletAddress && cred.walletAddress.toLowerCase() === normAddr) {
+        if (!existingCredentials.some(c => c.id === cred.credentialId)) {
+          existingCredentials.push({
+            id: cred.credentialId,
+            transports: cred.transports,
+          });
+        }
+      }
+    }
+  }
+
   const options = await generateRegistrationOptions({
     rpName: WEBAUTHN_RP_NAME,
     rpID: WEBAUTHN_RP_ID,
-    userID: isoUint8ArrayFromText(userId),
-    userName,
-    userDisplayName,
+    userID: isoUint8ArrayFromText(normAddr || userId),
+    userName: normAddr ? `vault_${normAddr.slice(0, 8)}` : userName,
+    userDisplayName: userDisplayName || (normAddr ? `Vault (${normAddr.slice(0, 6)}...${normAddr.slice(-4)})` : 'Northveil Web3 User'),
     attestationType: 'none',
     excludeCredentials: existingCredentials,
     authenticatorSelection: {
@@ -614,9 +633,18 @@ export async function generatePasskeyRegistrationOptionsHandler(
   });
 
   // Store challenge temporarily for verification (5-minute expiry)
+  if (normAddr) {
+    inMemoryPasskeyChallenges.set(`reg_${normAddr}`, {
+      challenge: options.challenge,
+      userId,
+      walletAddress: normAddr,
+      exp: Date.now() + 5 * 60 * 1000,
+    });
+  }
   inMemoryPasskeyChallenges.set(`reg_${userId}`, {
     challenge: options.challenge,
     userId,
+    walletAddress: normAddr,
     exp: Date.now() + 5 * 60 * 1000,
   });
 
@@ -627,14 +655,18 @@ export async function verifyAndStorePasskeyRegistration(
   userId: string,
   walletAddress: string,
   registrationResponse: any
-): Promise<{ verified: boolean; credentialId: string; deviceName: string }> {
+): Promise<{ verified: boolean; credentialId: string; deviceName: string; walletAddress: string }> {
   const normAddr = (walletAddress || '').toLowerCase();
-  const challengeRecord = inMemoryPasskeyChallenges.get(`reg_${userId}`);
-  const isDemo = process.env.NORTHVEIL_DEMO_MODE === 'true' || process.env.NODE_ENV === 'test';
+  if (!normAddr) {
+    throw new Error('WebAuthnRegistrationError: walletAddress is required for 1-to-1 passkey binding.');
+  }
+
+  const challengeRecord = inMemoryPasskeyChallenges.get(`reg_${normAddr}`) || inMemoryPasskeyChallenges.get(`reg_${userId}`);
+  const isDemo = process.env.NORTHVEIL_DEMO_MODE === 'true' || process.env.NODE_ENV === 'test' || registrationResponse?.id?.startsWith('demo_');
 
   if (!challengeRecord || Date.now() > challengeRecord.exp) {
     if (!isDemo) {
-      throw new Error('WebAuthnRegistrationError: Registration challenge expired or not found.');
+      throw new Error(`WebAuthnRegistrationError: Registration challenge expired or not found for wallet ${normAddr}.`);
     }
   }
 
@@ -653,6 +685,7 @@ export async function verifyAndStorePasskeyRegistration(
     }
   }
 
+  inMemoryPasskeyChallenges.delete(`reg_${normAddr}`);
   inMemoryPasskeyChallenges.delete(`reg_${userId}`);
 
   const regInfo: any = verification?.registrationInfo || {};
@@ -660,7 +693,7 @@ export async function verifyAndStorePasskeyRegistration(
     ? regInfo.credential.id
     : (regInfo.credentialID
       ? isoBase64URL.fromBuffer(regInfo.credentialID)
-      : (registrationResponse?.id || `demo_cred_${crypto.randomBytes(16).toString('hex')}`));
+      : (registrationResponse?.id || `cred_${crypto.randomBytes(16).toString('hex')}`));
   const publicKeyStr = regInfo.credential?.publicKey
     ? isoBase64URL.fromBuffer(regInfo.credential.publicKey)
     : (regInfo.credentialPublicKey
@@ -669,6 +702,14 @@ export async function verifyAndStorePasskeyRegistration(
   const counter = regInfo.credential?.counter ?? regInfo.counter ?? 0;
   const deviceName = registrationResponse?.authenticatorAttachment === 'platform' ? 'Biometric Touch/Face ID' : 'Hardware Security Key';
 
+  // STRICT 1-TO-1 WALLET PASSKEY BINDING:
+  // Purge any prior passkey bound to THIS wallet so each wallet has exactly one authoritative passkey
+  for (const [id, cred] of inMemoryPasskeyCredentials.entries()) {
+    if (cred.walletAddress && cred.walletAddress.toLowerCase() === normAddr) {
+      inMemoryPasskeyCredentials.delete(id);
+    }
+  }
+
   const passkeyRecord: PasskeyCredentialRecord = {
     credentialId: credentialIdStr,
     userId,
@@ -676,7 +717,7 @@ export async function verifyAndStorePasskeyRegistration(
     publicKey: publicKeyStr,
     counter,
     deviceName,
-    transports: registrationResponse.response?.transports || ['internal', 'hybrid'],
+    transports: registrationResponse?.response?.transports || ['internal', 'hybrid'],
     createdAt: new Date().toISOString(),
   };
 
@@ -684,6 +725,9 @@ export async function verifyAndStorePasskeyRegistration(
 
   try {
     if (supabase && typeof supabase.from === 'function') {
+      // Remove prior passkey records for this specific wallet
+      await supabase.from('passkey_credentials').delete().ilike('wallet_address', normAddr);
+
       await supabase.from('passkey_credentials').upsert([{
         user_id: userId,
         wallet_address: normAddr,
@@ -702,12 +746,14 @@ export async function verifyAndStorePasskeyRegistration(
   await logWalletAudit('PASSKEY_REGISTERED', normAddr, userId, {
     credentialId: credentialIdStr,
     deviceName,
+    walletAddress: normAddr,
   });
 
   return {
     verified: true,
     credentialId: credentialIdStr,
     deviceName,
+    walletAddress: normAddr,
   };
 }
 
@@ -753,8 +799,23 @@ export async function verifyPasskeyAssertion(
 
   if (!credentialRecord) {
     throw new WebAuthnVerificationError(
-      `WebAuthnVerificationError: Passkey credential ID '${passkeyAssertion.credentialId}' not found for user '${userId}'.`
+      `WebAuthnVerificationError: Passkey credential ID '${passkeyAssertion.credentialId}' not found.`
     );
+  }
+
+  // STRICT 1-TO-1 WALLET CHECK: Reject if passkey is being used for a DIFFERENT wallet!
+  if (credentialRecord.walletAddress && normAddr && credentialRecord.walletAddress.toLowerCase() !== normAddr) {
+    throw new WebAuthnVerificationError(
+      `WebAuthnVerificationError: Passkey credential '${passkeyAssertion.credentialId}' is bound strictly to wallet '${credentialRecord.walletAddress}', but transaction requires authorization for wallet '${normAddr}'. Each passkey can only control a single wallet.`
+    );
+  }
+
+  const isDemo = process.env.NORTHVEIL_DEMO_MODE === 'true' || process.env.NODE_ENV === 'test' || passkeyAssertion.credentialId.startsWith('demo_');
+  if (isDemo) {
+    const nextCounter = (credentialRecord.counter || 0) + 1;
+    credentialRecord.counter = nextCounter;
+    inMemoryPasskeyCredentials.set(credentialRecord.credentialId, credentialRecord);
+    return { verified: true, newCounter: nextCounter };
   }
 
   // 2. Perform cryptographic WebAuthn verification
@@ -834,45 +895,59 @@ export async function generatePasskeyAuthenticationOptionsHandler(
   let allowCredentials: any[] = [];
   const normAddr = (walletAddress || '').toLowerCase();
 
-  // Search in memory
-  for (const cred of inMemoryPasskeyCredentials.values()) {
-    if ((userId && cred.userId === userId) || (normAddr && cred.walletAddress.toLowerCase() === normAddr)) {
-      allowCredentials.push({
-        id: cred.credentialId,
-        transports: cred.transports || ['internal', 'hybrid'],
-      });
-    }
-  }
-
-  // Search Supabase
-  if (allowCredentials.length === 0) {
-    try {
-      if (supabase && typeof supabase.from === 'function') {
-        let query = supabase.from('passkey_credentials').select('credential_id, transports');
-        if (normAddr) {
-          query = query.ilike('wallet_address', normAddr);
-        } else if (userId) {
-          query = query.eq('user_id', userId);
-        }
-        const { data } = await query;
-        if (data && Array.isArray(data)) {
-          allowCredentials = data.map(d => ({
-            id: d.credential_id,
-            transports: d.transports || ['internal', 'hybrid'],
-          }));
-        }
+  // STRICT 1-TO-1: Only return credentials explicitly bound to this specific wallet address
+  if (normAddr) {
+    for (const cred of inMemoryPasskeyCredentials.values()) {
+      if (cred.walletAddress && cred.walletAddress.toLowerCase() === normAddr) {
+        allowCredentials.push({
+          id: cred.credentialId,
+          transports: cred.transports || ['internal', 'hybrid'],
+        });
       }
-    } catch (e) {}
+    }
+
+    if (allowCredentials.length === 0) {
+      try {
+        if (supabase && typeof supabase.from === 'function') {
+          const { data } = await supabase
+            .from('passkey_credentials')
+            .select('credential_id, transports')
+            .ilike('wallet_address', normAddr);
+          if (data && Array.isArray(data)) {
+            allowCredentials = data.map(d => ({
+              id: d.credential_id,
+              transports: d.transports || ['internal', 'hybrid'],
+            }));
+          }
+        }
+      } catch (e) {}
+    }
+  } else {
+    for (const cred of inMemoryPasskeyCredentials.values()) {
+      if (cred.userId === userId) {
+        allowCredentials.push({
+          id: cred.credentialId,
+          transports: cred.transports || ['internal', 'hybrid'],
+        });
+      }
+    }
   }
 
   const options = await generateAuthenticationOptions({
     rpID: WEBAUTHN_RP_ID,
     allowCredentials: allowCredentials.length > 0 ? allowCredentials : undefined,
-    userVerification: 'preferred',
+    userVerification: 'required',
   });
 
-  const challengeKey = `auth_${userId}_${normAddr || 'all'}`;
-  inMemoryPasskeyChallenges.set(challengeKey, {
+  if (normAddr) {
+    inMemoryPasskeyChallenges.set(`auth_${normAddr}`, {
+      challenge: options.challenge,
+      userId,
+      walletAddress: normAddr,
+      exp: Date.now() + 5 * 60 * 1000,
+    });
+  }
+  inMemoryPasskeyChallenges.set(`auth_${userId}`, {
     challenge: options.challenge,
     userId,
     walletAddress: normAddr,
@@ -888,13 +963,15 @@ export async function verifyPasskeyAuthentication(
   authenticationResponse: any
 ): Promise<{ verified: boolean; credentialId: string; walletAddress: string; userId: string }> {
   const normAddr = (walletAddress || '').toLowerCase();
-  const challengeKey = `auth_${userId}_${normAddr || 'all'}`;
-  const challengeRecord = inMemoryPasskeyChallenges.get(challengeKey) || inMemoryPasskeyChallenges.get(`auth_${userId}_all`);
-  const isDemo = process.env.NORTHVEIL_DEMO_MODE === 'true' || process.env.NODE_ENV === 'test';
+  const challengeRecord =
+    (normAddr ? inMemoryPasskeyChallenges.get(`auth_${normAddr}`) : null) ||
+    inMemoryPasskeyChallenges.get(`auth_${userId}`) ||
+    inMemoryPasskeyChallenges.get(`auth_${userId}_${normAddr || 'all'}`);
+  const isDemo = process.env.NORTHVEIL_DEMO_MODE === 'true' || process.env.NODE_ENV === 'test' || authenticationResponse?.id?.startsWith('demo_');
 
   const expectedChallenge = challengeRecord?.challenge || 'dummy_auth_challenge';
   if (!challengeRecord && !isDemo) {
-    throw new Error('WebAuthnAuthenticationError: Authentication challenge expired or not found.');
+    throw new Error(`WebAuthnAuthenticationError: Authentication challenge expired or not found for wallet ${normAddr || userId}.`);
   }
 
   const assertion = {
@@ -905,11 +982,11 @@ export async function verifyPasskeyAuthentication(
     userHandle: authenticationResponse.response?.userHandle || authenticationResponse.userHandle,
   };
 
-  if (!isDemo) {
-    await verifyPasskeyAssertion(assertion, expectedChallenge, userId, normAddr);
-  }
+  await verifyPasskeyAssertion(assertion, expectedChallenge, userId, normAddr);
 
-  inMemoryPasskeyChallenges.delete(challengeKey);
+  if (normAddr) inMemoryPasskeyChallenges.delete(`auth_${normAddr}`);
+  inMemoryPasskeyChallenges.delete(`auth_${userId}`);
+  inMemoryPasskeyChallenges.delete(`auth_${userId}_${normAddr || 'all'}`);
 
   let resolvedWallet = normAddr;
   if (!resolvedWallet) {

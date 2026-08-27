@@ -150,36 +150,36 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </p>
           </div>
 
-          {/* Action Buttons */}
-          <div id="tour-action-bar" className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {/* Action Buttons (Responsive 2x2 Grid on Mobile, Row on Desktop) */}
+          <div id="tour-action-bar" className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
             <button
               onClick={() => onOpenSend()}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2.5 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs sm:text-sm hover:opacity-85 active:scale-[0.98] transition-all shadow-md cursor-pointer whitespace-nowrap"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-3 sm:py-2.5 rounded-2xl sm:rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs sm:text-sm hover:opacity-85 active:scale-[0.98] transition-all shadow-md cursor-pointer whitespace-nowrap"
             >
               <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
               <span>Send</span>
             </button>
             <button
               onClick={() => onOpenReceive()}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2.5 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white active:scale-[0.98] font-medium text-xs sm:text-sm transition-all cursor-pointer whitespace-nowrap"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-3 sm:py-2.5 rounded-2xl sm:rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white active:scale-[0.98] font-medium text-xs sm:text-sm transition-all cursor-pointer whitespace-nowrap border border-black/[0.04] dark:border-white/[0.04]"
             >
               <ArrowDownLeft className="w-4 h-4" />
               <span>Receive</span>
             </button>
             <button
               onClick={() => setShowAddFundsModal(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2.5 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white font-medium text-xs sm:text-sm active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-3 sm:py-2.5 rounded-2xl sm:rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-900 dark:text-white font-medium text-xs sm:text-sm active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap border border-black/[0.04] dark:border-white/[0.04]"
             >
               <Plus className="w-4 h-4" />
               <span>Deposit</span>
             </button>
             <button
               onClick={onNavigateApprovals}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2.5 rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white active:scale-[0.98] font-medium text-xs sm:text-sm transition-all cursor-pointer whitespace-nowrap"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3 sm:py-2.5 rounded-2xl sm:rounded-full bg-black/[0.05] dark:bg-[#18181c] hover:bg-black/[0.08] dark:hover:bg-[#242429] text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white active:scale-[0.98] font-medium text-xs sm:text-sm transition-all cursor-pointer whitespace-nowrap border border-black/[0.04] dark:border-white/[0.04]"
               title="MCP Action Approvals"
             >
               <ShieldCheck className="w-4 h-4" />
-              <span className="hidden sm:inline">Approvals</span>
+              <span>Approvals</span>
             </button>
           </div>
         </div>

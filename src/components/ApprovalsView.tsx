@@ -13,6 +13,7 @@ import {
   RefreshCw,
   ThumbsUp,
   ThumbsDown,
+  Fingerprint,
 } from 'lucide-react';
 import { McpApprovalRecord } from '../types';
 import { SupabaseService } from '../services/SupabaseService';
@@ -369,24 +370,24 @@ export const ApprovalsView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Pending Actions (Approve / Reject) */}
+                {/* Pending Actions (Approve via Passkey / Reject) */}
                 {isPending && (
-                  <div className="flex items-center gap-2 pt-2 border-t border-black/[0.06] dark:border-white/[0.06]">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-black/[0.06] dark:border-white/[0.06]">
                     <button
                       onClick={() => handleApprove(item.id)}
                       disabled={actionProcessingId === item.id}
-                      className="px-4 py-2 rounded-full bg-black text-white dark:bg-white dark:text-black text-xs font-semibold hover:opacity-85 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
+                      className="flex-1 sm:flex-none justify-center px-5 py-3 sm:py-2.5 rounded-2xl sm:rounded-full bg-black text-white dark:bg-white dark:text-black text-xs font-semibold hover:opacity-85 active:scale-[0.98] transition-all flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
                     >
-                      <ThumbsUp className="w-3.5 h-3.5" />
-                      {actionProcessingId === item.id ? 'Approving...' : 'Approve & Execute'}
+                      <Fingerprint className="w-4 h-4 stroke-[2]" />
+                      <span>{actionProcessingId === item.id ? 'Authorizing Passkey...' : 'Approve with Passkey'}</span>
                     </button>
                     <button
                       onClick={() => handleReject(item.id)}
                       disabled={actionProcessingId === item.id}
-                      className="px-4 py-2 rounded-full bg-black/[0.05] dark:bg-white/[0.06] text-zinc-700 dark:text-zinc-300 text-xs font-medium hover:bg-red-500/10 hover:text-red-500 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      className="flex-1 sm:flex-none justify-center px-4 py-3 sm:py-2.5 rounded-2xl sm:rounded-full bg-black/[0.05] dark:bg-white/[0.06] text-zinc-700 dark:text-zinc-300 text-xs font-medium hover:bg-red-500/10 hover:text-red-500 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       <ThumbsDown className="w-3.5 h-3.5" />
-                      Reject
+                      <span>Reject</span>
                     </button>
                   </div>
                 )}

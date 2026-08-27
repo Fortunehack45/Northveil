@@ -85,7 +85,7 @@ export const Navigation: React.FC<NavigationProps> = ({
     },
   ];
 
-  // 4 Core Navigation Items for the Floating Mobile Bottom Bar
+  // 5 Core Navigation Items for the Floating Mobile Bottom Bar
   const mobileNavItems: {
     id: TabType;
     label: string;
@@ -103,8 +103,13 @@ export const Navigation: React.FC<NavigationProps> = ({
     },
     {
       id: 'agents',
-      label: 'AI Agents',
+      label: 'Agents',
       icon: <Bot className="w-4 h-4 stroke-[1.8]" />,
+    },
+    {
+      id: 'approvals',
+      label: 'Approvals',
+      icon: <ShieldCheck className="w-4 h-4 stroke-[1.8]" />,
     },
     {
       id: 'profile',
@@ -310,11 +315,11 @@ export const Navigation: React.FC<NavigationProps> = ({
           document.body
         )}
 
-      {/* Floating Mobile Bottom Navigation Bar (Curved Edges & Full Light/Dark Support) */}
-      <div className="md:hidden fixed bottom-3 inset-x-3 max-w-sm xs:max-w-md mx-auto z-40 pointer-events-none">
+      {/* Floating Mobile Bottom Navigation Bar (Curved Glassmorphism & Safe-Area Aware) */}
+      <div className="md:hidden fixed bottom-2.5 inset-x-2.5 max-w-sm sm:max-w-md mx-auto z-40 pointer-events-none pb-[env(safe-area-inset-bottom,0px)]">
         <nav
           aria-label="Mobile Navigation"
-          className="pointer-events-auto bg-white/95 dark:bg-[#121215]/95 backdrop-blur-xl border border-black/[0.08] dark:border-white/[0.08] rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.6)] p-1.5 flex items-center justify-between transition-colors"
+          className="pointer-events-auto bg-white/90 dark:bg-[#0f0f12]/90 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.08] rounded-full shadow-[0_12px_36px_rgba(0,0,0,0.18)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.7)] p-1.5 flex items-center justify-between transition-all"
         >
           {mobileNavItems.map((item) => {
             const isActive = activeTab === item.id;
@@ -322,14 +327,14 @@ export const Navigation: React.FC<NavigationProps> = ({
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all cursor-pointer select-none ${
+                className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-full transition-all duration-200 cursor-pointer select-none active:scale-95 ${
                   isActive
-                    ? 'bg-black text-white dark:bg-white dark:text-black font-bold shadow-sm'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.04]'
+                    ? 'bg-black text-white dark:bg-white dark:text-black font-bold shadow-md'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.04]'
                 }`}
               >
-                <span className="shrink-0">{item.icon}</span>
-                <span className="text-[10px] sm:text-[11px] font-semibold mt-1 tracking-tight">
+                <span className="shrink-0 scale-90 sm:scale-100">{item.icon}</span>
+                <span className="text-[9.5px] sm:text-[11px] font-semibold mt-0.5 tracking-tight">
                   {item.label}
                 </span>
               </button>

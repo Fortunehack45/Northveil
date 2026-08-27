@@ -2079,30 +2079,56 @@ app.post(['/token', '/oauth/token', '/oauth2/token', '/auth/token'], oauthTokenR
 app.post(['/register', '/oauth/register', '/oauth2/register'], handleRegister);
 
 // ═════════════════════════════════════════════════════════════
-// WEBAUTHN PASSKEY REGISTRATION & MANAGEMENT REST ROUTES
+// WEBAUTHN PASSKEY REGISTRATION & MANAGEMENT REST ROUTES (1-TO-1 BOUND)
 // ═════════════════════════════════════════════════════════════
-app.post(['/auth/passkey/register-options', '/api/v1/auth/passkey/register-options'], async (req: Request, res: Response) => {
+app.post(['/auth/passkey/register-options', '/api/v1/auth/passkey/register-options', '/api/v1/passkey/register-options'], async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
   try {
-    const userId = req.body?.userId || 'default_user';
+    const userId = req.body?.userId || `user_${Date.now()}`;
     const userName = req.body?.userName || 'user@northveil.xyz';
     const userDisplayName = req.body?.userDisplayName || 'Northveil Web3 User';
-    const options = await generatePasskeyRegistrationOptionsHandler(userId, userName, userDisplayName);
-    res.json(options);
+    const walletAddress = (req.body?.walletAddress || req.body?.wallet_address || '').toLowerCase();
+    const options = await generatePasskeyRegistrationOptionsHandler(userId, userName, userDisplayName, walletAddress);
+    res.json({ success: true, options, ...options });
   } catch (err: any) {
-    res.status(400).json({ error: 'passkey_registration_options_failed', message: err.message });
+    res.status(400).json({ success: false, error: 'passkey_registration_options_failed', message: err.message });
   }
 });
 
-app.post(['/auth/passkey/verify-register', '/api/v1/auth/passkey/verify-register'], async (req: Request, res: Response) => {
+app.post(['/auth/passkey/verify-register', '/auth/passkey/verify-registration', '/api/v1/auth/passkey/verify-register', '/api/v1/auth/passkey/verify-registration', '/api/v1/passkey/verify-registration'], async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
   try {
-    const { userId, walletAddress, registrationResponse } = req.body;
-    if (!userId || !walletAddress || !registrationResponse) {
-      return res.status(400).json({ error: 'invalid_request', message: 'userId, walletAddress, and registrationResponse are required.' });
+    const { userId = 'default_user', walletAddress, registrationResponse } = req.body || {};
+    if (!walletAddress || !registrationResponse) {
+      return res.status(400).json({ success: false, error: 'invalid_request', message: 'walletAddress and registrationResponse are required for 1-to-1 passkey binding.' });
     }
     const result = await verifyAndStorePasskeyRegistration(userId, walletAddress, registrationResponse);
-    res.json({ success: true, ...result });
+
+    const sessionPayload = {
+      type: 'user_session',
+      userId,
+      walletAddress: (walletAddress || '').toLowerCase(),
+      credentialId: result.credentialId,
+      exp: Date.now() + 30 * 24 * 60 * 60 * 1000,
+    };
+    const sessionToken = 'nv_sess_' + signOAuthPayload(sessionPayload);
+
+    res.cookie('northveil_session', sessionToken, {
+      httpOnly: true,
+      secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    res.json({
+      success: true,
+      ...result,
+      sessionToken,
+    });
   } catch (err: any) {
-    res.status(400).json({ error: 'passkey_verification_failed', message: err.message });
+    res.status(400).json({ success: false, error: 'passkey_verification_failed', message: err.message });
   }
 });
 
@@ -4353,15 +4379,18 @@ ${blkNum ? `> **Block Number**: \`${blkNum}\`` : ''}
       const userId = args.userId || 'default_user';
       const userName = args.userName || 'user@northveil.xyz';
       const userDisplayName = args.userDisplayName || 'Northveil Web3 User';
-      const options = await generatePasskeyRegistrationOptionsHandler(userId, userName, userDisplayName);
+      const targetAddress = (args.walletAddress || cleanAddress).toLowerCase();
+      const options = await generatePasskeyRegistrationOptionsHandler(userId, userName, userDisplayName, targetAddress);
       return {
         formattedMarkdown: `
 ### 🔑 WEBAUTHN PASSKEY REGISTRATION INITIATED
 
+> **Vault Address**: \`${targetAddress || 'General'}\`  
 > **User ID**: \`${userId}\`  
 > **RP ID**: \`${options.rp.id}\`  
 > **Challenge**: \`${options.challenge}\`  
 > **User Verification**: \`required\`  
+> **Binding**: 🔒 **1-to-1 Single Vault Constraint**  
 
 *Please call navigator.credentials.create() with these options in the browser/client.*
 `,
