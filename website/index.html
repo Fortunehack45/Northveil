@@ -935,13 +935,14 @@
       padding: 24px;
       font-size: 13.5px;
       line-height: 1.65;
-      color: #e0e0e0;
+      color: #ffffff;
       overflow-x: hidden;
       white-space: pre-wrap;
       word-break: break-word;
       scrollbar-width: none;
       -ms-overflow-style: none;
       min-height: 280px;
+      font-family: "JetBrains Mono", monospace;
     }
 
     .code-body::-webkit-scrollbar {
@@ -950,11 +951,21 @@
       height: 0 !important;
     }
 
-    .token-keyword { color: #ff7b72; }
-    .token-string { color: #a5d6ff; }
-    .token-fn { color: #d2a8ff; }
-    .token-comment { color: #8b949e; }
-    .token-number { color: #79c0ff; }
+    .code-body * {
+      color: #ffffff !important;
+    }
+
+    .token-keyword,
+    .token-string,
+    .token-fn,
+    .token-number {
+      color: #ffffff !important;
+    }
+
+    .token-comment,
+    .code-body .token-comment {
+      color: rgba(255, 255, 255, 0.45) !important;
+    }
 
     /* ═══════════════════════════════════════════════════════════════
        9. TOOLS & PROTOCOL CAPABILITIES
@@ -1451,7 +1462,7 @@
     </nav>
 
     <div class="header-right">
-      <a href="/" class="btn btn-solid header-cta appear appear--scale" style="--d: 0.34s;" onclick="if(window.location.port==='3002'){window.location.href='http://localhost:5173';return false;}">Launch Wallet</a>
+      <a href="https://wallet.northveil.xyz/" class="btn btn-solid header-cta appear appear--scale" style="--d: 0.34s;" target="_blank" rel="noopener noreferrer">Launch Wallet</a>
       <button class="burger appear appear--scale" style="--d: 0.34s;" aria-controls="site-nav" aria-expanded="false" aria-label="Open menu">
         <span class="burger-bar"></span>
         <span class="burger-bar"></span>
@@ -1483,13 +1494,7 @@
         </p>
 
         <div class="hero-actions">
-          <a href="/" class="btn btn-solid btn-hero appear appear--btn" style="--d: 0.96s; display: inline-flex; align-items: center; justify-content: center; gap: 8px;" onclick="if(window.location.port==='3002'){window.location.href='http://localhost:5173';return false;}">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
-              <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
-            </svg>
-            Launch Web3 Wallet
-          </a>
+          <a href="https://wallet.northveil.xyz/" class="btn btn-solid btn-hero appear appear--btn" style="--d: 0.96s;" target="_blank" rel="noopener noreferrer">Launch Web3 Wallet</a>
           <a href="#tools" class="btn btn-ghost btn-hero appear appear--side" style="--d: 1.10s;">Explore MCP Protocol</a>
         </div>
       </div>
@@ -1629,12 +1634,12 @@
           </div>
         </div>
         <div class="code-body" id="code-content">{
-  <span class="token-string">"mcpServers"</span>: {
-    <span class="token-string">"northveil"</span>: {
-      <span class="token-string">"command"</span>: <span class="token-string">"npx"</span>,
-      <span class="token-string">"args"</span>: [<span class="token-string">"-y"</span>, <span class="token-string">"@northveil/mcp-server"</span>],
-      <span class="token-string">"env"</span>: {
-        <span class="token-string">"NORTHVEIL_WALLET_ADDRESS"</span>: <span class="token-string">"0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"</span>
+  "mcpServers": {
+    "northveil": {
+      "command": "npx",
+      "args": ["-y", "@northveil/mcp-server"],
+      "env": {
+        "NORTHVEIL_WALLET_ADDRESS": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"
       }
     }
   }
@@ -1888,7 +1893,7 @@
     <h2 style="font-size: 34px; font-weight: 500; letter-spacing: -0.035em; margin-bottom: 14px;">Ready to empower your <em>AI agents</em> with on-chain vaults?</h2>
     <p style="color: var(--muted); font-size: 15.5px; max-width: 540px; margin-bottom: 28px; line-height: 1.55;">Connect Northveil MCP to your local Claude Desktop or backend runtime in less than 2 minutes.</p>
     <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
-      <a href="/" class="btn btn-solid btn-hero" onclick="if(window.location.port==='3002'){window.location.href='http://localhost:5173';return false;}">Open Web3 Wallet</a>
+      <a href="https://wallet.northveil.xyz/" class="btn btn-solid btn-hero" target="_blank" rel="noopener noreferrer">Open Web3 Wallet</a>
       <a href="#how-it-works" class="btn btn-ghost btn-hero">Read Documentation</a>
     </div>
   </div>
@@ -1906,7 +1911,7 @@
       <div class="footer-col">
         <h4>Protocol</h4>
         <ul>
-          <li><a href="/" onclick="if(window.location.port==='3002'){window.location.href='http://localhost:5173';return false;}">Web3 Wallet App</a></li>
+          <li><a href="https://wallet.northveil.xyz/" target="_blank" rel="noopener noreferrer">Web3 Wallet App</a></li>
           <li><a href="#benefits">Why Northveil</a></li>
           <li><a href="#how-it-works">Architecture</a></li>
           <li><a href="#tools">30+ MCP Tools</a></li>
