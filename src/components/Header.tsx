@@ -101,7 +101,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onToggleMobileNav }) 
   };
 
   return (
-    <header className="w-full h-14 sm:h-16 md:h-18 px-3 sm:px-6 md:px-8 bg-white dark:bg-black border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between gap-2 sm:gap-4 md:gap-6 shrink-0 z-30 relative transition-colors">
+    <header className="w-full h-14 sm:h-16 md:h-18 px-3 sm:px-6 md:px-8 bg-white dark:bg-black flex items-center justify-between gap-2 sm:gap-4 md:gap-6 shrink-0 z-30 relative transition-colors">
       {(isWalletMenuOpen || isNotifOpen) && (
         <div
           onClick={() => {
@@ -136,7 +136,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onToggleMobileNav }) 
               setIsWalletMenuOpen(!isWalletMenuOpen);
               setIsNotifOpen(false);
             }}
-            className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-black/[0.05] dark:bg-white/[0.05] hover:bg-black/[0.09] dark:hover:bg-white/[0.09] text-zinc-900 dark:text-white rounded-full text-xs flex items-center gap-1.5 sm:gap-2 cursor-pointer transition-all border border-black/[0.04] dark:border-white/[0.04]"
+            className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-black/[0.05] dark:bg-white/[0.05] hover:bg-black/[0.09] dark:hover:bg-white/[0.09] text-zinc-900 dark:text-white rounded-full text-xs flex items-center gap-1.5 sm:gap-2 cursor-pointer transition-all"
           >
             <span className="w-2 h-2 rounded-full shrink-0 bg-zinc-900 dark:bg-white" />
             <span className="hidden lg:inline-block max-w-[110px] truncate font-medium">

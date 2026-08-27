@@ -131,7 +131,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       {/* Sidebar Navigation (Full Suite of Tabs in Desktop & Mobile Drawer) */}
       <aside
         id="tour-navigation"
-        className={`w-72 max-w-[85vw] md:w-64 h-full bg-white dark:bg-[#070709] border-r border-black/[0.06] dark:border-white/[0.06] flex flex-col justify-between shrink-0 transition-transform duration-200 ${
+        className={`w-72 max-w-[85vw] md:w-64 h-full bg-white dark:bg-[#070709] flex flex-col justify-between shrink-0 transition-transform duration-200 ${
           isMobileOpen
             ? 'fixed inset-y-0 left-0 z-50 translate-x-0 shadow-2xl'
             : 'hidden md:flex z-30'
@@ -213,7 +213,7 @@ export const Navigation: React.FC<NavigationProps> = ({
         </nav>
 
         {/* Footer Actions: Active Identity, Quick Tour + Theme Toggle, Lock Vault, Log Out */}
-        <div className="p-3 bg-white dark:bg-[#070709] shrink-0 space-y-2 border-t border-black/[0.04] dark:border-white/[0.04]">
+        <div className="p-3 bg-white dark:bg-[#070709] shrink-0 space-y-2">
           {activeSubWallet && (
             <div className="p-2.5 bg-black/[0.03] dark:bg-white/[0.03] rounded-xl flex items-center gap-2.5">
               <BlockiesAvatar address={activeSubWallet.address} size={24} />

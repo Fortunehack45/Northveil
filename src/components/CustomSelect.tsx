@@ -51,8 +51,8 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full flex items-center justify-between gap-1.5 sm:gap-2 text-xs transition-all cursor-pointer select-none ${
           isFormVariant
-            ? 'px-3 py-2.5 rounded-xl bg-black/[0.05] dark:bg-black text-zinc-900 dark:text-white border border-black/[0.08] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-zinc-900'
-            : 'px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-black/[0.05] dark:bg-white/[0.05] hover:bg-black/[0.09] dark:hover:bg-white/[0.09] text-zinc-900 dark:text-white border border-black/[0.04] dark:border-white/[0.04]'
+            ? 'px-3 py-2.5 rounded-xl bg-black/[0.05] dark:bg-black text-zinc-900 dark:text-white hover:bg-black/[0.08] dark:hover:bg-zinc-900'
+            : 'px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-black/[0.05] dark:bg-white/[0.05] hover:bg-black/[0.09] dark:hover:bg-white/[0.09] text-zinc-900 dark:text-white'
         }`}
       >
         <div className="flex items-center gap-1.5 sm:gap-2.5 truncate min-w-0">
