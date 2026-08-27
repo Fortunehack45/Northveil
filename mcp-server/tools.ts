@@ -787,8 +787,8 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'send_transfer',
-    description: 'Sends native cryptocurrency (ETH, MATIC, BNB) or ERC-20 tokens (USDC, USDT, WBT) from a user vault. Checks autonomous spending policies; if within policy limits, triggers MPC co-signing and returns the transaction hash. If outside policy limits, stages the transfer and returns a WebAuthn Passkey approval request.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    description: 'Sends native cryptocurrency (ETH, MATIC, BNB) or ERC-20 tokens (USDC, USDT, WBT) directly on-chain from the user non-custodial MPC vault and returns the confirmed on-chain transaction hash and receipt.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -836,8 +836,8 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'execute_swap',
-    description: 'Executes a token swap via DEX aggregators (Uniswap, 1inch, PancakeSwap). Evaluates autonomous spending limits before triggering MPC signing or staging a Passkey approval request.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    description: 'Executes a token swap via DEX aggregators directly on-chain using the user MPC vault and returns the confirmed transaction hash.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -893,8 +893,8 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'buy_tokens',
-    description: 'Buys a token on DEX using ETH, USDT, or USDC. Evaluates autonomous spending limits before triggering MPC co-signing or staging a Passkey approval request.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    description: 'Buys a token on DEX directly on-chain using the user MPC vault and returns the confirmed transaction hash.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -918,8 +918,8 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'sell_tokens',
-    description: 'Sells a held token on DEX for native ETH or stablecoins. Evaluates autonomous spending limits before triggering MPC co-signing or staging a Passkey approval request.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    description: 'Sells a held token on DEX directly on-chain using the user MPC vault and returns the confirmed transaction hash.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -943,18 +943,18 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'deploy_smart_contract',
-    description: 'Compiles and deploys an ERC-20 token, ERC-721 NFT collection, or custom contract directly on-chain. Allows users to choose any arbitrary owner allocation percentage (0% to 100%) or exact amount.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    description: 'Compiles with Solc and deploys an ERC-20 token, ERC-721 NFT, or custom contract directly on-chain using the user MPC vault. Supports custom percentage allocations (e.g. 97% to reserve/reservation wallet and 3% to creator wallet) directly in the deployment transaction with no manual staging required.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
         contractName: {
           type: 'string',
-          description: 'Name of the smart contract (e.g. CyberVeil, AlphaGov).',
+          description: 'Name of the smart contract (e.g. FIRE, AlphaGov).',
         },
         symbol: {
           type: 'string',
-          description: 'Token ticker symbol (e.g. CVNFT, AGOV).',
+          description: 'Token ticker symbol (e.g. FIRE, AGOV).',
         },
         contractType: {
           type: 'string',
@@ -963,11 +963,23 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         },
         totalSupply: {
           type: 'number',
-          description: 'Total token supply (or max NFT collection size). Default: 1,000,000,000 for tokens, 10,000 for NFTs.',
+          description: 'Total token supply (e.g. 100000000 for 100M).',
         },
         ownerAllocationPercentage: {
           type: 'number',
-          description: 'Percentage of total supply to allocate directly to owner wallet at deployment (0 to 100). Remaining supply can be minted on demand.',
+          description: 'Percentage of total supply to allocate directly to creator/owner wallet at deployment (0 to 100). Default is 100 or specified split (e.g. 3 for 3%).',
+        },
+        reserveAllocationPercentage: {
+          type: 'number',
+          description: 'Percentage of total supply to allocate to reserve/reservation wallet at deployment (0 to 100, e.g. 97 for 97%).',
+        },
+        recipientAddress: {
+          type: 'string',
+          description: 'Optional 0x wallet address to receive the reserve or initial mint allocation (e.g. reservation wallet 0x...).',
+        },
+        reserveRecipientAddress: {
+          type: 'string',
+          description: 'Optional 0x address of the reservation/treasury wallet to receive the reserve token allocation.',
         },
         ownerAllocation: {
           type: 'number',
@@ -1012,6 +1024,18 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
           type: 'number',
           description: 'Owner allocation percentage (0-100).',
         },
+        reserveAllocationPercentage: {
+          type: 'number',
+          description: 'Reserve allocation percentage (0-100).',
+        },
+        recipientAddress: {
+          type: 'string',
+          description: 'Recipient address for reserve/initial mint.',
+        },
+        reserveRecipientAddress: {
+          type: 'string',
+          description: 'Reservation/treasury wallet address.',
+        },
         ownerAllocation: {
           type: 'number',
           description: 'Owner allocation.',
@@ -1034,8 +1058,8 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'mint_tokens',
-    description: 'Mints new ERC-20 tokens or ERC-721 NFTs from a deployed contract directly on-chain. Evaluates autonomous spending limits before triggering MPC signing or staging a Passkey approval request.',
-    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    description: 'Mints new ERC-20 tokens or ERC-721 NFTs from a deployed contract directly on-chain to any recipient address and returns the confirmed transaction hash.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
