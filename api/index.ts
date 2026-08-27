@@ -23,37 +23,85 @@ import readline from 'readline';
 import solc from 'solc';
 import { MCP_TOOLS } from './tools.js';
 
-function findImports(importPath: string) {
+// In-memory OpenZeppelin Virtual Filesystem Index for 100% Reliable Compilation
+const ozVirtualIndex = new Map<string, string>();
+
+function indexOpenZeppelinDirectory(dir: string, basePrefix = '') {
   try {
-    const cleanPath = importPath.replace(/^@openzeppelin\/contracts\//, '');
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      const relPath = path.join(basePrefix, entry.name).replace(/\\/g, '/');
+      if (entry.isDirectory()) {
+        indexOpenZeppelinDirectory(fullPath, relPath);
+      } else if (entry.name.endsWith('.sol')) {
+        const content = fs.readFileSync(fullPath, 'utf8');
+        ozVirtualIndex.set(relPath, content);
+        ozVirtualIndex.set('@openzeppelin/contracts/' + relPath, content);
+        ozVirtualIndex.set(entry.name, content);
+      }
+    }
+  } catch (e) {}
+}
+
+function initializeOpenZeppelinIndex() {
+  const candidateBases = [
+    path.resolve(__dirname_local, '..', 'node_modules', '@openzeppelin', 'contracts'),
+    path.resolve(__dirname_local, 'node_modules', '@openzeppelin', 'contracts'),
+    path.resolve(process.cwd(), 'node_modules', '@openzeppelin', 'contracts'),
+    path.resolve(process.cwd(), '..', 'node_modules', '@openzeppelin', 'contracts'),
+    path.resolve(process.cwd(), 'mcp-server', 'node_modules', '@openzeppelin', 'contracts'),
+  ];
+
+  for (const base of candidateBases) {
+    if (fs.existsSync(base)) {
+      indexOpenZeppelinDirectory(base);
+    }
+  }
+}
+
+// Pre-index on module load
+initializeOpenZeppelinIndex();
+
+function findImports(importPath: string) {
+  const norm = importPath.replace(/\\/g, '/');
+  if (ozVirtualIndex.has(norm)) {
+    return { contents: ozVirtualIndex.get(norm)! };
+  }
+  const clean = norm.replace(/^@openzeppelin\/contracts\//, '').replace(/^(\.\.\/)+/, '').replace(/^\.\//, '');
+  if (ozVirtualIndex.has(clean)) {
+    return { contents: ozVirtualIndex.get(clean)! };
+  }
+  const baseName = path.basename(norm);
+  if (ozVirtualIndex.has(baseName)) {
+    return { contents: ozVirtualIndex.get(baseName)! };
+  }
+
+  // Fallback: search disk dynamically if not in memory
+  try {
     const candidateBases = [
       path.resolve(__dirname_local, '..', 'node_modules'),
       path.resolve(__dirname_local, 'node_modules'),
       path.resolve(process.cwd(), 'node_modules'),
       path.resolve(process.cwd(), '..', 'node_modules'),
     ];
-
     for (const base of candidateBases) {
       const candidates = [
         path.resolve(base, importPath),
-        path.resolve(base, '@openzeppelin', 'contracts', cleanPath),
-        path.resolve(base, '@openzeppelin', 'contracts', 'token', 'ERC20', cleanPath),
-        path.resolve(base, '@openzeppelin', 'contracts', 'token', 'ERC721', cleanPath),
-        path.resolve(base, '@openzeppelin', 'contracts', 'token', 'ERC20', 'extensions', cleanPath),
-        path.resolve(base, '@openzeppelin', 'contracts', 'token', 'ERC721', 'extensions', cleanPath),
-        path.resolve(base, '@openzeppelin', 'contracts', 'utils', cleanPath),
-        path.resolve(base, '@openzeppelin', 'contracts', 'access', cleanPath),
-        path.resolve(base, '@openzeppelin', 'contracts', 'interfaces', cleanPath),
+        path.resolve(base, '@openzeppelin', 'contracts', clean),
         path.resolve(base, '@openzeppelin', importPath),
       ];
-
       for (const cand of candidates) {
         if (fs.existsSync(cand) && fs.statSync(cand).isFile()) {
-          return { contents: fs.readFileSync(cand, 'utf8') };
+          const fileContent = fs.readFileSync(cand, 'utf8');
+          ozVirtualIndex.set(norm, fileContent);
+          return { contents: fileContent };
         }
       }
     }
-  } catch (e) { }
+  } catch (e) {}
+
   return { error: 'File not found: ' + importPath };
 }
 import {

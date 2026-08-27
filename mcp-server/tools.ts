@@ -1,7 +1,7 @@
 /**
  * Northveil MCP Server Tool Definitions & Types
  * Compliant with Official Model Context Protocol (MCP) v2024-11-05 Spec (inputSchema & annotations)
- * Operating under Non-Custodial MPC/TEE Control-Plane Architecture (PayBox-Style Hardware Enclaves)
+ * Operating under Non-Custodial MPC/TEE Control-Plane Architecture (Hardware Enclaves)
  */
 
 export interface MCPToolParameter {

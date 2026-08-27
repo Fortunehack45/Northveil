@@ -7,7 +7,7 @@
 [![Python SDK](https://img.shields.io/badge/Python-northveil-yellow.svg?style=flat-square)](https://pypi.org/project/northveil/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
-Northveil is an enterprise decentralized infrastructure uniting an **AI-powered Multi-Chain Web3 dApp**, a **Universal 38-Tool Model Context Protocol (MCP) Server**, a **Non-Custodial MPC Control-Plane Architecture (PayBox-Style)**, and an **Autonomous Travel & Airline Protocol**.
+Northveil is an enterprise decentralized infrastructure uniting an **AI-powered Multi-Chain Web3 dApp**, a **Universal 38-Tool Model Context Protocol (MCP) Server**, a **Non-Custodial MPC Control-Plane Architecture**, and an **Autonomous Travel & Airline Protocol**.
 
 ---
 

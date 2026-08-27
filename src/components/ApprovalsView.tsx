@@ -52,7 +52,7 @@ export const ApprovalsView: React.FC = () => {
         if (!mergedMap.has(id)) {
           mergedMap.set(id, {
             id,
-            wallet_id: req.walletAddress || activeSubWallet?.address || '',
+            wallet_address: req.walletAddress || activeSubWallet?.address || '',
             tool_name: req.operationType ? `northveil_prepare_${req.operationType}` : 'token_transfer',
             parameters: {
               recipient: req.recipient,

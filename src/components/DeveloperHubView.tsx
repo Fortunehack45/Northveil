@@ -19,6 +19,7 @@ import { CustomSelect } from './CustomSelect';
 import { ProviderService } from '../services/ProviderService';
 import { SwapService } from '../services/SwapService';
 import { SupabaseService } from '../services/SupabaseService';
+import { MpcWalletService } from '../services/MpcWalletService';
 import { ethers } from 'ethers';
 
 export const DeveloperHubView: React.FC = () => {

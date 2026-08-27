@@ -1976,10 +1976,10 @@ export async function simulateTransactionTenderly(
 }
 
 // ═════════════════════════════════════════════════════════════
-// PAYBOX-PARITY POLICY ENGINE & CANONICAL HASH GENERATOR
+// NORTHVEIL POLICY ENGINE & CANONICAL HASH GENERATOR
 // ═════════════════════════════════════════════════════════════
 
-export interface PayboxCanonicalOperation {
+export interface NorthveilCanonicalOperation {
   clientId: string;
   walletId: string;
   walletAddress: string;
@@ -1994,7 +1994,7 @@ export interface PayboxCanonicalOperation {
   nonce: number;
 }
 
-export interface PayboxGrant {
+export interface NorthveilGrant {
   grantId: string;
   agentClientId: string;
   userId: string;
@@ -2017,7 +2017,7 @@ export interface PayboxGrant {
   expiresAt: string;
 }
 
-export function computeCanonicalHash(op: PayboxCanonicalOperation): string {
+export function computeCanonicalHash(op: NorthveilCanonicalOperation): string {
   const payload = [
     op.clientId || 'agt_default',
     op.walletId || 'wal_default',
@@ -2035,8 +2035,8 @@ export function computeCanonicalHash(op: PayboxCanonicalOperation): string {
 }
 
 export async function evaluatePolicy(
-  grant: PayboxGrant,
-  op: PayboxCanonicalOperation,
+  grant: NorthveilGrant,
+  op: NorthveilCanonicalOperation,
   sim: { success: boolean; revertReason?: string; warnings: string[] },
   spentLast24hUsd: number = 0,
   isKnownDestination: boolean = false

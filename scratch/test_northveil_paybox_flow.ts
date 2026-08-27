@@ -11,8 +11,8 @@ import {
   evaluatePolicy,
   computeCanonicalHash,
   formatHumanPreview,
-  PayboxCanonicalOperation,
-  PayboxGrant,
+  NorthveilCanonicalOperation,
+  NorthveilGrant,
 } from '../mcp-server/mpcControlPlaneService.js';
 import { MCP_TOOLS } from '../mcp-server/tools.js';
 
@@ -24,7 +24,7 @@ const TEST_VAULT = relayerWallet.address;
 const TEST_RECIPIENT = '0x000000000000000000000000000000000000dEaD';
 
 console.log('======================================================');
-console.log('🧪 NORTHVEIL PAYBOX-PARITY CONTROL PLANE VERIFICATION');
+console.log('🧪 NORTHVEIL POLICY ENGINE & CONTROL PLANE VERIFICATION');
 console.log('======================================================');
 console.log('Active Relayer Vault:', TEST_VAULT);
 console.log('======================================================\n');
@@ -74,7 +74,7 @@ async function runTests() {
 
   // Test 2: Policy Engine - Mode 1: Always Approve
   console.log('\n--- TEST 2: Policy Engine - Always Approve Mode ---');
-  const alwaysApproveGrant: PayboxGrant = {
+  const alwaysApproveGrant: NorthveilGrant = {
     grantId: 'grt_test_01',
     agentClientId: 'agt_claude_01',
     userId: 'user_01',
@@ -90,7 +90,7 @@ async function runTests() {
     expiresAt: new Date(Date.now() + 86400000).toISOString(),
   };
 
-  const op1: PayboxCanonicalOperation = {
+  const op1: NorthveilCanonicalOperation = {
     clientId: 'agt_claude_01',
     walletId: 'wal_01',
     walletAddress: TEST_VAULT,
@@ -111,12 +111,12 @@ async function runTests() {
 
   // Test 3: Policy Engine - Mode 2: Approve Above Limit (Small transfer -> AUTO_EXECUTE)
   console.log('\n--- TEST 3: Policy Engine - Approve Above Limit Mode ---');
-  const aboveLimitGrant: PayboxGrant = {
+  const aboveLimitGrant: NorthveilGrant = {
     ...alwaysApproveGrant,
     approvalMode: 'approve_above_limit',
   };
 
-  const smallOp: PayboxCanonicalOperation = {
+  const smallOp: NorthveilCanonicalOperation = {
     ...op1,
     amountUsdEstimate: 10.0, // Under $50 cap
   };
@@ -124,7 +124,7 @@ async function runTests() {
   const dec2 = await evaluatePolicy(aboveLimitGrant, smallOp, { success: true, warnings: [] }, 0, true);
   assert(dec2.decision === 'AUTO_EXECUTE', 'Small transfer under cap to known destination auto-executes');
 
-  const largeOp: PayboxCanonicalOperation = {
+  const largeOp: NorthveilCanonicalOperation = {
     ...op1,
     amountUsdEstimate: 75.0, // Above $50 cap
   };
@@ -134,19 +134,19 @@ async function runTests() {
 
   // Test 4: Hard Policy Gates (Deploy and Unseen Destination)
   console.log('\n--- TEST 4: Hard Policy Gates ---');
-  const deployGrant: PayboxGrant = {
+  const deployGrant: NorthveilGrant = {
     ...aboveLimitGrant,
     allowedOperations: ['read', 'simulate', 'transfer', 'swap', 'contract_call', 'deploy'],
     deployEnabled: true,
   };
-  const deployOp: PayboxCanonicalOperation = {
+  const deployOp: NorthveilCanonicalOperation = {
     ...op1,
     operationType: 'deploy',
   };
   const decDeploy = await evaluatePolicy(deployGrant, deployOp, { success: true, warnings: [] }, 0, true);
   assert(decDeploy.decision === 'NEEDS_APPROVAL', 'Contract deploy always forces approval regardless of mode');
 
-  const unseenOp: PayboxCanonicalOperation = {
+  const unseenOp: NorthveilCanonicalOperation = {
     ...smallOp,
   };
   const decUnseen = await evaluatePolicy(aboveLimitGrant, unseenOp, { success: true, warnings: [] }, 0, false); // isKnownDestination: false
@@ -194,7 +194,7 @@ async function runTests() {
     'sepolia',
     { to: TEST_RECIPIENT, value: '10000000000000' },
     'default_user',
-    'PayBox On-Chain Transfer Test to Burn Address'
+    'Northveil On-Chain Transfer Test to Burn Address'
   );
 
   assert(!!stageRes.approvalToken, 'Staged request returned single-use approvalToken');
@@ -213,7 +213,7 @@ async function runTests() {
   console.log('\n======================================================');
   console.log(`FINAL RESULT: ${passed}/${total} PASSED (${((passed / total) * 100).toFixed(1)}%)`);
   console.log('======================================================');
-  console.log('🎉 NORTHVEIL PAYBOX-PARITY ENGINE IS 100% OPERATIONAL!');
+  console.log('🎉 NORTHVEIL POLICY CONTROL PLANE ENGINE IS 100% OPERATIONAL!');
 }
 
 runTests().catch(err => {
