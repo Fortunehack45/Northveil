@@ -143,7 +143,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onToggleMobileNav }) 
               {activeSubWallet?.name || 'Primary Vault'}
             </span>
             <span className="text-[11px] text-zinc-700 dark:text-zinc-300 font-mono">
-              {activeSubWallet?.address ? `${activeSubWallet.address.slice(0, 4)}...${activeSubWallet.address.slice(-2)}` : '0x...'}
+              {activeSubWallet?.address ? `${activeSubWallet.address.slice(0, 6)}...${activeSubWallet.address.slice(-4)}` : '0x56f0...5417'}
             </span>
             <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
           </button>

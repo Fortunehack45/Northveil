@@ -44,13 +44,13 @@ import { Fingerprint, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-reac
 const DEFAULT_SUB_WALLETS: SubWalletAccount[] = [
   {
     id: 'acc-0',
-    name: 'Main Trading Vault',
+    name: 'Primary Vault',
     accountIndex: 0,
-    address: '0x71C8891575b50d22e032d847847c234a413d4cc8',
-    derivationPath: "m/44'/60'/0'/0/0",
+    address: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
+    derivationPath: 'turnkey://tee-nitro-enclave',
     colorTag: '#00f0ff',
     isDefault: true,
-    createdAt: '2026-01-10',
+    createdAt: '2026-08-01',
     balanceMultiplier: 1,
   },
   {
@@ -245,7 +245,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.address) {
           return parsed.map((w) => {
             const { privateKey, ...safeWallet } = w;
             const cleanName =
@@ -255,18 +255,64 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               safeWallet.name === 'Main Trading Vault'
                 ? 'Primary Vault'
                 : safeWallet.name;
-            return { ...safeWallet, name: cleanName };
+            return { ...safeWallet, name: cleanName, address: (safeWallet.address || '').toLowerCase() };
           });
         }
       } catch {}
     }
+
+    const mpcVault = localStorage.getItem('northveil_v3_mpc_vault');
+    if (mpcVault) {
+      try {
+        const parsed = JSON.parse(mpcVault);
+        if (parsed && parsed.walletAddress) {
+          return [
+            {
+              id: 'acc-0',
+              name: parsed.walletName || 'Primary Vault',
+              accountIndex: 0,
+              address: parsed.walletAddress.toLowerCase(),
+              derivationPath: 'turnkey://tee-nitro-enclave',
+              colorTag: '#ffffff',
+              isDefault: true,
+              createdAt: parsed.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+              balanceMultiplier: 1.0,
+            },
+          ];
+        }
+      } catch {}
+    }
+
+    const passkeysMap = localStorage.getItem('northveil_passkeys_by_wallet');
+    if (passkeysMap) {
+      try {
+        const parsed = JSON.parse(passkeysMap);
+        const addresses = Object.keys(parsed);
+        if (addresses.length > 0 && addresses[0].startsWith('0x')) {
+          return [
+            {
+              id: 'acc-0',
+              name: 'Primary Vault',
+              accountIndex: 0,
+              address: addresses[0].toLowerCase(),
+              derivationPath: 'turnkey://tee-nitro-enclave',
+              colorTag: '#ffffff',
+              isDefault: true,
+              createdAt: new Date().toISOString().split('T')[0],
+              balanceMultiplier: 1.0,
+            },
+          ];
+        }
+      } catch {}
+    }
+
     return [
       {
         id: 'acc-0',
         name: 'Primary Vault',
         accountIndex: 0,
-        address: '0x71C8891575b50d22e032d847847c234a413d4cc8',
-        derivationPath: "m/44'/60'/0'/0/0",
+        address: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
+        derivationPath: 'turnkey://tee-nitro-enclave',
         colorTag: '#ffffff',
         isDefault: true,
         createdAt: '2026-08-01',

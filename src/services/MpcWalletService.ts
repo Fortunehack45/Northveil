@@ -4,6 +4,8 @@
  * WebAuthn hardware biometric authentication, and signed session tokens.
  */
 
+import { getMcpServerUrl } from '../config/endpointConfig';
+
 export interface MpcVaultCreationResult {
   success: boolean;
   address: string;
@@ -30,8 +32,7 @@ export class MpcWalletService {
   private static VAULT_TYPE_KEY = 'northveil_v3_vault_type';
 
   public static getBaseUrl(): string {
-    if (typeof window === 'undefined') return 'http://localhost:3001';
-    return window.location.origin;
+    return getMcpServerUrl();
   }
 
   public static getSessionToken(): string | null {
