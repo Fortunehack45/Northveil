@@ -1511,8 +1511,14 @@ export async function approveAndExecuteWithPasskey(
     }
   } catch (turnkeyErr: any) {
     if (turnkeyErr instanceof TurnkeyEnclaveError) throw turnkeyErr;
+    const errMsg = turnkeyErr?.message || String(turnkeyErr);
+    if (errMsg.includes('Could not find any resource to sign with')) {
+      throw new TurnkeyEnclaveError(
+        `TurnkeyEnclaveError: The requested wallet address (${req.walletAddress}) is not an MPC wallet provisioned in your Turnkey organization (${turnkeyOrgId}). To sign transactions with Turnkey Hardware TEE enclaves, please provision an MPC wallet using the "create_wallet" tool, or switch to your Turnkey organization's wallet address.`
+      );
+    }
     throw new TurnkeyEnclaveError(
-      `Turnkey hardware enclave signing failed: ${turnkeyErr?.message || turnkeyErr}`
+      `Turnkey hardware enclave signing failed: ${errMsg}`
     );
   }
 
@@ -1749,8 +1755,14 @@ export async function executeAutonomousTransaction(
     }
   } catch (turnkeyErr: any) {
     if (turnkeyErr instanceof TurnkeyEnclaveError) throw turnkeyErr;
+    const errMsg = turnkeyErr?.message || String(turnkeyErr);
+    if (errMsg.includes('Could not find any resource to sign with')) {
+      throw new TurnkeyEnclaveError(
+        `TurnkeyEnclaveError: The requested wallet address (${normAddr}) is not an MPC wallet provisioned in your Turnkey organization (${turnkeyOrgId}). To sign autonomous transactions with Turnkey Hardware TEE enclaves, please provision an MPC wallet using the "create_wallet" tool, or switch to your Turnkey organization's wallet address.`
+      );
+    }
     throw new TurnkeyEnclaveError(
-      `Autonomous Turnkey hardware enclave signing failed: ${turnkeyErr?.message || turnkeyErr}`
+      `Autonomous Turnkey hardware enclave signing failed: ${errMsg}`
     );
   }
 
