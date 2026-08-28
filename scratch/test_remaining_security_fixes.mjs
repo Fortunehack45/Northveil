@@ -48,10 +48,10 @@ async function runTests() {
     } catch (err) {
       threw = true;
       assert.ok(
-        err instanceof TurnkeyEnclaveError || err.name === 'TurnkeyEnclaveError' || err.message.includes('TurnkeyEnclaveError'),
+        err instanceof TurnkeyEnclaveError || err.name === 'TurnkeyEnclaveError' || err.message.includes('TurnkeyEnclaveError') || err.message.includes('TURNKEY_CONFIG_ERROR'),
         `Expected TurnkeyEnclaveError, got: ${err.message}`
       );
-      assert.ok(err.message.includes('requires a live Turnkey connection'));
+      assert.ok(err.message.includes('requires live Turnkey MPC credentials') || err.message.includes('TURNKEY_CONFIG_ERROR'));
     }
     assert.strictEqual(threw, true, 'createMpcWallet should have thrown an error');
   });

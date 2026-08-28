@@ -13,11 +13,7 @@ Northveil is designed to operate strictly as a non-custodial multi-party computa
 
 ## ⚠️ Security Notice: Compromised Development Test Key
 
-> **IMPORTANT ADVISORY**: A development test private key was previously present in git commit history:
-> ```
-> 0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9
-> ```
-> - This key has been completely excised from the active codebase.
+> **IMPORTANT ADVISORY**: A development test private key (previously committed in historical commits) has been completely excised and burned:
 > - Because this key exists in public git history, **it must be treated as permanently compromised and burned**.
 > - If this address or key was ever funded on Sepolia, Ethereum mainnet, or any other EVM/SVM network, any remaining assets should be swept immediately.
 > - No server-side or custodial fallback keys are utilized anywhere in Northveil.

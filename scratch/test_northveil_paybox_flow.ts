@@ -16,9 +16,13 @@ import {
 } from '../mcp-server/mpcControlPlaneService.js';
 import { MCP_TOOLS } from '../mcp-server/tools.js';
 
-// NOTE: Hardcoded fallback key removed. Set LOCAL_TEST_PRIVATE_KEY in your environment for local testing.
-// Any previously committed test key in repo history is public and must be treated as permanently compromised.
-const RELAYER_KEY = process.env.LOCAL_TEST_PRIVATE_KEY || ethers.Wallet.createRandom().privateKey;
+// LOCAL_TEST_PRIVATE_KEY is strictly required. No hardcoded or silent fallback.
+const RELAYER_KEY = process.env.LOCAL_TEST_PRIVATE_KEY;
+if (!RELAYER_KEY) {
+  console.error('❌ ERROR: LOCAL_TEST_PRIVATE_KEY environment variable is required to run this test.');
+  console.error('Please set LOCAL_TEST_PRIVATE_KEY="0x..." in your environment and rerun.');
+  process.exit(1);
+}
 const relayerWallet = new ethers.Wallet(RELAYER_KEY);
 const TEST_VAULT = relayerWallet.address;
 const TEST_RECIPIENT = '0x000000000000000000000000000000000000dEaD';

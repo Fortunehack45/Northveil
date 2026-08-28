@@ -49,13 +49,17 @@ async function runEnforcementTests() {
   assert.strictEqual(walletThrew, true, 'createMpcWallet MUST throw TurnkeyEnclaveError when unconfigured');
   console.log('✅ [PASS] createMpcWallet refused server-side key generation.\n');
 
-  // Test 3: createMpcWallet with explicit self_custody_export succeeds with warning
-  console.log('--- Test 3: createMpcWallet Explicit Opt-In Self-Custody Export ---');
-  const exportWallet = await createMpcWallet('test_user_export', 'Export Vault', 'self_custody_export');
-  assert.ok(exportWallet.address.startsWith('0x'), 'Must return valid address');
-  assert.ok(exportWallet.privateKey && exportWallet.privateKey.startsWith('0x'), 'Must return privateKey');
-  assert.ok(exportWallet.warning && exportWallet.warning.includes('Private key was generated server-side'), 'Must include warning');
-  console.log('✅ [PASS] Explicit self_custody_export works with prominent security warning.\n');
+  // Test 3: createMpcWallet refuses any server-side key generation
+  console.log('--- Test 3: createMpcWallet Rejects Any Server-Side Key Generation ---');
+  let exportThrew = false;
+  try {
+    await createMpcWallet('test_user_export', 'Export Vault', 'self_custody_export');
+  } catch (err: any) {
+    exportThrew = true;
+    assert.ok(err instanceof TurnkeyEnclaveError || err.name === 'TurnkeyEnclaveError', 'Must throw TurnkeyEnclaveError');
+  }
+  assert.strictEqual(exportThrew, true, 'Server-side key generation must be refused under all provisioning modes without Turnkey/Demo');
+  console.log('✅ [PASS] createMpcWallet refuses server-side generation across all non-Turnkey invocations.\n');
 
   // Test 4: executeAutonomousTransaction throws TurnkeyEnclaveError when Turnkey unset & demo mode off
   console.log('--- Test 4: executeAutonomousTransaction Fails Loudly When Unconfigured ---');

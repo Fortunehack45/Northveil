@@ -28,16 +28,9 @@ function encryptCredential(plaintext) {
 }
 
 async function testSyncWallet(address, name) {
-  console.log('Testing syncWallet for address:', address);
+  console.log('Testing non-custodial metadata syncWallet for address:', address);
   const cleanAddr = address.toLowerCase();
 
-  // NOTE: Hardcoded fallback key removed. Set LOCAL_TEST_PRIVATE_KEY in your environment for local testing.
-  // Any previously committed test key in repo history is public and must be treated as permanently compromised.
-  const vaultPk = process.env.LOCAL_TEST_PRIVATE_KEY || '';
-  const vaultSeed = '';
-
-  const enc = encryptCredential(vaultSeed);
-  
   const record = {
     address: cleanAddr,
     name: name,
@@ -45,15 +38,9 @@ async function testSyncWallet(address, name) {
     user_id: 'default_user',
     wallet_status: 'active',
     derivation_path: "m/44'/60'/0'/0/0",
-    private_key: vaultPk,
-    seed_phrase: vaultSeed,
-    encrypted_credential: enc.ciphertext,
-    credential_type: 'seed_phrase',
-    iv: enc.iv,
-    auth_tag: enc.authTag
   };
 
-  console.log('Record to upsert:', record);
+  console.log('Record to upsert (non-custodial metadata only):', record);
 
   const { data, error } = await supabase
     .from('wallets')

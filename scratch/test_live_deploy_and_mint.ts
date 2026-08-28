@@ -1,9 +1,13 @@
 import { ethers } from 'ethers';
 import solc from 'solc';
 
-// NOTE: Hardcoded fallback key removed. Set LOCAL_TEST_PRIVATE_KEY in your environment for live testing.
-// Any previously committed test key in repo history is public and must be treated as permanently compromised.
-const RELAYER_KEY = process.env.LOCAL_TEST_PRIVATE_KEY || '';
+// LOCAL_TEST_PRIVATE_KEY is strictly required. No hardcoded or silent fallback.
+const RELAYER_KEY = process.env.LOCAL_TEST_PRIVATE_KEY;
+if (!RELAYER_KEY) {
+  console.error('❌ ERROR: LOCAL_TEST_PRIVATE_KEY environment variable is required to run live Sepolia deployment tests.');
+  console.error('Please set LOCAL_TEST_PRIVATE_KEY="0x..." in your environment and rerun.');
+  process.exit(1);
+}
 const RPC_URL = process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
 
 const erc20Source = `// SPDX-License-Identifier: MIT

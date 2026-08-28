@@ -297,14 +297,13 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return subWallets.find((w) => w.id === activeWalletId) || subWallets[0] || DEFAULT_SUB_WALLETS[0];
   }, [subWallets, activeWalletId]);
 
-  // Auto-sync active wallet to Supabase Cloud DB with AES-256-GCM encryption
+  // Auto-sync active wallet address metadata to Supabase Cloud DB
   useEffect(() => {
     if (activeSubWallet?.address) {
       const addr = activeSubWallet.address.toLowerCase();
-      const seed = (seedPhrase && seedPhrase.length > 0) ? seedPhrase.join(' ') : undefined;
-      SupabaseService.syncWallet(addr, activeSubWallet.name || 'Active Northveil Wallet', activeChain, undefined, seed);
+      SupabaseService.syncWallet(addr, activeSubWallet.name || 'Active Northveil Wallet', activeChain);
     }
-  }, [activeSubWallet?.address, activeChain, seedPhrase]);
+  }, [activeSubWallet?.address, activeChain]);
 
   // Sync transactions state with activeSubWallet address
   useEffect(() => {
@@ -430,9 +429,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     SupabaseService.syncWallet(
       address.toLowerCase(),
       newWallet.name,
-      activeChain,
-      undefined,
-      activeSeed.length >= 12 ? activeSeed.join(' ') : undefined
+      activeChain
     );
 
     setSubWallets((prev) => [...prev, newWallet]);
@@ -793,9 +790,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       SupabaseService.syncWallet(
         address.toLowerCase(),
         chosenName,
-        'ethereum',
-        undefined,
-        undefined
+        'ethereum'
       );
 
       return true;
@@ -913,9 +908,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       SupabaseService.syncWallet(
         address.toLowerCase(),
         chosenName,
-        'ethereum',
-        undefined,
-        finalSeed.join(' ')
+        'ethereum'
       );
 
       return true;
@@ -1845,13 +1838,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       const chosenName = name?.trim() || 'Primary Vault';
 
-      // Auto-sync address to Supabase with AES-256-GCM encrypted seed phrase
+      // Auto-sync address to Supabase
       SupabaseService.syncWallet(
         address.toLowerCase(),
         chosenName,
-        'ethereum',
-        undefined,
-        cleanWords.join(' ')
+        'ethereum'
       );
 
       const mainWallet: SubWalletAccount = {
@@ -1928,12 +1919,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setSubWallets([mainWallet]);
       setActiveWalletIdState('acc-0');
 
-      // Auto-sync address AND private key to Supabase for MCP tools
+      // Auto-sync address to Supabase for MCP tools
       SupabaseService.syncWallet(
         address,
         name.trim() || 'Main Trading Vault',
-        chain,
-        formattedKey
+        chain
       );
 
       localStorage.setItem(

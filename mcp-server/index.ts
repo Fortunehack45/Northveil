@@ -4291,17 +4291,17 @@ ${simulation.revertReason ? `> **Revert Reason**: \`${simulation.revertReason}\`
       const walletName = args?.walletName || args?.name || 'Northveil Vault Wallet';
       const userId = args?.userId || 'default_user';
       const result = await createMpcWallet(userId, walletName);
-      const seedPhrase = result.mnemonic || result.seedPhrase || '';
       return {
         formattedMarkdown: `
-### 🔐 NON-CUSTODIAL VAULT WALLET GENERATED
+### 🔐 NON-CUSTODIAL HARDWARE MPC VAULT PROVISIONED
 
 > **Vault Address**: \`${result.address}\`  
-${seedPhrase ? `> **Recovery Seed Phrase (12 Words)**: \`${seedPhrase}\`  \n` : ''}${result.privateKey ? `> **Private Key**: \`${result.privateKey}\`  \n` : ''}> **Derivation Path**: \`${result.derivationPath || "m/44'/60'/0'/0/0"}\`  
+> **MPC Wallet ID**: \`${result.mpcWalletId}\`  
 > **Key Type**: \`${result.keyType}\`  
-> **Custody Architecture**: 🟢 **SELF-SOVEREIGN CONTROL PLANE**  
+> **Provider**: \`${result.mpcProvider}\`  
+> **Custody Architecture**: 🟢 **TURNKEY HARDWARE TEE MPC (NON-CUSTODIAL)**  
 
-⚠️ **CRITICAL BACKUP INSTRUCTIONS**: Write down your 12-word seed phrase and store it in a secure offline location. This recovery phrase gives you complete, independent control of your wallet and deployed contracts across any EVM wallet software (MetaMask, Rainbow, Ledger, etc.).
+🛡️ **SECURITY GUARANTEE**: This wallet was provisioned directly in hardware secure enclaves (TEE/MPC). Raw private keys and seed phrases are never generated or stored server-side.
 `,
         ...result,
       };

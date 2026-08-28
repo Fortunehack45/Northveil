@@ -5,90 +5,23 @@ const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'e
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-function toHex(buf: Uint8Array): string {
-  return Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-/**
- * Client-Side Memory-Safe AES-256-GCM Encryption via Standard Web Crypto API
- * Generates a unique 16-byte random secret salt and 12-byte IV for every encryption
- */
-async function encryptCredentialClient(plaintext: string): Promise<{ ciphertext: string; iv: string; authTag: string; salt: string }> {
-  if (typeof window === 'undefined' || !window.crypto || !window.crypto.subtle) {
-    throw new Error('Web Crypto API (crypto.subtle) is required for secure client-side vault encryption.');
-  }
-
-  const masterSecret = (import.meta as any).env?.VITE_ENCRYPTION_KEY || (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
-  if (!masterSecret || masterSecret.trim().length < 16) {
-    throw new Error('FATAL SECURITY CONFIGURATION: No client vault key found. Please define VITE_ENCRYPTION_KEY or VITE_SUPABASE_ANON_KEY with at least 16 characters of entropy.');
-  }
-  const encoder = new TextEncoder();
-
-  // Generate random 16-byte salt
-  const salt = window.crypto.getRandomValues(new Uint8Array(16));
-  
-  // Derive key via PBKDF2 / SHA-256 with 10,000 iterations
-  const baseKey = await window.crypto.subtle.importKey(
-    'raw',
-    encoder.encode(masterSecret),
-    'PBKDF2',
-    false,
-    ['deriveKey']
-  );
-
-  const aesKey = await window.crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: salt as unknown as BufferSource,
-      iterations: 10000,
-      hash: 'SHA-256'
-    },
-    baseKey,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt']
-  );
-
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
-
-  const encryptedBuf = await window.crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: iv as unknown as BufferSource },
-    aesKey,
-    encoder.encode(plaintext)
-  );
-
-  const encryptedArray = new Uint8Array(encryptedBuf);
-  const tagLength = 16;
-  const ciphertextBytes = encryptedArray.slice(0, encryptedArray.length - tagLength);
-  const authTagBytes = encryptedArray.slice(encryptedArray.length - tagLength);
-
-  return {
-    ciphertext: toHex(ciphertextBytes),
-    iv: toHex(iv),
-    authTag: toHex(authTagBytes),
-    salt: toHex(salt)
-  };
-}
-
 export class SupabaseService {
   /**
-   * Sync wallet address to Supabase strictly with AES-256-GCM encryption
-   * Plaintext credentials (privateKey, seedPhrase) are NEVER stored in database columns or plaintext localStorage
+   * Sync non-sensitive wallet metadata (address, name, chainId, derivationPath) to Supabase.
+   * Private keys, seed phrases, and credentials are NEVER transmitted or stored server-side.
    */
-  static async syncWallet(address: string, name: string, chainId: string = 'ethereum', privateKey?: string, seedPhrase?: string) {
+  static async syncWallet(address: string, name: string, chainId: string = 'ethereum') {
     try {
       const cleanAddr = address.toLowerCase();
 
       // Fetch existing metadata record if present
       const { data: existing } = await supabase
         .from('wallets')
-        .select('*')
+        .select('user_id, wallet_status, derivation_path')
         .eq('address', cleanAddr)
         .maybeSingle();
 
-      const secretToEncrypt = seedPhrase || privateKey;
-
-      const record: any = { 
+      const record = { 
         address: cleanAddr, 
         name, 
         chain_id: chainId,
@@ -96,25 +29,6 @@ export class SupabaseService {
         wallet_status: existing?.wallet_status || 'active',
         derivation_path: existing?.derivation_path || "m/44'/60'/0'/0/0"
       };
-
-      if (secretToEncrypt) {
-        try {
-          const enc = await encryptCredentialClient(secretToEncrypt);
-          record.encrypted_credential = enc.ciphertext;
-          record.iv = enc.iv;
-          record.auth_tag = enc.authTag;
-          record.salt = enc.salt;
-          record.credential_type = seedPhrase ? 'seed_phrase' : 'private_key';
-        } catch (encErr) {
-          console.error('[Client Encryption Error]:', encErr);
-        }
-      } else if (existing) {
-        if (existing.encrypted_credential) record.encrypted_credential = existing.encrypted_credential;
-        if (existing.iv) record.iv = existing.iv;
-        if (existing.auth_tag) record.auth_tag = existing.auth_tag;
-        if (existing.salt) record.salt = existing.salt;
-        if (existing.credential_type) record.credential_type = existing.credential_type;
-      }
 
       const { data, error } = await supabase
         .from('wallets')

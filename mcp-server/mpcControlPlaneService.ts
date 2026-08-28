@@ -373,10 +373,6 @@ export async function createMpcWallet(
   provisioningMode?: string
 ): Promise<{
   address: string;
-  mnemonic?: string;
-  seedPhrase?: string;
-  privateKey?: string;
-  derivationPath?: string;
   mpcWalletId: string;
   mpcSubOrgId: string;
   mpcProvider: string;
@@ -516,65 +512,10 @@ export async function createMpcWallet(
     };
   }
 
-  // 3. Self-Sovereign Non-Custodial Vault Provisioning (with Full BIP-39 Seed Phrase & Private Key)
-  const newVault = ethers.Wallet.createRandom();
-  const address = newVault.address.toLowerCase();
-  const mnemonic = newVault.mnemonic?.phrase || '';
-  const privateKey = newVault.privateKey;
-  const derivationPath = newVault.path || "m/44'/60'/0'/0/0";
-  const mpcWalletId = `vault_wlt_${crypto.randomBytes(8).toString('hex')}`;
-  const mpcSubOrgId = `vault_suborg_${crypto.randomBytes(6).toString('hex')}`;
-
-  const walletRecord: NonCustodialWalletRecord = {
-    id: `mpc_${Date.now()}_${address.slice(0, 8)}`,
-    address,
-    user_id: userId,
-    chain_id: 'ethereum',
-    name: walletName,
-    mpc_provider: 'non-custodial-vault',
-    mpc_wallet_id: mpcWalletId,
-    mpc_sub_org_id: mpcSubOrgId,
-    key_type: 'ecdsa_secp256k1',
-    wallet_status: 'active',
-    created_at: new Date().toISOString(),
-  };
-
-  inMemoryMpcWallets.set(address, walletRecord);
-
-  try {
-    if (supabase && typeof supabase.from === 'function') {
-      await supabase.from('wallets').upsert([{
-        user_id: userId,
-        address,
-        chain_id: 'ethereum',
-        name: walletName,
-        mpc_provider: 'non-custodial-vault',
-        mpc_wallet_id: mpcWalletId,
-        wallet_status: 'active',
-        created_at: new Date().toISOString(),
-      }], { onConflict: 'address' });
-    }
-  } catch (e) {}
-
-  await logWalletAudit('MPC_WALLET_PROVISIONED', address, userId, {
-    mpcProvider: 'non-custodial-vault',
-    mpcWalletId,
-    mpcSubOrgId,
-    wallet_status: 'active',
-  });
-
-  return {
-    address,
-    mnemonic,
-    seedPhrase: mnemonic,
-    privateKey,
-    derivationPath,
-    mpcWalletId,
-    mpcSubOrgId,
-    mpcProvider: 'non-custodial-vault',
-    keyType: 'ecdsa_secp256k1',
-    status: 'active',
-  };
+  // 3. No Turnkey credentials and not in demo mode — hard fail
+  throw new TurnkeyEnclaveError(
+    'TurnkeyEnclaveError: TURNKEY_CONFIG_ERROR: Wallet creation requires live Turnkey MPC credentials (TURNKEY_API_PUBLIC_KEY, TURNKEY_API_PRIVATE_KEY, TURNKEY_ORGANIZATION_ID) or NORTHVEIL_DEMO_MODE=true. No wallet was created.'
+  );
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1455,149 +1396,88 @@ export async function approveAndExecuteWithPasskey(
     };
   }
 
-  if (turnkeyOrgId && turnkeyApiPrivateKey) {
-    try {
-      const turnkey = getTurnkeyClient();
-      const provider = getProviderForNetwork(req.network);
-
-      let nonce = 0;
-      try {
-        nonce = await provider.getTransactionCount(req.walletAddress, 'pending');
-      } catch (e) {
-        nonce = 0;
-      }
-
-      let maxFeePerGas = ethers.parseUnits('20', 'gwei').toString();
-      let maxPriorityFeePerGas = ethers.parseUnits('1.5', 'gwei').toString();
-      try {
-        const feeData = await provider.getFeeData();
-        if (feeData.maxFeePerGas) maxFeePerGas = feeData.maxFeePerGas.toString();
-        if (feeData.maxPriorityFeePerGas) maxPriorityFeePerGas = feeData.maxPriorityFeePerGas.toString();
-      } catch (e) {}
-
-      let rawVal = '0';
-      if (unsigned.value) {
-        rawVal = typeof unsigned.value === 'bigint' ? unsigned.value.toString() : String(unsigned.value);
-      } else if (req.amount > 0) {
-        try {
-          rawVal = ethers.parseEther(String(req.amount)).toString();
-        } catch (e) {
-          rawVal = '0';
-        }
-      }
-
-      const txToSign = {
-        to: unsigned.to || req.recipient,
-        value: rawVal,
-        data: unsigned.data || '0x',
-        nonce,
-        gasLimit: unsigned.gasLimit || 250000,
-        maxFeePerGas,
-        maxPriorityFeePerGas,
-        chainId: req.chainId || getChainIdForNetwork(req.network) || 11155111,
-        type: 2,
-      };
-
-      const unsignedSerialized = ethers.Transaction.from(txToSign).unsignedSerialized;
-
-      const signResult: any = await (turnkey as any).signTransaction({
-        type: 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2',
-        timestampMs: Date.now().toString(),
-        organizationId: turnkeyOrgId,
-        parameters: {
-          signWith: req.walletAddress,
-          unsignedTransaction: unsignedSerialized,
-          type: 'TRANSACTION_TYPE_ETHEREUM',
-        },
-      });
-
-      const signedTx = signResult.signedTransaction || signResult.activity?.result?.signTransactionResult?.signedTransaction;
-      if (signedTx) {
-        const broadcastRes = await provider.broadcastTransaction(signedTx);
-        txHash = broadcastRes.hash;
-
-        const receipt = await broadcastRes.wait(1, 45000);
-        if (receipt) {
-          blockNumber = Number(receipt.blockNumber);
-          gasUsed = receipt.gasUsed ? receipt.gasUsed.toString() : '21000';
-          if (receipt.contractAddress) contractAddress = receipt.contractAddress;
-        }
-      }
-    } catch (turnkeyErr: any) {
-      console.warn('[Turnkey Signing Notice]:', turnkeyErr?.message);
-    }
+  if (!turnkeyOrgId || !turnkeyApiPrivateKey) {
+    throw new TurnkeyEnclaveError(
+      'TurnkeyEnclaveError: TURNKEY_CONFIG_ERROR: Transaction signing requires live Turnkey MPC credentials (TURNKEY_ORGANIZATION_ID, TURNKEY_API_PRIVATE_KEY). No fallback signer is available.'
+    );
   }
 
-  if (!txHash) {
-    const isTestnet = req.network === 'sepolia' || req.network === 'base_sepolia' || req.network === 'amoy';
-    const fallbackTestnetKey = '0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9';
-    const signingKey = process.env.SEPOLIA_PRIVATE_KEY || process.env.PRIVATE_KEY || process.env.LOCAL_TEST_PRIVATE_KEY || (isTestnet ? fallbackTestnetKey : '');
-    if (signingKey && signingKey.startsWith('0x')) {
-      try {
-        let rawVal = 0n;
-        if (unsigned.value !== undefined && unsigned.value !== null && unsigned.value !== '') {
-          try {
-            const valStr = String(unsigned.value);
-            if (valStr.includes('.')) {
-              rawVal = ethers.parseEther(valStr);
-            } else {
-              rawVal = BigInt(valStr);
-            }
-          } catch (e) {
-            rawVal = req.amount > 0 ? ethers.parseEther(String(req.amount)) : 0n;
-          }
-        } else if (req.amount > 0) {
-          try {
-            rawVal = ethers.parseEther(String(req.amount));
-          } catch (e) {
-            rawVal = 0n;
-          }
-        }
+  try {
+    const turnkey = getTurnkeyClient();
+    const provider = getProviderForNetwork(req.network);
 
-        let targetTo = (unsigned.to || req.recipient || '').trim();
-        const isDeploy = req.asset === 'DEPLOY' || unsigned.isDeploy || (!targetTo || targetTo === ethers.ZeroAddress || targetTo === '0x0000000000000000000000000000000000000000');
-        let toAddress: string | undefined = undefined;
-        if (!isDeploy && targetTo.startsWith('0x') && targetTo.length === 42 && targetTo !== ethers.ZeroAddress) {
-          try {
-            toAddress = ethers.getAddress(targetTo.toLowerCase());
-          } catch (e) {
-            toAddress = targetTo;
-          }
-        }
-
-        const txResponse = await executeWithRpcFailover(req.network, async (p) => {
-          const w = new ethers.Wallet(signingKey, p);
-          return await w.sendTransaction({
-            to: toAddress,
-            value: rawVal,
-            data: unsigned.data || '0x',
-            gasLimit: isDeploy ? 3000000 : (unsigned.gasLimit || undefined),
-          });
-        });
-
-        txHash = txResponse.hash;
-        try {
-          const receiptPromise = txResponse.wait(1, 45000);
-          const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 30000));
-          const receipt: any = await Promise.race([receiptPromise, timeoutPromise]);
-          if (receipt) {
-            blockNumber = Number(receipt.blockNumber);
-            gasUsed = receipt.gasUsed ? receipt.gasUsed.toString() : '21000';
-            if (receipt.contractAddress) contractAddress = receipt.contractAddress;
-          }
-        } catch (receiptErr) {
-          try {
-            const p = getProviderForNetwork(req.network);
-            blockNumber = await p.getBlockNumber();
-          } catch (e) {}
-        }
-      } catch (broadcastErr: any) {
-        console.error('[On-Chain Broadcast Failure]:', broadcastErr);
-        throw new Error(`Real On-Chain Broadcast Failed: ${broadcastErr?.reason || broadcastErr?.shortMessage || broadcastErr?.message || broadcastErr}`);
-      }
-    } else {
-      throw new Error('On-Chain Signing Failed: No valid private key or Turnkey hardware enclave configured. Please set SEPOLIA_PRIVATE_KEY or TURNKEY credentials.');
+    let nonce = 0;
+    try {
+      nonce = await provider.getTransactionCount(req.walletAddress, 'pending');
+    } catch (e) {
+      nonce = 0;
     }
+
+    let maxFeePerGas = ethers.parseUnits('20', 'gwei').toString();
+    let maxPriorityFeePerGas = ethers.parseUnits('1.5', 'gwei').toString();
+    try {
+      const feeData = await provider.getFeeData();
+      if (feeData.maxFeePerGas) maxFeePerGas = feeData.maxFeePerGas.toString();
+      if (feeData.maxPriorityFeePerGas) maxPriorityFeePerGas = feeData.maxPriorityFeePerGas.toString();
+    } catch (e) {}
+
+    let rawVal = '0';
+    if (unsigned.value) {
+      rawVal = typeof unsigned.value === 'bigint' ? unsigned.value.toString() : String(unsigned.value);
+    } else if (req.amount > 0) {
+      try {
+        rawVal = ethers.parseEther(String(req.amount)).toString();
+      } catch (e) {
+        rawVal = '0';
+      }
+    }
+
+    const txToSign = {
+      to: unsigned.to || req.recipient,
+      value: rawVal,
+      data: unsigned.data || '0x',
+      nonce,
+      gasLimit: unsigned.gasLimit || 250000,
+      maxFeePerGas,
+      maxPriorityFeePerGas,
+      chainId: req.chainId || getChainIdForNetwork(req.network) || 11155111,
+      type: 2,
+    };
+
+    const unsignedSerialized = ethers.Transaction.from(txToSign).unsignedSerialized;
+
+    const signResult: any = await (turnkey as any).signTransaction({
+      type: 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2',
+      timestampMs: Date.now().toString(),
+      organizationId: turnkeyOrgId,
+      parameters: {
+        signWith: req.walletAddress,
+        unsignedTransaction: unsignedSerialized,
+        type: 'TRANSACTION_TYPE_ETHEREUM',
+      },
+    });
+
+    const signedTx = signResult.signedTransaction || signResult.activity?.result?.signTransactionResult?.signedTransaction;
+    if (signedTx) {
+      const broadcastRes = await provider.broadcastTransaction(signedTx);
+      txHash = broadcastRes.hash;
+
+      const receipt = await broadcastRes.wait(1, 45000);
+      if (receipt) {
+        blockNumber = Number(receipt.blockNumber);
+        gasUsed = receipt.gasUsed ? receipt.gasUsed.toString() : '21000';
+        if (receipt.contractAddress) contractAddress = receipt.contractAddress;
+      }
+    }
+
+    if (!txHash) {
+      throw new TurnkeyEnclaveError('Turnkey signing completed but no signed transaction was returned.');
+    }
+  } catch (turnkeyErr: any) {
+    if (turnkeyErr instanceof TurnkeyEnclaveError) throw turnkeyErr;
+    throw new TurnkeyEnclaveError(
+      `Turnkey hardware enclave signing failed: ${turnkeyErr?.message || turnkeyErr}`
+    );
   }
 
   // 5. Update Database Record
@@ -1722,147 +1602,88 @@ export async function executeAutonomousTransaction(
     };
   }
 
-  if (turnkeyOrgId && turnkeyApiPrivateKey) {
-    try {
-      const turnkey = getTurnkeyClient();
-      const provider = getProviderForNetwork(network);
-
-      let nonce = 0;
-      try {
-        nonce = await provider.getTransactionCount(normAddr, 'pending');
-      } catch (e) {
-        nonce = 0;
-      }
-
-      let maxFeePerGas = ethers.parseUnits('20', 'gwei').toString();
-      let maxPriorityFeePerGas = ethers.parseUnits('1.5', 'gwei').toString();
-      try {
-        const feeData = await provider.getFeeData();
-        if (feeData.maxFeePerGas) maxFeePerGas = feeData.maxFeePerGas.toString();
-        if (feeData.maxPriorityFeePerGas) maxPriorityFeePerGas = feeData.maxPriorityFeePerGas.toString();
-      } catch (e) {}
-
-      let rawVal = '0';
-      if (unsignedPayload.value) {
-        rawVal = typeof unsignedPayload.value === 'bigint' ? unsignedPayload.value.toString() : String(unsignedPayload.value);
-      } else if (amount > 0) {
-        try {
-          rawVal = ethers.parseEther(String(amount)).toString();
-        } catch (e) {
-          rawVal = '0';
-        }
-      }
-
-      const txToSign = {
-        to: unsignedPayload.to || recipient,
-        value: rawVal,
-        data: unsignedPayload.data || '0x',
-        nonce,
-        gasLimit: unsignedPayload.gasLimit || 250000,
-        maxFeePerGas,
-        maxPriorityFeePerGas,
-        chainId: unsignedPayload.chainId || getChainIdForNetwork(network) || 11155111,
-        type: 2,
-      };
-
-      const unsignedSerialized = ethers.Transaction.from(txToSign).unsignedSerialized;
-
-      const signResult: any = await (turnkey as any).signTransaction({
-        type: 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2',
-        timestampMs: Date.now().toString(),
-        organizationId: turnkeyOrgId,
-        parameters: {
-          signWith: normAddr,
-          unsignedTransaction: unsignedSerialized,
-          type: 'TRANSACTION_TYPE_ETHEREUM',
-        },
-      });
-
-      const signedTx = signResult.signedTransaction || signResult.activity?.result?.signTransactionResult?.signedTransaction;
-      if (signedTx) {
-        const broadcastRes = await provider.broadcastTransaction(signedTx);
-        txHash = broadcastRes.hash;
-
-        const receipt = await broadcastRes.wait(1, 45000);
-        if (receipt) {
-          blockNumber = Number(receipt.blockNumber);
-          gasUsed = receipt.gasUsed ? receipt.gasUsed.toString() : '21000';
-          if (receipt.contractAddress) contractAddress = receipt.contractAddress;
-        }
-      }
-    } catch (turnkeyErr: any) {
-      console.warn('[Autonomous Turnkey Notice]:', turnkeyErr?.message);
-    }
+  if (!turnkeyOrgId || !turnkeyApiPrivateKey) {
+    throw new TurnkeyEnclaveError(
+      'TurnkeyEnclaveError: TURNKEY_CONFIG_ERROR: Autonomous transaction signing requires live Turnkey MPC credentials (TURNKEY_ORGANIZATION_ID, TURNKEY_API_PRIVATE_KEY). No fallback signer is available.'
+    );
   }
 
-  if (!txHash) {
-    const isTestnet = network === 'sepolia' || network === 'base_sepolia' || network === 'amoy';
-    const fallbackTestnetKey = '0xfe01b8b0c9334a6f5386690ecc6f238b5e53f7b8a04914e618fdacac2217fdb9';
-    const signingKey = process.env.SEPOLIA_PRIVATE_KEY || process.env.PRIVATE_KEY || process.env.LOCAL_TEST_PRIVATE_KEY || (isTestnet ? fallbackTestnetKey : '');
-    if (signingKey && signingKey.startsWith('0x')) {
-      try {
-        let rawVal = 0n;
-        if (unsignedPayload.value !== undefined && unsignedPayload.value !== null && unsignedPayload.value !== '') {
-          try {
-            const valStr = String(unsignedPayload.value);
-            if (valStr.includes('.')) {
-              rawVal = ethers.parseEther(valStr);
-            } else {
-              rawVal = BigInt(valStr);
-            }
-          } catch (e) {
-            rawVal = amount > 0 ? ethers.parseEther(String(amount)) : 0n;
-          }
-        } else if (amount > 0) {
-          try {
-            rawVal = ethers.parseEther(String(amount));
-          } catch (e) {
-            rawVal = 0n;
-          }
-        }
+  try {
+    const turnkey = getTurnkeyClient();
+    const provider = getProviderForNetwork(network);
 
-        let targetTo = (unsignedPayload.to || recipient || '').trim();
-        const isDeploy = asset === 'DEPLOY' || unsignedPayload.isDeploy || (!targetTo || targetTo === ethers.ZeroAddress || targetTo === '0x0000000000000000000000000000000000000000');
-        let toAddress: string | undefined = undefined;
-        if (!isDeploy && targetTo.startsWith('0x') && targetTo.length === 42 && targetTo !== ethers.ZeroAddress) {
-          try {
-            toAddress = ethers.getAddress(targetTo.toLowerCase());
-          } catch (e) {
-            toAddress = targetTo;
-          }
-        }
-
-        const txResponse = await executeWithRpcFailover(network, async (p) => {
-          const w = new ethers.Wallet(signingKey, p);
-          return await w.sendTransaction({
-            to: toAddress,
-            value: rawVal,
-            data: unsignedPayload.data || '0x',
-            gasLimit: isDeploy ? 3000000 : (unsignedPayload.gasLimit || undefined),
-          });
-        });
-
-        txHash = txResponse.hash;
-        try {
-          const receipt = await txResponse.wait(1, 45000);
-          if (receipt) {
-            blockNumber = Number(receipt.blockNumber);
-            gasUsed = receipt.gasUsed ? receipt.gasUsed.toString() : '21000';
-            if (receipt.contractAddress) contractAddress = receipt.contractAddress;
-          }
-        } catch (receiptErr) {
-          try {
-            const p = getProviderForNetwork(network);
-            blockNumber = await p.getBlockNumber();
-          } catch (e) {}
-        }
-      } catch (broadcastErr: any) {
-        console.error('[Autonomous On-Chain Broadcast Failure]:', broadcastErr);
-        throw new Error(`Autonomous On-Chain Broadcast Failed: ${broadcastErr?.reason || broadcastErr?.shortMessage || broadcastErr?.message || broadcastErr}`);
-      }
-    } else {
-      throw new Error('On-Chain Signing Failed: No valid private key or Turnkey hardware enclave configured. Please set SEPOLIA_PRIVATE_KEY or TURNKEY credentials.');
+    let nonce = 0;
+    try {
+      nonce = await provider.getTransactionCount(normAddr, 'pending');
+    } catch (e) {
+      nonce = 0;
     }
+
+    let maxFeePerGas = ethers.parseUnits('20', 'gwei').toString();
+    let maxPriorityFeePerGas = ethers.parseUnits('1.5', 'gwei').toString();
+    try {
+      const feeData = await provider.getFeeData();
+      if (feeData.maxFeePerGas) maxFeePerGas = feeData.maxFeePerGas.toString();
+      if (feeData.maxPriorityFeePerGas) maxPriorityFeePerGas = feeData.maxPriorityFeePerGas.toString();
+    } catch (e) {}
+
+    let rawVal = '0';
+    if (unsignedPayload.value) {
+      rawVal = typeof unsignedPayload.value === 'bigint' ? unsignedPayload.value.toString() : String(unsignedPayload.value);
+    } else if (amount > 0) {
+      try {
+        rawVal = ethers.parseEther(String(amount)).toString();
+      } catch (e) {
+        rawVal = '0';
+      }
+    }
+
+    const txToSign = {
+      to: unsignedPayload.to || recipient,
+      value: rawVal,
+      data: unsignedPayload.data || '0x',
+      nonce,
+      gasLimit: unsignedPayload.gasLimit || 250000,
+      maxFeePerGas,
+      maxPriorityFeePerGas,
+      chainId: unsignedPayload.chainId || getChainIdForNetwork(network) || 11155111,
+      type: 2,
+    };
+
+    const unsignedSerialized = ethers.Transaction.from(txToSign).unsignedSerialized;
+
+    const signResult: any = await (turnkey as any).signTransaction({
+      type: 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2',
+      timestampMs: Date.now().toString(),
+      organizationId: turnkeyOrgId,
+      parameters: {
+        signWith: normAddr,
+        unsignedTransaction: unsignedSerialized,
+        type: 'TRANSACTION_TYPE_ETHEREUM',
+      },
+    });
+
+    const signedTx = signResult.signedTransaction || signResult.activity?.result?.signTransactionResult?.signedTransaction;
+    if (signedTx) {
+      const broadcastRes = await provider.broadcastTransaction(signedTx);
+      txHash = broadcastRes.hash;
+
+      const receipt = await broadcastRes.wait(1, 45000);
+      if (receipt) {
+        blockNumber = Number(receipt.blockNumber);
+        gasUsed = receipt.gasUsed ? receipt.gasUsed.toString() : '21000';
+        if (receipt.contractAddress) contractAddress = receipt.contractAddress;
+      }
+    }
+
+    if (!txHash) {
+      throw new TurnkeyEnclaveError('Turnkey autonomous signing completed but no signed transaction was returned.');
+    }
+  } catch (turnkeyErr: any) {
+    if (turnkeyErr instanceof TurnkeyEnclaveError) throw turnkeyErr;
+    throw new TurnkeyEnclaveError(
+      `Autonomous Turnkey hardware enclave signing failed: ${turnkeyErr?.message || turnkeyErr}`
+    );
   }
 
   // Increment spent_last_24h_usd in scope
