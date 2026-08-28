@@ -97,6 +97,41 @@ export class MpcWalletService {
   }
 
   /**
+   * Seamlessly import an existing private key or seed phrase directly into Turnkey Hardware Enclave
+   */
+  public static async importMpcVault(
+    importType: 'privateKey' | 'seed',
+    secret: string,
+    walletName: string = 'Imported Vault',
+    userId?: string
+  ): Promise<MpcVaultCreationResult> {
+    const effectiveUserId = userId || this.getUserId();
+    const res = await fetch(`${this.getBaseUrl()}/api/v1/wallets/import-mpc`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        importType,
+        secret,
+        walletName,
+        userId: effectiveUserId,
+      }),
+    });
+
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || 'Failed to import wallet into Turnkey MPC Enclave');
+    }
+
+    return {
+      success: true,
+      address: json.address,
+      mpcWalletId: json.mpcWalletId,
+      mpcProvider: json.mpcProvider || 'turnkey',
+      userId: effectiveUserId,
+    };
+  }
+
+  /**
    * Request WebAuthn Registration Challenge & Options
    */
   public static async getPasskeyRegistrationOptions(

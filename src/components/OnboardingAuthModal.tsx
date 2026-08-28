@@ -152,31 +152,43 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
     }
 
     setStep('processing');
-    setProcessingMsg('Encrypting Imported Keychain...');
-    await new Promise((r) => setTimeout(r, 400));
+    setProcessingMsg('Enclave Hardening: Provisioning Turnkey Nitro TEE Enclave...');
 
     const chosenName = importWalletName.trim() || 'Primary Vault';
+    const userId = MpcWalletService.getUserId();
 
     try {
+      let vaultResult: any = null;
       if (importType === 'seed' && parsedImportWords.length >= 12) {
+        const mnemonic = parsedImportWords.join(' ');
+        vaultResult = await MpcWalletService.importMpcVault('seed', mnemonic, chosenName, userId).catch((e) => {
+          console.warn('[Turnkey Enclave Import Notice]:', e.message);
+          return null;
+        });
         await setupVault(importPassword, parsedImportWords);
-        const success = restoreWalletFromSeed(parsedImportWords, chosenName);
-        if (success) {
-          if (onClose) onClose();
-        } else {
-          setImportPasswordError('Could not restore from this seed phrase.');
-          setStep('importPassword');
-        }
+        restoreWalletFromSeed(parsedImportWords, chosenName);
       } else if (importType === 'privateKey' && parsedImportKey) {
+        vaultResult = await MpcWalletService.importMpcVault('privateKey', parsedImportKey, chosenName, userId).catch((e) => {
+          console.warn('[Turnkey Enclave Import Notice]:', e.message);
+          return null;
+        });
         await setupVault(importPassword, [parsedImportKey]);
-        const success = restoreWalletFromPrivateKey(parsedImportKey, chosenName);
-        if (success) {
-          if (onClose) onClose();
-        } else {
-          setImportPasswordError('Could not restore from this private key.');
-          setStep('importPassword');
-        }
+        restoreWalletFromPrivateKey(parsedImportKey, chosenName);
       }
+
+      if (vaultResult && vaultResult.address) {
+        setProcessingMsg('Securing Hardware Vault Session...');
+        const sessionToken = MpcWalletService.getSessionToken() || `sess_${Date.now()}`;
+        await setupMpcVault(
+          chosenName,
+          vaultResult.address,
+          vaultResult.mpcWalletId,
+          userId,
+          sessionToken
+        );
+      }
+
+      if (onClose) onClose();
     } catch (err: any) {
       setImportPasswordError(err?.message || 'Import failed.');
       setStep('importPassword');

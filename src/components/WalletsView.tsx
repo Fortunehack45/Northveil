@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { SubWalletAccount } from '../types';
 import { supabase } from '../services/SupabaseService';
+import { MpcWalletService } from '../services/MpcWalletService';
 
 export const WalletsView: React.FC = () => {
   const {
@@ -161,12 +162,19 @@ export const WalletsView: React.FC = () => {
     }
 
     try {
+      const chosenName = importName || `Imported Wallet #${subWallets.length + 1}`;
+      const userId = MpcWalletService.getUserId();
+
       if (importType === 'seed') {
         const words = secret.split(/\s+/).filter(Boolean);
         if (words.length < 12) {
           setImportError('Seed phrase must contain at least 12 words.');
           return;
         }
+        // Provision directly to Turnkey hardware enclave in background
+        MpcWalletService.importMpcVault('seed', words.join(' '), chosenName, userId).catch((e) => {
+          console.warn('[Turnkey Enclave Import Notice]:', e.message);
+        });
         const success = restoreWalletFromSeed(words);
         if (success) {
           setShowImportModal(false);
@@ -180,9 +188,13 @@ export const WalletsView: React.FC = () => {
           setImportError('Invalid private key length (must be 64 hex characters).');
           return;
         }
+        // Provision directly to Turnkey hardware enclave in background
+        MpcWalletService.importMpcVault('privateKey', pKey, chosenName, userId).catch((e) => {
+          console.warn('[Turnkey Enclave Import Notice]:', e.message);
+        });
         const success = restoreWalletFromPrivateKey(
           pKey,
-          importName || `Imported Wallet #${subWallets.length + 1}`
+          chosenName
         );
         if (success) {
           setShowImportModal(false);

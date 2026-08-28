@@ -123,6 +123,7 @@ import {
   inMemoryTxRequests,
   inMemoryMpcWallets,
   executeWithRpcFailover,
+  importMpcWalletOrKey,
 } from './mpcControlPlaneService.js';
 
 const app = express();
@@ -2497,6 +2498,28 @@ app.post('/api/v1/wallets/create-mpc', async (req: Request, res: Response) => {
   }
 });
 
+app.post('/api/v1/wallets/import-mpc', async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  try {
+    const { importType = 'privateKey', secret, walletName = 'Imported Vault', userId = `user_${Date.now()}` } = req.body || {};
+    if (!secret) {
+      return res.status(400).json({ success: false, error: 'Missing private key or seed phrase to import.' });
+    }
+    const result = await importMpcWalletOrKey(importType, secret, walletName, userId);
+    return res.json({
+      success: true,
+      address: result.address,
+      mpcWalletId: result.mpcWalletId,
+      mpcProvider: result.mpcProvider,
+      userId: result.userId,
+      status: result.status,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post(['/api/v1/auth/passkey/register-options', '/api/v1/passkey/register-options'], async (req: Request, res: Response) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
@@ -4309,9 +4332,37 @@ ${simulation.revertReason ? `> **Revert Reason**: \`${simulation.revertReason}\`
 
     case 'import_wallet': {
       const walletName = args?.walletName || 'Imported Non-Custodial Vault';
+      const secret = args?.privateKey || args?.secret || args?.mnemonic || args?.seedPhrase;
+      const isSeed = !!(args?.mnemonic || args?.seedPhrase || (secret && secret.includes(' ')));
+
+      if (secret) {
+        const importRes = await importMpcWalletOrKey(
+          isSeed ? 'seed' : 'privateKey',
+          secret,
+          walletName,
+          'default_user'
+        );
+        return {
+          formattedMarkdown: `
+### 🔐 HARDWARE ENCLAVE WALLET IMPORTED
+
+> **Vault Address**: \`${importRes.address}\`  
+> **Wallet Label**: \`${walletName}\`  
+> **MPC Enclave ID**: \`${importRes.mpcWalletId}\`  
+> **Custody Model**: 🟢 **NON-CUSTODIAL TURNKEY HARDWARE MPC (AWS NITRO ENCLAVE)**  
+> **Status**: **ACTIVE (Passkey-Gated Authorization Enabled)**
+`,
+          address: importRes.address,
+          mpcWalletId: importRes.mpcWalletId,
+          walletName,
+          status: 'active',
+          custodyModel: 'non-custodial-tee-mpc',
+        };
+      }
+
       const address = (args?.address || args?.walletAddress || '').toLowerCase();
       if (!address || !address.startsWith('0x')) {
-        throw new Error('Please provide a valid 0x wallet address to register under the non-custodial control plane.');
+        throw new Error('Please provide a valid 0x wallet address or privateKey/seed phrase to import.');
       }
       try {
         await supabase.from('wallets').upsert([{

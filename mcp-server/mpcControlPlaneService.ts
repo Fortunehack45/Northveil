@@ -12,6 +12,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { TurnkeyClient } from '@turnkey/http';
 import { ApiKeyStamper } from '@turnkey/api-key-stamper';
+import { encryptPrivateKeyToBundle, encryptWalletToBundle } from '@turnkey/crypto';
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -519,6 +520,219 @@ export async function createMpcWallet(
   // 3. No Turnkey credentials and not in demo mode — hard fail
   throw new TurnkeyEnclaveError(
     'TurnkeyEnclaveError: TURNKEY_CONFIG_ERROR: Wallet creation requires live Turnkey MPC credentials (TURNKEY_API_PUBLIC_KEY, TURNKEY_API_PRIVATE_KEY, TURNKEY_ORGANIZATION_ID) or NORTHVEIL_DEMO_MODE=true. No wallet was created.'
+  );
+}
+
+/**
+ * Seamlessly import an existing private key or seed phrase directly into Turnkey Hardware AWS Nitro Enclave
+ */
+export async function importMpcWalletOrKey(
+  importType: 'privateKey' | 'seed',
+  secret: string,
+  walletName: string = 'Imported Vault',
+  userId: string = 'default_user'
+): Promise<{
+  address: string;
+  mpcWalletId: string;
+  mpcProvider: string;
+  userId: string;
+  status: string;
+}> {
+  const turnkeyOrgId = TURNKEY_ORGANIZATION_ID;
+  const hasLiveTurnkey = !!(TURNKEY_API_PUBLIC_KEY && TURNKEY_API_PRIVATE_KEY && TURNKEY_ORGANIZATION_ID);
+
+  if (hasLiveTurnkey) {
+    const turnkey = getTurnkeyClient();
+    try {
+      let effectiveUserId = userId;
+      try {
+        const whoami = await turnkey.getWhoami({ organizationId: turnkeyOrgId });
+        if (whoami?.userId) effectiveUserId = whoami.userId;
+      } catch (e) {
+        if (!effectiveUserId || effectiveUserId === 'default_user') {
+          const users = await turnkey.getUsers({ organizationId: turnkeyOrgId });
+          effectiveUserId = users.users?.[0]?.userId || effectiveUserId;
+        }
+      }
+
+      if (importType === 'privateKey') {
+        const cleanKey = secret.trim().replace(/^0x/, '');
+        const initRes = await turnkey.initImportPrivateKey({
+          type: 'ACTIVITY_TYPE_INIT_IMPORT_PRIVATE_KEY',
+          timestampMs: Date.now().toString(),
+          organizationId: turnkeyOrgId,
+          parameters: { userId: effectiveUserId },
+        });
+
+        const importBundle = initRes.activity?.result?.initImportPrivateKeyResult?.importBundle;
+        if (!importBundle) throw new TurnkeyEnclaveError('Failed to initialize Turnkey private key import bundle');
+
+        const encryptedBundle = await encryptPrivateKeyToBundle({
+          privateKey: cleanKey,
+          keyFormat: 'HEXADECIMAL',
+          importBundle,
+          userId: effectiveUserId,
+          organizationId: turnkeyOrgId,
+        });
+
+        const importRes = await turnkey.importPrivateKey({
+          type: 'ACTIVITY_TYPE_IMPORT_PRIVATE_KEY',
+          timestampMs: Date.now().toString(),
+          organizationId: turnkeyOrgId,
+          parameters: {
+            userId: effectiveUserId,
+            privateKeyName: `${walletName} (${Date.now()})`,
+            encryptedBundle,
+            curve: 'CURVE_SECP256K1',
+            addressFormats: ['ADDRESS_FORMAT_ETHEREUM'],
+          },
+        });
+
+        const result = importRes.activity?.result?.importPrivateKeyResult;
+        const addrObj: any = result?.addresses?.[0];
+        const address = ethers.getAddress(
+          typeof addrObj === 'string' ? addrObj : (addrObj?.address || ethers.computeAddress('0x' + cleanKey))
+        );
+        const privateKeyId = result?.privateKeyId || importRes.activity?.id || `pk_${Date.now()}`;
+
+        const walletRecord: NonCustodialWalletRecord = {
+          id: `mpc_${Date.now()}_${address.slice(0, 8)}`,
+          address: address.toLowerCase(),
+          user_id: userId,
+          chain_id: 'ethereum',
+          name: walletName,
+          mpc_provider: 'turnkey',
+          mpc_wallet_id: privateKeyId,
+          mpc_sub_org_id: TURNKEY_ORGANIZATION_ID,
+          key_type: 'ecdsa_secp256k1',
+          wallet_status: 'active',
+          created_at: new Date().toISOString(),
+        };
+
+        inMemoryMpcWallets.set(address.toLowerCase(), walletRecord);
+
+        try {
+          if (supabase && typeof supabase.from === 'function') {
+            await supabase.from('wallets').upsert([{
+              user_id: userId,
+              address: address.toLowerCase(),
+              chain_id: 'ethereum',
+              name: walletName,
+              mpc_provider: 'turnkey',
+              mpc_wallet_id: privateKeyId,
+              key_type: 'ecdsa_secp256k1',
+              wallet_status: 'active',
+              created_at: walletRecord.created_at,
+            }], { onConflict: 'address' });
+          }
+        } catch (err: any) {
+          console.warn('[Supabase Imported Wallet Upsert Notice]:', err.message);
+        }
+
+        return {
+          address,
+          mpcWalletId: privateKeyId,
+          mpcProvider: 'turnkey',
+          userId,
+          status: 'active',
+        };
+      } else {
+        const mnemonic = secret.trim();
+        const initRes = await turnkey.initImportWallet({
+          type: 'ACTIVITY_TYPE_INIT_IMPORT_WALLET',
+          timestampMs: Date.now().toString(),
+          organizationId: turnkeyOrgId,
+          parameters: { userId: effectiveUserId },
+        });
+
+        const importBundle = initRes.activity?.result?.initImportWalletResult?.importBundle;
+        if (!importBundle) throw new TurnkeyEnclaveError('Failed to initialize Turnkey wallet import bundle');
+
+        const encryptedBundle = await encryptWalletToBundle({
+          mnemonic,
+          importBundle,
+          userId: effectiveUserId,
+          organizationId: turnkeyOrgId,
+        });
+
+        const importRes = await turnkey.importWallet({
+          type: 'ACTIVITY_TYPE_IMPORT_WALLET',
+          timestampMs: Date.now().toString(),
+          organizationId: turnkeyOrgId,
+          parameters: {
+            userId: effectiveUserId,
+            walletName: `${walletName} (${Date.now()})`,
+            encryptedBundle,
+            accounts: [
+              {
+                curve: 'CURVE_SECP256K1',
+                pathFormat: 'PATH_FORMAT_BIP32',
+                path: "m/44'/60'/0'/0/0",
+                addressFormat: 'ADDRESS_FORMAT_ETHEREUM',
+              },
+            ],
+          },
+        });
+
+        const result = importRes.activity?.result?.importWalletResult;
+        const addrObj: any = result?.addresses?.[0];
+        const address = ethers.getAddress(
+          typeof addrObj === 'string' ? addrObj : (addrObj?.address || ethers.HDNodeWallet.fromPhrase(mnemonic).address)
+        );
+        const walletId = result?.walletId || importRes.activity?.id || `w_${Date.now()}`;
+
+        const walletRecord: NonCustodialWalletRecord = {
+          id: `mpc_${Date.now()}_${address.slice(0, 8)}`,
+          address: address.toLowerCase(),
+          user_id: userId,
+          chain_id: 'ethereum',
+          name: walletName,
+          mpc_provider: 'turnkey',
+          mpc_wallet_id: walletId,
+          mpc_sub_org_id: TURNKEY_ORGANIZATION_ID,
+          key_type: 'ecdsa_secp256k1',
+          wallet_status: 'active',
+          created_at: new Date().toISOString(),
+        };
+
+        inMemoryMpcWallets.set(address.toLowerCase(), walletRecord);
+
+        try {
+          if (supabase && typeof supabase.from === 'function') {
+            await supabase.from('wallets').upsert([{
+              user_id: userId,
+              address: address.toLowerCase(),
+              chain_id: 'ethereum',
+              name: walletName,
+              mpc_provider: 'turnkey',
+              mpc_wallet_id: walletId,
+              key_type: 'ecdsa_secp256k1',
+              wallet_status: 'active',
+              created_at: walletRecord.created_at,
+            }], { onConflict: 'address' });
+          }
+        } catch (err: any) {
+          console.warn('[Supabase Imported Wallet Upsert Notice]:', err.message);
+        }
+
+        return {
+          address,
+          mpcWalletId: walletId,
+          mpcProvider: 'turnkey',
+          userId,
+          status: 'active',
+        };
+      }
+    } catch (turnkeyErr: any) {
+      console.error('[Turnkey Enclave Import Failure]:', turnkeyErr.message);
+      throw new TurnkeyEnclaveError(
+        `TurnkeyEnclaveError: Wallet import into hardware enclave failed: ${turnkeyErr.message}`
+      );
+    }
+  }
+
+  throw new TurnkeyEnclaveError(
+    'TurnkeyEnclaveError: TURNKEY_CONFIG_ERROR: Importing a wallet into hardware enclave requires live Turnkey credentials.'
   );
 }
 
