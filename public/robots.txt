@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin.html
+
+# Sitemaps
+Sitemap: https://wallet.northveil.xyz/sitemap.xml
+Sitemap: https://www.northveil.xyz/sitemap.xml

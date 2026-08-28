@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/private/
+
+# Sitemaps
+Sitemap: https://www.northveil.xyz/sitemap.xml
+Sitemap: https://wallet.northveil.xyz/sitemap.xml
