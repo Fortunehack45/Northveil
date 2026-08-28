@@ -1,3 +1,36 @@
+# Northveil MCP & Wallet Ecosystem Architecture & Verification Walkthrough
+
+## Latest Fix: Passkey Authentication & Safe Wallet Address Resolution
+
+### Root Cause
+When Claude/browser clients authenticated via WebAuthn passkeys at `/api/v1/auth/passkey/verify-authentication`, the endpoint invoked `verifyPasskeyAuthentication(userId, walletAddress, authenticationResponse)`.
+Previously:
+1. `verifyPasskeyAuthentication` expected positional parameters `(response, sessionKey, walletAddress)`.
+2. This positional mismatch passed `userId` into `response` and `authenticationResponse` (an object) into `walletAddress`.
+3. The resulting return object contained `walletAddress` as a complex object instead of a string, triggering `TypeError: result.walletAddress.toLowerCase is not a function`.
+
+### Solutions Applied
+1. **Polymorphic Parameter Parser in `verifyPasskeyAuthentication`**:
+   - `verifyPasskeyAuthentication` in [api/mpcControlPlaneService.ts](file:///c:/Users/USER%20PC/Desktop/Northveil/api/mpcControlPlaneService.ts) and [mcp-server/mpcControlPlaneService.ts](file:///c:/Users/USER%20PC/Desktop/Northveil/mcp-server/mpcControlPlaneService.ts) now dynamically inspects argument types:
+     - Handles named property objects (`{ authenticationResponse, userId, walletAddress }`).
+     - Handles positional arguments with either `(userId, walletAddress, response)` or `(response, sessionKey, walletAddress)`.
+     - Strictly guarantees `walletAddress` in return payload is a valid lowercase EVM address string.
+2. **Defensive String Guards in `/api/v1/auth/passkey/verify-authentication`**:
+   - [api/index.ts](file:///c:/Users/USER%20PC/Desktop/Northveil/api/index.ts) and [mcp-server/index.ts](file:///c:/Users/USER%20PC/Desktop/Northveil/mcp-server/index.ts) validate `typeof walletAddress === 'string'` before calling `.toLowerCase()`.
+3. **Multi-RPC Failover in Nonce & Fee Estimation**:
+   - Implemented `executeWithRpcFailover` across `getExactNonce` and `getAccurateFeeData` to prevent TLS connection drops on public network RPCs.
+4. **100% Byte-Identical Parity Maintained**:
+   - `api/` and `mcp-server/` verified with matching SHA-256 hashes.
+5. **Full Test Suite Validation**:
+   - `test_unified_wallet_flow.ts`: **9/9 assertions passed (100%)**.
+   - `test_oauth_consent.ts`: **6/6 passed (100%)**.
+   - `test_non_custodial_enforcement.ts`: **6/6 passed (100%)**.
+   - `test_all_mcp_tools.ts`: **60/60 passed (100%)**.
+   - Root TypeScript Lint: **0 errors**.
+   - Pushed commit `2c9eacb` to `origin/main`.
+
+---
+
 # Walkthrough: Real Non-Custodial Conversion, Mobile Web Parity & Theme-Adaptive App Icon
 
 Northveil has completed a comprehensive upgrade across backend security architecture, multi-chain non-custodial MPC infrastructure, and full native Android mobile UI/UX parity with Material You adaptive app icons.
