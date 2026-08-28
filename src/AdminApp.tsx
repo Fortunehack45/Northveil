@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { AdminPanelView } from './components/AdminPanelView';
-import { ShieldAlert, Key, Lock, ArrowLeft, Terminal, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Lock, User, ArrowLeft, LogOut, CheckCircle2, KeyRound } from 'lucide-react';
 
 export const AdminApp: React.FC = () => {
-  const [passcode, setPasscode] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('northveil_admin_authenticated') === 'true';
   });
@@ -11,8 +12,15 @@ export const AdminApp: React.FC = () => {
 
   const handleAuthenticate = (e: React.FormEvent) => {
     e.preventDefault();
-    // Default admin passkey (or set custom)
-    if (passcode === 'admin123' || passcode === 'northveil2026' || passcode.length >= 6) {
+    const cleanUser = username.trim().toLowerCase();
+    const cleanPass = password.trim();
+
+    // Accepted usernames: "Fortune" or "Northveil"
+    const isUserValid = cleanUser === 'fortune' || cleanUser === 'northveil';
+    // Accepted password: "Fortune45"
+    const isPassValid = cleanPass === 'Fortune45';
+
+    if (isUserValid && isPassValid) {
       setIsAuthenticated(true);
       setError(false);
       localStorage.setItem('northveil_admin_authenticated', 'true');
@@ -28,59 +36,83 @@ export const AdminApp: React.FC = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#0a0a0c] brutal-grid-bg flex items-center justify-center p-4 font-mono text-left select-none">
-        <div className="bg-[#141419] border-4 border-white p-8 max-w-md w-full space-y-6 shadow-[10px_10px_0px_0px_#ff007f] relative z-10">
-          <div className="flex items-center justify-between border-b-2 border-white pb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-[#ff007f] text-white border-2 border-black flex items-center justify-center font-black text-xl shadow-[2px_2px_0px_0px_#000]">
-                <ShieldAlert className="w-6 h-6 stroke-[3]" />
-              </div>
-              <div>
-                <h1 className="text-lg font-black text-white uppercase tracking-tight">SUPER ADMIN PORTAL</h1>
-                <span className="text-[10px] text-[#ccff00] font-bold">NORTHVEIL PROTOCOL CONTROL</span>
-              </div>
+      <div className="min-h-screen bg-[#070709] text-white flex items-center justify-center p-4 selection:bg-white/20 font-sans">
+        <div className="bg-[#0f0f12] border border-white/[0.08] p-8 max-w-md w-full rounded-3xl shadow-2xl space-y-6 relative z-10 text-left">
+          {/* Brand Logo & Header */}
+          <div className="flex items-center gap-3.5 border-b border-white/[0.08] pb-5">
+            <img
+              src="https://iili.io/CDj46zl.png"
+              alt="Northveil Logo"
+              className="h-10 w-auto object-contain"
+            />
+            <div>
+              <h1 className="text-lg font-bold text-white tracking-tight">Super Admin Portal</h1>
+              <span className="text-xs text-emerald-400 font-medium flex items-center gap-1.5 pt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Northveil Protocol Governance
+              </span>
             </div>
           </div>
 
           <form onSubmit={handleAuthenticate} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-xs font-black text-slate-300 uppercase flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-[#00f0ff]" />
-                <span>ENTER ADMIN PASSKEY:</span>
+            {/* Username Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-400 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Admin Username (Fortune / Northveil)</span>
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  setError(false);
+                }}
+                placeholder="Enter admin username..."
+                autoFocus
+                className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-white/30 transition-colors"
+              />
+            </div>
+
+            {/* Password Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-400 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Passkey / Password</span>
               </label>
               <input
                 type="password"
-                value={passcode}
+                value={password}
                 onChange={(e) => {
-                  setPasscode(e.target.value);
+                  setPassword(e.target.value);
                   setError(false);
                 }}
-                placeholder="ENTER ADMIN PASSCODE..."
-                autoFocus
-                className="w-full bg-[#0a0a0c] border-2 border-white p-3 text-sm font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:border-[#ccff00]"
+                placeholder="Enter password..."
+                className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-white/30 transition-colors"
               />
-              {error && (
-                <p className="text-xs text-[#ff007f] font-black uppercase flex items-center gap-1">
-                  ⚠️ INVALID PASSKEY. ACCESS DENIED.
-                </p>
-              )}
             </div>
+
+            {error && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
+                Invalid credentials. Please verify your admin username and password.
+              </div>
+            )}
 
             <button
               type="submit"
-              className="w-full py-3 bg-[#ccff00] text-black font-mono font-black text-xs uppercase border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:bg-[#d8ff33] cursor-pointer transition-all"
+              className="w-full py-3 bg-white text-black font-semibold text-xs rounded-xl hover:bg-zinc-200 cursor-pointer transition-colors shadow-sm"
             >
-              UNLOCK ADMIN PORTAL 🔑
+              Authenticate &amp; Unlock Portal
             </button>
           </form>
 
-          <div className="pt-4 border-t-2 border-white/20 text-center">
+          <div className="pt-4 border-t border-white/[0.08] text-center">
             <a
               href="/"
-              className="text-xs font-bold text-[#00f0ff] hover:underline flex items-center justify-center gap-1"
+              className="text-xs text-zinc-400 hover:text-white transition-colors inline-flex items-center gap-1.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>RETURN TO MAIN WEB WALLET</span>
+              <span>Return to Web3 Wallet</span>
             </a>
           </div>
         </div>
@@ -89,30 +121,42 @@ export const AdminApp: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] brutal-grid-bg text-slate-100 font-mono">
+    <div className="min-h-screen bg-[#070709] text-zinc-100 font-sans selection:bg-white/20">
       {/* Admin Standalone Top Navigation Header */}
-      <header className="w-full h-16 sm:h-20 px-4 sm:px-8 border-b-3 border-white bg-[#10131c] flex items-center justify-between gap-4 z-30 relative">
-        <div className="flex items-center gap-3">
-          <a href="/" className="p-2 bg-[#181c28] border-2 border-white text-white hover:bg-white/10" title="Back to App">
-            <ArrowLeft className="w-4 h-4 stroke-[3]" />
+      <header className="w-full h-16 sm:h-20 px-4 sm:px-8 border-b border-white/[0.08] bg-[#0f0f12]/80 backdrop-blur-xl flex items-center justify-between gap-4 sticky top-0 z-30">
+        <div className="flex items-center gap-3.5">
+          <a
+            href="/"
+            className="p-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-all"
+            title="Back to Web3 Wallet"
+          >
+            <ArrowLeft className="w-4 h-4" />
           </a>
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-6 h-6 text-[#ff007f] stroke-[3]" />
-            <h1 className="text-base sm:text-xl font-black text-white uppercase tracking-tight font-mono">
-              NORTHVEIL SUPER ADMIN PORTAL
-            </h1>
-            <span className="px-2 py-0.5 bg-[#ccff00] text-black text-[9px] font-black uppercase border border-black hidden xs:inline-block">
-              SEPARATE ROOT ENTRY (/admin.html)
-            </span>
+          <div className="flex items-center gap-3">
+            <img
+              src="https://iili.io/CDj46zl.png"
+              alt="Northveil Logo"
+              className="h-8 w-auto object-contain"
+            />
+            <div>
+              <h1 className="text-base font-bold text-white tracking-tight">
+                Northveil Super Admin Portal
+              </h1>
+              <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                Live Production Governance
+              </span>
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={handleLogout}
-            className="px-3.5 py-1.5 bg-[#ff007f] text-white font-mono font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:bg-[#ff3399] cursor-pointer"
+            className="px-3.5 py-2 bg-white/[0.06] hover:bg-rose-500/10 border border-white/10 hover:border-rose-500/30 text-zinc-300 hover:text-rose-400 text-xs font-medium rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
           >
-            LOCK PORTAL
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Lock Portal</span>
           </button>
         </div>
       </header>
