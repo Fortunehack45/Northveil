@@ -212,34 +212,19 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
     const userId = MpcWalletService.getUserId();
 
     try {
-      let vaultResult: any = null;
       if (importType === 'seed' && parsedImportWords.length >= 12) {
         const mnemonic = parsedImportWords.join(' ');
-        vaultResult = await MpcWalletService.importMpcVault('seed', mnemonic, chosenName, userId).catch((e) => {
+        MpcWalletService.importMpcVault('seed', mnemonic, chosenName, userId).catch((e) => {
           console.warn('[Turnkey Enclave Import Notice]:', e.message);
-          return null;
         });
-        await setupVault(importPassword, parsedImportWords);
+        await setupVault(importPassword, parsedImportWords, chosenName);
         restoreWalletFromSeed(parsedImportWords, chosenName);
       } else if (importType === 'privateKey' && parsedImportKey) {
-        vaultResult = await MpcWalletService.importMpcVault('privateKey', parsedImportKey, chosenName, userId).catch((e) => {
+        MpcWalletService.importMpcVault('privateKey', parsedImportKey, chosenName, userId).catch((e) => {
           console.warn('[Turnkey Enclave Import Notice]:', e.message);
-          return null;
         });
-        await setupVault(importPassword, [parsedImportKey]);
+        await setupVault(importPassword, [parsedImportKey], chosenName);
         restoreWalletFromPrivateKey(parsedImportKey, chosenName);
-      }
-
-      if (vaultResult && vaultResult.address) {
-        setProcessingMsg('Securing Hardware Vault Session...');
-        const sessionToken = MpcWalletService.getSessionToken() || `sess_${Date.now()}`;
-        await setupMpcVault(
-          chosenName,
-          vaultResult.address,
-          vaultResult.mpcWalletId,
-          userId,
-          sessionToken
-        );
       }
 
       if (onClose) onClose();

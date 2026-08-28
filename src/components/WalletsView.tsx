@@ -27,6 +27,7 @@ export const WalletsView: React.FC = () => {
     activeSubWallet,
     setActiveWalletId,
     createSubWallet,
+    importSubWallet,
     renameSubWallet,
     deleteSubWallet,
     restoreWalletFromSeed,
@@ -176,10 +177,11 @@ export const WalletsView: React.FC = () => {
         MpcWalletService.importMpcVault('seed', words.join(' '), chosenName, userId).catch((e) => {
           console.warn('[Turnkey Enclave Import Notice]:', e.message);
         });
-        const success = restoreWalletFromSeed(words);
-        if (success) {
+        const newWallet = importSubWallet('seed', secret, chosenName);
+        if (newWallet) {
           setShowImportModal(false);
           setImportSecret('');
+          setImportName('');
         } else {
           setImportError('Failed to import seed phrase. Please check word order.');
         }
@@ -193,13 +195,11 @@ export const WalletsView: React.FC = () => {
         MpcWalletService.importMpcVault('privateKey', pKey, chosenName, userId).catch((e) => {
           console.warn('[Turnkey Enclave Import Notice]:', e.message);
         });
-        const success = restoreWalletFromPrivateKey(
-          pKey,
-          chosenName
-        );
-        if (success) {
+        const newWallet = importSubWallet('privateKey', pKey, chosenName);
+        if (newWallet) {
           setShowImportModal(false);
           setImportSecret('');
+          setImportName('');
         } else {
           setImportError('Invalid private key format.');
         }
