@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useWallet } from '../context/WalletContext';
+import { formatShortAddress, sanitizeToValidAddress } from '../services/addressUtils';
 import {
   Wallet,
   ArrowUpRight,
@@ -95,11 +96,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-  };
-
-  const formatShortAddress = (addr: string) => {
-    if (!addr) return '';
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
   return (
@@ -440,7 +436,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   {/* QR Code */}
                   <div className="mx-auto w-44 h-44 bg-white p-3 rounded-2xl border border-black/[0.08] dark:border-transparent shadow-sm flex items-center justify-center">
                     <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${activeSubWallet?.address}`}
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${sanitizeToValidAddress(activeSubWallet?.address)}`}
                       alt="Wallet QR Code"
                       className="w-full h-full object-contain"
                     />
@@ -449,7 +445,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   {/* Address Box */}
                   <div className="p-3 bg-black/[0.03] dark:bg-black border border-black/[0.06] dark:border-white/[0.08] rounded-2xl flex items-center justify-between gap-2">
                     <span className="font-mono text-xs text-zinc-800 dark:text-zinc-200 truncate">
-                      {activeSubWallet?.address}
+                      {sanitizeToValidAddress(activeSubWallet?.address)}
                     </span>
                     <button
                       onClick={handleCopyAddress}

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useWallet } from '../context/WalletContext';
 import { TokenSearchModal } from './TokenSearchModal';
 import { Send, QrCode, Copy, Check, ChevronDown } from 'lucide-react';
+import { sanitizeToValidAddress } from '../services/addressUtils';
 
 interface SendReceiveModalProps {
   mode: 'send' | 'receive';
@@ -32,12 +33,12 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
   const getActiveDisplayAddress = (): string => {
     const net = asset?.network || '';
     if (net === 'solana' || net === 'solana_devnet') {
-      return activeSubWallet?.solanaAddress || activeSubWallet?.address || '';
+      return activeSubWallet?.solanaAddress || sanitizeToValidAddress(activeSubWallet?.address, activeSubWallet?.accountIndex || 0);
     }
     if (net === 'bitcoin') {
-      return activeSubWallet?.bitcoinAddress || activeSubWallet?.address || '';
+      return activeSubWallet?.bitcoinAddress || sanitizeToValidAddress(activeSubWallet?.address, activeSubWallet?.accountIndex || 0);
     }
-    return activeSubWallet?.address || hardwareWallet.address || 'No address derived';
+    return sanitizeToValidAddress(activeSubWallet?.address || hardwareWallet.address, activeSubWallet?.accountIndex || 0);
   };
 
   const handleCopyAddress = () => {

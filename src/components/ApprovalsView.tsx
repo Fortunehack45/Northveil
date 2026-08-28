@@ -19,6 +19,7 @@ import { McpApprovalRecord } from '../types';
 import { SupabaseService } from '../services/SupabaseService';
 import { MpcWalletService } from '../services/MpcWalletService';
 import { WebAuthnService } from '../services/WebAuthnService';
+import { formatShortAddress } from '../services/addressUtils';
 
 export const ApprovalsView: React.FC = () => {
   const { activeSubWallet } = useWallet();
@@ -177,11 +178,6 @@ export const ApprovalsView: React.FC = () => {
     }
     return true;
   });
-
-  const formatShortAddress = (addr: string) => {
-    if (!addr) return '';
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-  };
 
   return (
     <div className="space-y-6 sm:space-y-8 mono-animate-in">

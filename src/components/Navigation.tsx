@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useWallet } from '../context/WalletContext';
 import { BlockiesAvatar } from './BlockiesAvatar';
+import { formatShortAddress } from '../services/addressUtils';
 import {
   LayoutGrid,
   Wallet,
@@ -222,7 +223,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                   {activeSubWallet.name}
                 </span>
                 <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono block truncate">
-                  {activeSubWallet.address.slice(0, 6)}...{activeSubWallet.address.slice(-4)}
+                  {formatShortAddress(activeSubWallet.address, activeSubWallet.accountIndex || 0)}
                 </span>
               </div>
             </div>

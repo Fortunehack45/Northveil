@@ -21,6 +21,7 @@ import {
 import { SmartContractRecord } from '../types';
 import { supabase } from '../services/SupabaseService';
 import { WebAuthnService } from '../services/WebAuthnService';
+import { formatShortAddress, sanitizeToValidAddress } from '../services/addressUtils';
 
 export const ProfileView: React.FC = () => {
   const {
@@ -154,11 +155,6 @@ export const ProfileView: React.FC = () => {
       }
       setSocialModalProvider(null);
     }
-  };
-
-  const formatShortAddress = (addr: string) => {
-    if (!addr) return '';
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
   return (

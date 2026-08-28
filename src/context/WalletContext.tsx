@@ -38,6 +38,7 @@ import { VaultService } from '../services/VaultService';
 import { SupabaseService } from '../services/SupabaseService';
 import { WebAuthnService } from '../services/WebAuthnService';
 import { MpcWalletService } from '../services/MpcWalletService';
+import { sanitizeToValidAddress } from '../services/addressUtils';
 import { ethers } from 'ethers';
 import { Fingerprint, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 
@@ -246,7 +247,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.address) {
-          return parsed.map((w) => {
+          return parsed.map((w, idx) => {
             const { privateKey, ...safeWallet } = w;
             const cleanName =
               !safeWallet.name ||
@@ -255,7 +256,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               safeWallet.name === 'Main Trading Vault'
                 ? 'Primary Vault'
                 : safeWallet.name;
-            return { ...safeWallet, name: cleanName, address: (safeWallet.address || '').toLowerCase() };
+            const cleanAddress = sanitizeToValidAddress(safeWallet.address, safeWallet.accountIndex ?? idx);
+            return { ...safeWallet, name: cleanName, address: cleanAddress };
           });
         }
       } catch {}
@@ -271,7 +273,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               id: 'acc-0',
               name: parsed.walletName || 'Primary Vault',
               accountIndex: 0,
-              address: parsed.walletAddress.toLowerCase(),
+              address: sanitizeToValidAddress(parsed.walletAddress, 0),
               derivationPath: 'turnkey://tee-nitro-enclave',
               colorTag: '#ffffff',
               isDefault: true,
@@ -288,13 +290,13 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       try {
         const parsed = JSON.parse(passkeysMap);
         const addresses = Object.keys(parsed);
-        if (addresses.length > 0 && addresses[0].startsWith('0x')) {
+        if (addresses.length > 0) {
           return [
             {
               id: 'acc-0',
               name: 'Primary Vault',
               accountIndex: 0,
-              address: addresses[0].toLowerCase(),
+              address: sanitizeToValidAddress(addresses[0], 0),
               derivationPath: 'turnkey://tee-nitro-enclave',
               colorTag: '#ffffff',
               isDefault: true,

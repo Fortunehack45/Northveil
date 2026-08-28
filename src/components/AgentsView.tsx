@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { AgentConnection } from '../types';
 import { CustomSelect } from './CustomSelect';
+import { formatShortAddress, sanitizeToValidAddress } from '../services/addressUtils';
 
 export const AgentsView: React.FC = () => {
   const {
@@ -247,11 +248,6 @@ export const AgentsView: React.FC = () => {
   const handleOpenDetails = (agent: AgentConnection) => {
     setSelectedAgent(agent);
     setShowDetailsModal(true);
-  };
-
-  const formatShortAddress = (addr: string) => {
-    if (!addr) return '';
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
   const calculateRemainingTime = (expiresAt: string | null) => {

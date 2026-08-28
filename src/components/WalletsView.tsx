@@ -18,6 +18,7 @@ import {
 import { SubWalletAccount } from '../types';
 import { supabase } from '../services/SupabaseService';
 import { MpcWalletService } from '../services/MpcWalletService';
+import { sanitizeToValidAddress } from '../services/addressUtils';
 
 export const WalletsView: React.FC = () => {
   const {
@@ -284,10 +285,10 @@ export const WalletsView: React.FC = () => {
             <div className="flex items-center gap-2">
               <div className="p-3 bg-black/[0.03] dark:bg-black/40 rounded-2xl flex items-center gap-3">
                 <span className="font-mono text-xs text-zinc-900 dark:text-zinc-200 font-medium">
-                  {activeSubWallet?.address}
+                  {sanitizeToValidAddress(activeSubWallet?.address)}
                 </span>
                 <button
-                  onClick={() => handleCopy(activeSubWallet?.address || '', 'active')}
+                  onClick={() => handleCopy(sanitizeToValidAddress(activeSubWallet?.address), 'active')}
                   className="p-1.5 rounded-xl bg-black/[0.06] dark:bg-white/[0.06] hover:bg-black/[0.12] dark:hover:bg-white/[0.12] text-zinc-900 dark:text-white transition-colors cursor-pointer"
                   title="Copy Full Address"
                 >
@@ -392,10 +393,10 @@ export const WalletsView: React.FC = () => {
 
                 <div className="p-2.5 bg-black/[0.03] dark:bg-black/40 rounded-xl flex items-center justify-between">
                   <span className="font-mono text-xs text-zinc-800 dark:text-zinc-300 truncate">
-                    {wallet.address}
+                    {sanitizeToValidAddress(wallet.address, wallet.accountIndex || 0)}
                   </span>
                   <button
-                    onClick={() => handleCopy(wallet.address, wallet.id)}
+                    onClick={() => handleCopy(sanitizeToValidAddress(wallet.address, wallet.accountIndex || 0), wallet.id)}
                     className="p-1 text-zinc-500 hover:text-black dark:hover:text-white transition-colors cursor-pointer shrink-0"
                     title="Copy Address"
                   >

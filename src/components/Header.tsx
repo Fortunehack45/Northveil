@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useWallet } from '../context/WalletContext';
+import { formatShortAddress } from '../services/addressUtils';
 import { TabType } from './Navigation';
 import { SUPPORTED_CHAINS } from '../data/initialData';
 import {
@@ -143,7 +144,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onToggleMobileNav }) 
               {activeSubWallet?.name || 'Primary Vault'}
             </span>
             <span className="text-[11px] text-zinc-700 dark:text-zinc-300 font-mono">
-              {activeSubWallet?.address ? `${activeSubWallet.address.slice(0, 6)}...${activeSubWallet.address.slice(-4)}` : '0x56f0...5417'}
+              {formatShortAddress(activeSubWallet?.address)}
             </span>
             <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
           </button>
@@ -165,8 +166,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onToggleMobileNav }) 
                 {(subWallets || []).map((w) => {
                   if (!w) return null;
                   const isActive = w.id === activeWalletId;
-                  const addrStr = w.address || '';
-                  const shortAddr = addrStr.length > 10 ? `${addrStr.slice(0, 6)}...${addrStr.slice(-4)}` : addrStr;
+                  const shortAddr = formatShortAddress(w.address, w.accountIndex || 0);
 
                   return (
                     <div
