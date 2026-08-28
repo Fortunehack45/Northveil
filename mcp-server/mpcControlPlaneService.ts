@@ -387,16 +387,20 @@ export async function createMpcWallet(
     const turnkey = getTurnkeyClient();
     try {
       const result: any = await (turnkey as any).createWallet({
+        type: 'ACTIVITY_TYPE_CREATE_WALLET',
+        timestampMs: Date.now().toString(),
         organizationId: TURNKEY_ORGANIZATION_ID,
-        walletName: `${walletName} - ${userId}`,
-        accounts: [
-          {
-            curve: 'CURVE_SECP256K1',
-            pathFormat: 'PATH_FORMAT_BIP32',
-            path: "m/44'/60'/0'/0/0",
-            addressFormat: 'ADDRESS_FORMAT_ETHEREUM',
-          },
-        ],
+        parameters: {
+          walletName: `${walletName} - ${userId}`,
+          accounts: [
+            {
+              curve: 'CURVE_SECP256K1',
+              pathFormat: 'PATH_FORMAT_BIP32',
+              path: "m/44'/60'/0'/0/0",
+              addressFormat: 'ADDRESS_FORMAT_ETHEREUM',
+            },
+          ],
+        },
       });
 
       const mpcWalletId = result.walletId || result.activity?.result?.createWalletResult?.walletId;
@@ -1422,8 +1426,27 @@ export async function approveAndExecuteWithPasskey(
     } catch (e) {}
 
     let rawVal = '0';
-    if (unsigned.value) {
-      rawVal = typeof unsigned.value === 'bigint' ? unsigned.value.toString() : String(unsigned.value);
+    if (unsigned.value !== undefined && unsigned.value !== null && unsigned.value !== '') {
+      const valStr = String(unsigned.value).trim();
+      if (valStr.startsWith('0x')) {
+        try {
+          rawVal = BigInt(valStr).toString();
+        } catch (e) {
+          rawVal = '0';
+        }
+      } else if (valStr.includes('.')) {
+        try {
+          rawVal = ethers.parseEther(valStr).toString();
+        } catch (e) {
+          rawVal = req.amount > 0 ? ethers.parseEther(String(req.amount)).toString() : '0';
+        }
+      } else {
+        try {
+          rawVal = BigInt(valStr).toString();
+        } catch (e) {
+          rawVal = '0';
+        }
+      }
     } else if (req.amount > 0) {
       try {
         rawVal = ethers.parseEther(String(req.amount)).toString();
@@ -1432,17 +1455,30 @@ export async function approveAndExecuteWithPasskey(
       }
     }
 
-    const txToSign = {
-      to: unsigned.to || req.recipient,
+    let targetTo = (unsigned.to || req.recipient || '').trim();
+    const isDeploy = req.asset === 'DEPLOY' || unsigned.isDeploy || (!targetTo || targetTo === ethers.ZeroAddress || targetTo === '0x0000000000000000000000000000000000000000');
+    let toAddress: string | undefined = undefined;
+    if (!isDeploy && targetTo.startsWith('0x') && targetTo.length === 42 && targetTo !== ethers.ZeroAddress) {
+      try {
+        toAddress = ethers.getAddress(targetTo.toLowerCase());
+      } catch (e) {
+        toAddress = targetTo;
+      }
+    }
+
+    const txToSign: any = {
       value: rawVal,
       data: unsigned.data || '0x',
       nonce,
-      gasLimit: unsigned.gasLimit || 250000,
+      gasLimit: isDeploy ? 3000000 : (unsigned.gasLimit || 250000),
       maxFeePerGas,
       maxPriorityFeePerGas,
       chainId: req.chainId || getChainIdForNetwork(req.network) || 11155111,
       type: 2,
     };
+    if (toAddress) {
+      txToSign.to = toAddress;
+    }
 
     const unsignedSerialized = ethers.Transaction.from(txToSign).unsignedSerialized;
 
@@ -1451,7 +1487,7 @@ export async function approveAndExecuteWithPasskey(
       timestampMs: Date.now().toString(),
       organizationId: turnkeyOrgId,
       parameters: {
-        signWith: req.walletAddress,
+        signWith: ethers.getAddress(req.walletAddress),
         unsignedTransaction: unsignedSerialized,
         type: 'TRANSACTION_TYPE_ETHEREUM',
       },
@@ -1628,8 +1664,27 @@ export async function executeAutonomousTransaction(
     } catch (e) {}
 
     let rawVal = '0';
-    if (unsignedPayload.value) {
-      rawVal = typeof unsignedPayload.value === 'bigint' ? unsignedPayload.value.toString() : String(unsignedPayload.value);
+    if (unsignedPayload.value !== undefined && unsignedPayload.value !== null && unsignedPayload.value !== '') {
+      const valStr = String(unsignedPayload.value).trim();
+      if (valStr.startsWith('0x')) {
+        try {
+          rawVal = BigInt(valStr).toString();
+        } catch (e) {
+          rawVal = '0';
+        }
+      } else if (valStr.includes('.')) {
+        try {
+          rawVal = ethers.parseEther(valStr).toString();
+        } catch (e) {
+          rawVal = amount > 0 ? ethers.parseEther(String(amount)).toString() : '0';
+        }
+      } else {
+        try {
+          rawVal = BigInt(valStr).toString();
+        } catch (e) {
+          rawVal = '0';
+        }
+      }
     } else if (amount > 0) {
       try {
         rawVal = ethers.parseEther(String(amount)).toString();
@@ -1638,17 +1693,30 @@ export async function executeAutonomousTransaction(
       }
     }
 
-    const txToSign = {
-      to: unsignedPayload.to || recipient,
+    let targetTo = (unsignedPayload.to || recipient || '').trim();
+    const isDeploy = asset === 'DEPLOY' || unsignedPayload.isDeploy || (!targetTo || targetTo === ethers.ZeroAddress || targetTo === '0x0000000000000000000000000000000000000000');
+    let toAddress: string | undefined = undefined;
+    if (!isDeploy && targetTo.startsWith('0x') && targetTo.length === 42 && targetTo !== ethers.ZeroAddress) {
+      try {
+        toAddress = ethers.getAddress(targetTo.toLowerCase());
+      } catch (e) {
+        toAddress = targetTo;
+      }
+    }
+
+    const txToSign: any = {
       value: rawVal,
       data: unsignedPayload.data || '0x',
       nonce,
-      gasLimit: unsignedPayload.gasLimit || 250000,
+      gasLimit: isDeploy ? 3000000 : (unsignedPayload.gasLimit || 250000),
       maxFeePerGas,
       maxPriorityFeePerGas,
       chainId: unsignedPayload.chainId || getChainIdForNetwork(network) || 11155111,
       type: 2,
     };
+    if (toAddress) {
+      txToSign.to = toAddress;
+    }
 
     const unsignedSerialized = ethers.Transaction.from(txToSign).unsignedSerialized;
 
@@ -1657,7 +1725,7 @@ export async function executeAutonomousTransaction(
       timestampMs: Date.now().toString(),
       organizationId: turnkeyOrgId,
       parameters: {
-        signWith: normAddr,
+        signWith: ethers.getAddress(normAddr),
         unsignedTransaction: unsignedSerialized,
         type: 'TRANSACTION_TYPE_ETHEREUM',
       },
