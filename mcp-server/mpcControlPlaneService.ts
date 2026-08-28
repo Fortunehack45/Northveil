@@ -582,19 +582,20 @@ export async function importMpcWalletOrKey(
   userId: string;
   status: string;
 }> {
-  const turnkeyOrgId = TURNKEY_ORGANIZATION_ID;
+  const turnkeyOrgId = TURNKEY_ORGANIZATION_ID || '';
   const hasLiveTurnkey = !!(TURNKEY_API_PUBLIC_KEY && TURNKEY_API_PRIVATE_KEY && TURNKEY_ORGANIZATION_ID);
 
   if (hasLiveTurnkey) {
     const turnkey = getTurnkeyClient();
     try {
-      let effectiveUserId = userId;
+      const safeOrgId = turnkeyOrgId;
+      let effectiveUserId = userId || 'default_user';
       try {
-        const whoami = await turnkey.getWhoami({ organizationId: turnkeyOrgId });
+        const whoami = await turnkey.getWhoami({ organizationId: safeOrgId });
         if (whoami?.userId) effectiveUserId = whoami.userId;
       } catch (e) {
         if (!effectiveUserId || effectiveUserId === 'default_user') {
-          const users = await turnkey.getUsers({ organizationId: turnkeyOrgId });
+          const users = await turnkey.getUsers({ organizationId: safeOrgId });
           effectiveUserId = users.users?.[0]?.userId || effectiveUserId;
         }
       }
@@ -604,7 +605,7 @@ export async function importMpcWalletOrKey(
         const initRes = await turnkey.initImportPrivateKey({
           type: 'ACTIVITY_TYPE_INIT_IMPORT_PRIVATE_KEY',
           timestampMs: Date.now().toString(),
-          organizationId: turnkeyOrgId,
+          organizationId: safeOrgId,
           parameters: { userId: effectiveUserId },
         });
 
@@ -616,13 +617,13 @@ export async function importMpcWalletOrKey(
           keyFormat: 'HEXADECIMAL',
           importBundle,
           userId: effectiveUserId,
-          organizationId: turnkeyOrgId,
+          organizationId: safeOrgId,
         });
 
         const importRes = await turnkey.importPrivateKey({
           type: 'ACTIVITY_TYPE_IMPORT_PRIVATE_KEY',
           timestampMs: Date.now().toString(),
-          organizationId: turnkeyOrgId,
+          organizationId: safeOrgId,
           parameters: {
             userId: effectiveUserId,
             privateKeyName: `${walletName} (${Date.now()})`,
@@ -647,7 +648,7 @@ export async function importMpcWalletOrKey(
           name: walletName,
           mpc_provider: 'turnkey',
           mpc_wallet_id: privateKeyId,
-          mpc_sub_org_id: TURNKEY_ORGANIZATION_ID,
+          mpc_sub_org_id: TURNKEY_ORGANIZATION_ID || safeOrgId,
           key_type: 'ecdsa_secp256k1',
           wallet_status: 'active',
           created_at: new Date().toISOString(),
@@ -685,7 +686,7 @@ export async function importMpcWalletOrKey(
         const initRes = await turnkey.initImportWallet({
           type: 'ACTIVITY_TYPE_INIT_IMPORT_WALLET',
           timestampMs: Date.now().toString(),
-          organizationId: turnkeyOrgId,
+          organizationId: safeOrgId,
           parameters: { userId: effectiveUserId },
         });
 
@@ -696,13 +697,13 @@ export async function importMpcWalletOrKey(
           mnemonic,
           importBundle,
           userId: effectiveUserId,
-          organizationId: turnkeyOrgId,
+          organizationId: safeOrgId,
         });
 
         const importRes = await turnkey.importWallet({
           type: 'ACTIVITY_TYPE_IMPORT_WALLET',
           timestampMs: Date.now().toString(),
-          organizationId: turnkeyOrgId,
+          organizationId: safeOrgId,
           parameters: {
             userId: effectiveUserId,
             walletName: `${walletName} (${Date.now()})`,
@@ -733,7 +734,7 @@ export async function importMpcWalletOrKey(
           name: walletName,
           mpc_provider: 'turnkey',
           mpc_wallet_id: walletId,
-          mpc_sub_org_id: TURNKEY_ORGANIZATION_ID,
+          mpc_sub_org_id: TURNKEY_ORGANIZATION_ID || safeOrgId,
           key_type: 'ecdsa_secp256k1',
           wallet_status: 'active',
           created_at: new Date().toISOString(),
@@ -1221,7 +1222,7 @@ export async function generatePasskeyAuthenticationOptionsHandler(
   let allowCredentials: any[] = [];
   const normAddr = (walletAddress || '').toLowerCase();
 
-  // STRICT 1-TO-1: Only return credentials explicitly bound to this specific wallet address
+  // 1. In-memory cache lookup
   if (normAddr) {
     for (const cred of inMemoryPasskeyCredentials.values()) {
       if (cred.walletAddress && cred.walletAddress.toLowerCase() === normAddr) {
@@ -1231,26 +1232,9 @@ export async function generatePasskeyAuthenticationOptionsHandler(
         });
       }
     }
-
-    if (allowCredentials.length === 0) {
-      try {
-        if (supabase && typeof supabase.from === 'function') {
-          const { data } = await supabase
-            .from('passkey_credentials')
-            .select('credential_id, transports')
-            .ilike('wallet_address', normAddr);
-          if (data && Array.isArray(data)) {
-            allowCredentials = data.map(d => ({
-              id: d.credential_id,
-              transports: d.transports || ['internal', 'hybrid'],
-            }));
-          }
-        }
-      } catch (e) {}
-    }
   } else {
     for (const cred of inMemoryPasskeyCredentials.values()) {
-      if (cred.userId === userId) {
+      if (cred.userId === userId || !userId || userId === 'default_user') {
         allowCredentials.push({
           id: cred.credentialId,
           transports: cred.transports || ['internal', 'hybrid'],
@@ -1259,10 +1243,50 @@ export async function generatePasskeyAuthenticationOptionsHandler(
     }
   }
 
+  // 2. Supabase persistent store lookup
+  try {
+    if (supabase && typeof supabase.from === 'function') {
+      let query = supabase.from('passkey_credentials').select('credential_id, transports');
+      if (normAddr) {
+        query = query.ilike('wallet_address', normAddr);
+      }
+      const { data } = await query;
+      if (data && Array.isArray(data)) {
+        for (const d of data) {
+          if (!allowCredentials.some(c => c.id === d.credential_id)) {
+            allowCredentials.push({
+              id: d.credential_id,
+              transports: d.transports || ['internal', 'hybrid'],
+            });
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
+  // 3. Turnkey authenticators lookup
+  try {
+    const turnkey = getTurnkeyClient();
+    const safeOrg = TURNKEY_ORGANIZATION_ID || '';
+    if (safeOrg) {
+      const usersRes = await turnkey.getUsers({ organizationId: safeOrg });
+      for (const u of usersRes?.users || []) {
+        for (const auth of u.authenticators || []) {
+          if (auth.credentialId && !allowCredentials.some(c => c.id === auth.credentialId)) {
+            allowCredentials.push({
+              id: auth.credentialId,
+              transports: ['internal', 'hybrid'],
+            });
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
   const options = await generateAuthenticationOptions({
     rpID: WEBAUTHN_RP_ID,
     allowCredentials: allowCredentials.length > 0 ? allowCredentials : undefined,
-    userVerification: 'required',
+    userVerification: 'preferred',
   });
 
   if (normAddr) {
@@ -1270,14 +1294,14 @@ export async function generatePasskeyAuthenticationOptionsHandler(
       challenge: options.challenge,
       userId,
       walletAddress: normAddr,
-      exp: Date.now() + 5 * 60 * 1000,
+      exp: Date.now() + 10 * 60 * 1000,
     });
   }
   inMemoryPasskeyChallenges.set(`auth_${userId}`, {
     challenge: options.challenge,
     userId,
     walletAddress: normAddr,
-    exp: Date.now() + 5 * 60 * 1000,
+    exp: Date.now() + 10 * 60 * 1000,
   });
 
   return options;
