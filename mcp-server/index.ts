@@ -1824,8 +1824,7 @@ const handleAuthorize = async (req: Request, res: Response) => {
         status.style.color = '#10B981';
         status.textContent = 'Authenticated! Redirecting to authorization...';
 
-        const sep = window.location.href.includes('?') ? '&' : '?';
-        window.location.href = window.location.href + sep + 'session_token=' + encodeURIComponent(verifyJson.sessionToken);
+        finishAuth(verifyJson.sessionToken);
       } catch (err) {
         status.style.color = '#EF4444';
         if (err.message && (err.message.includes('not allowed') || err.message.includes('timed out') || err.message.includes('passkey'))) {
@@ -1885,8 +1884,7 @@ const handleAuthorize = async (req: Request, res: Response) => {
         status.style.color = '#10B981';
         status.textContent = 'Passkey Registered! Redirecting to authorization...';
 
-        const sep = window.location.href.includes('?') ? '&' : '?';
-        window.location.href = window.location.href + sep + 'session_token=' + encodeURIComponent(verifyJson.sessionToken);
+        finishAuth(verifyJson.sessionToken);
       } catch (err) {
         status.style.color = '#EF4444';
         status.textContent = err.message || 'Passkey registration failed';
@@ -1906,11 +1904,22 @@ const handleAuthorize = async (req: Request, res: Response) => {
         const json = await res.json();
         if (!json.success || !json.sessionToken) throw new Error(json.error || 'Quick authorization failed');
 
-        const sep = window.location.href.includes('?') ? '&' : '?';
-        window.location.href = window.location.href + sep + 'session_token=' + encodeURIComponent(json.sessionToken);
+        finishAuth(json.sessionToken);
       } catch (err) {
         status.style.color = '#EF4444';
         status.textContent = err.message || 'Authorization failed';
+      }
+    }
+
+    function finishAuth(sessionToken) {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('session_token', sessionToken);
+        url.searchParams.set('confirmed', 'true');
+        window.location.replace(url.toString());
+      } catch (e) {
+        const sep = window.location.href.includes('?') ? '&' : '?';
+        window.location.href = window.location.href + sep + 'session_token=' + encodeURIComponent(sessionToken) + '&confirmed=true';
       }
     }
   </script>
