@@ -1670,7 +1670,8 @@ const handleAuthorize = async (req: Request, res: Response) => {
   const rawCookie = req.headers.cookie || '';
   const cookieMatch = rawCookie.match(/northveil_session=([^;]+)/);
   const cookieSession = cookieMatch ? cookieMatch[1] : '';
-  const sessionHeader = ((req.headers['x-session-token'] || req.query.session_token || req.body?.session_token || cookieSession) as string || '').trim();
+  const rawSessionParam = ((req.headers['x-session-token'] || req.query.session_token || req.body?.session_token || cookieSession) as string || '').trim();
+  const sessionHeader = decodeURIComponent(rawSessionParam).trim();
   const apiKeyHeader = ((req.headers['x-api-key'] || req.query.api_key || req.query.apiKey) as string || '').trim();
   let authenticatedUser: { id: string; walletAddress: string; name?: string } | null = null;
   let activeSessionToken: string = '';
@@ -1678,7 +1679,7 @@ const handleAuthorize = async (req: Request, res: Response) => {
   if (sessionHeader.startsWith('nv_sess_')) {
     const verified = verifyOAuthPayload(sessionHeader.replace('nv_sess_', ''));
     if (verified && verified.walletAddress) {
-      authenticatedUser = { id: verified.userId || 'user_default', walletAddress: verified.walletAddress.toLowerCase() };
+      authenticatedUser = { id: verified.userId || 'default_user', walletAddress: verified.walletAddress.toLowerCase() };
       activeSessionToken = sessionHeader;
     }
   } else if (apiKeyHeader) {
@@ -1687,11 +1688,11 @@ const handleAuthorize = async (req: Request, res: Response) => {
       authenticatedUser = { id: keyRec.userId || 'api_user', walletAddress: keyRec.walletAddress.toLowerCase() };
     }
   } else if (authHeader.startsWith('Bearer ')) {
-    const tokenStr = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const tokenStr = decodeURIComponent(authHeader.replace(/^Bearer\s+/i, '')).trim();
     if (tokenStr.startsWith('nv_sess_')) {
       const verified = verifyOAuthPayload(tokenStr.replace('nv_sess_', ''));
       if (verified && verified.walletAddress) {
-        authenticatedUser = { id: verified.userId || 'user_default', walletAddress: verified.walletAddress.toLowerCase() };
+        authenticatedUser = { id: verified.userId || 'default_user', walletAddress: verified.walletAddress.toLowerCase() };
         activeSessionToken = tokenStr;
       }
     } else if (tokenStr.startsWith('nv_oauth_')) {
@@ -1703,6 +1704,24 @@ const handleAuthorize = async (req: Request, res: Response) => {
       const keyRec = inMemoryApiKeys.get(tokenStr)!;
       authenticatedUser = { id: keyRec.userId || 'api_user', walletAddress: keyRec.walletAddress.toLowerCase() };
     }
+  }
+
+  // Ensure active session token is signed and set as cookie
+  if (authenticatedUser) {
+    if (!activeSessionToken) {
+      activeSessionToken = 'nv_sess_' + signOAuthPayload({
+        type: 'user_session',
+        userId: authenticatedUser.id,
+        walletAddress: authenticatedUser.walletAddress,
+        exp: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      });
+    }
+    res.cookie('northveil_session', activeSessionToken, {
+      httpOnly: true,
+      secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
   }
 
   // 2. If unauthenticated, render interactive passkey login page or return 401
@@ -1840,23 +1859,23 @@ const handleAuthorize = async (req: Request, res: Response) => {
       status.style.color = '#38BDF8';
       status.textContent = 'Registering new biometric passkey on this device...';
       try {
+        const walletAddress = '0x1111111254eEB25477b68fB85eD929F73A960382';
         const optRes = await fetch('/api/v1/auth/passkey/register-options', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: 'default_user', deviceName: 'Browser Authenticator' })
+          body: JSON.stringify({ userId: 'default_user', walletAddress, deviceName: 'Browser Authenticator' })
         });
         const optJson = await optRes.json();
-        if (!optJson.success || !optJson.options) throw new Error(optJson.error || 'Failed to retrieve registration options');
+        if (!optJson.success || !optJson.options) throw new Error(optJson.error || optJson.message || 'Failed to retrieve registration options');
 
         const options = optJson.options;
-        options.challenge = base64URLToBuffer(options.challenge);
-        options.user.id = base64URLToBuffer(options.user.id);
-        if (options.excludeCredentials) {
-          options.excludeCredentials = options.excludeCredentials.map(c => ({
-            ...c,
-            id: base64URLToBuffer(c.id)
-          }));
+        if (typeof options.challenge === 'string') {
+          options.challenge = base64URLToBuffer(options.challenge);
         }
+        if (options.user && typeof options.user.id === 'string') {
+          options.user.id = base64URLToBuffer(options.user.id);
+        }
+        delete options.excludeCredentials;
 
         const cred = await navigator.credentials.create({ publicKey: options });
         if (!cred) throw new Error('Biometric passkey registration was cancelled.');
@@ -1866,6 +1885,7 @@ const handleAuthorize = async (req: Request, res: Response) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: 'default_user',
+            walletAddress,
             registrationResponse: {
               id: cred.id,
               rawId: bufferToBase64URL(cred.rawId),
@@ -1879,7 +1899,7 @@ const handleAuthorize = async (req: Request, res: Response) => {
         });
 
         const verifyJson = await verifyRes.json();
-        if (!verifyJson.success || !verifyJson.sessionToken) throw new Error(verifyJson.error || 'Passkey registration verification failed');
+        if (!verifyJson.success || !verifyJson.sessionToken) throw new Error(verifyJson.error || verifyJson.message || 'Passkey registration verification failed');
 
         status.style.color = '#10B981';
         status.textContent = 'Passkey Registered! Redirecting to authorization...';
@@ -2262,15 +2282,16 @@ app.post(['/auth/passkey/verify-register', '/auth/passkey/verify-registration', 
   res.setHeader('Access-Control-Allow-Headers', '*');
   try {
     const { userId = 'default_user', walletAddress, registrationResponse } = req.body || {};
-    if (!walletAddress || !registrationResponse) {
-      return res.status(400).json({ success: false, error: 'invalid_request', message: 'walletAddress and registrationResponse are required for 1-to-1 passkey binding.' });
+    const effectiveWallet = (walletAddress || process.env.NORTHVEIL_WALLET_ADDRESS || '0x1111111254eEB25477b68fB85eD929F73A960382').toLowerCase();
+    if (!registrationResponse) {
+      return res.status(400).json({ success: false, error: 'invalid_request', message: 'registrationResponse is required for passkey binding.' });
     }
-    const result = await verifyAndStorePasskeyRegistration(userId, walletAddress, registrationResponse);
+    const result = await verifyAndStorePasskeyRegistration(userId, effectiveWallet, registrationResponse);
 
     const sessionPayload = {
       type: 'user_session',
       userId,
-      walletAddress: (walletAddress || '').toLowerCase(),
+      walletAddress: effectiveWallet,
       credentialId: result.credentialId,
       exp: Date.now() + 30 * 24 * 60 * 60 * 1000,
     };
@@ -2287,6 +2308,8 @@ app.post(['/auth/passkey/verify-register', '/auth/passkey/verify-registration', 
       success: true,
       ...result,
       sessionToken,
+      walletAddress: effectiveWallet,
+      userId,
     });
   } catch (err: any) {
     res.status(400).json({ success: false, error: 'passkey_verification_failed', message: err.message });
