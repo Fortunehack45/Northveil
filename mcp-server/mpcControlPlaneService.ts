@@ -1255,7 +1255,7 @@ export async function generatePasskeyAuthenticationOptionsHandler(
   try {
     const turnkey = getTurnkeyClient();
     const safeOrg = TURNKEY_ORGANIZATION_ID || '';
-    if (safeOrg) {
+    if (safeOrg && normAddr) {
       const usersRes = await turnkey.getUsers({ organizationId: safeOrg });
       for (const u of usersRes?.users || []) {
         for (const auth of u.authenticators || []) {
@@ -1270,9 +1270,13 @@ export async function generatePasskeyAuthenticationOptionsHandler(
     }
   } catch (e) {}
 
+  // For general / OAuth login (when walletAddress is not specified), omit allowCredentials
+  // so the browser can perform discoverable credential authentication with ANY passkey on the device.
+  const shouldFilterCredentials = !!normAddr && allowCredentials.length > 0;
+
   const options = await generateAuthenticationOptions({
     rpID: WEBAUTHN_RP_ID,
-    allowCredentials: allowCredentials.length > 0 ? allowCredentials : undefined,
+    allowCredentials: shouldFilterCredentials ? allowCredentials : undefined,
     userVerification: 'preferred',
   });
 
