@@ -13,7 +13,6 @@ import { OnboardingAuthModal } from './components/OnboardingAuthModal';
 import { AdminPanelView } from './components/AdminPanelView';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { InteractiveTourModal } from './components/InteractiveTourModal';
-import { CookieConsentModal } from './components/CookieConsentModal';
 import { Lock, Fingerprint } from 'lucide-react';
 
 const MainContent: React.FC = () => {
@@ -239,9 +238,6 @@ const MainContent: React.FC = () => {
         isOpen={isTourOpen}
         onClose={() => setIsTourOpen(false)}
       />
-
-      {/* Privacy & Cookie Preferences */}
-      <CookieConsentModal />
     </div>
   );
 };

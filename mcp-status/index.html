@@ -1,15 +1,107 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    
+    <!-- Primary Page Metadata & SEO -->
+    <title>Northveil MCP Gateway Status | Live Multi-Chain RPC Health, Agent Telemetry & Uptime Monitor</title>
+    <meta name="title" content="Northveil MCP Gateway Status | Live Multi-Chain RPC Health, Agent Telemetry & Uptime Monitor" />
+    <meta name="description" content="Official real-time system status and uptime monitor for Northveil Model Context Protocol (MCP) Server. Live latency diagnostics for Ethereum, Sepolia, Base, Polygon, and Solana RPCs, Supabase database connectivity, and autonomous AI agent execution telemetry." />
+    <meta name="keywords" content="Northveil status, MCP server status, crypto MCP gateway uptime, Model Context Protocol server health, multi-chain RPC latency, Ethereum Sepolia RPC status, Base mainnet RPC monitor, Solana RPC ping, crypto AI agent tool telemetry, Northveil server downtime, real-time blockchain API status" />
+    <meta name="author" content="Northveil Protocol" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="theme-color" content="#070709" />
+    <link rel="canonical" href="https://status.northveil.xyz/" />
+
+    <!-- Favicon & Icons -->
     <link rel="icon" type="image/png" href="https://iili.io/CDS9fvn.png" />
     <link rel="shortcut icon" href="https://iili.io/CDS9fvn.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Northveil MCP Server Status & Downtime Monitor</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
+    <link rel="apple-touch-icon" href="https://iili.io/CDj46zl.png" />
+
+    <!-- Open Graph / Facebook / LinkedIn -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://status.northveil.xyz/" />
+    <meta property="og:site_name" content="Northveil Protocol Status" />
+    <meta property="og:title" content="Northveil MCP Gateway Status | Live Multi-Chain RPC Health & Uptime" />
+    <meta property="og:description" content="Official live operational dashboard for Northveil MCP Server. Real-time RPC latency benchmarks, AI agent tool execution telemetry, and multi-chain node health." />
+    <meta property="og:image" content="https://iili.io/CDj46zl.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X Card Metadata -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@Northveil_xyz" />
+    <meta name="twitter:creator" content="@Northveil_xyz" />
+    <meta name="twitter:url" content="https://status.northveil.xyz/" />
+    <meta name="twitter:title" content="Northveil MCP Gateway Status | Live Multi-Chain RPC Health & Uptime" />
+    <meta name="twitter:description" content="Official live operational dashboard for Northveil MCP Server. Real-time RPC latency benchmarks, AI agent tool execution telemetry, and multi-chain node health." />
+    <meta name="twitter:image" content="https://iili.io/CDj46zl.png" />
+
+    <!-- Structured Data Graph (JSON-LD) for Search Engines -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://status.northveil.xyz/#website",
+          "url": "https://status.northveil.xyz/",
+          "name": "Northveil MCP Server Status",
+          "description": "Real-time uptime, health monitoring, and latency benchmarks for the Northveil Model Context Protocol Gateway and Multi-Chain RPC Relays.",
+          "publisher": {
+            "@id": "https://northveil.xyz/#organization"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://northveil.xyz/#organization",
+          "name": "Northveil",
+          "url": "https://northveil.xyz/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://iili.io/CDj46zl.png"
+          },
+          "sameAs": [
+            "https://x.com/Northveil_xyz",
+            "https://github.com/Fortunehack45/Northveil"
+          ]
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://status.northveil.xyz/#software",
+          "name": "Northveil MCP Server & Gateway",
+          "operatingSystem": "All",
+          "applicationCategory": "DeveloperApplication",
+          "description": "Model Context Protocol gateway for autonomous AI agents to execute multi-chain transactions, swaps, token deployments, and cryptographic key management.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          }
+        },
+        {
+          "@type": "Service",
+          "@id": "https://status.northveil.xyz/#service",
+          "name": "Northveil Multi-Chain RPC & MCP Health Monitoring",
+          "provider": {
+            "@id": "https://northveil.xyz/#organization"
+          },
+          "serviceType": "Cloud Infrastructure Status",
+          "areaServed": "Global",
+          "availableLanguage": "en"
+        }
+      ]
+    }
+    </script>
+
+    <!-- Web Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   </head>
-  <body class="bg-[#0a0a0c] text-white antialiased font-mono">
+  <body class="bg-[#070709] text-zinc-100 antialiased font-sans">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
