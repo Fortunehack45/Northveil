@@ -27,18 +27,31 @@ export const DeveloperHubView: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'mcp' | 'cli' | 'sdk' | 'webhooks' | 'playground'>('mcp');
   const [selectedMcpClient, setSelectedMcpClient] = useState<
-    'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http' | 'sse'
-  >('claude');
+    'claudeweb' | 'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http' | 'sse'
+  >('claudeweb');
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
   const isLocalhost =
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   const baseMcpUrl = isLocalhost ? 'http://localhost:3001' : 'https://mcp.northveil.xyz';
-  const currentAddress = activeSubWallet?.address || '0x0000000000000000000000000000000000000000';
+  const currentAddress = activeSubWallet?.address || '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
 
-  const getMcpSnippet = (client: 'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http' | 'sse') => {
+  const getMcpSnippet = (client: 'claudeweb' | 'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http' | 'sse') => {
     switch (client) {
+      case 'claudeweb':
+        return JSON.stringify(
+          {
+            connector_name: 'Northveil',
+            recommended_transport: 'Streamable HTTP',
+            streamable_http_url: `${baseMcpUrl}/mcp`,
+            alternative_sse_url: `${baseMcpUrl}/sse?wallet_address=${currentAddress}`,
+            icon_logo_url: 'https://iili.io/CDS9fvn.png',
+            status: 'Ready (60 Tools Active)',
+          },
+          null,
+          2
+        );
       case 'claude':
         return JSON.stringify(
           {
@@ -134,8 +147,10 @@ export const DeveloperHubView: React.FC = () => {
     }
   };
 
-  const getMcpConfigPath = (client: 'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http' | 'sse') => {
+  const getMcpConfigPath = (client: 'claudeweb' | 'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http' | 'sse') => {
     switch (client) {
+      case 'claudeweb':
+        return 'Claude.ai & Claude Mobile -> Settings -> Connectors -> Add custom connector';
       case 'claude':
         return 'macOS: ~/Library/Application Support/Claude/claude_desktop_config.json | Windows: %APPDATA%\\Claude\\claude_desktop_config.json | Linux: ~/.config/Claude/claude_desktop_config.json';
       case 'cursor':
@@ -785,6 +800,7 @@ export const DeveloperHubView: React.FC = () => {
               {/* Client Selector Buttons */}
               <div className="mono-segmented-container w-full flex flex-wrap bg-black/[0.04] dark:bg-black p-1 rounded-xl border border-black/[0.06] dark:border-white/[0.08]">
                 {[
+                  { id: 'claudeweb', label: 'Claude.ai Web' },
                   { id: 'claude', label: 'Claude Desktop' },
                   { id: 'cursor', label: 'Cursor IDE' },
                   { id: 'chatgpt', label: 'ChatGPT Actions' },
@@ -843,10 +859,18 @@ export const DeveloperHubView: React.FC = () => {
               {/* Step By Step Guide */}
               <div className="space-y-2 pt-1 text-xs text-zinc-600 dark:text-zinc-400">
                 <h4 className="font-bold text-zinc-900 dark:text-white">Step-by-Step Connection Guide:</h4>
+                {selectedMcpClient === 'claudeweb' && (
+                  <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed">
+                    <li>Open <strong>Claude.ai</strong> (or Claude Mobile App) &rarr; Go to <strong>Settings</strong> &rarr; <strong>Connectors</strong> &rarr; Click <strong>Add custom connector</strong>.</li>
+                    <li>Enter <strong>Name</strong>: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">Northveil</code>.</li>
+                    <li>Enter <strong>URL</strong>: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{baseMcpUrl}/mcp</code> (Streamable HTTP, recommended) or <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{baseMcpUrl}/sse?wallet_address={currentAddress}</code>.</li>
+                    <li>Click <strong>Add / Connect</strong>. Claude will immediately discover all 57 Northveil on-chain intelligence &amp; MPC tools.</li>
+                  </ol>
+                )}
                 {selectedMcpClient === 'claude' && (
                   <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed">
-                    <li><strong>Zero-JSON Method (Fastest)</strong>: Run <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude mcp add northveil {baseMcpUrl}/sse</code> in your terminal — no config file editing needed!</li>
-                    <li><strong>Claude Settings UI</strong>: Open Claude Desktop &rarr; <strong>Settings</strong> &rarr; <strong>Connectors / Developer</strong> &rarr; Click <strong>Add MCP Server</strong> &rarr; Enter URL <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{baseMcpUrl}/sse</code>.</li>
+                    <li><strong>Zero-JSON Method (Fastest)</strong>: Run <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude mcp add northveil {baseMcpUrl}/mcp</code> in your terminal — no config file editing needed!</li>
+                    <li><strong>Claude Settings UI</strong>: Open Claude Desktop &rarr; <strong>Settings</strong> &rarr; <strong>Connectors / Developer</strong> &rarr; Click <strong>Add MCP Server</strong> &rarr; Enter URL <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{baseMcpUrl}/mcp</code>.</li>
                     <li><strong>Config File (Optional)</strong>: Or paste the snippet above into <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude_desktop_config.json</code>.</li>
                   </ol>
                 )}

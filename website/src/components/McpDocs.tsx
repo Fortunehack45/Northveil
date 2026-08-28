@@ -14,7 +14,7 @@ import {
 
 export const McpDocs: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [selectedClient, setSelectedClient] = useState<'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http'>('claude');
+  const [selectedClient, setSelectedClient] = useState<'claudeweb' | 'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http'>('claudeweb');
 
   const mcpServerUrl = getMcpServerUrl();
   const mcpHttpUrl = getMcpHttpUrl();
@@ -204,8 +204,17 @@ export const McpDocs: React.FC = () => {
     }
   ];
 
-  const getSnippet = (client: 'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http') => {
+  const getSnippet = (client: 'claudeweb' | 'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http') => {
     switch (client) {
+      case 'claudeweb':
+        return JSON.stringify({
+          connector_name: "Northveil",
+          transport: "Streamable HTTP (Recommended) or SSE",
+          streamable_http_url: mcpHttpUrl,
+          sse_url: `${mcpSseUrl}?wallet_address=0xYOUR_WALLET_ADDRESS`,
+          logo_url: "https://iili.io/CDS9fvn.png",
+          active_tools_count: 60
+        }, null, 2);
       case 'claude':
         return JSON.stringify({
           mcpServers: {
@@ -348,6 +357,7 @@ export const McpDocs: React.FC = () => {
         <div className="bg-[#141419] border-3 border-white p-6 shadow-[6px_6px_0px_0px_#00f0ff] space-y-6 font-mono text-xs">
           <div className="flex flex-wrap gap-2">
             {[
+              { id: 'claudeweb', label: 'Claude.ai Web' },
               { id: 'claude', label: 'Claude Desktop' },
               { id: 'cursor', label: 'Cursor IDE' },
               { id: 'claudecode', label: 'Claude Code CLI' },

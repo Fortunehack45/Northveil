@@ -7,7 +7,18 @@
 [![Python SDK](https://img.shields.io/badge/Python-northveil-yellow.svg?style=flat-square)](https://pypi.org/project/northveil/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
-Northveil is an enterprise decentralized infrastructure uniting an **AI-powered Multi-Chain Web3 dApp**, a **Universal 38-Tool Model Context Protocol (MCP) Server**, a **Non-Custodial MPC Control-Plane Architecture**, and an **Autonomous Travel & Airline Protocol**.
+Northveil is an enterprise decentralized infrastructure uniting an **AI-powered Multi-Chain Web3 dApp**, a **Universal 60-Tool Model Context Protocol (MCP) Server**, a **Non-Custodial MPC Control-Plane Architecture**, and an **Autonomous Travel & Airline Protocol**.
+
+### 🔌 Official MCP Gateway Endpoints
+
+| Protocol / Client | Connection URL | Transport |
+| :--- | :--- | :--- |
+| **Claude.ai Web & Mobile (Custom Connector)** | `https://mcp.northveil.xyz/mcp` | Streamable HTTP (Recommended) |
+| **Claude Desktop & CLI** | `claude mcp add northveil https://mcp.northveil.xyz/mcp` | Streamable HTTP |
+| **Remote SSE Gateway** | `https://mcp.northveil.xyz/sse?wallet_address=0x56F0Fdbe...` | Server-Sent Events |
+| **ChatGPT Custom Action (OpenAPI 3.0)** | `https://mcp.northveil.xyz/openapi.json` | OpenAPI / OAuth 2.0 |
+| **Official Server Logo** | `https://iili.io/CDS9fvn.png` | Direct Binary Image |
+
 
 ---
 
