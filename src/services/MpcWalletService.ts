@@ -358,7 +358,7 @@ export class MpcWalletService {
       if (!res.ok || !json.success) {
         return [];
       }
-      return json.data || [];
+      return json.pendingApprovals || json.data || json.approvals || [];
     } catch {
       return [];
     }
@@ -377,6 +377,15 @@ export class MpcWalletService {
     blockNumber?: number;
     explorerUrl?: string;
     gasUsed?: string;
+    unsignedTransaction?: any;
+    unsignedSerialized?: string;
+    status?: string;
+    recipient?: string;
+    amount?: number;
+    asset?: string;
+    network?: string;
+    calldata?: string;
+    chainId?: number;
     error?: string;
   }> {
     const effectiveUserId = userId || this.getUserId();
@@ -397,7 +406,11 @@ export class MpcWalletService {
     if (!res.ok || !json.success) {
       throw new Error(json.error || 'Failed to approve transaction request');
     }
-    return json;
+    const inner = json.result || json;
+    return {
+      success: true,
+      ...inner,
+    };
   }
 
   /**

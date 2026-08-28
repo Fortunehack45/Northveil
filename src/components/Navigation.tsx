@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useWallet } from '../context/WalletContext';
 import { BlockiesAvatar } from './BlockiesAvatar';
 import { formatShortAddress } from '../services/addressUtils';
+import { MpcWalletService } from '../services/MpcWalletService';
 import {
   LayoutGrid,
   Wallet,
@@ -46,6 +47,19 @@ export const Navigation: React.FC<NavigationProps> = ({
 }) => {
   const { lockWallet, logOut, activeSubWallet, theme, toggleTheme } = useWallet();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [pendingCount, setPendingCount] = useState<number>(0);
+
+  useEffect(() => {
+    const checkPending = async () => {
+      try {
+        const pending = await MpcWalletService.getPendingApprovals();
+        setPendingCount(pending?.length || 0);
+      } catch {}
+    };
+    checkPending();
+    const interval = setInterval(checkPending, 3000);
+    return () => clearInterval(interval);
+  }, [activeSubWallet?.address]);
 
   const navItems: {
     id: TabType;
@@ -73,6 +87,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       id: 'approvals',
       label: 'Approvals',
       icon: <ShieldCheck className="w-4 h-4 stroke-[1.8]" />,
+      badge: pendingCount > 0 ? `${pendingCount}` : undefined,
     },
     {
       id: 'developerHub',

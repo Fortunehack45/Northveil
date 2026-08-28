@@ -3218,25 +3218,52 @@ app.get('/api/v1/dashboard/approvals/pending', async (req: Request, res: Respons
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
   const userId = (req.headers['x-user-id'] || req.query.userId || 'default_user').toString();
+  const walletAddress = (req.headers['x-wallet-address'] || req.query.walletAddress || req.query.address || '').toString().toLowerCase();
   let pendingApprovals: any[] = [];
   try {
     if (supabase && typeof supabase.from === 'function') {
-      const { data } = await supabase
-        .from('approvals')
+      let query = supabase
+        .from('transaction_requests')
         .select('*')
-        .eq('user_id', userId)
         .eq('status', 'pending');
-      if (data && data.length > 0) pendingApprovals = data;
+      if (walletAddress) {
+        query = query.eq('wallet_address', walletAddress);
+      }
+      const { data } = await query;
+      if (data && data.length > 0) {
+        pendingApprovals = data.map((d: any) => ({
+          approval_token: d.approval_token,
+          approvalToken: d.approval_token,
+          requestId: d.request_id,
+          request_id: d.request_id,
+          walletAddress: d.wallet_address,
+          wallet_address: d.wallet_address,
+          recipient: d.recipient,
+          amount: d.amount,
+          asset: d.asset,
+          network: d.network,
+          chainId: d.chain_id,
+          nonce: d.nonce,
+          unsignedPayload: d.unsigned_payload,
+          reason: d.reason,
+          status: d.status,
+          createdAt: d.created_at,
+          expiresAt: d.expires_at,
+        }));
+      }
     }
   } catch (e) {}
 
   if (pendingApprovals.length === 0) {
     for (const [token, reqObj] of inMemoryTxRequests.entries()) {
       if ((reqObj.status as string).toLowerCase() === 'pending') {
-        pendingApprovals.push({
-          approval_token: token,
-          ...reqObj,
-        });
+        if (!walletAddress || reqObj.walletAddress?.toLowerCase() === walletAddress) {
+          pendingApprovals.push({
+            approval_token: token,
+            approvalToken: token,
+            ...reqObj,
+          });
+        }
       }
     }
   }

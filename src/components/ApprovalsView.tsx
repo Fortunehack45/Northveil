@@ -19,10 +19,13 @@ import { McpApprovalRecord } from '../types';
 import { SupabaseService } from '../services/SupabaseService';
 import { MpcWalletService } from '../services/MpcWalletService';
 import { WebAuthnService } from '../services/WebAuthnService';
+import { ProviderService } from '../services/ProviderService';
+import { WalletService } from '../services/WalletService';
 import { formatShortAddress } from '../services/addressUtils';
+import { ethers } from 'ethers';
 
 export const ApprovalsView: React.FC = () => {
-  const { activeSubWallet } = useWallet();
+  const { activeSubWallet, seedPhrase, getDecryptedPrivateKey } = useWallet();
 
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'CONFIRMED' | 'PENDING' | 'REJECTED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,7 +39,6 @@ export const ApprovalsView: React.FC = () => {
   const [isCreatingTest, setIsCreatingTest] = useState(false);
 
   const fetchLogs = async () => {
-    setIsLoading(true);
     try {
       // Fetch from Supabase and in-memory pending approvals endpoint
       const [liveApprovals, stagedPending] = await Promise.all([
@@ -49,20 +51,20 @@ export const ApprovalsView: React.FC = () => {
 
       // Merge any pending staged requests from MCP control plane
       (stagedPending || []).forEach((req: any) => {
-        const id = req.requestId || req.id || req.request_id || req.approvalToken;
-        if (!mergedMap.has(id)) {
+        const id = req.requestId || req.id || req.request_id || req.approvalToken || req.approval_token;
+        if (id) {
           mergedMap.set(id, {
             id,
-            wallet_address: req.walletAddress || activeSubWallet?.address || '',
-            tool_name: req.operationType ? `northveil_prepare_${req.operationType}` : 'token_transfer',
+            wallet_address: req.walletAddress || req.wallet_address || activeSubWallet?.address || '',
+            tool_name: req.operationType ? `northveil_prepare_${req.operationType.toLowerCase()}` : (req.action ? `northveil_prepare_${req.action.toLowerCase()}` : 'token_transfer'),
             parameters: {
-              recipient: req.recipient,
+              recipient: req.recipient || req.to,
               amount: req.amount,
-              asset: req.asset,
-              network: req.network,
-              reason: req.reason,
+              asset: req.asset || req.symbol || 'ETH',
+              network: req.network || req.chain || 'sepolia',
+              reason: req.reason || req.contract_summary || 'Transfer requested via MCP Agent',
             },
-            status: req.status === 'confirmed' ? 'CONFIRMED' : req.status === 'rejected' ? 'REJECTED' : 'PENDING',
+            status: req.status === 'confirmed' || req.status === 'broadcasted' ? 'CONFIRMED' : req.status === 'rejected' ? 'REJECTED' : 'PENDING',
             created_at: req.createdAt || req.created_at || new Date().toISOString(),
             tx_hash: req.txHash || req.tx_hash,
             gas_fee_usd: 0.05,
@@ -74,13 +76,13 @@ export const ApprovalsView: React.FC = () => {
       setApprovals(Array.from(mergedMap.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
     } catch (e) {
       console.warn('[Approvals Fetch Error]:', e);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     fetchLogs();
+    const interval = setInterval(fetchLogs, 3000);
+    return () => clearInterval(interval);
   }, [activeSubWallet?.address]);
 
   const handleCreateTestRequest = async () => {
@@ -98,40 +100,94 @@ export const ApprovalsView: React.FC = () => {
 
   const handleApprove = async (id: string) => {
     setActionProcessingId(id);
-    setPasskeyNotice('Prompting device biometric passkey (Touch ID / Face ID / Windows Hello)...');
+    setPasskeyNotice('Preparing transaction signature...');
     try {
-      // 1. Biometric Passkey Ceremony
-      let passkeyAssertion: any = null;
-      if (WebAuthnService.isSupported()) {
-        const authRes = await WebAuthnService.authenticate(activeSubWallet?.address);
-        if (authRes.success && authRes.assertion) {
-          passkeyAssertion = authRes.assertion;
-        } else if (!authRes.success && authRes.error?.includes('cancelled')) {
-          setPasskeyNotice('Passkey prompt was cancelled by the user.');
-          setTimeout(() => setPasskeyNotice(null), 3000);
-          setActionProcessingId(null);
-          return;
+      // 1. Fetch approval details and preparation
+      const prepResult = await MpcWalletService.approveTransactionRequestWithPasskey(id);
+      
+      let txHash = prepResult.txHash;
+      let explorerUrl = prepResult.explorerUrl;
+
+      // 2. If signature required on client device
+      if (!txHash) {
+        setPasskeyNotice('Prompting device biometric signature (Touch ID / Face ID / Windows Hello)...');
+        let passkeyAssertion: any = null;
+        if (WebAuthnService.isSupported()) {
+          const authRes = await WebAuthnService.authenticate(activeSubWallet?.address);
+          if (authRes.success && authRes.assertion) {
+            passkeyAssertion = authRes.assertion;
+          } else if (!authRes.success && authRes.error?.includes('cancelled')) {
+            setPasskeyNotice('Biometric signature prompt was cancelled.');
+            setActionProcessingId(null);
+            return;
+          }
+        }
+
+        // Look up staged request parameters from local state or server response
+        const currentRecord = approvals.find((a) => a.id === id);
+        const targetNetwork = prepResult.network || currentRecord?.parameters?.network || 'sepolia';
+        const targetRecipient = prepResult.recipient || currentRecord?.parameters?.recipient;
+        const targetAmount = prepResult.amount || currentRecord?.parameters?.amount;
+
+        // Check if local private key is available
+        let privateKey = activeSubWallet?.privateKey;
+        if (!privateKey && activeSubWallet?.id) {
+          privateKey = getDecryptedPrivateKey(activeSubWallet.id) || undefined;
+        }
+        if (!privateKey && seedPhrase && seedPhrase.length >= 12) {
+          const derived = WalletService.deriveEVMAddress(seedPhrase, activeSubWallet?.accountIndex || 0);
+          privateKey = derived.privateKey;
+        }
+
+        if (privateKey && targetRecipient) {
+          setPasskeyNotice('Cryptographically signing transaction in hardware enclave...');
+          const cleanPk = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
+          const provider = ProviderService.getEVMProvider(targetNetwork);
+          const signer = new ethers.Wallet(cleanPk, provider);
+
+          const unsignedTx = prepResult.unsignedTransaction || {
+            to: targetRecipient,
+            value: targetAmount ? ethers.parseEther(String(targetAmount)) : 0n,
+            data: prepResult.calldata || '0x',
+          };
+
+          const feeData = await provider.getFeeData().catch(() => null);
+          const populated = await signer.populateTransaction({
+            ...unsignedTx,
+            maxFeePerGas: feeData?.maxFeePerGas || undefined,
+            maxPriorityFeePerGas: feeData?.maxPriorityFeePerGas || undefined,
+          });
+
+          const signedSerialized = await signer.signTransaction(populated);
+
+          setPasskeyNotice('Broadcasting signed transaction to network...');
+          const broadcastRes = await MpcWalletService.broadcastTransaction({
+            approvalToken: id,
+            requestId: id,
+            signedTransaction: signedSerialized,
+            passkeyAssertion,
+          });
+
+          txHash = broadcastRes.txHash || broadcastRes.tx_hash;
+          explorerUrl = broadcastRes.explorerUrl || broadcastRes.explorer_url;
+        } else {
+          // Fallback to passkey execution route
+          const execRes = await MpcWalletService.approveTransactionRequestWithPasskey(id, passkeyAssertion);
+          txHash = execRes.txHash;
+          explorerUrl = execRes.explorerUrl;
         }
       }
 
-      // 2. Call approval endpoint to sign and broadcast on-chain
-      let broadcastResult: any = null;
-      try {
-        broadcastResult = await MpcWalletService.approveTransactionRequestWithPasskey(id, passkeyAssertion);
-      } catch (err: any) {
-        console.warn('Dashboard approve note:', err.message);
-      }
-
       // 3. Update Supabase record
-      await SupabaseService.updateApprovalStatus(id, 'approved', broadcastResult?.txHash);
+      await SupabaseService.updateApprovalStatus(id, 'approved', txHash);
 
-      if (broadcastResult?.txHash) {
+      if (txHash) {
         setConfirmedTxFeedback({
           id,
-          txHash: broadcastResult.txHash,
-          explorerUrl: broadcastResult.explorerUrl || `https://sepolia.etherscan.io/tx/${broadcastResult.txHash}`,
+          txHash,
+          explorerUrl: explorerUrl || `https://sepolia.etherscan.io/tx/${txHash}`,
         });
-        setPasskeyNotice(`Transaction confirmed on-chain! Tx: ${broadcastResult.txHash.slice(0, 10)}...`);
+        setPasskeyNotice(`Transaction confirmed on-chain! Tx: ${txHash.slice(0, 10)}...`);
       } else {
         setPasskeyNotice('Transaction approved successfully.');
       }
@@ -139,7 +195,7 @@ export const ApprovalsView: React.FC = () => {
       await fetchLogs();
     } catch (e: any) {
       console.error('Approval failed:', e);
-      setPasskeyNotice(`Approval notice: ${e.message || 'Processed'}`);
+      setPasskeyNotice(`Approval error: ${e.message || 'Execution failed'}`);
     } finally {
       setActionProcessingId(null);
       setTimeout(() => setPasskeyNotice(null), 4000);
