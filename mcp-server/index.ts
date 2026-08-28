@@ -363,10 +363,42 @@ app.use('/api/v1', apiRateLimiter);
 app.use('/mcp', apiRateLimiter);
 app.use('/sse', apiRateLimiter);
 
-// Favicon Redirect Route for Browser & MCP Clients
-app.get(['/favicon.ico', '/favicon.png', '/favicon.jpg'], (req: Request, res: Response) => {
-  res.redirect(301, 'https://iili.io/CDS9fvn.png');
-});
+// Direct Favicon & Icon Serving for Browser, Claude & MCP Clients
+let cachedLogoBuffer: Buffer | null = null;
+const OFFICIAL_LOGO_URL = 'https://iili.io/CDS9fvn.png';
+
+async function serveLogoDirectly(req: Request, res: Response) {
+  try {
+    if (!cachedLogoBuffer) {
+      const resp = await fetch(OFFICIAL_LOGO_URL);
+      if (resp.ok) {
+        const arr = await resp.arrayBuffer();
+        cachedLogoBuffer = Buffer.from(arr);
+      }
+    }
+    if (cachedLogoBuffer) {
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      return res.send(cachedLogoBuffer);
+    }
+  } catch (e) {
+    console.warn('[Logo] Direct image fetch notice:', e);
+  }
+  return res.redirect(302, OFFICIAL_LOGO_URL);
+}
+
+app.get([
+  '/favicon.ico',
+  '/favicon.png',
+  '/favicon.jpg',
+  '/icon.png',
+  '/icon.ico',
+  '/logo.png',
+  '/logo.svg',
+  '/apple-touch-icon.png',
+  '/apple-touch-icon-precomposed.png',
+], serveLogoDirectly);
 
 // Real MCP Server Health & Telemetry Status Route
 app.get('/health', async (req: Request, res: Response) => {
@@ -1678,7 +1710,11 @@ app.get(['/.well-known/oauth-authorization-server', '/.well-known/openid-configu
     grant_types_supported: ['authorization_code', 'refresh_token'],
     token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'none'],
     scopes_supported: ['read', 'write', 'admin', 'transfer'],
-    code_challenge_methods_supported: ['S256', 'plain']
+    code_challenge_methods_supported: ['S256', 'plain'],
+    service_documentation: 'https://northveil.xyz',
+    logo_uri: 'https://iili.io/CDS9fvn.png',
+    icon_uri: 'https://iili.io/CDS9fvn.png',
+    ui_locales_supported: ['en'],
   });
 });
 
@@ -1688,10 +1724,15 @@ app.get('/.well-known/oauth-protected-resource', (req: Request, res: Response) =
   const baseUrl = `${protocol}://${req.headers.host}`;
   res.json({
     resource: baseUrl,
+    resource_name: 'Northveil Autonomous MPC Vault',
     authorization_servers: [baseUrl],
     bearer_methods_supported: ['header'],
     scopes_supported: ['read', 'write', 'admin', 'transfer'],
-    resource_documentation: `${baseUrl}/openapi.json`
+    resource_documentation: `${baseUrl}/openapi.json`,
+    resource_icon_uri: 'https://iili.io/CDS9fvn.png',
+    resource_logo_uri: 'https://iili.io/CDS9fvn.png',
+    logo_uri: 'https://iili.io/CDS9fvn.png',
+    icon_uri: 'https://iili.io/CDS9fvn.png',
   });
 });
 
@@ -3367,19 +3408,38 @@ app.all(['/api/v1/tools/:toolName', '/api/v1/:toolName'], async (req: Request, r
   }
 });
 
-// OFFICIAL MCP SSE ENDPOINTS
+// OFFICIAL MCP SSE & STREAMABLE HTTP ENDPOINTS
+// ═════════════════════════════════════════════════════════════
+
 app.get('/sse', async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+
   const rawKey = (req.headers['x-api-key'] || req.headers['authorization'] || req.query.api_key || '').toString();
   const explicitWallet = (req.query.wallet_address || req.query.wallet || req.headers['x-wallet-address'] || '').toString();
   const auth = await authenticateClient(rawKey, explicitWallet);
 
-  if (!auth.valid) {
-    return res.status(401).json({ error: "HTTP 401 Unauthorized: Invalid or missing Northveil API key ('X-API-Key' header required)." });
+  // If request is a standard HTTP probe (not an event-stream connection)
+  const isEventStream = req.headers.accept && req.headers.accept.includes('text/event-stream');
+  if (!isEventStream) {
+    return res.status(200).json({
+      name: 'Northveil AI Assistant',
+      version: '1.0.0',
+      status: 'online',
+      transport: 'sse',
+      protocolVersion: '2024-11-05',
+      authenticatedWallet: auth.walletAddress,
+      tools_count: MCP_TOOLS.length,
+      tools: MCP_TOOLS,
+      logo_url: OFFICIAL_LOGO_URL,
+    });
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
 
   const sessionId = Math.random().toString(36).substring(2, 12);
   sseSessions.set(sessionId, { res, apiKey: rawKey, walletAddress: auth.walletAddress, permissions: auth.permissions });
@@ -3388,10 +3448,13 @@ app.get('/sse', async (req: Request, res: Response) => {
   const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
   const messageUrl = `${protocol}://${host}/messages?sessionId=${sessionId}`;
 
+  res.write(`: connected\n\n`);
   res.write(`event: endpoint\ndata: ${messageUrl}\n\n`);
 
   const pingInterval = setInterval(() => {
-    res.write(': ping\n\n');
+    try {
+      res.write(': ping\n\n');
+    } catch {}
   }, 15000);
 
   req.on('close', () => {
@@ -3401,10 +3464,22 @@ app.get('/sse', async (req: Request, res: Response) => {
 });
 
 app.post('/messages', async (req: Request, res: Response) => {
-  const sessionId = req.query.sessionId as string;
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+
+  const sessionId = (req.query.sessionId || req.query.session_id || '') as string;
   const session = sseSessions.get(sessionId);
 
-  let { jsonrpc, method, params, id, name, arguments: toolArgs } = req.body || {};
+  let { jsonrpc = '2.0', method, params, id, name, arguments: toolArgs } = req.body || {};
+
+  // Handle client initialization notifications and heartbeats gracefully
+  if (method === 'notifications/initialized' || method === 'initialized') {
+    return res.status(200).json({ jsonrpc: '2.0', result: {} });
+  }
+  if (method === 'ping') {
+    return res.status(200).json({ jsonrpc: '2.0', result: {}, id: id ?? null });
+  }
 
   // Flexibly normalize request payload format for SSE messages
   if (!method && name) {
@@ -3417,13 +3492,13 @@ app.post('/messages', async (req: Request, res: Response) => {
     params = { name, arguments: toolArgs };
   }
 
-  if (!session) {
-    return res.status(401).json({ jsonrpc: '2.0', error: { code: -32001, message: 'HTTP 401 Unauthorized: Active SSE session not found' }, id });
-  }
+  const rawKey = (session?.apiKey || req.headers['x-api-key'] || req.headers['authorization'] || req.query.api_key || '').toString();
+  const reqAddress = (session?.walletAddress || req.query.wallet_address || req.query.wallet || req.headers['x-wallet-address'] || '').toString();
+  const auth = await authenticateClient(rawKey, reqAddress);
 
-  const walletAddress = session.walletAddress;
-  const apiKey = session.apiKey;
-  const permissions = session.permissions;
+  const walletAddress = session?.walletAddress || auth.walletAddress;
+  const permissions = session?.permissions || auth.permissions;
+  const apiKey = session?.apiKey || rawKey;
 
   let responsePayload: any;
 
@@ -3432,105 +3507,131 @@ app.post('/messages', async (req: Request, res: Response) => {
       jsonrpc: '2.0',
       result: {
         protocolVersion: '2024-11-05',
-        capabilities: { tools: {}, resources: {} },
-        serverInfo: { name: 'Northveil AI Assistant', version: '1.0.0' },
+        capabilities: {
+          tools: { listChanged: false },
+          resources: { subscribe: false, listChanged: false },
+          prompts: { listChanged: false },
+          logging: {},
+        },
+        serverInfo: {
+          name: 'Northveil AI Assistant',
+          version: '1.0.0',
+          logo_url: OFFICIAL_LOGO_URL,
+        },
       },
-      id,
+      id: id ?? null,
     };
   } else if (method === 'tools/list') {
     responsePayload = {
       jsonrpc: '2.0',
-      result: { tools: MCP_TOOLS },
-      id,
+      result: {
+        tools: MCP_TOOLS,
+        authenticatedWallet: walletAddress,
+      },
+      id: id ?? null,
     };
   } else if (method === 'tools/call') {
-    const { name, arguments: toolArgs } = params || {};
-    const permCheck = checkToolPermission(name, permissions);
+    const { name: callName, arguments: callArgs } = params || {};
+    const effectiveToolName = callName || name;
+    const effectiveArgs = callArgs || toolArgs || {};
 
-    if (!permCheck.allowed) {
+    const tool = MCP_TOOLS.find((t) => t.name === effectiveToolName);
+
+    if (!tool) {
       responsePayload = {
         jsonrpc: '2.0',
-        error: { code: -32003, message: `HTTP 403 Forbidden: API key lacks permission '${permCheck.requiredPermission}' for tool ${name}` },
-        id,
+        error: { code: -32601, message: `Tool not found: ${effectiveToolName}` },
+        id: id ?? null,
       };
     } else {
-      try {
-        const tool = MCP_TOOLS.find((t) => t.name === name);
-        const gateCheck = await enforceConfirmationGate(tool, toolArgs, walletAddress);
+      const permCheck = checkToolPermission(effectiveToolName, permissions);
 
-        if (!gateCheck.canProceed) {
-          if (gateCheck.error) {
-            responsePayload = {
-              jsonrpc: '2.0',
-              error: { code: -32002, message: gateCheck.error },
-              id,
-            };
+      if (!permCheck.allowed) {
+        responsePayload = {
+          jsonrpc: '2.0',
+          error: { code: -32003, message: `HTTP 403 Forbidden: API key lacks permission '${permCheck.requiredPermission}' for tool ${effectiveToolName}` },
+          id: id ?? null,
+        };
+      } else {
+        try {
+          const gateCheck = await enforceConfirmationGate(tool, effectiveArgs, walletAddress);
+
+          if (!gateCheck.canProceed) {
+            if (gateCheck.error) {
+              responsePayload = {
+                jsonrpc: '2.0',
+                error: { code: -32002, message: gateCheck.error },
+                id: id ?? null,
+              };
+            } else {
+              responsePayload = {
+                jsonrpc: '2.0',
+                result: {
+                  content: [
+                    {
+                      type: 'text',
+                      text: gateCheck.stagingResult.formattedMarkdown,
+                    },
+                  ],
+                  ...gateCheck.stagingResult,
+                },
+                id: id ?? null,
+              };
+            }
           } else {
+            const result = await executeRealTool(effectiveToolName, effectiveArgs, walletAddress, req);
+
+            try {
+              if (supabase && typeof supabase.from === 'function') {
+                await supabase.from('mcp_activity_logs').insert([{
+                  api_key: apiKey,
+                  tool_name: effectiveToolName,
+                  status: 'SUCCESS',
+                  parameters: { ...effectiveArgs, walletAddress },
+                  response: result,
+                }]);
+              }
+            } catch (logErr) {
+              console.error('[Activity Log] Failed to record tool call (non-fatal):', logErr);
+            }
+
             responsePayload = {
               jsonrpc: '2.0',
               result: {
                 content: [
                   {
                     type: 'text',
-                    text: gateCheck.stagingResult.formattedMarkdown,
+                    text: result?.formattedMarkdown || (typeof result === 'string' ? result : JSON.stringify(result, null, 2)),
                   },
                 ],
-                ...gateCheck.stagingResult,
               },
-              id,
+              id: id ?? null,
             };
           }
-        } else {
-          const result = await executeRealTool(name, toolArgs, walletAddress, req);
-
-          try {
-            if (supabase && typeof supabase.from === 'function') {
-              await supabase.from('mcp_activity_logs').insert([{
-                api_key: apiKey,
-                tool_name: name,
-                status: 'SUCCESS',
-                parameters: { ...toolArgs, walletAddress },
-                response: result,
-              }]);
-            }
-          } catch (logErr) {
-            console.error('[Activity Log] Failed to record tool call (non-fatal):', logErr);
-          }
-
+        } catch (err: any) {
           responsePayload = {
             jsonrpc: '2.0',
-            result: {
-              content: [
-                {
-                  type: 'text',
-                  text: result?.formattedMarkdown || (typeof result === 'string' ? result : JSON.stringify(result, null, 2)),
-                },
-              ],
-            },
-            id,
+            error: { code: -32603, message: err.message || 'Internal tool execution error' },
+            id: id ?? null,
           };
         }
-      } catch (err: any) {
-        responsePayload = {
-          jsonrpc: '2.0',
-          error: { code: -32603, message: err.message },
-          id,
-        };
       }
     }
   } else {
     responsePayload = {
       jsonrpc: '2.0',
       result: {},
-      id,
+      id: id ?? null,
     };
   }
 
-  if (session) {
-    session.res.write(`event: message\ndata: ${JSON.stringify(responsePayload)}\n\n`);
+  if (session && session.res) {
+    try {
+      session.res.write(`event: message\ndata: ${JSON.stringify(responsePayload)}\n\n`);
+    } catch {}
   }
 
-  return res.status(202).json(responsePayload);
+  return res.status(200).json(responsePayload);
 });
 
 // OPENAPI 3.0 SPECIFICATION ENDPOINT
@@ -3540,10 +3641,46 @@ app.get(['/openapi.json', '/api/docs/openapi.json'], (req: Request, res: Respons
   res.json(getOpenApiSpec(baseUrl));
 });
 
-// DIRECT MCP HTTP ENDPOINT (/mcp)
-// Under MCP Streamable HTTP specification, GET requests return 405 Method Not Allowed with Allow: POST header.
-app.get('/mcp', (req: Request, res: Response) => {
+// DIRECT MCP STREAMABLE HTTP ENDPOINT (/mcp)
+app.get('/mcp', async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Allow', 'POST');
+
+  if (req.headers.accept && req.headers.accept.includes('text/event-stream')) {
+    // Gracefully handle clients requesting SSE on /mcp
+    const rawKey = (req.headers['x-api-key'] || req.headers['authorization'] || req.query.api_key || '').toString();
+    const explicitWallet = (req.query.wallet_address || req.query.wallet || req.headers['x-wallet-address'] || '').toString();
+    const auth = await authenticateClient(rawKey, explicitWallet);
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+
+    const sessionId = Math.random().toString(36).substring(2, 12);
+    sseSessions.set(sessionId, { res, apiKey: rawKey, walletAddress: auth.walletAddress, permissions: auth.permissions });
+
+    const host = req.headers.host || 'localhost:3001';
+    const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
+    const messageUrl = `${protocol}://${host}/messages?sessionId=${sessionId}`;
+
+    res.write(`: connected\n\n`);
+    res.write(`event: endpoint\ndata: ${messageUrl}\n\n`);
+
+    const pingInterval = setInterval(() => {
+      try {
+        res.write(': ping\n\n');
+      } catch {}
+    }, 15000);
+
+    req.on('close', () => {
+      clearInterval(pingInterval);
+      sseSessions.delete(sessionId);
+    });
+    return;
+  }
+
   return res.status(405).json({
     jsonrpc: '2.0',
     error: {
@@ -3555,137 +3692,176 @@ app.get('/mcp', (req: Request, res: Response) => {
 });
 
 app.post('/mcp', async (req: Request, res: Response) => {
-  const { jsonrpc, method, params, id } = req.body || {};
-  const rawKey = (req.headers['x-api-key'] || req.headers['authorization'] || req.query.api_key || '').toString();
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 
-  const reqAddress = params?.arguments?.walletAddress || params?.arguments?.address || params?.arguments?.fromAddress || req.body?.walletAddress || req.query?.wallet_address as string;
-  const auth = await authenticateClient(rawKey, reqAddress);
+  const processSingleJsonRpc = async (body: any) => {
+    let { jsonrpc = '2.0', method, params, id, name, arguments: toolArgs } = body || {};
 
-  if (!auth.valid) {
-    return res.status(401).json({
-      jsonrpc: '2.0',
-      error: { code: -32001, message: "HTTP 401 Unauthorized: Invalid, inactive, or unauthorized Northveil API token or access to requested address is forbidden." },
-      id,
-    });
-  }
-
-  if (method === 'initialize') {
-    return res.json({
-      jsonrpc: '2.0',
-      result: {
-        protocolVersion: '2024-11-05',
-        capabilities: { tools: {}, resources: {} },
-        serverInfo: { name: 'Northveil AI Assistant', version: '1.0.0' },
-      },
-      id,
-    });
-  }
-
-  if (method === 'tools/list') {
-    return res.json({
-      jsonrpc: '2.0',
-      result: {
-        tools: MCP_TOOLS,
-        authenticatedWallet: auth.walletAddress,
-        permissions: auth.permissions,
-      },
-      id,
-    });
-  }
-
-  if (method === 'tools/call') {
-    const { name, arguments: toolArgs } = params || {};
-    const tool = MCP_TOOLS.find((t) => t.name === name);
-
-    if (!tool) {
-      return res.status(404).json({
-        jsonrpc: '2.0',
-        error: { code: -32601, message: `Tool not found: ${name}` },
-        id,
-      });
+    if (method === 'notifications/initialized' || method === 'initialized') {
+      return { jsonrpc: '2.0', result: {} };
+    }
+    if (method === 'ping') {
+      return { jsonrpc: '2.0', result: {}, id: id ?? null };
     }
 
-    const permCheck = checkToolPermission(name, auth.permissions);
-    if (!permCheck.allowed) {
-      return res.status(403).json({
-        jsonrpc: '2.0',
-        error: { code: -32003, message: `HTTP 403 Forbidden: API key lacks required permission '${permCheck.requiredPermission}' for tool ${name}` },
-        id,
-      });
+    if (!method && name) {
+      method = 'tools/call';
+      params = { name, arguments: toolArgs || body };
     }
 
-    try {
-      const gateCheck = await enforceConfirmationGate(tool, toolArgs, auth.walletAddress);
+    const rawKey = (req.headers['x-api-key'] || req.headers['authorization'] || req.query.api_key || '').toString();
+    const reqAddress = params?.arguments?.walletAddress || params?.arguments?.address || params?.arguments?.fromAddress || body?.walletAddress || req.query?.wallet_address as string;
+    const auth = await authenticateClient(rawKey, reqAddress);
 
-      if (!gateCheck.canProceed) {
-        if (gateCheck.error) {
-          return res.status(403).json({
+    if (!auth.valid) {
+      return {
+        jsonrpc: '2.0',
+        error: { code: -32001, message: 'HTTP 401 Unauthorized: Invalid, inactive, or unauthorized Northveil API token.' },
+        id: id ?? null,
+      };
+    }
+
+    if (method === 'initialize') {
+      return {
+        jsonrpc: '2.0',
+        result: {
+          protocolVersion: '2024-11-05',
+          capabilities: {
+            tools: { listChanged: false },
+            resources: { subscribe: false, listChanged: false },
+            prompts: { listChanged: false },
+            logging: {},
+          },
+          serverInfo: {
+            name: 'Northveil AI Assistant',
+            version: '1.0.0',
+            logo_url: OFFICIAL_LOGO_URL,
+          },
+        },
+        id: id ?? null,
+      };
+    }
+
+    if (method === 'tools/list') {
+      return {
+        jsonrpc: '2.0',
+        result: {
+          tools: MCP_TOOLS,
+          authenticatedWallet: auth.walletAddress,
+          permissions: auth.permissions,
+        },
+        id: id ?? null,
+      };
+    }
+
+    if (method === 'tools/call') {
+      const { name: callName, arguments: callArgs } = params || {};
+      const effectiveToolName = callName || name;
+      const effectiveArgs = callArgs || toolArgs || {};
+
+      const tool = MCP_TOOLS.find((t) => t.name === effectiveToolName);
+
+      if (!tool) {
+        return {
+          jsonrpc: '2.0',
+          error: { code: -32601, message: `Tool not found: ${effectiveToolName}` },
+          id: id ?? null,
+        };
+      }
+
+      const permCheck = checkToolPermission(effectiveToolName, auth.permissions);
+      if (!permCheck.allowed) {
+        return {
+          jsonrpc: '2.0',
+          error: { code: -32003, message: `HTTP 403 Forbidden: API key lacks required permission '${permCheck.requiredPermission}' for tool ${effectiveToolName}` },
+          id: id ?? null,
+        };
+      }
+
+      try {
+        const gateCheck = await enforceConfirmationGate(tool, effectiveArgs, auth.walletAddress);
+
+        if (!gateCheck.canProceed) {
+          if (gateCheck.error) {
+            return {
+              jsonrpc: '2.0',
+              error: { code: -32002, message: gateCheck.error },
+              id: id ?? null,
+            };
+          }
+          return {
             jsonrpc: '2.0',
-            error: { code: -32002, message: gateCheck.error },
-            id,
-          });
+            result: {
+              content: [
+                {
+                  type: 'text',
+                  text: gateCheck.stagingResult.formattedMarkdown,
+                },
+              ],
+              authenticatedWallet: auth.walletAddress,
+              permissions: auth.permissions,
+              ...gateCheck.stagingResult,
+            },
+            id: id ?? null,
+          };
         }
-        return res.json({
+
+        const result = await executeRealTool(effectiveToolName, effectiveArgs, auth.walletAddress, req);
+
+        try {
+          if (supabase && typeof supabase.from === 'function') {
+            await supabase.from('mcp_activity_logs').insert([{
+              api_key: rawKey.replace('Bearer ', ''),
+              tool_name: effectiveToolName,
+              status: 'SUCCESS',
+              parameters: { ...effectiveArgs, walletAddress: auth.walletAddress },
+              response: result,
+            }]);
+          }
+        } catch (logErr) {
+          console.error('[Activity Log] Failed to record tool call (non-fatal):', logErr);
+        }
+
+        return {
           jsonrpc: '2.0',
           result: {
             content: [
               {
                 type: 'text',
-                text: gateCheck.stagingResult.formattedMarkdown,
+                text: result?.formattedMarkdown || (typeof result === 'string' ? result : JSON.stringify(result, null, 2)),
               },
             ],
             authenticatedWallet: auth.walletAddress,
             permissions: auth.permissions,
-            ...gateCheck.stagingResult,
+            ...(typeof result === 'object' && result !== null ? result : {}),
           },
-          id,
-        });
+          id: id ?? null,
+        };
+      } catch (err: any) {
+        return {
+          jsonrpc: '2.0',
+          error: { code: -32603, message: err.message || 'Internal tool execution error' },
+          id: id ?? null,
+        };
       }
-
-      const result = await executeRealTool(name, toolArgs, auth.walletAddress, req);
-
-      try {
-        if (supabase && typeof supabase.from === 'function') {
-          await supabase.from('mcp_activity_logs').insert([{
-            api_key: rawKey.replace('Bearer ', ''),
-            tool_name: name,
-            status: 'SUCCESS',
-            parameters: { ...toolArgs, walletAddress: auth.walletAddress },
-            response: result,
-          }]);
-        }
-      } catch (logErr) {
-        console.error('[Activity Log] Failed to record tool call (non-fatal):', logErr);
-      }
-
-      return res.json({
-        jsonrpc: '2.0',
-        result: {
-          content: [
-            {
-              type: 'text',
-              text: result?.formattedMarkdown || (typeof result === 'string' ? result : JSON.stringify(result, null, 2)),
-            },
-          ],
-          authenticatedWallet: auth.walletAddress,
-          ...(typeof result === 'object' && result !== null ? result : {}),
-        },
-        id,
-      });
-    } catch (err: any) {
-      return res.status(500).json({
-        jsonrpc: '2.0',
-        error: { code: -32603, message: err.message },
-        id,
-      });
     }
+
+    return {
+      jsonrpc: '2.0',
+      result: {},
+      id: id ?? null,
+    };
+  };
+
+  if (Array.isArray(req.body)) {
+    const responses = await Promise.all(req.body.map(processSingleJsonRpc));
+    return res.json(responses);
   }
 
-  return res.json({
-    jsonrpc: '2.0',
-    result: {},
-    id,
-  });
+  const response = await processSingleJsonRpc(req.body);
+  return res.json(response);
 });
 
 // Helper to upload token logos and NFT images directly to Supabase Storage bucket
