@@ -284,11 +284,191 @@ export class NorthveilClient {
     return this.mcpCall<BookingStatusResult>('get_booking_status', { bookingReference: bookingReferenceOrPnr });
   }
 
+  /** Prepare an unsigned transaction request for local client signing */
+  async prepareTransaction(params: {
+    walletAddress?: string;
+    recipient: string;
+    amount: number;
+    asset?: string;
+    network?: string;
+    chainId?: number;
+    calldata?: string;
+    operationType?: 'TRANSFER' | 'SWAP' | 'DEPLOY' | 'CONTRACT_CALL';
+  }): Promise<{
+    success: boolean;
+    requestId: string;
+    approvalToken: string;
+    walletAddress: string;
+    recipient: string;
+    amount: number;
+    asset: string;
+    network: string;
+    chainId: number;
+    nonce: number;
+    unsignedTransaction: any;
+    unsignedSerialized?: string;
+    expiresAt: string;
+  }> {
+    return this.request('/api/v1/transactions/prepare', {
+      method: 'POST',
+      body: JSON.stringify({
+        walletAddress: params.walletAddress || this.walletAddress,
+        ...params,
+      }),
+    });
+  }
+
+  /** Broadcast an already signed raw transaction on-chain */
+  async broadcastTransaction(params: {
+    approvalToken?: string;
+    requestId?: string;
+    signedTransaction: string;
+  }): Promise<{
+    success: boolean;
+    status: string;
+    requestId: string;
+    walletAddress: string;
+    recipient: string;
+    amount: number;
+    asset: string;
+    network: string;
+    txHash: string;
+    blockNumber: number;
+    gasUsed: string;
+    explorerUrl: string;
+  }> {
+    return this.request('/api/v1/transactions/broadcast', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  /** Register public wallet metadata non-custodially */
+  async registerWallet(params: {
+    address: string;
+    walletName?: string;
+    chainId?: string;
+  }): Promise<{
+    success: boolean;
+    wallet: any;
+    address: string;
+    mpcWalletId: string;
+  }> {
+    return this.request('/api/v1/wallets/register', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
   /** Get full OpenAPI 3.0.3 schema for ChatGPT & REST Action integration */
   async getOpenApiSchema(): Promise<any> {
     const res = await fetch(`${this.baseUrl}/openapi.json`);
     return res.json();
   }
+
+  // ═══════════════════════════════════════════════════════
+  // CANONICAL 18 MCP TOOLS (NON-CUSTODIAL & ASYNC APPROVALS)
+  // ═══════════════════════════════════════════════════════
+
+  /** List permitted non-custodial wallets */
+  async listWallets(): Promise<{ wallets: string[]; active: string; count: number }> {
+    return this.mcpCall('northveil_list_wallets');
+  }
+
+  /** Get live multi-chain native and token balances */
+  async getBalances(network = 'base', walletAddress?: string): Promise<any> {
+    return this.mcpCall('northveil_get_balances', { network, walletAddress: walletAddress || this.walletAddress });
+  }
+
+  /** Simulate transaction execution on a fork */
+  async simulateTx(params: { from: string; to: string; value?: string; data?: string; network?: string }): Promise<any> {
+    return this.mcpCall('northveil_simulate_tx', params);
+  }
+
+  /** Estimate live EIP-1559 gas consumption and USD cost */
+  async estimateGas(params: { network?: string; to?: string; value?: string } = {}): Promise<any> {
+    return this.mcpCall('northveil_estimate_gas', params);
+  }
+
+  /** Audit smart contract security and bytecode */
+  async auditContract(params: { contractAddress?: string; code?: string; network?: string }): Promise<any> {
+    return this.mcpCall('northveil_audit_contract', params);
+  }
+
+  /** Non-custodially prepare an unsigned native or token transfer */
+  async prepareTransfer(params: { recipient: string; amount: number; asset?: string; network?: string }): Promise<any> {
+    return this.mcpCall('northveil_prepare_transfer', {
+      walletAddress: this.walletAddress,
+      ...params,
+    });
+  }
+
+  /** Non-custodially prepare an optimal DEX swap */
+  async prepareSwap(params: { fromToken: string; toToken: string; amount: number; slippage?: number; network?: string }): Promise<any> {
+    return this.mcpCall('northveil_prepare_swap', {
+      walletAddress: this.walletAddress,
+      ...params,
+    });
+  }
+
+  /** Request passkey biometric signature for a staged approval */
+  async requestSignature(params: { approvalToken: string; userId?: string }): Promise<any> {
+    return this.mcpCall('northveil_request_signature', params);
+  }
+
+  /** Request on-chain broadcast of a client-signed raw transaction */
+  async requestBroadcast(params: { approvalToken?: string; signedTransaction: string }): Promise<any> {
+    return this.mcpCall('northveil_request_broadcast', params);
+  }
+
+  /** List pending transaction approvals */
+  async listPendingApprovals(): Promise<any> {
+    return this.mcpCall('northveil_list_pending_approvals');
+  }
+
+  /** Get approval status for an approval token */
+  async getApprovalStatus(approvalToken: string): Promise<any> {
+    return this.mcpCall('northveil_get_approval_status', { approvalToken });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // OAUTH 2.0 & RFC METADATA DISCOVERY
+  // ═══════════════════════════════════════════════════════
+
+  /** Fetch RFC 9728 OAuth 2.0 Protected Resource Metadata */
+  async getOAuthProtectedResourceMetadata(): Promise<any> {
+    const res = await fetch(`${this.baseUrl}/.well-known/oauth-protected-resource`);
+    return res.json();
+  }
+
+  /** Fetch RFC 8414 OAuth 2.0 Authorization Server Metadata */
+  async getOAuthServerMetadata(): Promise<any> {
+    const res = await fetch(`${this.baseUrl}/.well-known/oauth-authorization-server`);
+    return res.json();
+  }
+
+  /** Register an OAuth 2.0 client dynamically (RFC 7591) */
+  async registerOAuthClient(params: {
+    client_name?: string;
+    redirect_uris: string[];
+    grant_types?: string[];
+    response_types?: string[];
+    scope?: string;
+  }): Promise<{
+    client_id: string;
+    client_secret?: string;
+    client_name: string;
+    redirect_uris: string[];
+    grant_types: string[];
+    response_types: string[];
+    scope: string;
+  }> {
+    return this.request('/oauth/register', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
 }
+
 
 

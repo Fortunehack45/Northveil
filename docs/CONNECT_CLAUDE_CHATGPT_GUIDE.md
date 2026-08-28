@@ -148,15 +148,20 @@ async with SseServerTransport("https://mcp.northveil.xyz/sse?wallet_address=0xYo
 
 ---
 
-## 🛡️ 7. WebAuthn Biometric Passkey Signing Ceremony
+## 🛡️ 7. Non-Custodial Transaction Lifecycle & Signing Ceremony
 
-1. When your AI agent calls `northveil_prepare_transfer`, `northveil_prepare_swap`, or `northveil_prepare_deploy`:
-   - The Policy Engine validates the transaction against your grant.
-   - It performs a dry-run fork simulation (`northveil_simulate_tx`).
-   - It returns a single-use approval token (`tok_...` / `req_...`) and human-readable USD preview.
-2. In the Northveil Wallet UI (**Approvals** tab):
-   - You see the pending card with the exact recipient, amount, fee in USD, and security check.
-   - You click **Approve & Execute**.
-   - Your device prompts for **Touch ID / Face ID / Windows Hello**.
-   - The hardware passkey biometric assertion authorizes the Turnkey MPC Enclave to sign and broadcast on-chain.
+1. **Step 1: Unsigned Transaction Preparation**:
+   - When your AI agent calls `northveil_prepare_transfer`, `northveil_prepare_swap`, `northveil_prepare_deploy`, or `POST /api/v1/transactions/prepare`:
+   - The Policy Engine validates the transaction parameters against your grant.
+   - It computes the exact nonce and gas parameters, performing a dry-run fork simulation (`northveil_simulate_tx`).
+   - It returns a single-use approval token (`tok_...`), unique `requestId`, and the unsigned serialized transaction.
+2. **Step 2: Client-Side Cryptographic Signing**:
+   - In the Northveil Wallet UI (**Approvals** tab) or via local client SDK / CLI:
+   - You review the exact recipient, amount, fee in USD, and security check.
+   - Your device prompts for **Touch ID / Face ID / Windows Hello** (WebAuthn Passkey) or Hardware Wallet signature.
+   - **Zero private keys ever touch the Northveil servers.**
+3. **Step 3: Signature Verification & Relayer Broadcast**:
+   - The client calls `northveil_request_broadcast` or `POST /api/v1/transactions/broadcast` with the signed payload.
+   - Northveil cryptographically validates the recovered signer against the authorized vault address and broadcasts the raw transaction on-chain.
    - You receive an instant block explorer confirmation link!
+

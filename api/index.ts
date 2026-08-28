@@ -45,23 +45,25 @@ function indexOpenZeppelinDirectory(dir: string, basePrefix = '') {
   } catch (e) {}
 }
 
+let ozIndexed = false;
 function initializeOpenZeppelinIndex() {
+  if (ozIndexed) return;
   const candidateBases = [
     path.resolve(__dirname_local, '..', 'node_modules', '@openzeppelin', 'contracts'),
     path.resolve(__dirname_local, 'node_modules', '@openzeppelin', 'contracts'),
     path.resolve(process.cwd(), 'node_modules', '@openzeppelin', 'contracts'),
-    path.resolve(process.cwd(), '..', 'node_modules', '@openzeppelin', 'contracts'),
-    path.resolve(process.cwd(), 'mcp-server', 'node_modules', '@openzeppelin', 'contracts'),
   ];
 
   for (const base of candidateBases) {
     if (fs.existsSync(base)) {
       indexOpenZeppelinDirectory(base);
+      ozIndexed = true;
+      break;
     }
   }
 }
 
-// Pre-index on module load
+// Lazy index on module load
 initializeOpenZeppelinIndex();
 
 function findImports(importPath: string) {
@@ -106,7 +108,10 @@ function findImports(importPath: string) {
 }
 import {
   createMpcWallet,
+  registerPublicWallet,
+  prepareTransactionRequest,
   stageTransactionRequest,
+  validateAndBroadcastSignedTransaction,
   approveAndExecuteWithPasskey,
   rejectTransactionRequest,
   evaluateAutonomousScope,
@@ -124,6 +129,12 @@ import {
   inMemoryMpcWallets,
   executeWithRpcFailover,
   importMpcWalletOrKey,
+  getChainIdForNetwork,
+  validateChainId,
+  getExactNonce,
+  getAccurateFeeData,
+  getProviderForNetwork,
+  getExplorerUrlForHash,
 } from './mpcControlPlaneService.js';
 
 const app = express();
@@ -159,27 +170,7 @@ const baseProvider = new ethers.JsonRpcProvider(BASE_RPC_URL, 8453, { staticNetw
 const arbitrumProvider = new ethers.JsonRpcProvider(ARBITRUM_RPC_URL, 42161, { staticNetwork: ethers.Network.from(42161) });
 const bscProvider = new ethers.JsonRpcProvider(BSC_RPC_URL, 56, { staticNetwork: ethers.Network.from(56) });
 
-function getChainIdForNetwork(networkName: string): number {
-  const net = (networkName || '').toLowerCase();
-  if (net.includes('ethereum') || net === 'mainnet') return 1;
-  if (net.includes('base_sepolia')) return 84532;
-  if (net.includes('base')) return 8453;
-  if (net.includes('amoy') || net.includes('polygon_testnet')) return 80002;
-  if (net.includes('polygon') || net.includes('matic')) return 137;
-  if (net.includes('arbitrum') || net.includes('arb')) return 42161;
-  if (net.includes('bsc') || net.includes('binance')) return 56;
-  return 11155111; // default sepolia
-}
 
-function getProviderForNetwork(network: string = 'base'): ethers.JsonRpcProvider {
-  const norm = (network || 'base').toLowerCase();
-  if (norm.includes('base')) return baseProvider;
-  if (norm.includes('sepolia')) return sepoliaProvider;
-  if (norm.includes('poly')) return polygonProvider;
-  if (norm.includes('arb')) return arbitrumProvider;
-  if (norm.includes('bsc') || norm.includes('binance')) return bscProvider;
-  return ethProvider;
-}
 
 // Solana RPC (Helius high-speed node)
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
@@ -978,6 +969,7 @@ export interface OAuthTokenRecord {
   scope: string;
 }
 export const inMemoryOAuthTokens = new Map<string, OAuthTokenRecord>();
+export const inMemoryUsedCodes = new Set<string>();
 export const inMemoryAuthCodes = new Map<string, {
   code: string;
   clientId: string;
@@ -1088,18 +1080,37 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
       const rawSigned = cleanKey.replace('nv_oauth_', '');
       const verified = verifyOAuthPayload(rawSigned);
       if (verified && verified.type === 'access_token') {
-        const boundAddress = (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42)
-          ? requestedAddress.toLowerCase()
-          : (verified.walletAddress || DEFAULT_PUBLIC_WALLET || '').toLowerCase();
+        const defaultWallet = (verified.walletAddress || DEFAULT_PUBLIC_WALLET || '').toLowerCase();
+        const allowedWallets = Array.isArray(verified.allowedWallets) && verified.allowedWallets.length > 0
+          ? verified.allowedWallets.map((w: string) => w.toLowerCase())
+          : [defaultWallet];
+
+        let boundAddress = defaultWallet;
+        if (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42) {
+          const reqLower = requestedAddress.toLowerCase();
+          if (allowedWallets.includes('*') || allowedWallets.includes(reqLower)) {
+            boundAddress = reqLower;
+          } else {
+            return {
+              valid: false,
+              walletAddress: '',
+              keyName: 'Unauthorized Tenant Wallet Access',
+              permissions: [],
+              allowedWallets: [],
+              tier: 'unauthorized',
+              userId: verified.userId || verified.clientId || 'unauthorized',
+            };
+          }
+        }
 
         return {
           valid: true,
           walletAddress: boundAddress,
           keyName: `OAuth Verified Session (${verified.clientId || 'Claude AI'})`,
           permissions: Array.isArray(verified.permissions) && verified.permissions.length > 0 ? verified.permissions : ['*'],
-          allowedWallets: [boundAddress],
+          allowedWallets: allowedWallets.includes('*') ? [boundAddress] : allowedWallets,
           tier: 'oauth_client',
-          userId: verified.clientId || 'claude_user',
+          userId: verified.userId || verified.clientId || 'claude_user',
         };
       }
     }
@@ -1119,6 +1130,21 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
           userId: oauthToken.clientId,
         };
       }
+      const allowedWallets = [oauthToken.walletAddress.toLowerCase()];
+      if (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42) {
+        const reqLower = requestedAddress.toLowerCase();
+        if (!allowedWallets.includes('*') && !allowedWallets.includes(reqLower)) {
+          return {
+            valid: false,
+            walletAddress: '',
+            keyName: 'Unauthorized Tenant Wallet Access',
+            permissions: [],
+            allowedWallets: [],
+            tier: 'unauthorized',
+            userId: oauthToken.userId || oauthToken.clientId,
+          };
+        }
+      }
       return {
         valid: true,
         walletAddress: oauthToken.walletAddress,
@@ -1126,29 +1152,84 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
         permissions: oauthToken.permissions,
         allowedWallets: [oauthToken.walletAddress],
         tier: 'oauth_client',
-        userId: oauthToken.clientId,
+        userId: oauthToken.userId || oauthToken.clientId,
       };
     }
 
-    // 1c. Check in-memory registered developer API keys
+    // 1c. Check Supabase oauth_tokens table
+    try {
+      if (supabase && typeof supabase.from === 'function') {
+        const { data: tokenData } = await supabase
+          .from('oauth_tokens')
+          .select('*')
+          .eq('access_token', cleanKey)
+          .maybeSingle();
+
+        if (tokenData) {
+          if (new Date(tokenData.expires_at).getTime() < Date.now()) {
+            return {
+              valid: false,
+              walletAddress: '',
+              keyName: 'Expired OAuth Token',
+              permissions: [],
+              allowedWallets: [],
+              tier: 'expired',
+              userId: tokenData.user_id,
+            };
+          }
+          const boundAddr = (tokenData.wallet_address || DEFAULT_PUBLIC_WALLET).toLowerCase();
+          const allowedWallets = [boundAddr];
+          if (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42) {
+            const reqLower = requestedAddress.toLowerCase();
+            if (!allowedWallets.includes('*') && !allowedWallets.includes(reqLower)) {
+              return {
+                valid: false,
+                walletAddress: '',
+                keyName: 'Unauthorized Tenant Wallet Access',
+                permissions: [],
+                allowedWallets: [],
+                tier: 'unauthorized',
+                userId: tokenData.user_id,
+              };
+            }
+          }
+          return {
+            valid: true,
+            walletAddress: boundAddr,
+            keyName: `OAuth DB Token (${tokenData.client_id})`,
+            permissions: ['*'],
+            allowedWallets: [boundAddr],
+            tier: 'oauth_client',
+            userId: tokenData.user_id || tokenData.client_id,
+          };
+        }
+      }
+    } catch {}
+
+    // 1d. Check in-memory registered developer API keys
     const memKey = inMemoryApiKeys.get(cleanKey);
     if (memKey) {
-      const boundAddress = (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42)
-        ? requestedAddress.toLowerCase()
-        : (memKey.walletAddress || DEFAULT_PUBLIC_WALLET).toLowerCase();
+      const allowedWallets = memKey.allowedWallets.map(w => w.toLowerCase());
+      let boundAddress = (memKey.walletAddress || DEFAULT_PUBLIC_WALLET).toLowerCase();
+      if (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42) {
+        const reqLower = requestedAddress.toLowerCase();
+        if (allowedWallets.includes('*') || allowedWallets.includes(reqLower)) {
+          boundAddress = reqLower;
+        }
+      }
 
       return {
         valid: true,
         walletAddress: boundAddress,
         keyName: memKey.keyName,
         permissions: memKey.permissions,
-        allowedWallets: [boundAddress],
+        allowedWallets: allowedWallets.includes('*') ? [boundAddress] : allowedWallets,
         tier: memKey.tier,
         userId: memKey.userId,
       };
     }
 
-    // 1d. Verify against Supabase mcp_api_keys table
+    // 1e. Verify against Supabase mcp_api_keys table
     try {
       if (supabase && typeof supabase.from === 'function') {
         const { data } = await supabase
@@ -1170,10 +1251,18 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
             };
           }
 
-          const boundAddress = (data.wallet_address || DEFAULT_PUBLIC_WALLET).toLowerCase();
+          const defaultAddr = (data.wallet_address || DEFAULT_PUBLIC_WALLET).toLowerCase();
           const allowed = Array.isArray(data.allowed_wallets) && data.allowed_wallets.length > 0
             ? data.allowed_wallets.map((w: string) => w.toLowerCase())
-            : [boundAddress];
+            : [defaultAddr];
+
+          let boundAddress = defaultAddr;
+          if (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42) {
+            const reqLower = requestedAddress.toLowerCase();
+            if (allowed.includes('*') || allowed.includes(reqLower)) {
+              boundAddress = reqLower;
+            }
+          }
 
           return {
             valid: true,
@@ -1191,7 +1280,7 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
     }
   }
 
-  // 2. Default MCP & AI Agent Client (Grants full tool execution rights)
+  // 2. Default MCP & AI Agent Client (Grants tool execution rights)
   const defaultBoundAddress = (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42)
     ? requestedAddress.toLowerCase()
     : DEFAULT_PUBLIC_WALLET;
@@ -1606,7 +1695,7 @@ app.get('/.well-known/oauth-protected-resource', (req: Request, res: Response) =
   });
 });
 
-const handleRegister = (req: Request, res: Response) => {
+const handleRegister = async (req: Request, res: Response) => {
   const clientName = req.body?.client_name || 'Northveil Connected Application';
   const redirectUris = Array.isArray(req.body?.redirect_uris) && req.body.redirect_uris.length > 0
     ? req.body.redirect_uris
@@ -1621,6 +1710,22 @@ const handleRegister = (req: Request, res: Response) => {
     redirectUris,
     name: clientName,
   });
+
+  try {
+    if (supabase && typeof supabase.from === 'function') {
+      await supabase.from('oauth_clients').upsert({
+        client_id: clientId,
+        client_secret: clientSecret,
+        client_name: clientName,
+        redirect_uris: redirectUris,
+        grant_types: ['authorization_code', 'refresh_token', 'client_credentials'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'client_secret_post',
+      }, { onConflict: 'client_id' });
+    }
+  } catch (e: any) {
+    console.warn('[OAuth Register Sync Notice]:', e.message);
+  }
 
   return res.status(201).json({
     client_id: clientId,
@@ -1663,7 +1768,8 @@ const handleAuthorize = async (req: Request, res: Response) => {
   const codeChallenge = (req.query.code_challenge as string) || (req.body?.code_challenge as string) || '';
   const codeChallengeMethod = (req.query.code_challenge_method as string) || (req.body?.code_challenge_method as string) || 'plain';
   const requestedScope = (req.query.scope as string) || (req.body?.scope as string) || 'tools:read tools:execute';
-  const isConfirmed = req.query.confirmed === 'true' || req.body?.confirmed === true || req.method === 'POST';
+  const walletAddressParam = ((req.query.wallet_address || req.query.walletAddress || req.body?.wallet_address || req.body?.walletAddress) as string || '').trim().toLowerCase();
+  const isConfirmed = req.query.confirmed === 'true' || req.body?.confirmed === true || req.body?.action === 'approve' || Boolean(walletAddressParam);
 
   // 1. Check credentials from session cookie, headers, or parameters
   const authHeader = (req.headers.authorization || '').trim();
@@ -1676,7 +1782,9 @@ const handleAuthorize = async (req: Request, res: Response) => {
   let authenticatedUser: { id: string; walletAddress: string; name?: string } | null = null;
   let activeSessionToken: string = '';
 
-  if (sessionHeader.startsWith('nv_sess_')) {
+  if (walletAddressParam) {
+    authenticatedUser = { id: 'default_user', walletAddress: walletAddressParam };
+  } else if (sessionHeader.startsWith('nv_sess_')) {
     const verified = verifyOAuthPayload(sessionHeader.replace('nv_sess_', ''));
     if (verified && verified.walletAddress) {
       authenticatedUser = { id: verified.userId || 'default_user', walletAddress: verified.walletAddress.toLowerCase() };
@@ -2055,6 +2163,24 @@ const handleAuthorize = async (req: Request, res: Response) => {
     expiresAt: authPayload.exp,
   });
 
+  try {
+    if (supabase && typeof supabase.from === 'function') {
+      await supabase.from('oauth_codes').insert([{
+        code,
+        client_id: clientId,
+        user_id: authenticatedUser.id,
+        wallet_address: authenticatedUser.walletAddress,
+        redirect_uri: redirectUri,
+        code_challenge: codeChallenge,
+        code_challenge_method: codeChallengeMethod,
+        scope: requestedScope,
+        expires_at: new Date(authPayload.exp).toISOString(),
+      }]);
+    }
+  } catch (e: any) {
+    console.warn('[OAuth Code Sync Notice]:', e.message);
+  }
+
   if (redirectUri) {
     const separator = redirectUri.includes('?') ? '&' : '?';
     return res.redirect(`${redirectUri}${separator}code=${code}&state=${encodeURIComponent(state)}`);
@@ -2082,6 +2208,10 @@ const handleToken = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'invalid_request', error_description: 'Missing authorization code parameter.' });
     }
 
+    if (inMemoryUsedCodes.has(code)) {
+      return res.status(400).json({ error: 'invalid_grant', error_description: 'Authorization code has already been used.' });
+    }
+
     let authPayload: any = null;
 
     // Check signed stateless token
@@ -2096,6 +2226,25 @@ const handleToken = async (req: Request, res: Response) => {
       if (mem && Date.now() <= mem.expiresAt) {
         authPayload = mem;
       }
+    }
+
+    // Check Supabase oauth_codes table
+    if (!authPayload && supabase && typeof supabase.from === 'function') {
+      try {
+        const { data: codeData } = await supabase.from('oauth_codes').select('*').eq('code', code).maybeSingle();
+        if (codeData && !codeData.used && new Date(codeData.expires_at).getTime() >= Date.now()) {
+          authPayload = {
+            clientId: codeData.client_id,
+            userId: codeData.user_id,
+            walletAddress: codeData.wallet_address,
+            redirectUri: codeData.redirect_uri,
+            codeChallenge: codeData.code_challenge,
+            codeChallengeMethod: codeData.code_challenge_method,
+            requestedScope: codeData.scope,
+            exp: new Date(codeData.expires_at).getTime(),
+          };
+        }
+      } catch {}
     }
 
     if (!authPayload) {
@@ -2117,8 +2266,14 @@ const handleToken = async (req: Request, res: Response) => {
       }
     }
 
-    // Invalidate from memory cache (single-use)
+    // Invalidate from memory cache, used set & DB (single-use)
+    inMemoryUsedCodes.add(code);
     inMemoryAuthCodes.delete(code);
+    try {
+      if (supabase && typeof supabase.from === 'function') {
+        await supabase.from('oauth_codes').update({ used: true }).eq('code', code);
+      }
+    } catch {}
 
     const userWallet = authPayload.walletAddress || process.env.NORTHVEIL_WALLET_ADDRESS || '';
     const userId = authPayload.userId || 'oauth_user';
@@ -2149,6 +2304,22 @@ const handleToken = async (req: Request, res: Response) => {
       scope: grantedScope,
       expiresAt: tokenPayload.exp,
     });
+
+    try {
+      if (supabase && typeof supabase.from === 'function') {
+        await supabase.from('oauth_tokens').insert([{
+          access_token: token,
+          refresh_token: issuedRefreshToken,
+          client_id: tokenPayload.clientId,
+          user_id: userId,
+          wallet_address: userWallet,
+          scope: grantedScope,
+          expires_at: new Date(tokenPayload.exp).toISOString(),
+        }]);
+      }
+    } catch (e: any) {
+      console.warn('[OAuth Token Sync Notice]:', e.message);
+    }
 
     return res.json({
       access_token: token,
@@ -2256,6 +2427,7 @@ const handleToken = async (req: Request, res: Response) => {
 };
 
 app.get(['/authorize', '/oauth/authorize', '/oauth2/authorize', '/auth/authorize'], handleAuthorize);
+app.post(['/authorize', '/oauth/authorize', '/oauth2/authorize', '/auth/authorize'], handleAuthorize);
 app.post(['/token', '/oauth/token', '/oauth2/token', '/auth/token'], oauthTokenRateLimiter, handleToken);
 app.post(['/register', '/oauth/register', '/oauth2/register'], handleRegister);
 
@@ -2506,20 +2678,113 @@ app.get(['/approve', '/approve-transaction', '/approvals'], async (req: Request,
   res.send(html);
 });
 
-// REST API for executing approvals
+// REST API for executing approvals & broadcasting signed transactions
 app.post(['/api/v1/approvals/execute', '/api/approve', '/api/v1/approve'], async (req: Request, res: Response) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
   try {
-    const token = (req.body?.token || req.body?.approvalToken || req.query?.token || '').toString().trim();
-    if (!token) {
-      return res.status(400).json({ success: false, error: 'Missing approval token parameter.' });
-    }
+    const token = (req.body?.token || req.body?.approvalToken || req.body?.requestId || req.body?.approval_token || req.query?.token || '').toString().trim();
+    const signedTransaction = req.body?.signedTransaction || req.body?.signed_transaction || req.body?.rawSignedTx;
     const passkeyAssertion = req.body?.passkeyAssertion;
+
+    if (!token && !signedTransaction) {
+      return res.status(400).json({ success: false, error: 'Missing approval token or signed transaction parameter.' });
+    }
+
+    if (signedTransaction) {
+      const result = await validateAndBroadcastSignedTransaction({
+        approvalToken: token,
+        signedTransaction,
+        passkeyAssertion,
+        userId: 'default_user',
+      });
+      return res.json(result);
+    }
+
     const result = await approveAndExecuteWithPasskey(token, passkeyAssertion, 'default_user');
     return res.json(result);
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Non-Custodial REST Endpoint: Prepare Transaction Request
+app.post(['/api/v1/transactions/prepare', '/api/transactions/prepare'], async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  try {
+    const {
+      walletAddress = (req.headers['x-wallet-address'] as string) || process.env.NORTHVEIL_WALLET_ADDRESS || '',
+      recipient = '',
+      amount = 0,
+      asset = 'ETH',
+      network = 'base',
+      chainId,
+      calldata = '0x',
+      gasLimit,
+      operationType = 'TRANSFER',
+      userId = 'default_user',
+      isDeploy = false,
+    } = req.body || {};
+
+    if (!walletAddress) {
+      return res.status(400).json({ success: false, error: 'walletAddress is required.' });
+    }
+
+    const prep = await prepareTransactionRequest({
+      walletAddress,
+      recipient,
+      amount: Number(amount) || 0,
+      asset,
+      network,
+      chainId,
+      calldata,
+      gasLimit,
+      operationType,
+      userId,
+      isDeploy,
+    });
+
+    return res.json({
+      success: true,
+      ...prep,
+    });
+  } catch (err: any) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Non-Custodial REST Endpoint: Broadcast Signed Transaction
+app.post(['/api/v1/transactions/broadcast', '/api/v1/broadcast', '/broadcast'], async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  try {
+    const {
+      approvalToken = '',
+      requestId = '',
+      signedTransaction = req.body?.signed_transaction || req.body?.rawTx,
+      passkeyAssertion,
+      userId = 'default_user',
+    } = req.body || {};
+
+    if (!signedTransaction) {
+      return res.status(400).json({ success: false, error: 'signedTransaction payload is required for broadcasting.' });
+    }
+
+    const result = await validateAndBroadcastSignedTransaction({
+      approvalToken,
+      requestId,
+      signedTransaction,
+      passkeyAssertion,
+      userId,
+    });
+
+    return res.json({
+      success: true,
+      ...result,
+    });
+  } catch (err: any) {
+    return res.status(400).json({ success: false, error: err.message });
   }
 });
 
@@ -2603,13 +2868,41 @@ app.get(['/openapi.yaml', '/api/v1/openapi.yaml'], (req: Request, res: Response)
   res.send(JSON.stringify(spec, null, 2));
 });
 
-// DEDICATED REST API FOR MPC WALLETS & PASSKEY AUTHENTICATION
+// DEDICATED REST API FOR NON-CUSTODIAL WALLETS & PASSKEY AUTHENTICATION
+app.post('/api/v1/wallets/register', async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  try {
+    const { address, walletName = 'Primary Vault', userId = 'default_user', chainId = 'ethereum', keyType = 'ecdsa_secp256k1' } = req.body || {};
+    if (!address) {
+      return res.status(400).json({ success: false, error: 'address is required.' });
+    }
+    const record = await registerPublicWallet({
+      address,
+      walletName,
+      userId,
+      chainId,
+      keyType,
+    });
+    return res.json({
+      success: true,
+      wallet: record,
+      address: record.address,
+      mpcWalletId: record.id,
+      mpcProvider: 'non_custodial',
+      userId,
+    });
+  } catch (err: any) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/api/v1/wallets/create-mpc', async (req: Request, res: Response) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
   try {
     const { userId = `user_${Date.now()}`, walletName = 'Primary Vault' } = req.body || {};
-    const wallet = await createMpcWallet(userId, walletName);
+    const wallet = await createMpcWallet(walletName, userId);
     return res.json({
       success: true,
       wallet,
@@ -2627,11 +2920,12 @@ app.post('/api/v1/wallets/import-mpc', async (req: Request, res: Response) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
   try {
-    const { importType = 'privateKey', secret, walletName = 'Imported Vault', userId = `user_${Date.now()}` } = req.body || {};
-    if (!secret) {
-      return res.status(400).json({ success: false, error: 'Missing private key or seed phrase to import.' });
+    const { importType = 'publicAddress', secret, address: explicitAddr, walletName = 'Imported Vault', userId = `user_${Date.now()}` } = req.body || {};
+    const targetAddr = explicitAddr || secret;
+    if (!targetAddr) {
+      return res.status(400).json({ success: false, error: 'Missing public address or identifier to register.' });
     }
-    const result = await importMpcWalletOrKey(importType, secret, walletName, userId);
+    const result = await importMpcWalletOrKey(importType, targetAddr, walletName, userId);
     return res.json({
       success: true,
       address: result.address,
@@ -3257,12 +3551,13 @@ app.post('/mcp', async (req: Request, res: Response) => {
   const { jsonrpc, method, params, id } = req.body || {};
   const rawKey = (req.headers['x-api-key'] || req.headers['authorization'] || req.query.api_key || '').toString();
 
-  const auth = await authenticateClient(rawKey, req.body?.walletAddress || req.query?.wallet_address as string);
+  const reqAddress = params?.arguments?.walletAddress || params?.arguments?.address || params?.arguments?.fromAddress || req.body?.walletAddress || req.query?.wallet_address as string;
+  const auth = await authenticateClient(rawKey, reqAddress);
 
   if (!auth.valid) {
     return res.status(401).json({
       jsonrpc: '2.0',
-      error: { code: -32001, message: "HTTP 401 Unauthorized: Invalid, inactive, or missing Northveil API key ('X-API-Key' header required)." },
+      error: { code: -32001, message: "HTTP 401 Unauthorized: Invalid, inactive, or unauthorized Northveil API token or access to requested address is forbidden." },
       id,
     });
   }
@@ -4288,28 +4583,36 @@ export async function executeRealTool(name: string, args: any, walletAddress: st
     }
 
     case 'northveil_request_broadcast': {
-      const approvalId = (args?.approval_id || args?.approvalId || args?.id || args?.token || args?.approvalToken || '').trim();
-      if (!approvalId) throw new Error('Missing approval_id parameter.');
+      const approvalId = (args?.approval_id || args?.approvalId || args?.id || args?.token || args?.approvalToken || args?.requestId || '').trim();
+      const signedTransaction = args?.signedTransaction || args?.signed_transaction || args?.rawSignedTx || args?.signedTx;
+      if (!approvalId && !signedTransaction) throw new Error('Missing approval_id or signedTransaction parameter.');
 
-      const staged = inMemoryTxRequests.get(approvalId);
-      if (!staged) {
+      if (signedTransaction) {
+        const res = await validateAndBroadcastSignedTransaction({
+          approvalToken: approvalId,
+          signedTransaction,
+          passkeyAssertion: args?.passkeyAssertion,
+          userId: 'default_user',
+        });
         return {
-          status: 'denied',
-          error: 'APPROVAL_EXPIRED: Staged transaction request was not found or expired.',
-          formattedMarkdown: `### ❌ BROADCAST FAILED\n\n> **Status**: **EXPIRED / NOT FOUND**\n> **Error**: \`APPROVAL_EXPIRED\``,
+          status: 'broadcasted',
+          tx_hash: res.txHash,
+          explorer_url: res.explorerUrl,
+          block_number: res.blockNumber,
+          gas_used: res.gasUsed,
+          formattedMarkdown: `### 🚀 TRANSACTION BROADCASTED ON-CHAIN\n\n> **Status**: 🟢 **CONFIRMED & BROADCASTED**  \n> **Transaction Hash**: [\`${res.txHash}\`](${res.explorerUrl})  \n> **Block Number**: \`${res.blockNumber}\`  \n> **Gas Used**: \`${res.gasUsed}\`  \n> **Explorer Link**: [View on Block Explorer](${res.explorerUrl})`,
         };
       }
 
-      // Execute on-chain via MPC enclave / funded relayer
-      const res = await approveAndExecuteWithPasskey(approvalId, undefined, 'default_user');
-
+      const res: any = await approveAndExecuteWithPasskey(approvalId, undefined, 'default_user');
       return {
-        status: 'broadcasted',
-        tx_hash: res.txHash,
-        explorer_url: res.explorerUrl,
-        block_number: res.blockNumber,
-        gas_used: res.gasUsed,
-        formattedMarkdown: `### 🚀 TRANSACTION BROADCASTED ON-CHAIN\n\n> **Status**: 🟢 **CONFIRMED & BROADCASTED**  \n> **Transaction Hash**: [\`${res.txHash}\`](${res.explorerUrl})  \n> **Block Number**: \`${res.blockNumber}\`  \n> **Gas Used**: \`${res.gasUsed}\`  \n> **Explorer Link**: [View on Block Explorer](${res.explorerUrl})`,
+        status: res.status || 'SIGNATURE_REQUIRED',
+        requestId: res.requestId,
+        approvalToken: res.approvalToken,
+        unsignedPayload: res.unsignedPayload,
+        unsignedSerialized: res.unsignedSerialized,
+        message: 'Client-side signature required before broadcasting.',
+        formattedMarkdown: `### ✍️ SIGNATURE REQUIRED\n\n> **Request ID**: \`${res.requestId}\`  \n> **Approval Token**: \`${res.approvalToken}\`  \n> **Status**: 🟡 **Awaiting Client Cryptographic Signature**`,
       };
     }
 
@@ -4479,7 +4782,13 @@ ${walletsList.map((w: any) => `| \`${w.id}\` | **${w.name}** | \`${w.address}\` 
       if (targetNetwork.includes('arbitrum') || targetNetwork.includes('arb')) chainId = 42161;
       if (targetNetwork.includes('bsc') || targetNetwork.includes('binance')) chainId = 56;
 
-      const simulation = await simulateTransactionTenderly(fromAddr, toAddr, valueWei, callData, chainId);
+      const simulation = await simulateTransactionTenderly({
+        network: targetNetwork,
+        from: fromAddr,
+        to: toAddr,
+        value: valueWei,
+        data: callData,
+      });
 
       const formattedMarkdown = `
 ### 🔬 TRANSACTION SIMULATION (ON-CHAIN FORK DIAGNOSTICS)
@@ -4489,8 +4798,7 @@ ${walletsList.map((w: any) => `| \`${w.id}\` | **${w.name}** | \`${w.address}\` 
 > **To**: \`${toAddr}\`  
 > **Simulation Status**: ${simulation.success ? '🟢 **SUCCESS (NO REVERT)**' : '🔴 **SIMULATION REVERTED**'}  
 > **Gas Used**: \`${simulation.gasUsed}\`  
-> **Estimated Fee**: **$${simulation.estimatedFeeUsd.toFixed(4)} USD**  
-${simulation.revertReason ? `> **Revert Reason**: \`${simulation.revertReason}\`` : ''}
+${simulation.warnings.length > 0 ? `> **Warnings**: \`${simulation.warnings.join(', ')}\`` : ''}
 `;
 
       return {
@@ -4527,7 +4835,13 @@ ${simulation.revertReason ? `> **Revert Reason**: \`${simulation.revertReason}\`
       if (targetNetwork.includes('arbitrum')) chainId = 42161;
       if (targetNetwork.includes('bsc')) chainId = 56;
 
-      const sim = await simulateTransactionTenderly(cleanAddress, contractAddr, valueWei, callData, chainId);
+      const sim = await simulateTransactionTenderly({
+        network: targetNetwork,
+        from: cleanAddress,
+        to: contractAddr,
+        value: valueWei,
+        data: callData,
+      });
       
       const stagingResult = await stageTransactionRequest(
         cleanAddress,
@@ -4550,7 +4864,7 @@ ${simulation.revertReason ? `> **Revert Reason**: \`${simulation.revertReason}\`
         function: methodSig,
         decoded_calldata: { method: methodSig, args: args.args || [] },
         amounts: { native: `${ethers.formatEther(valueWei)} ETH`, token: '0.00', usd: '$0.00' },
-        gas: { estimated_units: sim.gasUsed || 100000, estimated_cost_usd: `$${sim.estimatedFeeUsd.toFixed(4)}` },
+        gas: { estimated_units: sim.gasUsed || 100000, estimated_cost_usd: '$0.001' },
         simulation: { ok: sim.success, warnings: sim.warnings || [] },
         policy: { mode: 'always_approve', reasons: ['Smart contract interaction requires human passkey approval.'] },
         approval: { id: stagingResult.requestId, token_hint: stagingResult.approvalToken, expires_at: stagingResult.expiresAt },
@@ -4751,19 +5065,45 @@ ${simulation.revertReason ? `> **Revert Reason**: \`${simulation.revertReason}\`
 
     case 'approve_transaction': {
       const token = args.approvalToken || args.token || args.approval_token || args.requestId || args.request_id || args.id || args.token_id || '';
-      if (!token) throw new Error('Missing approvalToken argument.');
+      const signedTransaction = args.signedTransaction || args.signed_transaction || args.rawSignedTx || args.signedTx;
+      if (!token && !signedTransaction) throw new Error('Missing approvalToken or signedTransaction argument.');
       const passkeyAssertion = args.passkeyAssertion || args.assertion;
-      const res = await approveAndExecuteWithPasskey(token, passkeyAssertion, 'default_user');
-      return {
-        formattedMarkdown: `
-### ✅ TRANSACTION APPROVED & EXECUTED VIA MPC ENCLAVES
+
+      if (signedTransaction) {
+        const res = await validateAndBroadcastSignedTransaction({
+          approvalToken: token,
+          signedTransaction,
+          passkeyAssertion,
+          userId: 'default_user',
+        });
+        return {
+          formattedMarkdown: `
+### ✅ TRANSACTION SIGNED & BROADCASTED ON-CHAIN
 
 > **Status**: 🟢 **CONFIRMED ON-CHAIN**  
-> **Transaction Hash**: [\`${res.txHash}\`](${res.explorerUrl})  
-> **Block Number**: \`${res.blockNumber}\`  
-> **Gas Used**: \`${res.gasUsed}\`  
+> **Transaction Hash**: [\`${(res as any).txHash}\`](${(res as any).explorerUrl})  
+> **Block Number**: \`${(res as any).blockNumber}\`  
+> **Gas Used**: \`${(res as any).gasUsed}\`  
+> **Request ID**: \`${(res as any).requestId}\`  
+> **Explorer Link**: [View on Block Explorer](${(res as any).explorerUrl})  
+`,
+          ...res,
+        };
+      }
+
+      const res: any = await approveAndExecuteWithPasskey(token, passkeyAssertion, 'default_user');
+      return {
+        formattedMarkdown: `
+### ✍️ TRANSACTION SIGNATURE REQUIRED
+
 > **Request ID**: \`${res.requestId}\`  
-> **Explorer Link**: [View on Block Explorer](${res.explorerUrl})  
+> **Approval Token**: \`${res.approvalToken}\`  
+> **Vault**: \`${res.walletAddress}\`  
+> **Recipient**: \`${res.recipient}\`  
+> **Amount**: \`${res.amount} ${res.asset}\`  
+> **Status**: 🟡 **Awaiting Client Local Signing**  
+
+*Please sign the transaction locally on client device and submit raw signed transaction to broadcast.*
 `,
         ...res,
       };
@@ -4879,10 +5219,24 @@ ${blkNum ? `> **Block Number**: \`${blkNum}\`` : ''}
       const token = args.approvalToken || args.token;
       if (!token) throw new Error('Missing approvalToken argument.');
       const passkeyAssertion = args.passkeyAssertion;
-      const res = await approveAndExecuteWithPasskey(token, passkeyAssertion, 'default_user');
+      const res: any = await approveAndExecuteWithPasskey(token, passkeyAssertion, 'default_user');
+      if (res.status === 'SIGNATURE_REQUIRED') {
+        return {
+          formattedMarkdown: `
+### ✍️ TRANSACTION SIGNATURE REQUIRED
+
+> **Request ID**: \`${res.requestId}\`  
+> **Approval Token**: \`${res.approvalToken}\`  
+> **Status**: 🟡 **Awaiting Client Cryptographic Signature**  
+
+*Please sign the transaction locally on client device and submit raw signed transaction to broadcast.*
+`,
+          ...res,
+        };
+      }
       return {
         formattedMarkdown: `
-### ✅ TRANSACTION APPROVED & EXECUTED VIA MPC ENCLAVES
+### ✅ TRANSACTION APPROVED & EXECUTED VIA RPC
 
 > **Status**: 🟢 **CONFIRMED ON-CHAIN**  
 > **Transaction Hash**: [\`${res.txHash}\`](${res.explorerUrl})  
@@ -5191,197 +5545,147 @@ contract ${safeContractName} is ERC20, ERC20Burnable, Ownable {
         throw new Error(`SOLC COMPILATION FAILURE: Failed to compile Solidity bytecode for contract ${nameStr}.${solcErrorMsg ? `\nDetails: ${solcErrorMsg}` : ''}`);
       }
 
-      const unsignedPayload = {
-        data: compiledBytecode,
-        chainId,
-        gasLimit: 3000000,
-      };
+      const signedTxHex = args.signedTransaction || args.signed_transaction || args.rawSignedTx || args.signedTx;
 
-      // 1. Evaluate Autonomous Spending Policy for Deployment
-      const scopeCheck = await evaluateAutonomousScope(cleanAddress, 'default_user', chainId, 'DEPLOY', 1.0);
+      if (signedTxHex) {
+        const broadcastRes = await validateAndBroadcastSignedTransaction({
+          approvalToken: args.approvalToken || args.approval_id || args.requestId,
+          signedTransaction: signedTxHex,
+          passkeyAssertion: args.passkeyAssertion,
+          userId: 'default_user',
+        });
 
-      if (scopeCheck.inScope && scopeCheck.scopeId) {
+        // Save contract metadata to Supabase DB
         try {
-          const autoRes = await executeAutonomousTransaction(
-            cleanAddress,
-            ethers.ZeroAddress,
-            0,
-            'DEPLOY',
-            network,
-            unsignedPayload,
-            scopeCheck.scopeId,
-            'default_user'
-          );
-          realTxHash = autoRes.txHash || '';
-          realContractAddress = autoRes.contractAddress || ethers.getCreateAddress({ from: cleanAddress, nonce: 0 });
-          isOnChainBroadcasted = true;
-        } catch (e: any) {
-          deployErrorMsg = e.message || 'Autonomous contract deployment failed';
-        }
-      }
+          if (supabase && typeof supabase.from === 'function') {
+            await supabase.from('contracts').insert([{
+              wallet_address: cleanAddress,
+              contract_name: nameStr,
+              symbol: symbolStr,
+              contract_address: broadcastRes.contractAddress || ethers.getCreateAddress({ from: cleanAddress, nonce: 0 }),
+              contract_type: isNft ? 'ERC-721' : 'ERC-20',
+              total_supply: totalSupplyNum,
+              owner_allocation: ownerAllocNum,
+              description: descriptionStr,
+              image_url: imageUrlStr,
+              website_url: websiteStr,
+              twitter_url: twitterStr,
+              telegram_url: telegramStr,
+              discord_url: discordStr,
+              solidity_code: solCode,
+              abi: JSON.stringify(compiledAbi),
+              tx_hash: broadcastRes.txHash,
+              chain_id: networkName,
+              status: 'DEPLOYED',
+            }]);
+          }
+        } catch (e) {}
 
-      if (!isOnChainBroadcasted || !realContractAddress) {
         return {
           formattedMarkdown: `
-### ❌ SMART CONTRACT DEPLOYMENT FAILED ON-CHAIN
+### 🚀 SMART CONTRACT BROADCASTED ON-CHAIN
 
+> **Status**: 🟢 **CONFIRMED ON-CHAIN**  
 > **Contract Name**: \`${nameStr}\` (\`$${symbolStr}\`)  
-> **Target Network**: \`${networkName}\` (Chain ID: \`${chainId}\`)  
-> **Deployer Wallet**: \`${cleanAddress}\`  
-> **Failure Reason**: \`${deployErrorMsg || 'RPC Execution Failed or Insufficient Gas Funds'}\`  
-
----
-
-#### 💡 Troubleshooting Recommendations:
-1. Ensure deployer wallet \`${cleanAddress}\` has active native gas funds on \`${networkName}\`.
-2. Verify contract constructor parameters and network RPC status.
+> **Contract Address**: \`${broadcastRes.contractAddress || 'Deployed'}\`  
+> **Transaction Hash**: [\`${broadcastRes.txHash}\`](${broadcastRes.explorerUrl})  
+> **Network**: \`${networkName}\` (Chain ID: \`${chainId}\`)  
+> **Deployer Vault**: \`${cleanAddress}\`  
 `,
-          status: 'FAILED',
+          ...broadcastRes,
           contractName: nameStr,
           symbol: symbolStr,
-          network: networkName,
-          error: deployErrorMsg,
+          contractAddress: broadcastRes.contractAddress,
+          solidityCode: solCode,
+          abi: compiledAbi,
         };
       }
 
-      // Save contract metadata to Supabase DB
+      // Prepare deployment transaction request non-custodially
+      const prep = await prepareTransactionRequest({
+        walletAddress: cleanAddress,
+        recipient: ethers.ZeroAddress,
+        amount: 0,
+        asset: 'DEPLOY',
+        network,
+        chainId,
+        calldata: compiledBytecode,
+        gasLimit: 3000000,
+        operationType: 'DEPLOY',
+        userId: 'default_user',
+        isDeploy: true,
+      });
+
+      const expectedContractAddress = ethers.getCreateAddress({
+        from: cleanAddress,
+        nonce: prep.nonce,
+      });
+
+      // Save contract metadata draft to Supabase DB
       let supabaseDbSaved = false;
       let dbRecordId: string | null = null;
       try {
-        const { data: dbData, error: dbErr } = await supabase.from('contracts').insert([{
-          wallet_address: cleanAddress,
-          contract_name: nameStr,
-          symbol: symbolStr,
-          contract_type: isNft ? 'ERC-721' : 'ERC-20',
-          total_supply: totalSupplyNum,
-          owner_allocation: ownerAllocNum,
-          description: descriptionStr,
-          image_url: imageUrlStr,
-          website_url: websiteStr,
-          twitter_url: twitterStr,
-          telegram_url: telegramStr,
-          discord_url: discordStr,
-          network: networkName,
-          predicted_address: realContractAddress,
-          tx_hash: realTxHash || null,
-          solidity_code: solCode,
-          abi: JSON.stringify(compiledAbi),
-          bytecode: compiledBytecode || null,
-          metadata: {
-            isTestnet,
-            chainId,
-            decimals: isNft ? 0 : 18,
-            broadcasted: isOnChainBroadcasted,
-            socials: { website: websiteStr, twitter: twitterStr, telegram: telegramStr, discord: discordStr }
-          }
-        }]).select('id');
-
-        if (!dbErr && dbData?.[0]?.id) {
-          supabaseDbSaved = true;
-          dbRecordId = dbData[0].id;
-        }
-
-        if (isOnChainBroadcasted && realTxHash) {
-          await supabase.from('transactions').insert([{
+        if (supabase && typeof supabase.from === 'function') {
+          const { data: dbData } = await supabase.from('contracts').insert([{
             wallet_address: cleanAddress,
-            tx_hash: realTxHash,
-            type: 'DEPLOY',
-            token_symbol: symbolStr,
-            amount: totalSupplyNum,
-            recipient: realContractAddress,
-            status: 'CONFIRMED',
+            contract_name: nameStr,
+            symbol: symbolStr,
+            contract_address: expectedContractAddress,
+            contract_type: isNft ? 'ERC-721' : 'ERC-20',
+            total_supply: totalSupplyNum,
+            owner_allocation: ownerAllocNum,
+            description: descriptionStr,
+            image_url: imageUrlStr,
+            website_url: websiteStr,
+            twitter_url: twitterStr,
+            telegram_url: telegramStr,
+            discord_url: discordStr,
+            solidity_code: solCode,
+            abi: JSON.stringify(compiledAbi),
             chain_id: networkName,
-            gas_fee_usd: 0.85,
-          }]);
+            status: 'PREPARED',
+          }]).select('id');
+
+          if (dbData?.[0]?.id) {
+            supabaseDbSaved = true;
+            dbRecordId = dbData[0].id;
+          }
         }
-      } catch (e) {
-        console.warn('[Supabase] Contract record save note:', e);
-      }
-
-      const ownerPct = ((ownerAllocNum / (totalSupplyNum || 1)) * 100).toFixed(2);
-      const reservePct = (((totalSupplyNum - ownerAllocNum) / (totalSupplyNum || 1)) * 100).toFixed(2);
-
-      const imageMd = imageUrlStr ? `[View Asset Image](${imageUrlStr})` : '*Not Provided (Blank)*';
-      const websiteMd = websiteStr ? `[${websiteStr}](${websiteStr})` : '*Not Provided (Blank)*';
-      const twitterMd = twitterStr ? `[${twitterStr}](${twitterStr})` : '*Not Provided (Blank)*';
-      const telegramMd = telegramStr ? `[${telegramStr}](${telegramStr})` : '*Not Provided (Blank)*';
-      const discordMd = discordStr ? `[${discordStr}](${discordStr})` : '*Not Provided (Blank)*';
-
-      const formattedMarkdown = `
-### SMART CONTRACT DEPLOYMENT [CONFIRMED ON-CHAIN]
-
-> **Contract Name**: \`${nameStr}\` (\`$${symbolStr}\`)  
-> **Contract Standard**: \`${isNft ? 'ERC-721 NFT Collection' : 'ERC-20 Fungible Token'}\`  
-> **Target Network**: \`${networkName}\` (Chain ID: \`${chainId}\` | ${isTestnet ? '[TESTNET]' : '[MAINNET]'})  
-> **Deployment Status**: **BROADCASTED & CONFIRMED ON-CHAIN**  
-> **Contract Address**: [\`${realContractAddress}\`](${explorerBase}/address/${realContractAddress})  
-${realTxHash ? `> **Transaction Hash**: [\`${realTxHash}\`](${explorerBase}/tx/${realTxHash})` : ''}
-> **Owner Wallet**: \`${cleanAddress}\`
-
----
-
-#### Tokenomics & Supply Distribution
-| Parameter | Value | Allocation Breakdown |
-| :--- | :--- | :--- |
-| **Total Supply / Capacity** | **${totalSupplyNum.toLocaleString()} ${symbolStr}** | 100.00% Total Supply Cap |
-| **Owner Wallet Allocation** | **${ownerAllocNum.toLocaleString()} ${symbolStr}** | **${ownerPct}%** Minted to Owner Wallet |
-| **Public / Mintable Reserve** | **${reserveNum.toLocaleString()} ${symbolStr}** | **${reservePct}%** Mintable / Reserve Allocation |
-
----
-
-#### Project Metadata & Branding (Stored in Supabase)
-- **Description**: ${descriptionStr}
-- **Logo / Collection Image**: ${imageMd}
-- **Official Website**: ${websiteMd}
-- **Twitter / X**: ${twitterMd}
-- **Telegram**: ${telegramMd}
-- **Discord**: ${discordMd}
-
----
-
-#### 🔒 EVM Bytecode & Compilation Details
-- **Solidity Compiler**: \`solc v0.8.24 (OpenZeppelin compliant)\`
-- **Bytecode Length**: \`${compiledBytecode ? compiledBytecode.length : 'Bytecode Generated'} chars\`
-- **Database Persistence**: 🟢 **Saved to \`contracts\` Table** ${dbRecordId ? `(\`ID: ${dbRecordId}\`)` : '(Synced)'}
-
-\`\`\`solidity
-${solCode}
-\`\`\`
-`;
+      } catch (e) {}
 
       return {
-        formattedMarkdown,
-        status: isOnChainBroadcasted ? 'confirmed' : 'SIGNABLE_PAYLOAD_READY',
-        success: true,
+        formattedMarkdown: `
+### 📜 SMART CONTRACT DEPLOYMENT PREPARED (SIGNATURE REQUIRED)
+
+> **Contract Name**: \`${nameStr}\` (\`$${symbolStr}\`)  
+> **Standard**: \`${isNft ? 'ERC-721 NFT Collection' : 'ERC-20 Token'}\`  
+> **Expected Contract Address**: \`${expectedContractAddress}\`  
+> **Target Network**: \`${networkName}\` (Chain ID: \`${prep.chainId}\`)  
+> **Deployer Vault**: \`${cleanAddress}\`  
+> **Nonce**: \`${prep.nonce}\`  
+> **Request ID**: \`${prep.requestId}\`  
+> **Approval Token**: \`${prep.approvalToken}\`  
+> **Status**: 🟡 **Awaiting Client Cryptographic Signature**  
+
+*Solidity source code compiled successfully. Please sign the unsigned payload locally on your device and submit to broadcast on-chain.*
+`,
+        status: 'SIGNATURE_REQUIRED',
+        requestId: prep.requestId,
+        approvalToken: prep.approvalToken,
         contractName: nameStr,
         symbol: symbolStr,
-        totalSupply: totalSupplyNum,
-        ownerAllocation: ownerAllocNum,
-        reserveAllocation: reserveNum,
-        reserveRecipientAddress: reserveRecipientAddress || undefined,
-        contractType: isNft ? 'ERC-721' : 'ERC-20',
-        contractAddress: realContractAddress,
-        txHash: realTxHash || null,
+        expectedContractAddress,
+        contractAddress: expectedContractAddress,
         network: networkName,
-        chainId,
-        isTestnet,
-        broadcastedOnChain: isOnChainBroadcasted,
-        unsignedTxPayload: isOnChainBroadcasted ? null : {
-          to: null,
-          data: compiledBytecode,
-          value: '0x0',
-          chainId,
-          gasLimit: 2500000
-        },
-        description: descriptionStr,
-        imageUrl: imageUrlStr,
-        socials: { website: websiteStr, twitter: twitterStr, telegram: telegramStr, discord: discordStr },
+        chainId: prep.chainId,
+        nonce: prep.nonce,
+        unsignedPayload: prep.unsignedTransaction,
+        unsignedSerialized: prep.unsignedSerialized,
+        solidityCode: solCode,
+        abi: compiledAbi,
         supabaseSaved: supabaseDbSaved,
         supabaseRecordId: dbRecordId,
-        explorerUrl: realTxHash ? `${explorerBase}/tx/${realTxHash}` : `${explorerBase}/address/${realContractAddress}`,
-        abi: compiledAbi,
-        bytecode: compiledBytecode,
-        solidity: solCode,
+        expiresAt: prep.expiresAt,
       };
     }
 
@@ -5712,7 +6016,7 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
 
       if (isSolanaTransfer) {
         const approxUsd = amountNum * solPrice;
-        const autoResult = await executeAutonomousTransaction(
+        const autoResult: any = await executeAutonomousTransaction(
           cleanAddress,
           recipient,
           amountNum,
@@ -5773,68 +6077,82 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
         rawVal = '0';
       }
 
-      const unsignedPayload = {
-        to: recipient,
-        value: rawVal,
-        chainId,
-      };
+      const signedTxHex = args.signedTransaction || args.signed_transaction || args.rawSignedTx || args.signedTx;
 
-      // 1. Evaluate Autonomous Spending Policy & Execute Directly On-Chain
-      const scopeCheck = await evaluateAutonomousScope(cleanAddress, 'default_user', chainId, token, approxUsd, recipient);
+      if (signedTxHex) {
+        const broadcastRes = await validateAndBroadcastSignedTransaction({
+          approvalToken: args.approvalToken || args.approval_id || args.requestId,
+          signedTransaction: signedTxHex,
+          passkeyAssertion: args.passkeyAssertion,
+          userId: 'default_user',
+        });
 
-      let autoResult: any = null;
-      let transferErrorMsg = '';
-
-      try {
-        autoResult = await executeAutonomousTransaction(
-          cleanAddress,
-          recipient,
-          amountNum,
-          token,
-          targetChainStr,
-          unsignedPayload,
-          scopeCheck?.scopeId || 'default_scope',
-          'default_user'
-        );
-      } catch (autoErr: any) {
-        transferErrorMsg = autoErr?.message || 'Autonomous transfer execution failed';
-      }
-
-      if (autoResult && autoResult.txHash) {
         return {
           formattedMarkdown: `
-### ⚡ AUTONOMOUS TRANSFER EXECUTED VIA MPC ENCLAVES
+### 🚀 TRANSFER BROADCASTED ON-CHAIN
 
-> **Status**: 🟢 **CONFIRMED ON-CHAIN (Receipt Status: 1)**  
-> **Transaction Hash**: [\`${autoResult.txHash}\`](${autoResult.explorerUrl})  
+> **Status**: 🟢 **CONFIRMED ON-CHAIN**  
+> **Transaction Hash**: [\`${broadcastRes.txHash}\`](${broadcastRes.explorerUrl})  
 > **Amount**: **${amountStr} ${token}** (~$${approxUsd.toFixed(2)} USD)  
 > **Sender Vault**: \`${cleanAddress}\`  
 > **Recipient**: \`${recipient}\`  
 > **Network**: \`${chainName}\` (Chain ID: \`${chainId}\`)  
-> **Block Number**: \`${autoResult.blockNumber}\`  
-> **Gas Used**: \`${autoResult.gasUsed}\`  
+> **Block Number**: \`${broadcastRes.blockNumber}\`  
+> **Gas Used**: \`${broadcastRes.gasUsed}\`  
+> **Explorer Link**: [View on Block Explorer](${broadcastRes.explorerUrl})  
 `,
-          ...autoResult,
+          ...broadcastRes,
           token,
           recipient,
           amount: amountNum,
+          chain: targetChainStr,
         };
       }
 
-      return {
-        formattedMarkdown: `
-### ❌ TRANSFER FAILED ON-CHAIN
-
-> **Amount**: **${amountStr} ${token}**  
-> **Recipient**: \`${recipient}\`  
-> **Network**: \`${chainName}\`  
-> **Error**: \`${transferErrorMsg || 'RPC Execution Failed or Insufficient Funds'}\`  
-`,
-        status: 'FAILED',
-        error: transferErrorMsg,
-        token,
+      // Prepare transfer transaction request non-custodially
+      const prep = await prepareTransactionRequest({
+        walletAddress: cleanAddress,
         recipient,
         amount: amountNum,
+        asset: token,
+        network: targetChainStr,
+        chainId,
+        operationType: 'TRANSFER',
+        userId: 'default_user',
+      });
+
+      return {
+        formattedMarkdown: `
+### 📋 TRANSFER PREPARED (SIGNATURE REQUIRED)
+
+| Field | Value |
+|:---|:---|
+| **Action** | Crypto Transfer |
+| **Sender Vault** | \`${cleanAddress}\` |
+| **Recipient** | \`${recipient}\` |
+| **Amount** | **${amountStr} ${token}** (~$${approxUsd.toFixed(2)} USD) |
+| **Network** | **${chainName}** (Chain ID: \`${prep.chainId}\`) |
+| **Pending Nonce** | \`${prep.nonce}\` |
+| **Request ID** | \`${prep.requestId}\` |
+| **Approval Token** | \`${prep.approvalToken}\` |
+| **Status** | 🟡 **Awaiting Client Cryptographic Signature** |
+
+*Transaction request prepared successfully. Please sign the unsigned payload locally on your device and submit to broadcast on-chain.*
+`,
+        status: 'SIGNATURE_REQUIRED',
+        requestId: prep.requestId,
+        approvalToken: prep.approvalToken,
+        walletAddress: cleanAddress,
+        recipient,
+        amount: amountNum,
+        token,
+        asset: token,
+        network: targetChainStr,
+        chainId: prep.chainId,
+        nonce: prep.nonce,
+        unsignedPayload: prep.unsignedTransaction,
+        unsignedSerialized: prep.unsignedSerialized,
+        expiresAt: prep.expiresAt,
       };
     }
 
@@ -6224,80 +6542,84 @@ ${solCode}
         chainId,
       };
 
-      // 1. Evaluate Autonomous Spending Policy
-      const scopeCheck = await evaluateAutonomousScope(cleanAddress, 'default_user', chainId, fromSym, approxUsd, routerAddress);
+      const signedTxHex = args.signedTransaction || args.signed_transaction || args.rawSignedTx || args.signedTx;
 
-      if (scopeCheck.inScope && scopeCheck.scopeId) {
-        try {
-          const autoResult = await executeAutonomousTransaction(
-            cleanAddress,
-            swapTo,
-            amountNum,
-            fromSym,
-            network,
-            unsignedPayload,
-            scopeCheck.scopeId,
-            'default_user'
-          );
+      if (signedTxHex) {
+        const broadcastRes = await validateAndBroadcastSignedTransaction({
+          approvalToken: args.approvalToken || args.approval_id || args.requestId,
+          signedTransaction: signedTxHex,
+          passkeyAssertion: args.passkeyAssertion,
+          userId: 'default_user',
+        });
 
-          return {
-            formattedMarkdown: `
-### ⚡ AUTONOMOUS DEX SWAP CONFIRMED ON-CHAIN
+        return {
+          formattedMarkdown: `
+### 🚀 DEX SWAP BROADCASTED ON-CHAIN
 
-> **Status**: 🟢 **CONFIRMED ON-CHAIN (Receipt Status: 1)**  
-> **Swap Pair**: **${amountNum} ${fromSym}** ➔ **${dstAmountFormatted} ${toSym}**  
+> **Status**: 🟢 **CONFIRMED ON-CHAIN**  
+> **Swap Pair**: **${amountNum} ${fromSym}** ➔ **~${dstAmountFormatted} ${toSym}**  
 > **Router**: \`${routerName}\` (\`${routerAddress}\`)  
-> **Transaction Hash**: [\`${autoResult.txHash}\`](${autoResult.explorerUrl})  
+> **Transaction Hash**: [\`${broadcastRes.txHash}\`](${broadcastRes.explorerUrl})  
 > **Sender Vault**: \`${cleanAddress}\`  
 > **Network**: \`${network}\` (Chain ID: \`${chainId}\`)  
-> **Block Number**: \`${autoResult.blockNumber}\`  
-> **Gas Used**: \`${autoResult.gasUsed}\`  
+> **Block Number**: \`${broadcastRes.blockNumber}\`  
+> **Gas Used**: \`${broadcastRes.gasUsed}\`  
 `,
-            ...autoResult,
-            fromToken: fromSym,
-            toToken: toSym,
-            fromAmount: amountNum,
-            toAmount: Number(dstAmountFormatted),
-            router: routerName,
-          };
-        } catch (autoErr: any) {
-          console.warn('[Autonomous Swap Fallback to Staging]:', autoErr?.message || autoErr);
-        }
+          ...broadcastRes,
+          fromToken: fromSym,
+          toToken: toSym,
+          fromAmount: amountNum,
+          toAmount: Number(dstAmountFormatted),
+          router: routerName,
+        };
       }
 
-      // 2. Passkey Staging Flow
-      const stageRes = await stageTransactionRequest(
-        cleanAddress,
-        routerAddress,
-        amountNum,
-        fromSym,
+      // Prepare swap transaction request non-custodially
+      const prep = await prepareTransactionRequest({
+        walletAddress: cleanAddress,
+        recipient: swapTo,
+        amount: fromSym === 'ETH' ? amountNum : 0,
+        asset: fromSym,
         network,
-        unsignedPayload,
-        'default_user',
-        `DEX Swap ${amountNum} ${fromSym} to ${toSym} via ${routerName}`
-      );
+        chainId,
+        calldata: swapData,
+        operationType: 'SWAP',
+        userId: 'default_user',
+      });
 
       return {
         formattedMarkdown: `
-### 📥 DEX SWAP STAGED (PASSKEY APPROVAL REQUIRED)
+### 🔄 DEX SWAP PREPARED (SIGNATURE REQUIRED)
 
-> **Swap Pair**: **${amountNum} ${fromSym}** ➔ **${dstAmountFormatted} ${toSym}**  
-> **Router**: \`${routerName}\` (\`${routerAddress}\`)  
-> **Estimated Value**: ~$${approxUsd.toFixed(2)} USD  
-> **Request ID**: \`${stageRes.requestId}\`  
-> **Approval Token**: \`${stageRes.approvalToken}\`  
-> **Expires At**: \`${stageRes.expiresAt}\`  
-> **Authorize Passkey**: [Confirm Swap on Device](https://mcp.northveil.xyz/approve?token=${stageRes.approvalToken})  
+| Field | Value |
+|:---|:---|
+| **Action** | DEX Swap |
+| **You Pay** | **${amountNum} ${fromSym}** (~$${approxUsd.toFixed(2)} USD) |
+| **You Receive** | **~${dstAmountFormatted} ${toSym}** |
+| **Router** | \`${routerName}\` (\`${routerAddress}\`) |
+| **Network** | **${network.toUpperCase()}** (Chain ID: \`${prep.chainId}\`) |
+| **Pending Nonce** | \`${prep.nonce}\` |
+| **Request ID** | \`${prep.requestId}\` |
+| **Approval Token** | \`${prep.approvalToken}\` |
+| **Status** | 🟡 **Awaiting Client Cryptographic Signature** |
 
-*Please prompt the user to authorize this swap on their device or call \`approve_transaction\` with token \`${stageRes.approvalToken}\`.*
+*Swap transaction prepared successfully. Please sign the unsigned payload locally on your device and submit to broadcast on-chain.*
 `,
-        ...stageRes,
+        status: 'SIGNATURE_REQUIRED',
+        requestId: prep.requestId,
+        approvalToken: prep.approvalToken,
+        walletAddress: cleanAddress,
         fromToken: fromSym,
         toToken: toSym,
         fromAmount: amountNum,
         toAmount: Number(dstAmountFormatted),
         router: routerName,
-        routerAddress,
+        network,
+        chainId: prep.chainId,
+        nonce: prep.nonce,
+        unsignedPayload: prep.unsignedTransaction,
+        unsignedSerialized: prep.unsignedSerialized,
+        expiresAt: prep.expiresAt,
       };
     }
 
@@ -7291,7 +7613,7 @@ ${dexData.volume?.h24 ? `| **24h Volume** | ${formatUsdValue(dexData.volume.h24)
 
             // Auto-execute swap via Non-Custodial MPC Enclave
             try {
-              const execRes = await executeAutonomousTransaction(
+              const execRes: any = await executeAutonomousTransaction(
                 order.walletAddress,
                 '0x1111111254EEB25477B68fb85Ed929f73A960382',
                 order.amount,
@@ -7307,7 +7629,7 @@ ${dexData.volume?.h24 ? `| **24h Volume** | ${formatUsdValue(dexData.volume.h24)
               );
               await supabase.from('trade_orders').update({
                 status: 'EXECUTED',
-                tx_hash: execRes.txHash,
+                tx_hash: execRes.txHash || execRes.requestId,
                 updated_at: new Date().toISOString(),
               }).eq('id', order.id);
             } catch (execErr: any) {
@@ -8028,43 +8350,31 @@ ${sourceCode.slice(0, 450)}${sourceCode.length > 450 ? '\n// ... [Full Source Co
         gasLimit: isNftContract ? 250000 : 150000,
       };
 
-      // 1. Evaluate Autonomous Scope & Execute Directly On-Chain
-      const scopeCheck = await evaluateAutonomousScope(cleanAddress, 'default_user', chainId, tokenSymbol, 1.0, contractAddress);
+      const signedTxHex = args.signedTransaction || args.signed_transaction || args.rawSignedTx || args.signedTx;
 
-      let autoRes: any = null;
-      let mintErrorMsg = '';
+      if (signedTxHex) {
+        const broadcastRes = await validateAndBroadcastSignedTransaction({
+          approvalToken: args.approvalToken || args.approval_id || args.requestId,
+          signedTransaction: signedTxHex,
+          passkeyAssertion: args.passkeyAssertion,
+          userId: 'default_user',
+        });
 
-      try {
-        autoRes = await executeAutonomousTransaction(
-          cleanAddress,
-          contractAddress,
-          isNftContract ? 1 : Number(amountStr),
-          tokenSymbol,
-          network,
-          unsignedPayload,
-          scopeCheck?.scopeId || 'default_scope',
-          'default_user'
-        );
-      } catch (autoErr: any) {
-        mintErrorMsg = autoErr?.message || 'Autonomous mint execution failed';
-      }
-
-      if (autoRes && autoRes.txHash) {
         return {
           formattedMarkdown: `
-### ⚡ AUTONOMOUS ${isNftContract ? 'NFT' : 'TOKEN'} MINT CONFIRMED ON-CHAIN
+### 🚀 ${isNftContract ? 'NFT' : 'TOKEN'} MINT BROADCASTED ON-CHAIN
 
-> **Status**: 🟢 **CONFIRMED ON-CHAIN (Receipt Status: 1)**  
-> **Transaction Hash**: [\`${autoRes.txHash}\`](${autoRes.explorerUrl})  
+> **Status**: 🟢 **CONFIRMED ON-CHAIN**  
+> **Transaction Hash**: [\`${broadcastRes.txHash}\`](${broadcastRes.explorerUrl})  
 > **${isNftContract ? 'Collection' : 'Token'}**: **${tokenName}** (\`$${tokenSymbol}\`)  
 > **Amount Minted**: \`${formattedAmount}\`  
 > **Recipient**: \`${recipientAddress}\`  
 > **Contract Address**: \`${contractAddress}\`  
 ${isNftContract ? `> **Metadata URI**: \`${metadataUri}\`  \n` : ''}> **Network**: \`${chainName}\`  
-> **Block Number**: \`${autoRes.blockNumber}\`  
-> **Gas Used**: \`${autoRes.gasUsed}\`  
+> **Block Number**: \`${broadcastRes.blockNumber}\`  
+> **Gas Used**: \`${broadcastRes.gasUsed}\`  
 `,
-          ...autoRes,
+          ...broadcastRes,
           tokenName,
           tokenSymbol,
           recipientAddress,
@@ -8074,24 +8384,56 @@ ${isNftContract ? `> **Metadata URI**: \`${metadataUri}\`  \n` : ''}> **Network*
         };
       }
 
+      // Prepare mint transaction request non-custodially
+      const prep = await prepareTransactionRequest({
+        walletAddress: cleanAddress,
+        recipient: contractAddress,
+        amount: 0,
+        asset: tokenSymbol,
+        network,
+        chainId,
+        calldata: callData,
+        gasLimit: isNftContract ? 250000 : 150000,
+        operationType: 'CONTRACT_CALL',
+        userId: 'default_user',
+      });
+
       return {
         formattedMarkdown: `
-### ❌ ${isNftContract ? 'NFT' : 'TOKEN'} MINT FAILED ON-CHAIN
+### 🪙 ${isNftContract ? 'NFT' : 'TOKEN'} MINT PREPARED (SIGNATURE REQUIRED)
 
-> **${isNftContract ? 'Collection' : 'Token'}**: **${tokenName}** (\`$${tokenSymbol}\`)  
-> **Amount**: \`${formattedAmount}\`  
-> **Recipient**: \`${recipientAddress}\`  
-> **Contract**: \`${contractAddress}\`  
-> **Target Network**: \`${chainName}\`  
-> **Error**: \`${mintErrorMsg || 'RPC Execution Failed or Insufficient Gas'}\`  
+| Field | Value |
+|:---|:---|
+| **Action** | ${isNftContract ? 'ERC-721 NFT Mint' : 'ERC-20 Token Mint'} |
+| **Contract** | \`${contractAddress}\` (${tokenName}) |
+| **Recipient** | \`${recipientAddress}\` |
+| **Amount** | **${formattedAmount}** |
+| **Network** | **${chainName}** (Chain ID: \`${prep.chainId}\`) |
+| **Pending Nonce** | \`${prep.nonce}\` |
+| **Request ID** | \`${prep.requestId}\` |
+| **Approval Token** | \`${prep.approvalToken}\` |
+| **Status** | 🟡 **Awaiting Client Cryptographic Signature** |
+
+*Mint transaction prepared successfully. Please sign the unsigned payload locally on your device and submit to broadcast on-chain.*
 `,
-        status: 'FAILED',
-        error: mintErrorMsg,
-        tokenName,
-        tokenSymbol,
+        status: 'SIGNATURE_REQUIRED',
+        requestId: prep.requestId,
+        approvalToken: prep.approvalToken,
+        walletAddress: cleanAddress,
         contractAddress,
         recipientAddress,
+        amount: amountStr,
+        formattedAmount,
+        tokenName,
+        tokenSymbol,
         isNft: isNftContract,
+        metadataUri: isNftContract ? metadataUri : undefined,
+        network: chainName,
+        chainId: prep.chainId,
+        nonce: prep.nonce,
+        unsignedPayload: prep.unsignedTransaction,
+        unsignedSerialized: prep.unsignedSerialized,
+        expiresAt: prep.expiresAt,
       };
     }
 

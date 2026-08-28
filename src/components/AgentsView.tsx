@@ -108,14 +108,34 @@ export const AgentsView: React.FC = () => {
           null,
           2
         );
+      case 'cursor':
+        return JSON.stringify(
+          {
+            mcpServers: {
+              northveil: {
+                url: `${baseMcpUrl}/mcp`,
+                headers: {
+                  Authorization: 'Bearer nv_live_YOUR_API_KEY',
+                  'x-wallet-address': targetWallet,
+                },
+              },
+            },
+          },
+          null,
+          2
+        );
       case 'chatgpt':
         return JSON.stringify(
           {
             integration: 'OpenAI ChatGPT Custom Action / GPT Plugin',
             schema_url: `${baseMcpUrl}/openapi.json`,
+            mcp_stream_url: `${baseMcpUrl}/mcp`,
             oauth_configuration: {
               authorization_url: `${baseMcpUrl}/oauth/authorize`,
               token_url: `${baseMcpUrl}/oauth/token`,
+              client_registration_url: `${baseMcpUrl}/oauth/register`,
+              protected_resource_metadata: `${baseMcpUrl}/.well-known/oauth-protected-resource`,
+              authorization_server_metadata: `${baseMcpUrl}/.well-known/oauth-authorization-server`,
               scope: 'tools:read tools:execute',
               client_id: 'chatgpt_agent',
               client_secret: 'northveil_secret',
@@ -129,33 +149,17 @@ export const AgentsView: React.FC = () => {
           null,
           2
         );
-      case 'cursor':
-        return JSON.stringify(
-          {
-            mcpServers: {
-              northveil: {
-                command: 'npx',
-                args: ['-y', 'northveil-cli', 'mcp'],
-                env: {
-                  NORTHVEIL_WALLET_ADDRESS: targetWallet,
-                  NORTHVEIL_API_URL: baseMcpUrl,
-                },
-              },
-            },
-          },
-          null,
-          2
-        );
+      case 'claudecode':
+        return `claude mcp add northveil ${baseMcpUrl}/mcp --header "Authorization: Bearer nv_live_YOUR_API_KEY"`;
       case 'windsurf':
         return JSON.stringify(
           {
             mcpServers: {
               northveil: {
-                command: 'npx',
-                args: ['-y', 'northveil-cli', 'mcp'],
-                env: {
-                  NORTHVEIL_WALLET_ADDRESS: targetWallet,
-                  NORTHVEIL_API_URL: baseMcpUrl,
+                url: `${baseMcpUrl}/mcp`,
+                headers: {
+                  Authorization: 'Bearer nv_live_YOUR_API_KEY',
+                  'x-wallet-address': targetWallet,
                 },
               },
             },
@@ -163,8 +167,6 @@ export const AgentsView: React.FC = () => {
           null,
           2
         );
-      case 'claudecode':
-        return `claude mcp add northveil npx -y northveil-cli mcp`;
       case 'sse':
         return JSON.stringify(
           {

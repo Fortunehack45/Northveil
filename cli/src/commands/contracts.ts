@@ -34,7 +34,7 @@ export function registerContractCommands(program: any) {
 
   program
     .command('mint')
-    .description('Mint new tokens from a deployed ERC-20 contract via custodial signer')
+    .description('Mint new tokens from a deployed ERC-20 contract')
     .requiredOption('-c, --contract <address>', 'Deployed contract address (0x...)')
     .requiredOption('-a, --amount <amount>', 'Amount of tokens to mint')
     .option('-r, --recipient <address>', 'Recipient address (defaults to caller)')

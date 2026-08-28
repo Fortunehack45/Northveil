@@ -8,14 +8,17 @@ export const ApiDocs: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const endpoints = [
-    { method: 'POST', path: '/api/v1/get_portfolio', desc: 'Fetch wallet net worth and token balances across multi-chain providers' },
-    { method: 'POST', path: '/api/v1/deploy_smart_contract', desc: 'Deploy compiled Solidity contract to EVM network' },
-    { method: 'POST', path: '/api/v1/send_transfer', desc: 'Execute on-chain cryptocurrency transaction transfer' },
-    { method: 'POST', path: '/api/v1/get_wallet_info', desc: 'Fetch active wallet status and chain metadata' },
-    { method: 'POST', path: '/api/v1/execute_swap', desc: 'Perform token swap via 1inch EVM / Jupiter Solana' },
+    { method: 'POST', path: '/api/v1/transactions/prepare', desc: 'Non-custodial transaction staging: computes nonces, gas limits, and returns unsigned payload with approvalToken' },
+    { method: 'POST', path: '/api/v1/transactions/broadcast', desc: 'Cryptographically verifies recovered signature against authorized vault and broadcasts on-chain' },
+    { method: 'POST', path: '/api/v1/wallets/register', desc: 'Registers a public wallet address non-custodially (strictly rejects server-side private keys)' },
+    { method: 'POST', path: '/mcp', desc: 'Standard streamable Model Context Protocol JSON-RPC 2.0 tool execution endpoint' },
+    { method: 'GET', path: '/.well-known/oauth-protected-resource', desc: 'RFC 9728 OAuth 2.0 Protected Resource Metadata' },
+    { method: 'GET', path: '/.well-known/oauth-authorization-server', desc: 'RFC 8414 OAuth 2.0 Authorization Server Metadata' },
+    { method: 'POST', path: '/oauth/register', desc: 'RFC 7591 Dynamic Client Registration for AI Agents' },
+    { method: 'POST', path: '/api/v1/tools/get_portfolio', desc: 'Fetch wallet net worth and token balances across multi-chain providers' },
+    { method: 'POST', path: '/api/v1/tools/deploy_smart_contract', desc: 'Deploy compiled Solidity contract to EVM network' },
     { method: 'GET', path: '/openapi.json', desc: 'Download complete OpenAPI 3.0 specification JSON' },
-    { method: 'GET', path: '/health', desc: 'Check API server health & database ping status' },
-    { method: 'GET', path: '/keep-alive', desc: 'Supabase keep-alive heartbeat runner' }
+    { method: 'GET', path: '/health', desc: 'Check API server health & RPC connectivity status' },
   ];
 
   const runTest = async () => {

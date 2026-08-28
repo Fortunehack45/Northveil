@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Cpu, Terminal, Shield, Check, Copy, ArrowRight, Activity, Globe, Zap, Layers, Lock, Server, CheckCircle2, ShieldCheck, FileText, ChevronRight, Code } from 'lucide-react';
-import { getMcpSseUrl } from '../config/endpointConfig';
+import { getMcpSseUrl, getMcpHttpUrl } from '../config/endpointConfig';
 
 interface HeroProps {
   onExploreMcp: () => void;
@@ -241,23 +241,45 @@ export const Hero: React.FC<HeroProps> = ({ onExploreMcp, onExploreApi }) => {
           </div>
         </section>
 
-        {/* SECTION 5: REMOTE MCP SSE ENDPOINT BANNER */}
+        {/* SECTION 5: REMOTE MCP PROTOCOL ENDPOINT BANNER */}
         <div className="bg-[#00f0ff] text-black border-4 border-black p-6 sm:p-8 shadow-[8px_8px_0px_0px_#ccff00] space-y-4">
           <div className="flex items-center justify-between text-xs font-black uppercase border-b-3 border-black pb-3">
-            <span>REMOTE MCP SSE ENDPOINT URL (CLAUDE & CHATGPT CONNECTOR):</span>
-            <span className="bg-black text-[#00f0ff] px-3 py-1 border border-black">HTTP 200 ONLINE</span>
+            <span>LIVE MCP PROTOCOL ENDPOINTS (STREAMABLE HTTP & SSE):</span>
+            <span className="bg-black text-[#00f0ff] px-3 py-1 border border-black">100% NON-CUSTODIAL LIVE</span>
           </div>
-          <div className="flex items-center gap-3">
-            <code className="flex-1 p-3.5 bg-black text-[#ccff00] font-bold text-xs sm:text-sm border-3 border-black overflow-x-auto">
-              {mcpSseUrl}
-            </code>
-            <button
-              onClick={copySseUrl}
-              className="px-6 py-3.5 bg-black text-white hover:bg-[#ff007f] font-black text-xs uppercase border-3 border-black transition-all cursor-pointer flex items-center gap-2"
-            >
-              {copiedUrl ? <Check className="w-4 h-4 text-[#ccff00] stroke-[3]" /> : <Copy className="w-4 h-4 stroke-[3]" />}
-              <span>{copiedUrl ? 'COPIED' : 'COPY URL'}</span>
-            </button>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-black border-2 border-black p-3 space-y-2">
+              <span className="text-[#00f0ff] font-mono text-xs font-black block uppercase">STREAMABLE HTTP (POST /mcp):</span>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 p-2 bg-[#141419] text-[#ccff00] font-bold text-xs border border-white/20 overflow-x-auto">
+                  {getMcpHttpUrl()}
+                </code>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(getMcpHttpUrl());
+                    setCopiedUrl(true);
+                    setTimeout(() => setCopiedUrl(false), 2000);
+                  }}
+                  className="px-3 py-2 bg-[#00f0ff] text-black font-black text-xs uppercase hover:bg-white transition-all cursor-pointer"
+                >
+                  COPY
+                </button>
+              </div>
+            </div>
+            <div className="bg-black border-2 border-black p-3 space-y-2">
+              <span className="text-[#ccff00] font-mono text-xs font-black block uppercase">SERVER-SENT EVENTS (GET /sse):</span>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 p-2 bg-[#141419] text-[#00f0ff] font-bold text-xs border border-white/20 overflow-x-auto">
+                  {mcpSseUrl}
+                </code>
+                <button
+                  onClick={copySseUrl}
+                  className="px-3 py-2 bg-[#ccff00] text-black font-black text-xs uppercase hover:bg-white transition-all cursor-pointer"
+                >
+                  {copiedUrl ? 'COPIED' : 'COPY'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 

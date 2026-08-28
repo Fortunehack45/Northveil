@@ -325,7 +325,7 @@ export class WebAuthnService {
 
         const registered = this.getRegisteredPasskey(normAddr);
         requestOptions = {
-          challenge,
+          challenge: challenge as unknown as BufferSource,
           rpId: this.getRpId(),
           userVerification: 'preferred',
           timeout: 60000,

@@ -103,6 +103,84 @@ export class NorthveilSDK {
   }
 
   /**
+   * Fetch live multi-chain token balances
+   */
+  public async getBalances(network = 'base'): Promise<any> {
+    return this.callTool('northveil_get_balances', { network });
+  }
+
+  /**
+   * Non-custodially prepare an unsigned transaction request for client signing
+   */
+  public async prepareTransaction(params: {
+    recipient: string;
+    amount: number;
+    asset?: string;
+    network?: string;
+    chainId?: number;
+    calldata?: string;
+  }): Promise<{
+    success: boolean;
+    requestId: string;
+    approvalToken: string;
+    walletAddress: string;
+    recipient: string;
+    amount: number;
+    asset: string;
+    network: string;
+    chainId: number;
+    nonce: number;
+    unsignedTransaction: any;
+    unsignedSerialized?: string;
+    expiresAt: string;
+  }> {
+    return this.request('/api/v1/transactions/prepare', {
+      method: 'POST',
+      body: JSON.stringify({
+        walletAddress: this.walletAddress,
+        ...params,
+      }),
+    });
+  }
+
+  /**
+   * Cryptographically verify recovered signature and broadcast signed transaction on-chain
+   */
+  public async broadcastTransaction(params: {
+    approvalToken?: string;
+    requestId?: string;
+    signedTransaction: string;
+  }): Promise<{
+    success: boolean;
+    status: string;
+    requestId: string;
+    walletAddress: string;
+    recipient: string;
+    amount: number;
+    asset: string;
+    network: string;
+    txHash: string;
+    blockNumber: number;
+    gasUsed: string;
+    explorerUrl: string;
+  }> {
+    return this.request('/api/v1/transactions/broadcast', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  /**
+   * Register public wallet non-custodially
+   */
+  public async registerWallet(params: { address: string; walletName?: string; chainId?: string }): Promise<any> {
+    return this.request('/api/v1/wallets/register', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  /**
    * Deploy a compiled Solidity smart contract to a real EVM blockchain
    */
   public async deploySmartContract(contractName: string, network: string = 'sepolia'): Promise<DeploymentResponse> {
@@ -115,5 +193,26 @@ export class NorthveilSDK {
    */
   public async sendTransfer(token: string, amount: number, recipientAddress: string): Promise<any> {
     return this.callTool('send_transfer', { token, amount, recipientAddress });
+  }
+
+  /**
+   * Simulate a transaction on a fork
+   */
+  public async simulateTransaction(params: { from: string; to: string; value?: string; data?: string; network?: string }): Promise<any> {
+    return this.callTool('northveil_simulate_tx', params);
+  }
+
+  /**
+   * Estimate live gas fees
+   */
+  public async estimateGas(params: { network?: string; to?: string; value?: string } = {}): Promise<any> {
+    return this.callTool('northveil_estimate_gas', params);
+  }
+
+  /**
+   * Audit smart contract source or address
+   */
+  public async auditContract(params: { contractAddress?: string; code?: string; network?: string }): Promise<any> {
+    return this.callTool('northveil_audit_contract', params);
   }
 }

@@ -1,10 +1,30 @@
 import React, { useState } from 'react';
-import { Cpu, Terminal, Check, Copy, Shield, Layers, Code, Zap, BookOpen, ChevronRight, Lock, Key, Server, RefreshCw } from 'lucide-react';
-import { getMcpSseUrl } from '../config/endpointConfig';
+import { Cpu, Terminal, Check, Copy, Shield, Layers, Code, Zap, BookOpen, ChevronRight, Lock, Key, Server, RefreshCw, Globe, Sparkles } from 'lucide-react';
+import {
+  getMcpServerUrl,
+  getMcpHttpUrl,
+  getMcpSseUrl,
+  getOAuthAuthorizeUrl,
+  getOAuthTokenUrl,
+  getOAuthRegisterUrl,
+  getOAuthProtectedResourceUrl,
+  getOAuthServerMetadataUrl,
+  getOpenApiUrl,
+} from '../config/endpointConfig';
 
 export const McpDocs: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [selectedClient, setSelectedClient] = useState<'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http'>('claude');
+
+  const mcpServerUrl = getMcpServerUrl();
+  const mcpHttpUrl = getMcpHttpUrl();
   const mcpSseUrl = getMcpSseUrl();
+  const oauthAuthorizeUrl = getOAuthAuthorizeUrl();
+  const oauthTokenUrl = getOAuthTokenUrl();
+  const oauthRegisterUrl = getOAuthRegisterUrl();
+  const oauthProtectedResourceUrl = getOAuthProtectedResourceUrl();
+  const oauthServerMetadataUrl = getOAuthServerMetadataUrl();
+  const openApiUrl = getOpenApiUrl();
 
   const copyText = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -12,145 +32,238 @@ export const McpDocs: React.FC = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const toolsList = [
+  const canonicalToolsList = [
     {
-      name: 'deploy_smart_contract',
-      category: 'Smart Contracts',
-      desc: 'Deploys a compiled Solidity smart contract to a real EVM blockchain network (Sepolia, Ethereum Mainnet, Polygon). Returns contract address, deployment transaction hash, and live Etherscan verification link.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          contractName: { type: 'string', description: 'Name of the smart contract (e.g. NorthveilToken)' },
-          bytecode: { type: 'string', description: 'Optional compiled EVM bytecode hex string (0x...)' },
-          abi: { type: 'string', description: 'Optional contract ABI JSON string' },
-          network: { type: 'string', description: 'Target EVM network (sepolia, ethereum, polygon)' }
-        },
-        required: ['contractName']
-      }
+      name: 'northveil_list_wallets',
+      category: 'Read / Identity',
+      policy: 'Autonomous (Read-Only)',
+      desc: 'Enumerates authenticated, non-custodial public wallet addresses permitted for the session.',
+      inputSchema: { type: 'object', properties: {} }
     },
     {
-      name: 'get_wallet_info',
-      category: 'Account & Network',
-      desc: 'Retrieves current active wallet address, account label, network chain status, Ethers.js RPC connection, and Supabase DB synchronization state.',
+      name: 'northveil_get_balances',
+      category: 'Read / Balances',
+      policy: 'Autonomous (Read-Only)',
+      desc: 'Retrieves live multi-chain native and token balances (ETH, BASE, SOL, MATIC, ARB, BSC).',
       inputSchema: {
         type: 'object',
         properties: {
-          chain: { type: 'string', description: 'Optional chain filter (ethereum, solana, bitcoin, polygon, arbitrum, bsc)' }
+          walletAddress: { type: 'string', description: 'Target wallet address' },
+          network: { type: 'string', description: 'Blockchain network (base, ethereum, sepolia, solana, polygon, arbitrum, bsc)' }
         }
       }
     },
     {
-      name: 'get_portfolio',
-      category: 'Portfolio Analytics',
-      desc: 'Fetches complete token asset holdings across multi-chain balances, live USD market valuations via price engines, 24h price changes, and net worth breakdown.',
+      name: 'northveil_get_portfolio',
+      category: 'Read / Analytics',
+      policy: 'Autonomous (Read-Only)',
+      desc: 'Aggregates complete multi-chain token holdings, live USD market valuations, and net worth breakdown.',
       inputSchema: {
         type: 'object',
         properties: {
-          hideZeroBalances: { type: 'boolean', description: 'Set to true to omit assets with zero balance' }
+          walletAddress: { type: 'string', description: 'Target wallet address' },
+          hideZeroBalances: { type: 'boolean', description: 'Omit tokens with 0 balance' }
         }
       }
     },
     {
-      name: 'get_token_balance',
-      category: 'Asset Queries',
-      desc: 'Queries exact balance and fiat USD market valuation for a specific cryptocurrency token symbol (ETH, BTC, SOL, USDT, USDC).',
+      name: 'northveil_simulate_tx',
+      category: 'Simulate / Diagnostics',
+      policy: 'Autonomous (Read-Only)',
+      desc: 'Simulates transaction execution on an on-chain fork to compute accurate gas consumption, balance deltas, and detect reverts.',
       inputSchema: {
         type: 'object',
         properties: {
-          symbol: { type: 'string', description: 'Cryptocurrency token symbol (e.g. ETH, BTC, SOL)' }
+          from: { type: 'string', description: 'Sender address' },
+          to: { type: 'string', description: 'Recipient or contract address' },
+          value: { type: 'string', description: 'Value in ETH / native units' },
+          data: { type: 'string', description: 'Call data hex (0x...)' },
+          network: { type: 'string', description: 'Target network' }
         },
-        required: ['symbol']
+        required: ['from', 'to']
       }
     },
     {
-      name: 'send_transfer',
-      category: 'Transactions',
-      desc: 'Executes an on-chain cryptocurrency transaction transfer. Generates a signable unsigned intent object or broadcasts signed transaction directly.',
+      name: 'northveil_estimate_gas',
+      category: 'Simulate / Fees',
+      policy: 'Autonomous (Read-Only)',
+      desc: 'Fetches live EIP-1559 gas fees (Base Fee, Priority Fee) and computes USD cost estimates.',
       inputSchema: {
         type: 'object',
         properties: {
-          token: { type: 'string', description: 'Token symbol (ETH, USDT, SOL)' },
-          amount: { type: 'number', description: 'Human readable transfer amount' },
-          recipientAddress: { type: 'string', description: 'Recipient wallet address (0x...)' },
-          chain: { type: 'string', description: 'Target blockchain network' }
-        },
-        required: ['token', 'amount', 'recipientAddress']
+          network: { type: 'string', description: 'Target network' },
+          to: { type: 'string', description: 'Target address' },
+          value: { type: 'string', description: 'Value amount' }
+        }
       }
     },
     {
-      name: 'execute_swap',
-      category: 'DEX Aggregation',
-      desc: 'Performs token swap via 1inch v6 aggregator on EVM or Jupiter v6 aggregator on Solana.',
+      name: 'northveil_audit_contract',
+      category: 'Security / Audit',
+      policy: 'Autonomous (Read-Only)',
+      desc: 'Performs AST vulnerability analysis, honeypot detection, fee analysis, and owner control verification.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          contractAddress: { type: 'string', description: 'Contract address' },
+          network: { type: 'string', description: 'Target network' }
+        },
+        required: ['contractAddress']
+      }
+    },
+    {
+      name: 'northveil_prepare_transfer',
+      category: 'Action / Stage',
+      policy: 'Policy-Gated (Client Signing Required)',
+      desc: 'Non-custodially stages a native or token transfer. Returns an unsigned signable payload, unique requestId, and approvalToken.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          walletAddress: { type: 'string', description: 'Sender vault address' },
+          recipient: { type: 'string', description: 'Recipient public address' },
+          amount: { type: 'number', description: 'Amount to transfer' },
+          asset: { type: 'string', description: 'Token symbol (ETH, USDC, SOL)' },
+          network: { type: 'string', description: 'Target network' }
+        },
+        required: ['recipient', 'amount']
+      }
+    },
+    {
+      name: 'northveil_prepare_swap',
+      category: 'Action / DEX',
+      policy: 'Policy-Gated (Client Signing Required)',
+      desc: 'Stages an optimal DEX swap via 1inch v6 (EVM) or Jupiter v6 (Solana) with slippage protection.',
       inputSchema: {
         type: 'object',
         properties: {
           fromToken: { type: 'string', description: 'Source token symbol' },
           toToken: { type: 'string', description: 'Destination token symbol' },
           amount: { type: 'number', description: 'Amount to swap' },
-          slippage: { type: 'number', description: 'Slippage tolerance percentage (e.g. 0.5)' }
+          slippage: { type: 'number', description: 'Slippage percentage' },
+          network: { type: 'string', description: 'Network' }
         },
         required: ['fromToken', 'toToken', 'amount']
       }
     },
     {
-      name: 'get_transaction_history',
-      category: 'Audit & Logs',
-      desc: 'Queries complete on-chain transaction history timeline and audit log for a wallet from Supabase DB.',
+      name: 'northveil_request_signature',
+      category: 'Signing / Passkey',
+      policy: 'WebAuthn / Passkey Prompt',
+      desc: 'Prompts the user for biometric WebAuthn assertion or local cryptographic signature for a staged transaction.',
       inputSchema: {
         type: 'object',
         properties: {
-          limit: { type: 'number', description: 'Maximum transactions to fetch (default 10)' }
-        }
+          approvalToken: { type: 'string', description: 'Staged transaction approval token' },
+          userId: { type: 'string', description: 'User identifier' }
+        },
+        required: ['approvalToken']
       }
     },
     {
-      name: 'create_smart_contract',
+      name: 'northveil_request_broadcast',
+      category: 'Broadcast / Relayer',
+      policy: 'Signature Verified & Relayed',
+      desc: 'Cryptographically verifies the recovered signature against the authorized vault and broadcasts the raw transaction on-chain.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          approvalToken: { type: 'string', description: 'Staged approval token' },
+          signedTransaction: { type: 'string', description: 'Raw signed transaction hex (0x...)' }
+        },
+        required: ['signedTransaction']
+      }
+    },
+    {
+      name: 'deploy_smart_contract',
       category: 'Smart Contracts',
-      desc: 'Generates and audits custom OpenZeppelin Solidity smart contract code based on natural language prompts.',
+      policy: 'Hard-Gated (Approval Required)',
+      desc: 'Deploys a verified Solidity contract (ERC20, ERC721, Staking, Vault) to EVM testnets or mainnets.',
       inputSchema: {
         type: 'object',
         properties: {
-          prompt: { type: 'string', description: 'Natural language contract prompt' },
-          contractType: { type: 'string', description: 'Contract type (ERC20, ERC721, Vault)' }
+          contractName: { type: 'string', description: 'Name of the contract' },
+          contractType: { type: 'string', description: 'Type (erc20, erc721, staking, vault)' },
+          symbol: { type: 'string', description: 'Token symbol' },
+          totalSupply: { type: 'number', description: 'Initial token supply' },
+          network: { type: 'string', description: 'Target network' }
         },
-        required: ['prompt']
+        required: ['contractName']
       }
     },
     {
-      name: 'get_gas_estimate',
-      category: 'Network Feeds',
-      desc: 'Queries live EIP-1559 gas fee prices (Base Fee, Priority Fee) via Ethers.js RPC provider.',
+      name: 'check_wallet_health',
+      category: 'Security / Diagnostics',
+      policy: 'Autonomous (Read-Only)',
+      desc: 'Analyzes wallet health score, gas sufficiency, asset diversification, and dust token hazards.',
       inputSchema: {
         type: 'object',
         properties: {
-          chain: { type: 'string', description: 'Target EVM chain (ethereum, polygon, arbitrum)' }
-        }
-      }
-    },
-    {
-      name: 'audit_smart_contract',
-      category: 'Security & Audit',
-      desc: 'Performs static security analysis on Solidity code to detect reentrancy bugs, integer overflows, and access control risks.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          code: { type: 'string', description: 'Solidity contract code string' }
-        },
-        required: ['code']
-      }
-    },
-    {
-      name: 'get_nft_gallery',
-      category: 'Asset Queries',
-      desc: 'Fetches owned NFT digital assets, collection metadata, and floor prices for a wallet address.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          chain: { type: 'string', description: 'Blockchain network (ethereum, polygon)' }
+          walletAddress: { type: 'string', description: 'Target wallet address' }
         }
       }
     }
   ];
+
+  const getSnippet = (client: 'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http') => {
+    switch (client) {
+      case 'claude':
+        return JSON.stringify({
+          mcpServers: {
+            northveil: {
+              url: mcpHttpUrl,
+              headers: {
+                Authorization: "Bearer nv_live_YOUR_API_KEY",
+                "x-wallet-address": "0xYOUR_WALLET_ADDRESS"
+              }
+            }
+          }
+        }, null, 2);
+      case 'cursor':
+        return JSON.stringify({
+          mcpServers: {
+            northveil: {
+              url: mcpHttpUrl,
+              headers: {
+                Authorization: "Bearer nv_live_YOUR_API_KEY",
+                "x-wallet-address": "0xYOUR_WALLET_ADDRESS"
+              }
+            }
+          }
+        }, null, 2);
+      case 'claudecode':
+        return `claude mcp add northveil ${mcpHttpUrl} --header "Authorization: Bearer nv_live_YOUR_API_KEY"`;
+      case 'chatgpt':
+        return JSON.stringify({
+          integration: "OpenAI ChatGPT Custom Action",
+          openapi_spec_url: openApiUrl,
+          mcp_endpoint: mcpHttpUrl,
+          oauth_metadata: {
+            authorization_server: oauthServerMetadataUrl,
+            protected_resource: oauthProtectedResourceUrl,
+            authorization_url: oauthAuthorizeUrl,
+            token_url: oauthTokenUrl,
+            client_registration_url: oauthRegisterUrl,
+            scopes_supported: ["tools:read", "tools:execute"]
+          }
+        }, null, 2);
+      case 'windsurf':
+        return JSON.stringify({
+          mcpServers: {
+            northveil: {
+              url: mcpHttpUrl,
+              headers: {
+                Authorization: "Bearer nv_live_YOUR_API_KEY",
+                "x-wallet-address": "0xYOUR_WALLET_ADDRESS"
+              }
+            }
+          }
+        }, null, 2);
+      case 'http':
+        return `curl -X POST ${mcpHttpUrl} \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer nv_live_YOUR_API_KEY" \\\n  -H "x-wallet-address: 0xYOUR_WALLET_ADDRESS" \\\n  -d '{\n    "jsonrpc": "2.0",\n    "id": 1,\n    "method": "tools/call",\n    "params": {\n      "name": "northveil_get_balances",\n      "arguments": { "network": "base" }\n    }\n  }'`;
+      default:
+        return '';
+    }
+  };
 
   return (
     <div className="max-w-[96%] mx-auto py-8 px-2 sm:px-4 space-y-10 text-left bg-[#0a0a0c]">
@@ -158,137 +271,179 @@ export const McpDocs: React.FC = () => {
       {/* Brutalist Title Banner */}
       <div className="bg-[#ccff00] text-black border-4 border-black p-6 sm:p-8 shadow-[8px_8px_0px_0px_#00f0ff] space-y-4">
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-black text-[#ccff00] font-mono text-xs font-black uppercase">
-          <Cpu className="w-4 h-4" /> MCP SPEC v2024-11-05
+          <Cpu className="w-4 h-4" /> MCP PROTOCOL SPEC • 100% NON-CUSTODIAL
         </div>
         <h1 className="text-3xl sm:text-6xl font-black text-black uppercase tracking-tighter leading-none">
           MODEL CONTEXT PROTOCOL <br />
-          <span className="bg-black text-[#00f0ff] px-2 py-0.5 inline-block my-1">AI SERVER MANUAL</span>
+          <span className="bg-black text-[#00f0ff] px-2 py-0.5 inline-block my-1">AI SERVER INTEGRATION GUIDE</span>
         </h1>
         <p className="font-mono text-xs sm:text-sm font-bold text-black border-t-3 border-black pt-3">
-          EXHAUSTIVE TECHNICAL SPECIFICATION FOR ANTHROPIC CLAUDE WEB, CHATGPT ACTIONS, AND CURSOR IDE INTEGRATION VIA SERVER-SENT EVENTS (SSE) & JSON-RPC 2.0.
+          COMPLETE SPECIFICATION FOR CLAUDE DESKTOP, CURSOR IDE, CLAUDE CODE, CHATGPT ACTIONS, AND LLM AGENTS VIA STREAMABLE HTTP & SSE.
         </p>
       </div>
 
-      {/* SECTION 1: ARCHITECTURE OVERVIEW */}
+      {/* SECTION 1: PROTOCOL ENDPOINTS & DISCOVERY */}
       <section className="space-y-6">
         <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3 border-b-3 border-white pb-3">
-          <Server className="w-6 h-6 text-[#ccff00]" />
-          <span>1. ARCHITECTURE OVERVIEW & PROTOCOL FLOW</span>
+          <Globe className="w-6 h-6 text-[#ccff00]" />
+          <span>1. PROTOCOL ENDPOINTS & RFC DISCOVERY</span>
         </h2>
-        <div className="bg-[#141419] border-3 border-white p-6 shadow-[6px_6px_0px_0px_#ccff00] space-y-4 font-mono text-xs text-slate-200">
-          <p className="leading-relaxed">
-            The Northveil Model Context Protocol (MCP) server operates as a non-custodial gateway enabling LLMs to query blockchain nodes and propose smart contract transactions.
-          </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="bg-[#141419] border-2 border-[#00f0ff] p-4 shadow-[4px_4px_0px_0px_#00f0ff] space-y-2">
+            <span className="text-[#00f0ff] font-mono text-xs font-black block uppercase">STREAMABLE HTTP MCP</span>
+            <code className="text-xs text-white bg-black p-2 border border-white/20 block font-mono break-all">
+              {mcpHttpUrl}
+            </code>
+            <p className="text-slate-400 font-mono text-[11px]">
+              Standard streamable JSON-RPC 2.0 transport via <code>POST /mcp</code> (rejects GET with 405 per spec).
+            </p>
+            <button
+              onClick={() => copyText(mcpHttpUrl, 'mcpHttp')}
+              className="w-full py-1.5 bg-[#00f0ff] text-black font-mono text-xs font-bold hover:bg-white cursor-pointer"
+            >
+              {copiedId === 'mcpHttp' ? 'COPIED!' : 'COPY URL'}
+            </button>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-            <div className="bg-black border-2 border-[#00f0ff] p-4 shadow-[4px_4px_0px_0px_#00f0ff] space-y-2">
-              <span className="text-[#00f0ff] font-black block uppercase">SSE EVENT STREAM</span>
-              <p className="text-slate-300">
-                Establishes long-lived HTTP Server-Sent Events stream on <code>/sse</code> for bi-directional message dispatching.
-              </p>
-            </div>
-            <div className="bg-black border-2 border-[#ccff00] p-4 shadow-[4px_4px_0px_0px_#ccff00] space-y-2">
-              <span className="text-[#ccff00] font-black block uppercase">JSON-RPC 2.0 PROTOCOL</span>
-              <p className="text-slate-300">
-                Handles tool execution requests via standardized <code>POST /messages</code> or <code>POST /mcp</code> calls.
-              </p>
-            </div>
-            <div className="bg-black border-2 border-[#ff007f] p-4 shadow-[4px_4px_0px_0px_#ff007f] space-y-2">
-              <span className="text-[#ff007f] font-black block uppercase">PERMISSION GUARD</span>
-              <p className="text-slate-300">
-                Enforces API key permissions (<code>read_only</code>, <code>transfer_enabled</code>, <code>contract_deploy_enabled</code>).
-              </p>
-            </div>
+          <div className="bg-[#141419] border-2 border-[#ccff00] p-4 shadow-[4px_4px_0px_0px_#ccff00] space-y-2">
+            <span className="text-[#ccff00] font-mono text-xs font-black block uppercase">SERVER-SENT EVENTS (SSE)</span>
+            <code className="text-xs text-white bg-black p-2 border border-white/20 block font-mono break-all">
+              {mcpSseUrl}
+            </code>
+            <p className="text-slate-400 font-mono text-[11px]">
+              Real-time persistent bi-directional streaming via <code>GET /sse</code> for interactive agent sessions.
+            </p>
+            <button
+              onClick={() => copyText(mcpSseUrl, 'mcpSse')}
+              className="w-full py-1.5 bg-[#ccff00] text-black font-mono text-xs font-bold hover:bg-white cursor-pointer"
+            >
+              {copiedId === 'mcpSse' ? 'COPIED!' : 'COPY URL'}
+            </button>
+          </div>
+
+          <div className="bg-[#141419] border-2 border-[#ff007f] p-4 shadow-[4px_4px_0px_0px_#ff007f] space-y-2">
+            <span className="text-[#ff007f] font-mono text-xs font-black block uppercase">RFC 9728 & RFC 8414 OAUTH</span>
+            <code className="text-xs text-white bg-black p-2 border border-white/20 block font-mono break-all text-[10px]">
+              {oauthProtectedResourceUrl}
+            </code>
+            <p className="text-slate-400 font-mono text-[11px]">
+              Dynamic OAuth 2.0 PKCE discovery metadata and RFC 7591 dynamic client registration.
+            </p>
+            <button
+              onClick={() => copyText(oauthProtectedResourceUrl, 'oauthMeta')}
+              className="w-full py-1.5 bg-[#ff007f] text-white font-mono text-xs font-bold hover:bg-white hover:text-black cursor-pointer"
+            >
+              {copiedId === 'oauthMeta' ? 'COPIED!' : 'COPY METADATA URL'}
+            </button>
           </div>
         </div>
       </section>
 
-      {/* SECTION 2: CLAUDE WEB CONNECTOR */}
+      {/* SECTION 2: CLIENT CONFIGURATION GENERATOR */}
       <section className="space-y-6">
         <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3 border-b-3 border-white pb-3">
-          <Key className="w-6 h-6 text-[#00f0ff]" />
-          <span>2. CLAUDE WEB CUSTOM CONNECTOR SETUP</span>
+          <Terminal className="w-6 h-6 text-[#00f0ff]" />
+          <span>2. CLIENT CONFIGURATION GENERATOR</span>
         </h2>
         <div className="bg-[#141419] border-3 border-white p-6 shadow-[6px_6px_0px_0px_#00f0ff] space-y-6 font-mono text-xs">
-          <p className="text-slate-200">
-            In Claude Web (<b>Claude.ai</b>), navigate to <b>Profile $\rightarrow$ Settings $\rightarrow$ Connectors $\rightarrow$ Add Custom Connector</b> and enter the values below:
-          </p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'claude', label: 'Claude Desktop' },
+              { id: 'cursor', label: 'Cursor IDE' },
+              { id: 'claudecode', label: 'Claude Code CLI' },
+              { id: 'chatgpt', label: 'ChatGPT Custom Action' },
+              { id: 'windsurf', label: 'Windsurf' },
+              { id: 'http', label: 'cURL / Direct HTTP' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setSelectedClient(tab.id as any)}
+                className={`px-4 py-2 border-2 uppercase font-bold transition-all cursor-pointer ${
+                  selectedClient === tab.id
+                    ? 'bg-[#ccff00] text-black border-black shadow-[3px_3px_0px_0px_#00f0ff]'
+                    : 'bg-black text-slate-300 border-white/20 hover:border-white'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-black border-3 border-[#ccff00] p-5 shadow-[4px_4px_0px_0px_#ccff00] space-y-4">
-              <div className="text-[#ccff00] font-black border-b-2 border-white/20 pb-2 flex items-center justify-between">
-                <span>1. CONNECTOR SETTINGS</span>
-                <span className="bg-[#ccff00] text-black px-2 py-0.5 text-[10px]">REQUIRED</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block">Name:</span>
-                <code className="text-white bg-[#141419] p-2 border border-white block mt-1">Northveil AI Assistant</code>
-              </div>
-              <div>
-                <span className="text-slate-400 block">Remote SSE Endpoint URL:</span>
-                <div className="flex items-center gap-2 mt-1">
-                  <code className="text-[#00f0ff] bg-[#141419] p-2 border border-white flex-1 break-all text-[11px]">
-                    {mcpSseUrl}?wallet_address=0xYOUR_WALLET
-                  </code>
-                  <button
-                    onClick={() => copyText(mcpSseUrl, 'sse')}
-                    className="px-3 py-2 bg-[#ccff00] text-black border border-black font-black hover:bg-[#00f0ff]"
-                  >
-                    {copiedId === 'sse' ? 'COPIED' : 'COPY'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-black border-3 border-[#ff007f] p-5 shadow-[4px_4px_0px_0px_#ff007f] space-y-4">
-              <div className="text-[#ff007f] font-black border-b-2 border-white/20 pb-2 flex items-center justify-between">
-                <span>2. OAUTH 2.0 PKCE CREDENTIALS</span>
-                <span className="bg-[#ff007f] text-white px-2 py-0.5 text-[10px]">PRE-CONFIGURED</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block">OAuth Client ID:</span>
-                <code className="text-white bg-[#141419] p-2 border border-white block mt-1">northveil_ai_client</code>
-              </div>
-              <div>
-                <span className="text-slate-400 block">OAuth Client Secret:</span>
-                <code className="text-white bg-[#141419] p-2 border border-white block mt-1">northveil_ai_secret</code>
-              </div>
-            </div>
+          <div className="relative">
+            <pre className="p-4 bg-black border-2 border-white text-[#ccff00] overflow-x-auto text-xs leading-relaxed max-h-72">
+              {getSnippet(selectedClient)}
+            </pre>
+            <button
+              onClick={() => copyText(getSnippet(selectedClient), `snippet-${selectedClient}`)}
+              className="absolute top-3 right-3 px-3 py-1.5 bg-[#00f0ff] text-black font-bold border border-black hover:bg-white cursor-pointer"
+            >
+              {copiedId === `snippet-${selectedClient}` ? 'COPIED!' : 'COPY SNIPPET'}
+            </button>
           </div>
         </div>
       </section>
 
-      {/* SECTION 3: COMPLETE 11 MCP TOOLS SPECIFICATION */}
+      {/* SECTION 3: 2-STEP NON-CUSTODIAL EXECUTION LIFECYCLE */}
+      <section className="space-y-6">
+        <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3 border-b-3 border-white pb-3">
+          <Shield className="w-6 h-6 text-[#ff007f]" />
+          <span>3. TWO-STEP NON-CUSTODIAL EXECUTION LIFECYCLE</span>
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-mono text-xs">
+          <div className="bg-[#141419] border-3 border-white p-5 shadow-[4px_4px_0px_0px_#ccff00] space-y-3">
+            <span className="text-[#ccff00] font-black text-sm block">STEP 1: PREPARATION</span>
+            <p className="text-slate-300 leading-relaxed">
+              Agent calls <code>prepare_transfer</code> or <code>prepare_swap</code>. Northveil computes exact nonces, gas limits, and returns unsigned serialized transaction hex and a unique <code>approvalToken</code>.
+            </p>
+          </div>
+          <div className="bg-[#141419] border-3 border-white p-5 shadow-[4px_4px_0px_0px_#00f0ff] space-y-3">
+            <span className="text-[#00f0ff] font-black text-sm block">STEP 2: LOCAL SIGNING</span>
+            <p className="text-slate-300 leading-relaxed">
+              The user cryptographically signs the unsigned payload locally via WebAuthn biometric Passkey, Hardware Wallet, or local client SDK. <b>Zero private keys ever touch the server.</b>
+            </p>
+          </div>
+          <div className="bg-[#141419] border-3 border-white p-5 shadow-[4px_4px_0px_0px_#ff007f] space-y-3">
+            <span className="text-[#ff007f] font-black text-sm block">STEP 3: BROADCAST</span>
+            <p className="text-slate-300 leading-relaxed">
+              Agent calls <code>northveil_request_broadcast</code> with <code>signedTransaction</code>. Northveil validates recovered address against authorized vault and broadcasts on-chain.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 4: CANONICAL MCP TOOLS CATALOG */}
       <section className="space-y-6">
         <div className="flex items-center justify-between border-b-3 border-white pb-3">
           <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3">
-            <Layers className="w-6 h-6 text-[#ff007f]" />
-            <span>3. COMPLETE MCP TOOLS SPECIFICATION (11 TOOLS)</span>
+            <Layers className="w-6 h-6 text-[#ccff00]" />
+            <span>4. CANONICAL MCP TOOL SPECIFICATION (18 CANONICAL + 39 EXTENSIONS)</span>
           </h2>
           <span className="bg-[#ccff00] text-black font-mono text-xs font-black px-3 py-1 border-2 border-black">
-            JSON-RPC 2.0
+            57 TOTAL TOOLS
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {toolsList.map((tool, idx) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-mono">
+          {canonicalToolsList.map((tool, idx) => (
             <div key={idx} className="bg-[#141419] border-3 border-white p-6 shadow-[6px_6px_0px_0px_#ccff00] space-y-4">
-              <div className="flex items-center justify-between border-b-2 border-white/20 pb-3 font-mono">
-                <span className="font-black text-[#00f0ff] text-sm">
-                  {tool.name}
-                </span>
-                <span className="bg-[#0a0a0c] text-[#ccff00] px-2.5 py-1 text-[10px] font-bold border border-white/20 uppercase">
+              <div className="flex items-center justify-between border-b-2 border-white/20 pb-3">
+                <span className="font-black text-[#00f0ff] text-sm">{tool.name}</span>
+                <span className="bg-black text-[#ccff00] px-2 py-0.5 text-[10px] font-bold border border-white/20 uppercase">
                   {tool.category}
                 </span>
               </div>
               
-              <p className="text-xs font-mono text-slate-300 leading-relaxed">
-                {tool.desc}
-              </p>
+              <div className="text-xs text-slate-300 space-y-1">
+                <p className="leading-relaxed">{tool.desc}</p>
+                <div className="pt-1">
+                  <span className="text-slate-500 text-[11px]">Security Gate: </span>
+                  <span className="text-[#ff007f] font-bold text-[11px]">{tool.policy}</span>
+                </div>
+              </div>
 
-              <div className="bg-black border-2 border-white p-3 space-y-1.5 font-mono">
-                <span className="text-[10px] text-slate-400 block uppercase">Input Schema (JSON):</span>
-                <pre className="text-[11px] text-[#ccff00] overflow-x-auto whitespace-pre-wrap">
+              <div className="bg-black border-2 border-white/40 p-3 space-y-1">
+                <span className="text-[10px] text-slate-400 block uppercase">Input Schema:</span>
+                <pre className="text-[11px] text-[#ccff00] overflow-x-auto whitespace-pre-wrap max-h-36">
                   {JSON.stringify(tool.inputSchema, null, 2)}
                 </pre>
               </div>
@@ -300,3 +455,4 @@ export const McpDocs: React.FC = () => {
     </div>
   );
 };
+

@@ -27,7 +27,7 @@ export const DeveloperHubView: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'mcp' | 'cli' | 'sdk' | 'webhooks' | 'playground'>('mcp');
   const [selectedMcpClient, setSelectedMcpClient] = useState<
-    'claude' | 'chatgpt' | 'claudecode' | 'cursor' | 'windsurf' | 'sse'
+    'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http' | 'sse'
   >('claude');
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
@@ -37,7 +37,7 @@ export const DeveloperHubView: React.FC = () => {
   const baseMcpUrl = isLocalhost ? 'http://localhost:3001' : 'https://mcp.northveil.xyz';
   const currentAddress = activeSubWallet?.address || '0x0000000000000000000000000000000000000000';
 
-  const getMcpSnippet = (client: 'claude' | 'chatgpt' | 'claudecode' | 'cursor' | 'windsurf' | 'sse') => {
+  const getMcpSnippet = (client: 'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http' | 'sse') => {
     switch (client) {
       case 'claude':
         return JSON.stringify(
@@ -56,6 +56,22 @@ export const DeveloperHubView: React.FC = () => {
           null,
           2
         );
+      case 'cursor':
+        return JSON.stringify(
+          {
+            mcpServers: {
+              northveil: {
+                url: `${baseMcpUrl}/mcp`,
+                headers: {
+                  Authorization: 'Bearer nv_live_YOUR_API_KEY',
+                  'x-wallet-address': currentAddress,
+                },
+              },
+            },
+          },
+          null,
+          2
+        );
       case 'chatgpt':
         return JSON.stringify(
           {
@@ -65,6 +81,9 @@ export const DeveloperHubView: React.FC = () => {
             oauth_configuration: {
               authorization_url: `${baseMcpUrl}/oauth/authorize`,
               token_url: `${baseMcpUrl}/oauth/token`,
+              client_registration_url: `${baseMcpUrl}/oauth/register`,
+              protected_resource_metadata: `${baseMcpUrl}/.well-known/oauth-protected-resource`,
+              authorization_server_metadata: `${baseMcpUrl}/.well-known/oauth-authorization-server`,
               scope: 'tools:read tools:execute',
               client_id: 'chatgpt_agent',
               client_secret: 'northveil_secret',
@@ -79,34 +98,16 @@ export const DeveloperHubView: React.FC = () => {
           2
         );
       case 'claudecode':
-        return `claude mcp add northveil npx -y northveil-cli mcp`;
-      case 'cursor':
-        return JSON.stringify(
-          {
-            mcpServers: {
-              northveil: {
-                command: 'npx',
-                args: ['-y', 'northveil-cli', 'mcp'],
-                env: {
-                  NORTHVEIL_WALLET_ADDRESS: currentAddress,
-                  NORTHVEIL_API_URL: baseMcpUrl,
-                },
-              },
-            },
-          },
-          null,
-          2
-        );
+        return `claude mcp add northveil ${baseMcpUrl}/mcp --header "Authorization: Bearer nv_live_YOUR_API_KEY"`;
       case 'windsurf':
         return JSON.stringify(
           {
             mcpServers: {
               northveil: {
-                command: 'npx',
-                args: ['-y', 'northveil-cli', 'mcp'],
-                env: {
-                  NORTHVEIL_WALLET_ADDRESS: currentAddress,
-                  NORTHVEIL_API_URL: baseMcpUrl,
+                url: `${baseMcpUrl}/mcp`,
+                headers: {
+                  Authorization: 'Bearer nv_live_YOUR_API_KEY',
+                  'x-wallet-address': currentAddress,
                 },
               },
             },
@@ -114,6 +115,8 @@ export const DeveloperHubView: React.FC = () => {
           null,
           2
         );
+      case 'http':
+        return `curl -X POST ${baseMcpUrl}/mcp \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer nv_live_YOUR_API_KEY" \\\n  -H "x-wallet-address: ${currentAddress}" \\\n  -d '{\n    "jsonrpc": "2.0",\n    "id": 1,\n    "method": "tools/call",\n    "params": {\n      "name": "northveil_get_balances",\n      "arguments": { "network": "base" }\n    }\n  }'`;
       case 'sse':
         return JSON.stringify(
           {
@@ -131,20 +134,22 @@ export const DeveloperHubView: React.FC = () => {
     }
   };
 
-  const getMcpConfigPath = (client: 'claude' | 'chatgpt' | 'claudecode' | 'cursor' | 'windsurf' | 'sse') => {
+  const getMcpConfigPath = (client: 'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http' | 'sse') => {
     switch (client) {
       case 'claude':
         return 'macOS: ~/Library/Application Support/Claude/claude_desktop_config.json | Windows: %APPDATA%\\Claude\\claude_desktop_config.json | Linux: ~/.config/Claude/claude_desktop_config.json';
+      case 'cursor':
+        return 'Project Root: .cursor/mcp.json (or Cursor Settings > Features > MCP Servers)';
       case 'chatgpt':
         return 'ChatGPT UI > Explore GPTs > Create a GPT > Configure > Actions > "Create new action"';
       case 'claudecode':
         return 'Terminal CLI command line execution';
-      case 'cursor':
-        return 'Project Root: .cursor/mcp.json (or Cursor Settings > Features > MCP Servers)';
       case 'windsurf':
         return 'Global Path: ~/.codeium/windsurf/mcp_config.json';
+      case 'http':
+        return 'Direct Streamable HTTP JSON-RPC 2.0 (POST /mcp)';
       case 'sse':
-        return 'Remote Streamable HTTP / SSE Endpoint URL';
+        return 'Remote Streamable SSE Endpoint URL (GET /sse)';
       default:
         return '';
     }
@@ -781,10 +786,11 @@ export const DeveloperHubView: React.FC = () => {
               <div className="mono-segmented-container w-full flex flex-wrap bg-black/[0.04] dark:bg-black p-1 rounded-xl border border-black/[0.06] dark:border-white/[0.08]">
                 {[
                   { id: 'claude', label: 'Claude Desktop' },
-                  { id: 'chatgpt', label: 'ChatGPT / GPTs' },
-                  { id: 'claudecode', label: 'Claude Code' },
                   { id: 'cursor', label: 'Cursor IDE' },
+                  { id: 'chatgpt', label: 'ChatGPT Actions' },
+                  { id: 'claudecode', label: 'Claude Code' },
                   { id: 'windsurf', label: 'Windsurf' },
+                  { id: 'http', label: 'POST /mcp (HTTP)' },
                   { id: 'sse', label: 'Remote SSE' },
                 ].map((client) => (
                   <button

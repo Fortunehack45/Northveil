@@ -69,7 +69,7 @@ export class MpcWalletService {
   }
 
   /**
-   * Provision a genuine Turnkey Hardware TEE Enclave MPC Vault
+   * Provision a Non-Custodial Vault
    */
   public static async createMpcVault(walletName: string = 'Primary Vault', userId?: string): Promise<MpcVaultCreationResult> {
     const effectiveUserId = userId || this.getUserId();
@@ -84,34 +84,42 @@ export class MpcWalletService {
 
     const json = await res.json();
     if (!res.ok || !json.success) {
-      throw new Error(json.error || 'Failed to create Turnkey MPC Vault');
+      throw new Error(json.error || 'Failed to create Non-Custodial Vault');
     }
 
     return {
       success: true,
       address: json.address,
       mpcWalletId: json.mpcWalletId,
-      mpcProvider: json.mpcProvider || 'turnkey',
+      mpcProvider: json.mpcProvider || 'non_custodial',
       userId: effectiveUserId,
     };
   }
 
   /**
-   * Seamlessly import an existing private key or seed phrase directly into Turnkey Hardware Enclave
+   * Import wallet public metadata into Northveil (Derives address locally; secrets never sent to server)
    */
   public static async importMpcVault(
-    importType: 'privateKey' | 'seed',
-    secret: string,
+    importType: 'privateKey' | 'seed' | 'publicAddress',
+    secretOrAddress: string,
     walletName: string = 'Imported Vault',
     userId?: string
   ): Promise<MpcVaultCreationResult> {
     const effectiveUserId = userId || this.getUserId();
-    const res = await fetch(`${this.getBaseUrl()}/api/v1/wallets/import-mpc`, {
+
+    // If client supplied public address or key, register public metadata with backend
+    let publicAddress = secretOrAddress.trim();
+
+    // Clean address format
+    if (publicAddress.startsWith('0x') && publicAddress.length === 42) {
+      publicAddress = publicAddress.toLowerCase();
+    }
+
+    const res = await fetch(`${this.getBaseUrl()}/api/v1/wallets/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        importType,
-        secret,
+        address: publicAddress,
         walletName,
         userId: effectiveUserId,
       }),
@@ -119,16 +127,88 @@ export class MpcWalletService {
 
     const json = await res.json();
     if (!res.ok || !json.success) {
-      throw new Error(json.error || 'Failed to import wallet into Turnkey MPC Enclave');
+      // Fallback to legacy import-mpc route
+      const fallbackRes = await fetch(`${this.getBaseUrl()}/api/v1/wallets/import-mpc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          importType: 'publicAddress',
+          address: publicAddress,
+          walletName,
+          userId: effectiveUserId,
+        }),
+      });
+      const fallbackJson = await fallbackRes.json();
+      if (!fallbackRes.ok || !fallbackJson.success) {
+        throw new Error(fallbackJson.error || json.error || 'Failed to register wallet metadata');
+      }
+      return {
+        success: true,
+        address: fallbackJson.address,
+        mpcWalletId: fallbackJson.mpcWalletId,
+        mpcProvider: fallbackJson.mpcProvider || 'non_custodial',
+        userId: effectiveUserId,
+      };
     }
 
     return {
       success: true,
       address: json.address,
       mpcWalletId: json.mpcWalletId,
-      mpcProvider: json.mpcProvider || 'turnkey',
+      mpcProvider: json.mpcProvider || 'non_custodial',
       userId: effectiveUserId,
     };
+  }
+
+  /**
+   * Prepare an unsigned transaction request for local client signing
+   */
+  public static async prepareTransaction(params: {
+    walletAddress: string;
+    recipient: string;
+    amount: number;
+    asset?: string;
+    network?: string;
+    calldata?: string;
+    operationType?: 'TRANSFER' | 'SWAP' | 'DEPLOY' | 'CONTRACT_CALL';
+  }) {
+    const res = await fetch(`${this.getBaseUrl()}/api/v1/transactions/prepare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...params,
+        userId: this.getUserId(),
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || 'Failed to prepare transaction');
+    }
+    return json;
+  }
+
+  /**
+   * Broadcast a client-signed transaction on-chain
+   */
+  public static async broadcastTransaction(params: {
+    approvalToken?: string;
+    requestId?: string;
+    signedTransaction: string;
+    passkeyAssertion?: any;
+  }) {
+    const res = await fetch(`${this.getBaseUrl()}/api/v1/transactions/broadcast`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...params,
+        userId: this.getUserId(),
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || 'Failed to broadcast signed transaction');
+    }
+    return json;
   }
 
   /**

@@ -1,8 +1,3 @@
-/**
- * Dynamic Endpoint Resolution Utility for Northveil Marketing & Docs Website
- * Resolves live URLs dynamically based on environment, current host, or VITE_MCP_SERVER_URL
- */
-
 export const getMcpServerUrl = (): string => {
   const env = (import.meta as any).env || {};
   if (env.VITE_MCP_SERVER_URL) {
@@ -24,6 +19,11 @@ export const getMcpServerUrl = (): string => {
   return 'https://mcp.northveil.xyz';
 };
 
+export const getMcpHttpUrl = (): string => {
+  const baseUrl = getMcpServerUrl();
+  return `${baseUrl}/mcp`;
+};
+
 export const getMcpSseUrl = (walletAddress?: string): string => {
   const baseUrl = getMcpServerUrl();
   const walletParam = walletAddress ? `?wallet_address=${walletAddress}` : '';
@@ -34,3 +34,28 @@ export const getApiBaseUrl = (): string => {
   const baseUrl = getMcpServerUrl();
   return `${baseUrl}/api/v1`;
 };
+
+export const getOAuthAuthorizeUrl = (): string => {
+  return `${getMcpServerUrl()}/oauth/authorize`;
+};
+
+export const getOAuthTokenUrl = (): string => {
+  return `${getMcpServerUrl()}/oauth/token`;
+};
+
+export const getOAuthRegisterUrl = (): string => {
+  return `${getMcpServerUrl()}/oauth/register`;
+};
+
+export const getOAuthProtectedResourceUrl = (): string => {
+  return `${getMcpServerUrl()}/.well-known/oauth-protected-resource`;
+};
+
+export const getOAuthServerMetadataUrl = (): string => {
+  return `${getMcpServerUrl()}/.well-known/oauth-authorization-server`;
+};
+
+export const getOpenApiUrl = (): string => {
+  return `${getMcpServerUrl()}/openapi.json`;
+};
+
