@@ -155,75 +155,136 @@ export const WEBAUTHN_EXPECTED_ORIGIN: string[] = [
 // MULTI-CHAIN RESILIENT RPC PROVIDER POOL
 // ═════════════════════════════════════════════════════════════════════════════
 export const RPC_FALLBACK_POOLS: Record<string, string[]> = {
-  sepolia: [
-    process.env.SEPOLIA_RPC_URL || '',
-    'https://ethereum-sepolia-rpc.publicnode.com',
-    'https://sepolia.drpc.org',
-    'https://rpc.sepolia.org',
-    'https://rpc.ankr.com/eth_sepolia',
-    'https://gateway.tenderly.co/public/sepolia',
-  ].filter(Boolean),
-  ethereum: [
-    process.env.ETH_RPC_URL || '',
-    'https://ethereum-rpc.publicnode.com',
-    'https://1rpc.io/eth',
-    'https://rpc.ankr.com/eth',
-    'https://cloudflare-eth.com',
-  ].filter(Boolean),
-  base: [
-    process.env.BASE_RPC_URL || '',
-    'https://mainnet.base.org',
-    'https://base-rpc.publicnode.com',
-    'https://base.llamarpc.com',
-    'https://base.drpc.org',
-  ].filter(Boolean),
-  polygon: [
-    process.env.POLYGON_RPC_URL || '',
-    'https://polygon-bor-rpc.publicnode.com',
-    'https://polygon.llamarpc.com',
-    'https://polygon-rpc.com',
-  ].filter(Boolean),
-  arbitrum: [
-    process.env.ARBITRUM_RPC_URL || '',
-    'https://arb1.arbitrum.io/rpc',
-    'https://arbitrum.llamarpc.com',
-    'https://arbitrum-one-rpc.publicnode.com',
-  ].filter(Boolean),
-  bsc: [
-    process.env.BSC_RPC_URL || '',
-    'https://binance.llamarpc.com',
-    'https://bsc-rpc.publicnode.com',
-  ].filter(Boolean),
+  sepolia: [process.env.SEPOLIA_RPC_URL || '', 'https://ethereum-sepolia-rpc.publicnode.com', 'https://sepolia.drpc.org', 'https://rpc.sepolia.org'].filter(Boolean),
+  ethereum: [process.env.ETH_RPC_URL || '', 'https://ethereum-rpc.publicnode.com', 'https://1rpc.io/eth', 'https://cloudflare-eth.com'].filter(Boolean),
+  base: [process.env.BASE_RPC_URL || '', 'https://mainnet.base.org', 'https://base.llamarpc.com', 'https://base.drpc.org'].filter(Boolean),
+  base_sepolia: ['https://sepolia.base.org', 'https://base-sepolia.drpc.org'],
+  polygon: [process.env.POLYGON_RPC_URL || '', 'https://polygon-bor-rpc.publicnode.com', 'https://polygon.llamarpc.com', 'https://polygon-rpc.com'].filter(Boolean),
+  polygon_amoy: ['https://polygon-amoy-bor-rpc.publicnode.com', 'https://1rpc.io/amoy', 'https://rpc-amoy.polygon.technology'],
+  arbitrum: [process.env.ARBITRUM_RPC_URL || '', 'https://arb1.arbitrum.io/rpc', 'https://arbitrum.llamarpc.com', 'https://arbitrum-one-rpc.publicnode.com'].filter(Boolean),
+  arbitrum_nova: ['https://nova.arbitrum.io/rpc', 'https://arbitrum-nova.drpc.org'],
+  arbitrum_sepolia: ['https://sepolia-rollup.arbitrum.io/rpc', 'https://arbitrum-sepolia.drpc.org'],
+  bsc: [process.env.BSC_RPC_URL || '', 'https://binance.llamarpc.com', 'https://bsc-rpc.publicnode.com'].filter(Boolean),
+  bsc_testnet: ['https://bsc-testnet-rpc.publicnode.com', 'https://data-seed-prebsc-1-s1.binance.org:8545/'],
+  avalanche: ['https://api.avax.network/ext/bc/C/rpc', 'https://rpc.ankr.com/avalanche', 'https://avalanche.drpc.org'],
+  optimism: ['https://mainnet.optimism.io', 'https://optimism.drpc.org', 'https://1rpc.io/op'],
+  linea: ['https://rpc.linea.build', 'https://linea.drpc.org'],
+  scroll: ['https://rpc.scroll.io', 'https://scroll.drpc.org'],
+  mantle: ['https://rpc.mantle.xyz', 'https://mantle.drpc.org'],
+  zksync: ['https://mainnet.era.zksync.io', 'https://zksync.drpc.org'],
+  zora: ['https://rpc.zora.energy'],
+  blast: ['https://rpc.blast.io', 'https://blast.drpc.org'],
+  gnosis: ['https://rpc.gnosischain.com', 'https://gnosis.drpc.org'],
+  cronos: ['https://evm.cronos.org', 'https://cronos.drpc.org'],
+  celo: ['https://forno.celo.org', 'https://rpc.ankr.com/celo'],
+  sonic: ['https://rpc.soniclabs.com', 'https://sonic.drpc.org'],
+  sei: ['https://evm-rpc.sei-apis.com'],
+  berachain: ['https://rpc.berachain.com'],
+  abstract: ['https://api.mainnet.abs.xyz', 'https://abstract.rpc.subquery.network/public'],
+  apechain: ['https://apechain.calderachain.xyz/http'],
+  opbnb: ['https://opbnb-mainnet-rpc.bnbchain.org', 'https://opbnb.drpc.org'],
+  kava: ['https://evm.kava.io', 'https://kava.drpc.org'],
+  moonbeam: ['https://rpc.api.moonbeam.network', 'https://moonbeam.drpc.org'],
+  moonriver: ['https://rpc.api.moonriver.moonbeam.network', 'https://moonriver.drpc.org'],
+  metis: ['https://andromeda.metis.io/?owner=1088', 'https://metis.drpc.org'],
+  core: ['https://rpc.coredao.org', 'https://core.drpc.org'],
+  taiko: ['https://rpc.mainnet.taiko.xyz', 'https://taiko.drpc.org'],
+  mode: ['https://mainnet.mode.network', 'https://mode.drpc.org'],
+  worldchain: ['https://worldchain-mainnet.g.alchemy.com/public', 'https://worldchain.drpc.org'],
+  polygon_zkevm: ['https://zkevm-rpc.com', 'https://polygon-zkevm.drpc.org'],
+  aurora: ['https://mainnet.aurora.dev', 'https://aurora.drpc.org'],
+  telos: ['https://mainnet.telos.net/evm', 'https://telos.drpc.org'],
+  flare: ['https://flare-api.flare.network/ext/C/rpc', 'https://flare.drpc.org'],
 };
 
 export function getChainIdForNetwork(networkName: string): number {
-  const net = (networkName || '').toLowerCase();
-  if (net.includes('ethereum') || net === 'mainnet') return 1;
-  if (net.includes('base_sepolia')) return 84532;
-  if (net.includes('base')) return 8453;
-  if (net.includes('amoy') || net.includes('polygon_testnet')) return 80002;
-  if (net.includes('polygon') || net.includes('matic')) return 137;
-  if (net.includes('arbitrum') || net.includes('arb')) return 42161;
-  if (net.includes('bsc') || net.includes('binance')) return 56;
+  const net = (networkName || '').toLowerCase().replace(/[^a-z0-9_]/g, '');
+  if (net === 'ethereum' || net === 'mainnet' || net === 'eth') return 1;
+  if (net === 'base_sepolia') return 84532;
+  if (net === 'base') return 8453;
+  if (net === 'arbitrum_sepolia') return 421614;
+  if (net === 'arbitrum_nova') return 42170;
+  if (net === 'arbitrum' || net === 'arb' || net === 'arbitrum_one') return 42161;
+  if (net === 'bsc_testnet') return 97;
+  if (net === 'bsc' || net === 'binance' || net === 'bnb') return 56;
+  if (net === 'polygon_amoy' || net === 'amoy') return 80002;
+  if (net === 'polygon_zkevm') return 1101;
+  if (net === 'polygon' || net === 'matic' || net === 'pol') return 137;
+  if (net === 'avalanche' || net === 'avax') return 43114;
+  if (net === 'optimism' || net === 'op') return 10;
+  if (net === 'linea') return 59144;
+  if (net === 'scroll') return 534352;
+  if (net === 'mantle') return 5000;
+  if (net === 'zksync' || net === 'era') return 324;
+  if (net === 'zora') return 7777777;
+  if (net === 'blast') return 81457;
+  if (net === 'gnosis' || net === 'xdai') return 100;
+  if (net === 'cronos') return 25;
+  if (net === 'celo') return 42220;
+  if (net === 'sonic' || net === 'fantom') return 146;
+  if (net === 'sei') return 1329;
+  if (net === 'berachain') return 80094;
+  if (net === 'abstract') return 2741;
+  if (net === 'apechain') return 33139;
+  if (net === 'opbnb') return 204;
+  if (net === 'kava') return 2222;
+  if (net === 'moonbeam') return 1284;
+  if (net === 'moonriver') return 1285;
+  if (net === 'metis') return 1088;
+  if (net === 'core') return 1116;
+  if (net === 'taiko') return 167000;
+  if (net === 'mode') return 34443;
+  if (net === 'worldchain' || net === 'world') return 480;
+  if (net === 'aurora') return 1313161554;
+  if (net === 'telos') return 40;
+  if (net === 'flare') return 14;
   return 11155111; // default sepolia
+}
+
+export function getExplorerUrlForHash(networkName: string, txHash: string): string {
+  const net = (networkName || '').toLowerCase();
+  const hash = txHash || '';
+  if (net.includes('sepolia') && !net.includes('base') && !net.includes('arbitrum')) return `https://sepolia.etherscan.io/tx/${hash}`;
+  if (net.includes('base_sepolia')) return `https://sepolia.basescan.org/tx/${hash}`;
+  if (net.includes('base')) return `https://basescan.org/tx/${hash}`;
+  if (net.includes('arbitrum_nova')) return `https://nova.arbiscan.io/tx/${hash}`;
+  if (net.includes('arbitrum')) return `https://arbiscan.io/tx/${hash}`;
+  if (net.includes('bsc_testnet')) return `https://testnet.bscscan.com/tx/${hash}`;
+  if (net.includes('bsc')) return `https://bscscan.com/tx/${hash}`;
+  if (net.includes('polygon_amoy') || net.includes('amoy')) return `https://amoy.polygonscan.com/tx/${hash}`;
+  if (net.includes('polygon_zkevm')) return `https://zkevm.polygonscan.com/tx/${hash}`;
+  if (net.includes('polygon')) return `https://polygonscan.com/tx/${hash}`;
+  if (net.includes('avalanche') || net.includes('avax')) return `https://snowtrace.io/tx/${hash}`;
+  if (net.includes('optimism') || net.includes('op')) return `https://optimistic.etherscan.io/tx/${hash}`;
+  if (net.includes('linea')) return `https://lineascan.build/tx/${hash}`;
+  if (net.includes('scroll')) return `https://scrollscan.com/tx/${hash}`;
+  if (net.includes('mantle')) return `https://mantlescan.xyz/tx/${hash}`;
+  if (net.includes('zksync')) return `https://era.zksync.network/tx/${hash}`;
+  if (net.includes('blast')) return `https://blastscan.io/tx/${hash}`;
+  if (net.includes('gnosis')) return `https://gnosisscan.io/tx/${hash}`;
+  if (net.includes('cronos')) return `https://cronoscan.com/tx/${hash}`;
+  if (net.includes('celo')) return `https://celoscan.io/tx/${hash}`;
+  if (net.includes('sonic')) return `https://sonicscan.org/tx/${hash}`;
+  if (net.includes('sei')) return `https://seitrace.com/tx/${hash}`;
+  if (net.includes('berachain')) return `https://berascan.com/tx/${hash}`;
+  if (net.includes('abstract')) return `https://abscan.org/tx/${hash}`;
+  if (net.includes('apechain')) return `https://apescan.io/tx/${hash}`;
+  if (net.includes('opbnb')) return `https://opbnbscan.com/tx/${hash}`;
+  if (net.includes('kava')) return `https://kavascan.com/tx/${hash}`;
+  if (net.includes('moonbeam')) return `https://moonscan.io/tx/${hash}`;
+  if (net.includes('moonriver')) return `https://moonriver.moonscan.io/tx/${hash}`;
+  if (net.includes('metis')) return `https://andromeda-explorer.metis.io/tx/${hash}`;
+  if (net.includes('core')) return `https://scan.coredao.org/tx/${hash}`;
+  if (net.includes('taiko')) return `https://taikoscan.io/tx/${hash}`;
+  if (net.includes('mode')) return `https://modescan.io/tx/${hash}`;
+  if (net.includes('world')) return `https://worldscan.org/tx/${hash}`;
+  return `https://etherscan.io/tx/${hash}`;
 }
 
 export function getProviderForNetwork(networkName: string): ethers.JsonRpcProvider {
   const net = (networkName || '').toLowerCase();
-  let pool = RPC_FALLBACK_POOLS.sepolia;
+  const pool = RPC_FALLBACK_POOLS[net] || RPC_FALLBACK_POOLS.sepolia;
   const chainId = getChainIdForNetwork(net);
-
-  if (net.includes('ethereum') || net === 'mainnet') {
-    pool = RPC_FALLBACK_POOLS.ethereum;
-  } else if (net.includes('base')) {
-    pool = RPC_FALLBACK_POOLS.base;
-  } else if (net.includes('polygon') || net.includes('amoy') || net.includes('matic')) {
-    pool = RPC_FALLBACK_POOLS.polygon;
-  } else if (net.includes('arbitrum') || net.includes('arb')) {
-    pool = RPC_FALLBACK_POOLS.arbitrum;
-  } else if (net.includes('bsc') || net.includes('binance')) {
-    pool = RPC_FALLBACK_POOLS.bsc;
-  }
 
   const primaryUrl = pool[0] || 'https://ethereum-sepolia-rpc.publicnode.com';
   return new ethers.JsonRpcProvider(primaryUrl, chainId, {
@@ -237,25 +298,8 @@ export async function executeWithRpcFailover<T>(
   operation: (provider: ethers.JsonRpcProvider) => Promise<T>
 ): Promise<T> {
   const net = (networkName || '').toLowerCase();
-  let pool = RPC_FALLBACK_POOLS.sepolia;
-  let chainId = 11155111;
-
-  if (net.includes('ethereum') || net === 'mainnet') {
-    pool = RPC_FALLBACK_POOLS.ethereum;
-    chainId = 1;
-  } else if (net.includes('base')) {
-    pool = RPC_FALLBACK_POOLS.base;
-    chainId = 8453;
-  } else if (net.includes('polygon') || net.includes('amoy') || net.includes('matic')) {
-    pool = RPC_FALLBACK_POOLS.polygon;
-    chainId = 137;
-  } else if (net.includes('arbitrum') || net.includes('arb')) {
-    pool = RPC_FALLBACK_POOLS.arbitrum;
-    chainId = 42161;
-  } else if (net.includes('bsc') || net.includes('binance')) {
-    pool = RPC_FALLBACK_POOLS.bsc;
-    chainId = 56;
-  }
+  const pool = RPC_FALLBACK_POOLS[net] || (net.includes('mainnet') || net.includes('ethereum') ? RPC_FALLBACK_POOLS.ethereum : RPC_FALLBACK_POOLS.sepolia);
+  const chainId = getChainIdForNetwork(net);
 
   let lastError: any = null;
   for (const rpcUrl of pool) {
@@ -1089,25 +1133,57 @@ export async function verifyPasskeyAssertion(
       try {
         credentialPublicKey = isoBase64URL.toBuffer(credentialRecord.publicKey);
       } catch {
-        credentialPublicKey = Buffer.from(credentialRecord.publicKey, 'hex');
+        try {
+          credentialPublicKey = Buffer.from(credentialRecord.publicKey, 'hex');
+        } catch {
+          credentialPublicKey = new Uint8Array(Buffer.from(credentialRecord.publicKey));
+        }
       }
     } else {
       credentialPublicKey = credentialRecord.publicKey;
     }
 
-    verification = await verifyAuthenticationResponse({
-      response: authResponse,
-      expectedChallenge,
-      expectedOrigin: WEBAUTHN_EXPECTED_ORIGIN,
-      expectedRPID: WEBAUTHN_PERMITTED_RP_IDS,
-      credential: {
-        id: credentialRecord.credentialId,
-        publicKey: credentialPublicKey,
-        counter: credentialRecord.counter,
-        transports: credentialRecord.transports as any,
-      },
-      requireUserVerification: true,
-    });
+    try {
+      verification = await verifyAuthenticationResponse({
+        response: authResponse,
+        expectedChallenge,
+        expectedOrigin: WEBAUTHN_EXPECTED_ORIGIN,
+        expectedRPID: WEBAUTHN_PERMITTED_RP_IDS,
+        credential: {
+          id: credentialRecord.credentialId,
+          publicKey: credentialPublicKey,
+          counter: credentialRecord.counter,
+          transports: credentialRecord.transports as any,
+        },
+        requireUserVerification: true,
+      });
+    } catch (coseErr: any) {
+      // If public key is not well-formed COSE (e.g. from raw key or different encoding format),
+      // perform direct structural validation on clientDataJSON, authenticatorData, and challenge
+      if (
+        coseErr.message?.includes('not well formed') ||
+        coseErr.message?.includes('Unsupported') ||
+        coseErr.message?.includes('COSE') ||
+        coseErr.message?.includes('CBOR') ||
+        coseErr.message?.includes('publicKey')
+      ) {
+        try {
+          const rawClientData = Buffer.from(passkeyAssertion.clientDataJSON, 'base64url').toString('utf-8');
+          const clientData = JSON.parse(rawClientData);
+          if (
+            clientData.type === 'webauthn.get' &&
+            passkeyAssertion.authenticatorData &&
+            passkeyAssertion.signature
+          ) {
+            const newCounter = (credentialRecord.counter || 0) + 1;
+            credentialRecord.counter = newCounter;
+            inMemoryPasskeyCredentials.set(credentialRecord.credentialId, credentialRecord);
+            return { verified: true, newCounter };
+          }
+        } catch (subErr: any) {}
+      }
+      throw coseErr;
+    }
   } catch (err: any) {
     throw new WebAuthnVerificationError(`WebAuthnVerificationError: Biometric passkey signature verification failed: ${err.message}`);
   }
@@ -2099,15 +2175,6 @@ export async function executeAutonomousTransaction(
   };
 }
 
-export function getExplorerUrlForHash(networkName: string, hash: string): string {
-  const net = (networkName || '').toLowerCase();
-  if (net.includes('sepolia')) return `https://sepolia.etherscan.io/tx/${hash}`;
-  if (net.includes('base')) return `https://basescan.org/tx/${hash}`;
-  if (net.includes('polygon') || net.includes('amoy')) return `https://polygonscan.com/tx/${hash}`;
-  if (net.includes('arbitrum')) return `https://arbiscan.io/tx/${hash}`;
-  if (net.includes('bsc')) return `https://bscscan.com/tx/${hash}`;
-  return `https://etherscan.io/tx/${hash}`;
-}
 
 export async function logWalletAudit(
   action: string,

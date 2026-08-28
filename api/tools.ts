@@ -135,6 +135,52 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     },
   },
   {
+    name: 'northveil_get_token_price',
+    description: 'Fetches real-time market price in USD, 24h percentage change, and liquidity metrics for any token symbol or contract address across 37+ EVM chains and Solana.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        token: {
+          type: 'string',
+          description: 'Token ticker symbol (e.g. ETH, SOL, BTC, BNB, ARB, AERO) or 0x contract address',
+        },
+        network: {
+          type: 'string',
+          description: 'Target blockchain network (e.g. ethereum, base, arbitrum, bsc, solana)',
+        },
+      },
+      required: ['token'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        token: {
+          type: 'string',
+          description: 'Token ticker symbol or contract address',
+        },
+        network: {
+          type: 'string',
+          description: 'Target blockchain network',
+        },
+      },
+      required: ['token'],
+    },
+  },
+  {
+    name: 'northveil_list_networks',
+    description: 'Lists all 37+ supported blockchain networks (Ethereum, Solana, Base, Arbitrum, BSC, Polygon, Avalanche, Optimism, Linea, Scroll, Mantle, zkSync, Blast, etc.) with chain IDs, block times, and explorer URLs.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
     name: 'northveil_list_nfts',
     description: 'Retrieves verified NFT digital collectibles, contract metadata, token IDs, and asset media across EVM and Solana.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },

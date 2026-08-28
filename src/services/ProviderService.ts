@@ -90,7 +90,61 @@ export class ProviderService {
         rpcUrls.push('https://rpc.zora.energy');
         break;
       case 'opbnb':
-        rpcUrls.push('https://opbnb-mainnet-rpc.bnbchain.org');
+        rpcUrls.push('https://opbnb-mainnet-rpc.bnbchain.org', 'https://opbnb.drpc.org');
+        break;
+      case 'blast':
+        rpcUrls.push('https://rpc.blast.io', 'https://blast.drpc.org', 'https://blast.din.lol/rpc');
+        break;
+      case 'gnosis':
+        rpcUrls.push('https://rpc.gnosischain.com', 'https://gnosis.drpc.org');
+        break;
+      case 'cronos':
+        rpcUrls.push('https://evm.cronos.org', 'https://cronos.drpc.org');
+        break;
+      case 'kava':
+        rpcUrls.push('https://evm.kava.io', 'https://kava.drpc.org');
+        break;
+      case 'moonbeam':
+        rpcUrls.push('https://rpc.api.moonbeam.network', 'https://moonbeam.drpc.org');
+        break;
+      case 'moonriver':
+        rpcUrls.push('https://rpc.api.moonriver.moonbeam.network', 'https://moonriver.drpc.org');
+        break;
+      case 'metis':
+        rpcUrls.push('https://andromeda.metis.io/?owner=1088', 'https://metis.drpc.org');
+        break;
+      case 'core':
+        rpcUrls.push('https://rpc.coredao.org', 'https://core.drpc.org');
+        break;
+      case 'taiko':
+        rpcUrls.push('https://rpc.mainnet.taiko.xyz', 'https://taiko.drpc.org');
+        break;
+      case 'mode':
+        rpcUrls.push('https://mainnet.mode.network', 'https://mode.drpc.org');
+        break;
+      case 'worldchain':
+        rpcUrls.push('https://worldchain-mainnet.g.alchemy.com/public', 'https://worldchain.drpc.org');
+        break;
+      case 'arbitrum_nova':
+        rpcUrls.push('https://nova.arbitrum.io/rpc', 'https://arbitrum-nova.drpc.org');
+        break;
+      case 'polygon_zkevm':
+        rpcUrls.push('https://zkevm-rpc.com', 'https://polygon-zkevm.drpc.org');
+        break;
+      case 'aurora':
+        rpcUrls.push('https://mainnet.aurora.dev', 'https://aurora.drpc.org');
+        break;
+      case 'telos':
+        rpcUrls.push('https://mainnet.telos.net/evm', 'https://telos.drpc.org');
+        break;
+      case 'flare':
+        rpcUrls.push('https://flare-api.flare.network/ext/C/rpc', 'https://flare.drpc.org');
+        break;
+      case 'base_sepolia':
+        rpcUrls.push('https://sepolia.base.org', 'https://base-sepolia.drpc.org');
+        break;
+      case 'arbitrum_sepolia':
+        rpcUrls.push('https://sepolia-rollup.arbitrum.io/rpc', 'https://arbitrum-sepolia.drpc.org');
         break;
       default:
         rpcUrls.push('https://eth.llamarpc.com');
