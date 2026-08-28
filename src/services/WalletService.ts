@@ -125,6 +125,9 @@ export class WalletService {
    * Derives a Solana address from a seed phrase and account index
    */
   static deriveSolanaAddress(mnemonicWords: string[], accountIndex: number = 0, passphrase?: string): { address: string; privateKey: string; path: string } {
+    if (mnemonicWords.length === 1) {
+      return { address: '', privateKey: '', path: '' };
+    }
     const mnemonic = mnemonicWords.join(' ');
     const seed = bip39.mnemonicToSeedSync(mnemonic, passphrase);
     const path = `m/44'/501'/${accountIndex}'/0'`;
@@ -143,6 +146,9 @@ export class WalletService {
    * Derives a Bitcoin address (Native SegWit / p2wpkh) from a seed phrase and account index
    */
   static deriveBitcoinAddress(mnemonicWords: string[], accountIndex: number = 0, passphrase?: string): { address: string; privateKey: string; path: string } {
+    if (mnemonicWords.length === 1) {
+      return { address: '', privateKey: '', path: '' };
+    }
     const mnemonic = mnemonicWords.join(' ');
     const seed = bip39.mnemonicToSeedSync(mnemonic, passphrase);
     const root = bip32.fromSeed(seed, bitcoin.networks.bitcoin);
@@ -163,6 +169,11 @@ export class WalletService {
    * Cryptographically signs an EIP-191 message using the derived EVM wallet
    */
   static async signMessage(mnemonicWords: string[], accountIndex: number, message: string, passphrase?: string): Promise<string> {
+    if (mnemonicWords.length === 1 && (mnemonicWords[0].startsWith('0x') || mnemonicWords[0].length === 64)) {
+      const clean = mnemonicWords[0].startsWith('0x') ? mnemonicWords[0] : `0x${mnemonicWords[0]}`;
+      const wallet = new ethers.Wallet(clean);
+      return wallet.signMessage(message);
+    }
     const mnemonic = mnemonicWords.join(' ');
     const path = `m/44'/60'/0'/0/${accountIndex}`;
     const hdNode = ethers.HDNodeWallet.fromMnemonic(
@@ -177,6 +188,10 @@ export class WalletService {
    * Retrieves an ethers.Wallet instance connected to a provider securely in memory
    */
   static getEVMWallet(mnemonicWords: string[], accountIndex: number, provider: ethers.Provider, passphrase?: string): ethers.Wallet {
+    if (mnemonicWords.length === 1 && (mnemonicWords[0].startsWith('0x') || mnemonicWords[0].length === 64)) {
+      const clean = mnemonicWords[0].startsWith('0x') ? mnemonicWords[0] : `0x${mnemonicWords[0]}`;
+      return new ethers.Wallet(clean, provider);
+    }
     const mnemonic = mnemonicWords.join(' ');
     const path = `m/44'/60'/0'/0/${accountIndex}`;
     const hdNode = ethers.HDNodeWallet.fromMnemonic(

@@ -17,6 +17,7 @@ import {
 import { useWallet } from '../context/WalletContext';
 import { MpcWalletService } from '../services/MpcWalletService';
 import { WebAuthnService } from '../services/WebAuthnService';
+import { ethers } from 'ethers';
 
 interface OnboardingAuthModalProps {
   onClose?: () => void;
@@ -172,32 +173,30 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       return;
     }
 
-    if (importType === 'seed') {
-      const words = raw.split(/\s+/).map((w) => w.trim().toLowerCase()).filter(Boolean);
-      if (words.length < 12) {
-        setImportError('Seed phrase must contain at least 12 words.');
-        return;
-      }
+    const words = raw.split(/\s+/).map((w) => w.trim().toLowerCase()).filter(Boolean);
+    if (words.length >= 12) {
+      // 12-24 word seed phrase
       setParsedImportWords(words);
       setParsedImportKey('');
       setStep('importPassword');
     } else {
-      const clean = raw.trim();
+      // Hex private key
+      const clean = raw.replace(/\s+/g, '');
       const pKey = clean.startsWith('0x') ? clean : `0x${clean}`;
-      if (pKey.length !== 66) {
-        setImportError('Invalid private key length (must be 64 hex characters).');
+      if (pKey.length !== 66 || !ethers.isHexString(pKey, 32)) {
+        setImportError('Invalid format: Please enter a valid 12-24 word seed phrase or a 64-character private key (0x...).');
         return;
       }
       setParsedImportKey(pKey);
-      setParsedImportWords([]);
+      setParsedImportWords([pKey]);
       setStep('importPassword');
     }
   };
 
   const handleFinalizeImportedVault = async () => {
     setImportPasswordError('');
-    if (importPassword.length < 6) {
-      setImportPasswordError('Password must be at least 6 characters.');
+    if (importPassword.length < 4) {
+      setImportPasswordError('Password must be at least 4 characters.');
       return;
     }
     if (importPassword !== confirmImportPassword) {
@@ -212,19 +211,18 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
     const userId = MpcWalletService.getUserId();
 
     try {
-      if (importType === 'seed' && parsedImportWords.length >= 12) {
+      if (parsedImportWords.length >= 12) {
         const mnemonic = parsedImportWords.join(' ');
         MpcWalletService.importMpcVault('seed', mnemonic, chosenName, userId).catch((e) => {
           console.warn('[Turnkey Enclave Import Notice]:', e.message);
         });
         await setupVault(importPassword, parsedImportWords, chosenName);
-        restoreWalletFromSeed(parsedImportWords, chosenName);
-      } else if (importType === 'privateKey' && parsedImportKey) {
-        MpcWalletService.importMpcVault('privateKey', parsedImportKey, chosenName, userId).catch((e) => {
+      } else if (parsedImportKey || parsedImportWords.length === 1) {
+        const keyToImport = parsedImportKey || parsedImportWords[0];
+        MpcWalletService.importMpcVault('privateKey', keyToImport, chosenName, userId).catch((e) => {
           console.warn('[Turnkey Enclave Import Notice]:', e.message);
         });
-        await setupVault(importPassword, [parsedImportKey], chosenName);
-        restoreWalletFromPrivateKey(parsedImportKey, chosenName);
+        await setupVault(importPassword, [keyToImport], chosenName);
       }
 
       if (onClose) onClose();

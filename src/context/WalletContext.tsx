@@ -931,7 +931,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const unlockVault = async (password: string): Promise<boolean> => {
     const decryptedSeed = await VaultService.decrypt(password);
-    if (decryptedSeed && decryptedSeed.length >= 12) {
+    if (decryptedSeed && (decryptedSeed.length >= 12 || decryptedSeed.length === 1)) {
       setSeedPhrase(decryptedSeed);
       setIsLocked(false);
       return true;
@@ -1025,15 +1025,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setStakingPositions([]);
       setOwnedNFTs([]);
       setAssets(INITIAL_ASSETS.map((a) => ({ ...a, balance: 0 })));
-
-      localStorage.setItem(
-        'northveil_v3_encrypted_vault',
-        JSON.stringify({
-          version: 3,
-          configuredAt: new Date().toISOString(),
-          type: finalSeed.length === 1 ? 'private_key' : 'seed',
-        })
-      );
 
       setIsVaultConfigured(true);
       setIsLocked(false);
@@ -1509,19 +1500,37 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       throw new Error('Wallet or target asset not initialized.');
     }
 
-    // 1. If user has an imported local seed phrase
-    if (seedPhrase && seedPhrase.length >= 12) {
+    // 1. Resolve local signing wallet if available (seed phrase or imported private key)
+    let localWallet: ethers.Wallet | null = null;
+    let localPrivateKey: string | undefined = activeSubWallet.privateKey;
+
+    if (!localPrivateKey && activeSubWallet.id) {
+      localPrivateKey = (await getDecryptedPrivateKey(activeSubWallet.id)) || undefined;
+    }
+    if (!localPrivateKey && seedPhrase && seedPhrase.length > 0) {
+      if (seedPhrase.length === 1) {
+        localPrivateKey = seedPhrase[0];
+      } else if (seedPhrase.length >= 12) {
+        const derived = WalletService.deriveEVMAddress(seedPhrase, activeSubWallet.accountIndex);
+        localPrivateKey = derived.privateKey;
+      }
+    }
+
+    if (localPrivateKey) {
+      const cleanPk = localPrivateKey.startsWith('0x') ? localPrivateKey : `0x${localPrivateKey}`;
+      const provider = ProviderService.getEVMProvider(sourceAsset.network);
+      localWallet = new ethers.Wallet(cleanPk, provider);
+    }
+
+    if (localWallet) {
       try {
-        const provider = ProviderService.getEVMProvider(sourceAsset.network);
-        const connectedWallet = WalletService.getEVMWallet(seedPhrase, activeSubWallet.accountIndex, provider);
-        
         const txHash = await SwapService.executeSwap({
           fromAsset: sourceAsset,
           toAsset: targetAsset,
           amount: fromAmount,
           slippage: userSettings.slippageTolerance,
           walletAddress: activeSubWallet.address,
-          evmWallet: connectedWallet,
+          evmWallet: localWallet,
           quoteData
         });
 
@@ -1624,10 +1633,32 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       throw new Error('Target asset or wallet unavailable.');
     }
 
-    // 1. If user has an imported local seed phrase / private key
-    if (seedPhrase && seedPhrase.length >= 12) {
-      try {
-        if (targetAsset.network === 'solana' || targetAsset.network === 'solana_devnet') {
+    // 1. Resolve local signing wallet if available
+    let localWallet: ethers.Wallet | null = null;
+    let localPrivateKey: string | undefined = activeSubWallet.privateKey;
+
+    if (!localPrivateKey && activeSubWallet.id) {
+      localPrivateKey = (await getDecryptedPrivateKey(activeSubWallet.id)) || undefined;
+    }
+    if (!localPrivateKey && seedPhrase && seedPhrase.length > 0) {
+      if (seedPhrase.length === 1) {
+        localPrivateKey = seedPhrase[0];
+      } else if (seedPhrase.length >= 12) {
+        const derived = WalletService.deriveEVMAddress(seedPhrase, activeSubWallet.accountIndex);
+        localPrivateKey = derived.privateKey;
+      }
+    }
+
+    if (localPrivateKey) {
+      const cleanPk = localPrivateKey.startsWith('0x') ? localPrivateKey : `0x${localPrivateKey}`;
+      const provider = ProviderService.getEVMProvider(targetAsset.network);
+      localWallet = new ethers.Wallet(cleanPk, provider);
+    }
+
+    // Solana Native Handling
+    if (targetAsset.network === 'solana' || targetAsset.network === 'solana_devnet') {
+      if (seedPhrase && seedPhrase.length >= 12) {
+        try {
           const { Keypair, Connection, PublicKey, SystemProgram, Transaction: SolTx, sendAndConfirmTransaction, LAMPORTS_PER_SOL } = await import('@solana/web3.js');
           const rpcUrl = targetAsset.network === 'solana_devnet' ? 'https://api.devnet.solana.com' : 'https://api.mainnet-beta.solana.com';
           const connection = new Connection(rpcUrl, 'confirmed');
@@ -1682,10 +1713,18 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           });
           refreshBalances();
           return signature;
+        } catch (e: any) {
+          alert('Solana Transfer Failed: ' + (e.reason || e.message || e));
+          throw e;
         }
+      }
+    }
 
+    // EVM Local Signing Handling
+    if (localWallet) {
+      try {
         const provider = ProviderService.getEVMProvider(targetAsset.network);
-        const connectedWallet = WalletService.getEVMWallet(seedPhrase, activeSubWallet.accountIndex, provider);
+        const connectedWallet = localWallet.connect(provider);
 
         let txResponse;
         if (!targetAsset.contractAddress || targetAsset.contractAddress === '0x0000000000000000000000000000000000000000' || targetAsset.contractAddress === '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c') {
@@ -1693,14 +1732,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             to: recipientAddress,
             value: ethers.parseEther(amount.toString())
           };
-          const gasLimit = await connectedWallet.estimateGas(tx);
+          const gasLimit = await connectedWallet.estimateGas(tx).catch(() => 21000n);
           txResponse = await connectedWallet.sendTransaction({ ...tx, gasLimit });
         } else {
           const ERC20_ABI = ['function transfer(address to, uint256 value) returns (bool)'];
           const contract = new ethers.Contract(targetAsset.contractAddress, ERC20_ABI, connectedWallet);
-          const decimals = 18;
+          const decimals = targetAsset.decimals || 18;
           const parsedAmount = ethers.parseUnits(amount.toString(), decimals);
-          const gasLimit = await contract.transfer.estimateGas(recipientAddress, parsedAmount);
+          const gasLimit = await contract.transfer.estimateGas(recipientAddress, parsedAmount).catch(() => 65000n);
           txResponse = await contract.transfer(recipientAddress, parsedAmount, { gasLimit });
         }
 
@@ -2120,14 +2159,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       localStorage.setItem('northveil_v3_subwallets', JSON.stringify([mainWallet]));
       localStorage.setItem('northveil_v3_active_subwallet', 'acc-0');
 
-      localStorage.setItem(
-        'northveil_v3_encrypted_vault',
-        JSON.stringify({
-          version: 3,
-          configuredAt: new Date().toISOString(),
-          type: 'seed',
-        })
-      );
       setIsVaultConfigured(true);
       setIsLocked(false);
       setVaultType('imported');
@@ -2197,14 +2228,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         chain
       );
 
-      localStorage.setItem(
-        'northveil_v3_encrypted_vault',
-        JSON.stringify({
-          version: 3,
-          configuredAt: new Date().toISOString(),
-          type: 'private_key',
-        })
-      );
       setIsVaultConfigured(true);
       setIsLocked(false);
       setVaultType('imported');

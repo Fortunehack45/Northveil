@@ -18,7 +18,8 @@ import {
 import { SubWalletAccount } from '../types';
 import { supabase } from '../services/SupabaseService';
 import { MpcWalletService } from '../services/MpcWalletService';
-import { sanitizeToValidAddress } from '../services/addressUtils';
+import { formatShortAddress, sanitizeToValidAddress } from '../services/addressUtils';
+import { ethers } from 'ethers';
 
 export const WalletsView: React.FC = () => {
   const {
@@ -157,41 +158,38 @@ export const WalletsView: React.FC = () => {
   const handleImportWallet = (e: React.FormEvent) => {
     e.preventDefault();
     setImportError('');
-    const secret = importSecret.trim();
-    if (!secret) {
+    const raw = importSecret.trim();
+    if (!raw) {
       setImportError('Please enter a valid seed phrase or private key.');
       return;
     }
 
     try {
-      const chosenName = importName || `Imported Wallet #${subWallets.length + 1}`;
+      const chosenName = importName.trim() || `Imported Wallet #${subWallets.length + 1}`;
       const userId = MpcWalletService.getUserId();
 
-      if (importType === 'seed') {
-        const words = secret.split(/\s+/).filter(Boolean);
-        if (words.length < 12) {
-          setImportError('Seed phrase must contain at least 12 words.');
-          return;
-        }
-        // Provision directly to Turnkey hardware enclave in background
+      const words = raw.split(/\s+/).map((w) => w.trim().toLowerCase()).filter(Boolean);
+      if (words.length >= 12) {
+        // Seed phrase
         MpcWalletService.importMpcVault('seed', words.join(' '), chosenName, userId).catch((e) => {
           console.warn('[Turnkey Enclave Import Notice]:', e.message);
         });
-        const newWallet = importSubWallet('seed', secret, chosenName);
+        const newWallet = importSubWallet('seed', words.join(' '), chosenName);
         if (newWallet) {
           setShowImportModal(false);
           setImportSecret('');
           setImportName('');
         } else {
-          setImportError('Failed to import seed phrase. Please check word order.');
+          setImportError('Failed to import seed phrase. Please check word count and order.');
         }
       } else {
-        const pKey = secret.startsWith('0x') ? secret : `0x${secret}`;
-        if (pKey.length !== 66) {
-          setImportError('Invalid private key length (must be 64 hex characters).');
+        // Private key
+        const clean = raw.replace(/\s+/g, '');
+        const pKey = clean.startsWith('0x') ? clean : `0x${clean}`;
+        if (pKey.length !== 66 || !ethers.isHexString(pKey, 32)) {
+          setImportError('Invalid format: Must be a 12-24 word seed phrase or a 64-character private key.');
           return;
         }
-        // Provision directly to Turnkey hardware enclave in background
         MpcWalletService.importMpcVault('privateKey', pKey, chosenName, userId).catch((e) => {
           console.warn('[Turnkey Enclave Import Notice]:', e.message);
         });

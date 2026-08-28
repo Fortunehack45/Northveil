@@ -132,11 +132,15 @@ export const ApprovalsView: React.FC = () => {
         // Check if local private key is available
         let privateKey = activeSubWallet?.privateKey;
         if (!privateKey && activeSubWallet?.id) {
-          privateKey = getDecryptedPrivateKey(activeSubWallet.id) || undefined;
+          privateKey = (await getDecryptedPrivateKey(activeSubWallet.id)) || undefined;
         }
-        if (!privateKey && seedPhrase && seedPhrase.length >= 12) {
-          const derived = WalletService.deriveEVMAddress(seedPhrase, activeSubWallet?.accountIndex || 0);
-          privateKey = derived.privateKey;
+        if (!privateKey && seedPhrase && seedPhrase.length > 0) {
+          if (seedPhrase.length === 1) {
+            privateKey = seedPhrase[0];
+          } else if (seedPhrase.length >= 12) {
+            const derived = WalletService.deriveEVMAddress(seedPhrase, activeSubWallet?.accountIndex || 0);
+            privateKey = derived.privateKey;
+          }
         }
 
         if (privateKey && targetRecipient) {
