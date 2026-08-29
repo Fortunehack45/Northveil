@@ -5008,7 +5008,7 @@ const WALLET_SCOPED_TOOLS = new Set([
 export async function executeRealTool(name: string, args: any, walletAddress: string, req?: Request) {
   const toolName = name;
 
-  const explicitWallet = (args?.walletAddress || args?.userWallet || args?.ownerAddress || args?.fromAddress || args?.deployerAddress || args?.creatorAddress || args?.from || args?.address || args?.account || args?.solanaAddress || '').toString().trim();
+  const explicitWallet = (args?.walletAddress || args?.userWallet || args?.ownerAddress || args?.fromAddress || args?.deployerAddress || args?.creatorAddress || args?.recipientAddress || args?.recipient || args?.targetAddress || args?.toAddress || args?.from || args?.address || args?.account || args?.solanaAddress || '').toString().trim();
   const isExplicitEvm = explicitWallet.toLowerCase().startsWith('0x') && explicitWallet.length === 42;
   const isExplicitSol = !explicitWallet.startsWith('0x') && explicitWallet.length >= 32 && explicitWallet.length <= 44;
 
@@ -5024,6 +5024,14 @@ export async function executeRealTool(name: string, args: any, walletAddress: st
     const envAddr = process.env.NORTHVEIL_WALLET_ADDRESS.trim();
     if ((envAddr.startsWith('0x') && envAddr.length === 42) || (!envAddr.startsWith('0x') && envAddr.length >= 32)) {
       cleanAddress = envAddr.toLowerCase();
+    }
+  }
+
+  // If still not resolved, check in-memory registered MPC vaults
+  if (!cleanAddress && inMemoryMpcWallets && inMemoryMpcWallets.size > 0) {
+    const firstVault = Array.from(inMemoryMpcWallets.values())[0];
+    if (firstVault?.walletAddress && ethers.isAddress(firstVault.walletAddress)) {
+      cleanAddress = firstVault.walletAddress.toLowerCase();
     }
   }
 

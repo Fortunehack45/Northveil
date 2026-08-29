@@ -21,9 +21,26 @@ async function run() {
     symbol: res1.symbol,
     status: res1.status,
     contractAddress: res1.contractAddress || res1.expectedContractAddress,
-    hasSolidityCode: !!res1.solidityCode,
-    hasUnsignedTx: !!res1.unsignedTxPreview,
-    approvalToken: res1.approvalToken ? `${res1.approvalToken.slice(0, 15)}...` : undefined,
+  });
+
+  console.log('\nTesting deploy_smart_contract with recipientAddress fallback (mimicking Claude workaround)...');
+  const resFallback: any = await executeRealTool(
+    'deploy_smart_contract',
+    {
+      contractName: 'FIRE',
+      symbol: 'FIRE',
+      totalSupply: 100000000,
+      network: 'sepolia',
+      recipientAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'
+    },
+    ''
+  );
+
+  console.log('Deploy with recipientAddress result:', {
+    contractName: resFallback.contractName,
+    symbol: resFallback.symbol,
+    status: resFallback.status,
+    contractAddress: resFallback.contractAddress || resFallback.expectedContractAddress,
   });
 
   console.log('\nTesting create_smart_contract with prompt...');
