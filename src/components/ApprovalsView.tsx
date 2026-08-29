@@ -35,7 +35,13 @@ export const ApprovalsView: React.FC = () => {
   const [passkeyNotice, setPasskeyNotice] = useState<string | null>(null);
   const [confirmedTxFeedback, setConfirmedTxFeedback] = useState<{ id: string; txHash: string; explorerUrl?: string } | null>(null);
 
-  const [approvals, setApprovals] = useState<McpApprovalRecord[]>([]);
+  const [approvals, setApprovals] = useState<McpApprovalRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('northveil_approval_history');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
   const [isCreatingTest, setIsCreatingTest] = useState(false);
 
   const fetchLogs = async () => {
@@ -47,16 +53,38 @@ export const ApprovalsView: React.FC = () => {
       ]);
 
       const mergedMap = new Map<string, McpApprovalRecord>();
-      (liveApprovals || []).forEach((item) => mergedMap.set(item.id, item));
+      
+      // 1. Preload currently retained approvals from state and localStorage
+      approvals.forEach((item) => mergedMap.set(item.id, item));
+      try {
+        const saved = localStorage.getItem('northveil_approval_history');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          (parsed || []).forEach((item: McpApprovalRecord) => {
+            if (item.id && !mergedMap.has(item.id)) mergedMap.set(item.id, item);
+          });
+        }
+      } catch {}
+
+      // 2. Merge live approvals from Supabase
+      (liveApprovals || []).forEach((item) => {
+        const existing = mergedMap.get(item.id);
+        if (existing && (existing.status === 'CONFIRMED' || existing.status === 'REJECTED') && item.status === 'PENDING') {
+          // Do not downgrade locally confirmed/rejected items
+          return;
+        }
+        mergedMap.set(item.id, { ...existing, ...item });
+      });
 
       const now = Date.now();
-      // Merge any pending staged requests from MCP control plane
+      // 3. Merge any staged requests from MCP control plane
       (stagedPending || []).forEach((req: any) => {
         const id = req.requestId || req.id || req.request_id || req.approvalToken || req.approval_token;
         if (id) {
-          const isConfirmed = Boolean(req.txHash || req.tx_hash || req.status === 'confirmed' || req.status === 'broadcasted');
-          const isRejected = req.status === 'rejected';
-          const isExpired = !isConfirmed && (
+          const existing = mergedMap.get(id);
+          const isConfirmed = Boolean(req.txHash || req.tx_hash || req.status === 'confirmed' || req.status === 'broadcasted' || existing?.status === 'CONFIRMED');
+          const isRejected = req.status === 'rejected' || existing?.status === 'REJECTED';
+          const isExpired = !isConfirmed && !isRejected && (
             req.token_used ||
             (req.expiresAt && new Date(req.expiresAt).getTime() <= now) ||
             (req.createdAt && now - new Date(req.createdAt).getTime() > 2 * 3600 * 1000)
@@ -106,19 +134,24 @@ export const ApprovalsView: React.FC = () => {
 
           mergedMap.set(id, {
             id,
-            wallet_address: req.walletAddress || req.wallet_address || activeSubWallet?.address || '',
+            wallet_address: req.walletAddress || req.wallet_address || activeSubWallet?.address || existing?.wallet_address || '',
             tool_name: toolName,
             parameters,
             status,
-            created_at: req.createdAt || req.created_at || new Date().toISOString(),
-            tx_hash: req.txHash || req.tx_hash,
+            created_at: req.createdAt || req.created_at || existing?.created_at || new Date().toISOString(),
+            tx_hash: req.txHash || req.tx_hash || existing?.tx_hash,
             gas_fee_usd: isDeploy ? 0.25 : 0.05,
             agent_type: 'Northveil MCP Agent',
+            response: existing?.response || (req.txHash ? { txHash: req.txHash, contractAddress: req.contractAddress, explorerUrl: req.explorerUrl } : undefined),
           });
         }
       });
 
-      setApprovals(Array.from(mergedMap.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      const sorted = Array.from(mergedMap.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setApprovals(sorted);
+      try {
+        localStorage.setItem('northveil_approval_history', JSON.stringify(sorted.slice(0, 100)));
+      } catch {}
     } catch (e) {
       console.warn('[Approvals Fetch Error]:', e);
     }
@@ -310,20 +343,24 @@ export const ApprovalsView: React.FC = () => {
         }
       }
 
-      // 3. Update local state immediately so Approve button disappears instantaneously
+      // 3. Update local state immediately and persist to localStorage
       if (txHash) {
-        setApprovals((prev) =>
-          prev.map((item) =>
+        setApprovals((prev) => {
+          const updated = prev.map((item) =>
             item.id === id
               ? {
                   ...item,
-                  status: 'CONFIRMED',
+                  status: 'CONFIRMED' as const,
                   tx_hash: txHash,
                   response: { ...item.response, txHash, explorerUrl, contractAddress: deployedContractAddress, status: 'confirmed' },
                 }
               : item
-          )
-        );
+          );
+          try {
+            localStorage.setItem('northveil_approval_history', JSON.stringify(updated.slice(0, 100)));
+          } catch {}
+          return updated;
+        });
 
         // 4. Update Supabase record
         await SupabaseService.updateApprovalStatus(id, 'approved', txHash);
@@ -355,17 +392,21 @@ export const ApprovalsView: React.FC = () => {
   const handleReject = async (id: string) => {
     setActionProcessingId(id);
     try {
-      setApprovals((prev) =>
-        prev.map((item) =>
+      setApprovals((prev) => {
+        const updated = prev.map((item) =>
           item.id === id
             ? {
                 ...item,
-                status: 'REJECTED',
+                status: 'REJECTED' as const,
                 response: { ...item.response, status: 'rejected' },
               }
             : item
-        )
-      );
+        );
+        try {
+          localStorage.setItem('northveil_approval_history', JSON.stringify(updated.slice(0, 100)));
+        } catch {}
+        return updated;
+      });
       await MpcWalletService.rejectTransactionRequest(id).catch(() => {});
       await SupabaseService.updateApprovalStatus(id, 'rejected');
       setPasskeyNotice('Approval token burned and voided immediately.');

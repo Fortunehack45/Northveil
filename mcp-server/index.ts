@@ -346,25 +346,8 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Express Rate Limiter: High capacity for agents & dashboard polling, bypasses localhost, internal SSE, and active sessions
-const apiRateLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute window
-  max: 5000, // 5000 requests per minute
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => {
-    const ip = req.ip || req.socket?.remoteAddress || '';
-    const isLocal = ip === '127.0.0.1' || ip === '::1' || ip.includes('127.0.0.1') || ip === 'localhost';
-    const hasAuthKey = Boolean(req.headers.authorization || req.headers['x-api-key']);
-    const isPollingPath = req.path.includes('/pending') || req.path.includes('/status') || req.path.includes('/health') || req.path.includes('/sse');
-    return isLocal || hasAuthKey || isPollingPath;
-  },
-  message: {
-    jsonrpc: '2.0',
-    error: { code: -32000, message: 'Too many requests. Rate limit exceeded.' },
-    id: null,
-  },
-});
+// Infinite / Unrestricted Rate Limiter: Zero throttling or blocking for all agents, browsers, and MCP requests
+const apiRateLimiter = (req: Request, res: Response, next: any) => next();
 
 app.use('/api/v1', apiRateLimiter);
 app.use('/mcp', apiRateLimiter);
@@ -1788,17 +1771,8 @@ const handleRegister = async (req: Request, res: Response) => {
   });
 };
 
-// Dedicated rate limiter for OAuth token exchange
-const oauthTokenRateLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    error: 'slow_down',
-    error_description: 'Too many authentication attempts. Please try again in 1 minute.',
-  },
-});
+// Infinite / Unrestricted OAuth token rate limiter
+const oauthTokenRateLimiter = (req: Request, res: Response, next: any) => next();
 
 function escapeHtml(str: string): string {
   return (str || '')
@@ -3220,37 +3194,29 @@ app.post('/api/v1/dashboard/clients/:id/revoke', async (req: Request, res: Respo
   return res.json({ success: true, message: `Agent client ${id} has been revoked.` });
 });
 
-// 4. GET PENDING APPROVALS
-app.get('/api/v1/dashboard/approvals/pending', async (req: Request, res: Response) => {
+// 4. GET PENDING & ALL APPROVALS
+app.get(['/api/v1/dashboard/approvals/pending', '/api/v1/dashboard/approvals'], async (req: Request, res: Response) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
   const userId = (req.headers['x-user-id'] || req.query.userId || 'default_user').toString();
   const walletAddress = (req.headers['x-wallet-address'] || req.query.walletAddress || req.query.address || '').toString().toLowerCase();
-  let pendingApprovals: any[] = [];
+  
+  const allApprovalsMap = new Map<string, any>();
   try {
     if (supabase && typeof supabase.from === 'function') {
       let query = supabase
         .from('transaction_requests')
         .select('*')
-        .eq('status', 'pending')
-        .is('tx_hash', null)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(100);
       if (walletAddress) {
         query = query.eq('wallet_address', walletAddress);
       }
       const { data } = await query;
       if (data && data.length > 0) {
-        const now = Date.now();
-        pendingApprovals = data
-          .filter((d: any) => {
-            if (d.tx_hash || d.token_used) return false;
-            if (d.expires_at && new Date(d.expires_at).getTime() <= now) return false;
-            // Also reject stale un-expired requests older than 2 hours
-            if (d.created_at && now - new Date(d.created_at).getTime() > 2 * 3600 * 1000) return false;
-            return true;
-          })
-          .map((d: any) => ({
+        data.forEach((d: any) => {
+          const id = d.request_id || d.approval_token;
+          allApprovalsMap.set(id, {
             approval_token: d.approval_token,
             approvalToken: d.approval_token,
             requestId: d.request_id,
@@ -3266,29 +3232,38 @@ app.get('/api/v1/dashboard/approvals/pending', async (req: Request, res: Respons
             unsignedPayload: d.unsigned_payload,
             reason: d.reason,
             status: d.status,
+            txHash: d.tx_hash,
+            tx_hash: d.tx_hash,
+            contractAddress: d.contract_address,
+            contract_address: d.contract_address,
             createdAt: d.created_at,
             expiresAt: d.expires_at,
-          }));
+          });
+        });
       }
     }
   } catch (e) {}
 
-  if (pendingApprovals.length === 0) {
-    const now = Date.now();
-    for (const [token, reqObj] of inMemoryTxRequests.entries()) {
-      if ((reqObj.status as string).toLowerCase() === 'pending' && !reqObj.txHash) {
-        if (reqObj.expiresAt && new Date(reqObj.expiresAt).getTime() <= now) continue;
-        if (!walletAddress || reqObj.walletAddress?.toLowerCase() === walletAddress) {
-          pendingApprovals.push({
-            approval_token: token,
-            approvalToken: token,
-            ...reqObj,
-          });
-        }
-      }
+  // Merge all in-memory requests
+  for (const [token, reqObj] of inMemoryTxRequests.entries()) {
+    if (!walletAddress || reqObj.walletAddress?.toLowerCase() === walletAddress) {
+      const id = reqObj.requestId || token;
+      allApprovalsMap.set(id, {
+        approval_token: token,
+        approvalToken: token,
+        ...reqObj,
+      });
     }
   }
-  return res.json({ success: true, pendingApprovals });
+
+  const allList = Array.from(allApprovalsMap.values());
+  const pendingList = allList.filter((a: any) => (a.status || '').toLowerCase() === 'pending');
+
+  return res.json({
+    success: true,
+    pendingApprovals: pendingList,
+    approvals: allList,
+  });
 });
 
 // 5. APPROVE TRANSACTION (WITH PASKEY BIOMETRIC CONFIRMATION)
