@@ -1542,6 +1542,39 @@ export async function approveAndExecuteWithPasskey(
     }
   }
 
+  if (!req && supabase && typeof supabase.from === 'function') {
+    try {
+      const { data } = await supabase
+        .from('transaction_requests')
+        .select('*')
+        .or(`approval_token.eq.${cleanToken},request_id.eq.${cleanToken},id.eq.${cleanToken}`)
+        .maybeSingle();
+      if (data) {
+        req = {
+          requestId: data.request_id || cleanToken,
+          approvalToken: data.approval_token || cleanToken,
+          walletAddress: data.wallet_address,
+          recipient: data.recipient,
+          amount: Number(data.amount) || 0,
+          asset: data.asset || 'ETH',
+          network: data.network || 'sepolia',
+          chainId: Number(data.chain_id) || getChainIdForNetwork(data.network || 'sepolia'),
+          nonce: data.nonce !== undefined ? Number(data.nonce) : undefined,
+          unsignedPayload: data.unsigned_payload,
+          unsignedSerialized: data.unsigned_serialized,
+          passkeyChallenge: data.passkey_challenge || '',
+          userId: data.user_id || 'default_user',
+          status: data.status || 'pending',
+          expiresAt: data.expires_at || new Date(Date.now() + 900000).toISOString(),
+          createdAt: data.created_at || new Date().toISOString(),
+          txHash: data.tx_hash,
+          explorerUrl: data.explorer_url,
+        };
+        inMemoryTxRequests.set(cleanToken, req);
+      }
+    } catch {}
+  }
+
   if (!req) {
     throw new Error('STAGING_REQUEST_NOT_FOUND: Approval token or request ID not found.');
   }

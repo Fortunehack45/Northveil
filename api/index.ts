@@ -3275,10 +3275,47 @@ app.post('/api/v1/dashboard/approvals/:id/approve', async (req: Request, res: Re
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
   const { id } = req.params;
-  const { passkeyAssertion, userId = 'default_user' } = req.body || {};
+  const { passkeyAssertion, userId = 'default_user', signedTransaction } = req.body || {};
   try {
-    const result = await approveAndExecuteWithPasskey(id, passkeyAssertion, userId);
+    const result = await approveAndExecuteWithPasskey(id, passkeyAssertion, userId, signedTransaction);
     return res.json({ success: true, result });
+  } catch (err: any) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 5b. BROADCAST CLIENT-SIGNED TRANSACTION
+app.post('/api/v1/dashboard/approvals/:id/broadcast', async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  const { id } = req.params;
+  const { signedTransaction, passkeyAssertion, userId = 'default_user' } = req.body || {};
+  try {
+    const result = await validateAndBroadcastSignedTransaction({
+      approvalToken: id,
+      signedTransaction,
+      passkeyAssertion,
+      userId,
+    });
+    return res.json({ success: true, ...result });
+  } catch (err: any) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/v1/transactions/broadcast', async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  const { approvalToken, requestId, signedTransaction, passkeyAssertion, userId = 'default_user' } = req.body || {};
+  try {
+    const targetToken = approvalToken || requestId || '';
+    const result = await validateAndBroadcastSignedTransaction({
+      approvalToken: targetToken,
+      signedTransaction,
+      passkeyAssertion,
+      userId,
+    });
+    return res.json({ success: true, ...result });
   } catch (err: any) {
     return res.status(400).json({ success: false, error: err.message });
   }

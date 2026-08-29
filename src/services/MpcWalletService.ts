@@ -201,13 +201,31 @@ export class MpcWalletService {
     requestId?: string;
     signedTransaction: string;
     passkeyAssertion?: any;
-  }) {
+    userId?: string;
+  }): Promise<{
+    success: boolean;
+    txHash?: string;
+    tx_hash?: string;
+    transactionHash?: string;
+    explorerUrl?: string;
+    explorer_url?: string;
+    blockNumber?: number;
+    status?: string;
+    error?: string;
+  }> {
+    const effectiveUserId = params.userId || this.getUserId();
+    const token = this.getSessionToken();
+    const targetToken = params.approvalToken || params.requestId || '';
     const res = await fetch(`${this.getBaseUrl()}/api/v1/transactions/broadcast`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({
         ...params,
-        userId: this.getUserId(),
+        approvalToken: targetToken,
+        userId: effectiveUserId,
       }),
     });
     const json = await res.json();
