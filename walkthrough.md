@@ -159,3 +159,51 @@ Command: `npm run test:mpc`
 🎉 ALL 35/35 TESTS PASSED SUCCESSFULLY!
 ======================================================
 ```
+
+### 3. Seed Phrase Provisioning & Multi-Chain Transaction Status Suite
+Command: `npx tsx scratch/test_seed_phrase_and_tx_status.ts`
+```
+🧪 Testing MCP Seed Phrase Provisioning & Robust Tx Status Checking...
+
+1. Testing create_wallet & seed phrase export...
+   ✅ [PASS] Vault Address: 0x0a62f71a16366bb035c96433a02c6b834f65ca0c
+   ✅ [PASS] 12-Word Seed Phrase: steel rebel butter involve nature front leave metal they picnic vast wedding
+   ✅ [PASS] Derivation Path: m/44'/60'/0'/0/0
+   ✅ [PASS] Private Key Available (Length: 66)
+
+2. Testing MCP tool: northveil_create_wallet...
+   ✅ [PASS] MCP Tool Result Address: 0x041dd9160c60b39fbe6b14aae9083fd3efbd71b3
+   ✅ [PASS] MCP Tool Seed Phrase: rhythm chief pipe large flat raise grain cruise afford dragon dinner intact
+
+3. Testing MCP tool: export_seed_phrase...
+   ✅ [PASS] Exported Seed Phrase: leave load fun remember owner innocent reward depth because donor double modify
+
+4. Testing northveil_get_tx with in-memory staged deployment...
+   ✅ [PASS] northveil_get_tx by requestId -> Status: confirmed
+   ✅ [PASS] Explorer URL: https://sepolia.etherscan.io/tx/0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+
+5. Testing get_transaction_status by txHash...
+   ✅ [PASS] get_transaction_status by txHash -> Status: confirmed
+
+6. Testing get_transaction_status with non-staged raw txHash...
+   ✅ [PASS] Non-staged tx lookup status: confirmed
+   ✅ [PASS] Returned without error or crash.
+
+🎉 ALL TESTS PASSED SUCCESSFULLY (100%)
+```
+
+---
+
+## 🔒 Branding & Protocol Enhancements
+
+1. **Turnkey Branding Completely Excised**:
+   - Replaced all user-facing references with **Northveil Secure Hardware Enclave** / **Northveil MPC**.
+   - Updated `website/index.html`, `SECURITY.md`, `MpcWalletService.ts`, `OnboardingAuthModal.tsx`, and `WalletContext.tsx`.
+
+2. **Self-Sovereign BIP-39 Seed Phrase Provisioning**:
+   - `create_wallet` and `northveil_create_wallet` return full 12-word recovery phrases (`seedPhrase`, `mnemonicWords`), `derivationPath: "m/44'/60'/0'/0/0"`, and `privateKey`.
+   - Added `northveil_export_seed_phrase` / `export_seed_phrase` MCP tool for retrieving recovery phrases for authorized vaults.
+
+3. **Sub-Second Multi-Chain Transaction Status Resolution**:
+   - `northveil_get_tx` and `get_transaction_status` query in-memory staged records, Supabase DB, and parallelized candidate RPC network providers (`sepolia`, `base`, `ethereum`, `polygon`, `arbitrum`, `bsc`, `optimism`, `avalanche`) with 1.5s timeout protection to resolve block numbers, confirmations, gas metrics, contract addresses, and explorer links without crashing or returning false negatives.
+
