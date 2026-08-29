@@ -38,7 +38,7 @@ import { VaultService } from '../services/VaultService';
 import { SupabaseService } from '../services/SupabaseService';
 import { WebAuthnService } from '../services/WebAuthnService';
 import { MpcWalletService } from '../services/MpcWalletService';
-import { sanitizeToValidAddress } from '../services/addressUtils';
+import { sanitizeToValidAddress, parseEtherSafe } from '../services/addressUtils';
 import { ethers } from 'ethers';
 import { Fingerprint, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 
@@ -1737,7 +1737,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         if (!targetAsset.contractAddress || targetAsset.contractAddress === '0x0000000000000000000000000000000000000000' || targetAsset.contractAddress === '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c') {
           const tx = {
             to: recipientAddress,
-            value: ethers.parseEther(amount.toString())
+            value: parseEtherSafe(amount)
           };
           const gasLimit = await connectedWallet.estimateGas(tx).catch(() => 21000n);
           txResponse = await connectedWallet.sendTransaction({ ...tx, gasLimit });
@@ -1745,7 +1745,13 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           const ERC20_ABI = ['function transfer(address to, uint256 value) returns (bool)'];
           const contract = new ethers.Contract(targetAsset.contractAddress, ERC20_ABI, connectedWallet);
           const decimals = targetAsset.decimals || 18;
-          const parsedAmount = ethers.parseUnits(amount.toString(), decimals);
+          const fixedStr = Number(amount).toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: decimals });
+          let parsedAmount = 0n;
+          try {
+            parsedAmount = ethers.parseUnits(fixedStr, decimals);
+          } catch {
+            parsedAmount = parseEtherSafe(amount);
+          }
           const gasLimit = await contract.transfer.estimateGas(recipientAddress, parsedAmount).catch(() => 65000n);
           txResponse = await contract.transfer(recipientAddress, parsedAmount, { gasLimit });
         }

@@ -58,3 +58,70 @@ export const formatShortAddress = (rawAddr?: string | null, _accountIndex?: numb
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 };
 
+/**
+ * Safely parses any crypto amount string, number, or exponential notation (e.g. 5e-7) into BigInt wei
+ * without throwing "invalid FixedNumber string value".
+ */
+export const parseEtherSafe = (value: string | number | bigint | undefined | null): bigint => {
+  if (value === undefined || value === null) return 0n;
+  if (typeof value === 'bigint') return value;
+
+  if (typeof value === 'number') {
+    if (isNaN(value) || value <= 0) return 0n;
+    const fixedStr = value.toLocaleString('en-US', {
+      useGrouping: false,
+      maximumFractionDigits: 18,
+    });
+    try {
+      return ethers.parseEther(fixedStr);
+    } catch {
+      try {
+        return ethers.parseUnits(value.toFixed(18), 18);
+      } catch {
+        return 0n;
+      }
+    }
+  }
+
+  const str = String(value).trim();
+  if (!str || str === '0' || str === '0x' || str === '0x0') return 0n;
+
+  if (str.startsWith('0x')) {
+    try {
+      return BigInt(str);
+    } catch {
+      return 0n;
+    }
+  }
+
+  // If already a large integer (wei)
+  if (/^\d+$/.test(str) && str.length > 12) {
+    try {
+      return BigInt(str);
+    } catch {}
+  }
+
+  // Extract numerical substring (supports negative/positive integers, floats, scientific notation like 5e-7)
+  const numMatch = str.match(/[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?/);
+  if (!numMatch) return 0n;
+
+  const cleaned = numMatch[0];
+  const num = Number(cleaned);
+  if (num <= 0 || isNaN(num)) return 0n;
+
+  const fixedStr = num.toLocaleString('en-US', {
+    useGrouping: false,
+    maximumFractionDigits: 18,
+  });
+
+  try {
+    return ethers.parseEther(fixedStr);
+  } catch {
+    try {
+      return ethers.parseUnits(num.toFixed(18), 18);
+    } catch {
+      return 0n;
+    }
+  }
+};
+

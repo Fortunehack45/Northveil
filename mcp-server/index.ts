@@ -6322,9 +6322,14 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
       
       let rawVal = '0';
       try {
-        rawVal = ethers.parseEther(String(amountNum)).toString();
+        const fixedStr = Number(amountNum).toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 18 });
+        rawVal = ethers.parseEther(fixedStr).toString();
       } catch (e) {
-        rawVal = '0';
+        try {
+          rawVal = ethers.parseUnits(Number(amountNum).toFixed(18), 18).toString();
+        } catch {
+          rawVal = '0';
+        }
       }
 
       const signedTxHex = args.signedTransaction || args.signed_transaction || args.rawSignedTx || args.signedTx;

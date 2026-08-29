@@ -21,7 +21,7 @@ import { MpcWalletService } from '../services/MpcWalletService';
 import { WebAuthnService } from '../services/WebAuthnService';
 import { ProviderService } from '../services/ProviderService';
 import { WalletService } from '../services/WalletService';
-import { formatShortAddress } from '../services/addressUtils';
+import { formatShortAddress, parseEtherSafe } from '../services/addressUtils';
 import { ethers } from 'ethers';
 
 export const ApprovalsView: React.FC = () => {
@@ -187,7 +187,7 @@ export const ApprovalsView: React.FC = () => {
         // Look up staged request parameters from local state or server response
         const targetNetwork = prepResult?.network || currentRecord?.parameters?.network || 'sepolia';
         const targetRecipient = prepResult?.recipient || currentRecord?.parameters?.recipient;
-        const targetAmount = prepResult?.amount || currentRecord?.parameters?.amount;
+        const targetAmount = prepResult?.amount !== undefined ? prepResult.amount : currentRecord?.parameters?.amount;
 
         // Check if this is a smart contract deployment transaction
         const isDeployTx = Boolean(
@@ -219,14 +219,12 @@ export const ApprovalsView: React.FC = () => {
           const provider = ProviderService.getEVMProvider(targetNetwork);
           const signer = new ethers.Wallet(cleanPk, provider);
 
-          const cleanAmount = typeof targetAmount === 'number'
-            ? targetAmount
-            : parseFloat(String(targetAmount || '0').replace(/[^0-9.]/g, '')) || 0;
+          const valueInWei = isDeployTx ? 0n : parseEtherSafe(targetAmount);
 
           let unsignedTx: any = prepResult?.unsignedTransaction;
           if (!unsignedTx) {
             unsignedTx = {
-              value: cleanAmount > 0 ? ethers.parseEther(cleanAmount.toString()) : 0n,
+              value: valueInWei,
               data: prepResult?.calldata || currentRecord?.parameters?.calldata || '0x',
             };
             if (!isDeployTx && targetRecipient && targetRecipient !== ethers.ZeroAddress && targetRecipient !== '') {
@@ -237,8 +235,10 @@ export const ApprovalsView: React.FC = () => {
             if (isDeployTx || !unsignedTx.to || unsignedTx.to === ethers.ZeroAddress || unsignedTx.to === '') {
               delete unsignedTx.to;
             }
-            if (typeof unsignedTx.value === 'string' && !unsignedTx.value.startsWith('0x')) {
-              unsignedTx.value = BigInt(unsignedTx.value);
+            if (unsignedTx.value !== undefined) {
+              unsignedTx.value = parseEtherSafe(unsignedTx.value);
+            } else {
+              unsignedTx.value = valueInWei;
             }
           }
 

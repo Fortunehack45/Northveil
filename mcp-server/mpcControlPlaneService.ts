@@ -1085,11 +1085,16 @@ export async function prepareTransactionRequest(
 
   // 5. Value parsing
   let rawValue = '0';
-  if (amount > 0) {
+  if (amount && Number(amount) > 0) {
     try {
-      rawValue = ethers.parseEther(String(amount)).toString();
+      const fixedStr = Number(amount).toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 18 });
+      rawValue = ethers.parseEther(fixedStr).toString();
     } catch {
-      rawValue = '0';
+      try {
+        rawValue = ethers.parseUnits(Number(amount).toFixed(18), 18).toString();
+      } catch {
+        rawValue = '0';
+      }
     }
   }
 
