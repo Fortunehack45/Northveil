@@ -386,7 +386,7 @@
 
     .content-sections-wrapper {
       position: relative;
-      z-index: 2;
+      z-index: 5;
       width: 100%;
       padding-bottom: 40px;
     }
@@ -394,19 +394,19 @@
     .cta-box-wrap {
       padding: 0 24px 60px;
       position: relative;
-      z-index: 5;
+      z-index: 10;
       max-width: 960px;
       margin: 0 auto;
     }
 
-    /* Top Transition: Liquid Frosted Fade Blur between Hero and Benefits */
+    /* Top Transition: Liquid Frosted Fade Blur between Hero and Benefits (Strictly Behind Content) */
     .transition-hero-fade {
       position: absolute;
       top: 0;
       left: 0;
       right: 0;
       height: 240px;
-      z-index: 4;
+      z-index: 1;
       pointer-events: none;
       background: linear-gradient(180deg, #000000 0%, rgba(0, 0, 0, 0.88) 32%, rgba(0, 0, 0, 0.32) 75%, transparent 100%);
       backdrop-filter: blur(24px) saturate(180%);
@@ -415,14 +415,14 @@
       -webkit-mask-image: linear-gradient(180deg, #000000 0%, rgba(0, 0, 0, 0.85) 45%, transparent 100%);
     }
 
-    /* Bottom Transition: Smooth Liquid Fade to Pitch Black right above Footer */
+    /* Bottom Transition: Smooth Liquid Fade to Pitch Black right above Footer (Strictly Behind Content) */
     .transition-footer-fade {
       position: absolute;
       bottom: 0;
       left: 0;
       right: 0;
       height: 100px;
-      z-index: 3;
+      z-index: 1;
       pointer-events: none;
       background: linear-gradient(0deg, #000000 0%, rgba(0, 0, 0, 0.95) 40%, rgba(0, 0, 0, 0.3) 80%, transparent 100%);
       backdrop-filter: blur(12px);
@@ -920,7 +920,7 @@
       margin: 0 auto;
       padding: 120px 24px;
       position: relative;
-      z-index: 2;
+      z-index: 6;
     }
 
     .section-header {
@@ -930,6 +930,8 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      position: relative;
+      z-index: 10;
     }
 
     .section-badge {
@@ -945,6 +947,9 @@
       letter-spacing: 0.04em;
       text-transform: uppercase;
       margin-bottom: 18px;
+      position: relative;
+      z-index: 10;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
     }
 
     h2.section-title {
@@ -954,6 +959,9 @@
       line-height: 1.18;
       color: #ffffff;
       margin-bottom: 14px;
+      position: relative;
+      z-index: 10;
+      text-shadow: 0 2px 14px rgba(0, 0, 0, 0.9);
     }
 
     p.section-desc {
@@ -961,6 +969,9 @@
       font-size: 15px;
       line-height: 1.6;
       letter-spacing: -0.01em;
+      position: relative;
+      z-index: 10;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
     }
 
     /* ═══════════════════════════════════════════════════════════════
@@ -2070,7 +2081,7 @@
        (From section after hero down to section before footer)
        ═══════════════════════════════════════════════════════════════ -->
   <div class="content-backdrop-area">
-    <!-- Continuous Background Video Canvas (Pinned Layer) -->
+    <!-- Continuous Background Video Canvas (Pinned Layer - All Background Effects & Blurs) -->
     <div class="content-video-container" aria-hidden="true">
       <video autoplay loop muted playsinline class="content-backdrop-video" preload="auto" disablePictureInPicture>
         <source src="https://res.cloudinary.com/elgbqqkh/video/upload/q_auto,f_auto/Editing_video_loop_and_watermark_202608281208.mp4" type="video/mp4">
@@ -2078,13 +2089,14 @@
         <source src="https://res.cloudinary.com/elgbqqkh/video/upload/Editing_video_loop_and_watermark_202608281208.mp4" type="video/mp4">
       </video>
       <div class="content-video-overlay" aria-hidden="true"></div>
+      <!-- Top Liquid Frosted Fade-Blur Transition (Strictly on Video Background Canvas) -->
+      <div class="transition-hero-fade" aria-hidden="true"></div>
+      <!-- Bottom Liquid Frosted Fade to Black (Strictly on Video Background Canvas) -->
+      <div class="transition-footer-fade" aria-hidden="true"></div>
     </div>
 
-    <!-- Foreground Content Sections Wrapper -->
+    <!-- Foreground Content Sections Wrapper (All Headers & Text Render Crisp Above Blur) -->
     <div class="content-sections-wrapper">
-      <!-- Top Liquid Frosted Fade-Blur Transition between Hero and Benefits -->
-      <div class="transition-hero-fade" aria-hidden="true"></div>
-
       <!-- ═══════════════════════════════════════════════════════════════
            SECTION 2: BENEFITS & PROTOCOL PILLARS
            ═══════════════════════════════════════════════════════════════ -->
@@ -2466,8 +2478,6 @@
     </div>
   </div>
 
-    <!-- Bottom Liquid Frosted Fade to Pitch Black before Footer -->
-    <div class="transition-footer-fade" aria-hidden="true"></div>
     </div> <!-- End content-sections-wrapper -->
   </div> <!-- End content-backdrop-area -->
 
