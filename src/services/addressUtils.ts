@@ -1,56 +1,60 @@
 import { ethers } from 'ethers';
-import { WalletService } from './WalletService';
 
 /**
- * Sanitizes any raw wallet address string.
- * If a seed phrase, mnemonic, or raw private key was mistakenly passed,
- * it automatically derives the actual on-chain 0x public address.
+ * Defensive address validator.
+ * Validates on-chain public addresses (EVM 0x, Solana Base58, Bitcoin SegWit).
+ * Rejects mnemonic phrases, raw private keys, arbitrary strings, and never
+ * substitutes a dummy fallback address.
  */
-export const sanitizeToValidAddress = (rawAddress?: string | null, accountIndex: number = 0): string => {
-  if (!rawAddress) return '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+export const sanitizeToValidAddress = (rawAddress?: string | null, _accountIndex?: number): string => {
+  if (!rawAddress || typeof rawAddress !== 'string') return '';
   const clean = rawAddress.trim();
+  if (!clean) return '';
 
-  // 1. If it contains spaces or is a multi-word mnemonic seed phrase
-  if (clean.includes(' ') || clean.split(/\s+/).length >= 12) {
-    try {
-      const words = clean.split(/\s+/).filter(Boolean);
-      if (words.length >= 12) {
-        const derived = WalletService.deriveEVMAddress(words, accountIndex);
-        if (derived && derived.address && derived.address.startsWith('0x')) {
-          return derived.address.toLowerCase();
-        }
-      }
-    } catch {}
-    return '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+  // 1. Strictly reject mnemonic phrases (containing spaces or words)
+  if (clean.includes(' ') || clean.split(/\s+/).length > 1) {
+    return '';
   }
 
-  // 2. If it is an EVM private key (64 hex characters or 66 chars starting with 0x)
+  // 2. Strictly reject raw 64/66-char private keys
   if ((clean.startsWith('0x') && clean.length === 66) || (!clean.startsWith('0x') && clean.length === 64)) {
-    try {
-      const formatted = clean.startsWith('0x') ? clean : `0x${clean}`;
-      const wallet = new ethers.Wallet(formatted);
-      return wallet.address.toLowerCase();
-    } catch {}
+    return '';
   }
 
-  // 3. If it is already a valid EVM address (0x + 40 hex chars)
-  if (clean.startsWith('0x') && clean.length === 42 && ethers.isAddress(clean)) {
-    return clean.toLowerCase();
+  // 3. Validate EVM address (0x + 40 hex chars)
+  if (clean.startsWith('0x') && clean.length === 42) {
+    if (ethers.isAddress(clean)) {
+      try {
+        return ethers.getAddress(clean);
+      } catch {
+        return clean.toLowerCase();
+      }
+    }
+    return '';
   }
 
-  // 4. If it is a base58 Solana address (32-44 chars) or SegWit Bitcoin address (bc1...)
-  if ((clean.length >= 32 && clean.length <= 44 && !clean.includes(' ')) || clean.startsWith('bc1')) {
+  // 4. Validate Solana base58 address (32-44 characters, base58 chars only)
+  if (clean.length >= 32 && clean.length <= 44 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(clean)) {
     return clean;
   }
 
-  return '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+  // 5. Validate Bitcoin SegWit / Legacy address
+  if (clean.startsWith('bc1') || clean.startsWith('1') || clean.startsWith('3')) {
+    if (clean.length >= 26 && clean.length <= 62) {
+      return clean;
+    }
+  }
+
+  return '';
 };
 
 /**
  * Formats an address into a short representation like 0x56f0...5417
  */
-export const formatShortAddress = (rawAddr?: string | null, accountIndex: number = 0): string => {
-  const addr = sanitizeToValidAddress(rawAddr, accountIndex);
+export const formatShortAddress = (rawAddr?: string | null, _accountIndex?: number): string => {
+  const addr = sanitizeToValidAddress(rawAddr);
+  if (!addr) return '0x0000...0000';
   if (addr.length <= 12) return addr;
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 };
+

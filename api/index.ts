@@ -5177,47 +5177,28 @@ ${simulation.warnings.length > 0 ? `> **Warnings**: \`${simulation.warnings.join
     case 'import_wallet': {
       const walletName = args?.walletName || 'Imported Non-Custodial Vault';
       const secret = args?.privateKey || args?.secret || args?.mnemonic || args?.seedPhrase;
-      const isSeed = !!(args?.mnemonic || args?.seedPhrase || (secret && secret.includes(' ')));
 
       if (secret) {
-        const importRes = await importMpcWalletOrKey(
-          isSeed ? 'seed' : 'privateKey',
-          secret,
-          walletName,
-          'default_user'
-        );
-        return {
-          formattedMarkdown: `
-### 🔐 HARDWARE ENCLAVE WALLET IMPORTED
-
-> **Vault Address**: \`${importRes.address}\`  
-> **Wallet Label**: \`${walletName}\`  
-> **MPC Enclave ID**: \`${importRes.mpcWalletId}\`  
-> **Custody Model**: 🟢 **NON-CUSTODIAL TURNKEY HARDWARE MPC (AWS NITRO ENCLAVE)**  
-> **Status**: **ACTIVE (Passkey-Gated Authorization Enabled)**
-`,
-          address: importRes.address,
-          mpcWalletId: importRes.mpcWalletId,
-          walletName,
-          status: 'active',
-          custodyModel: 'non-custodial-tee-mpc',
-        };
+        throw new Error('SECURITY_VIOLATION: Private keys or seed phrases must NEVER be transmitted over MCP. Import your wallet securely inside the local Northveil client interface, then register the public address.');
       }
 
       const address = (args?.address || args?.walletAddress || '').toLowerCase();
-      if (!address || !address.startsWith('0x')) {
-        throw new Error('Please provide a valid 0x wallet address or privateKey/seed phrase to import.');
+      if (!address || !address.startsWith('0x') || address.length !== 42) {
+        throw new Error('INVALID_ARGUMENT: Please provide a valid 0x public wallet address to register.');
       }
+
       try {
-        await supabase.from('wallets').upsert([{
-          user_id: 'default_user',
-          address,
-          chain_id: 'ethereum',
-          name: walletName,
-          mpc_provider: 'turnkey',
-          wallet_status: 'active',
-          created_at: new Date().toISOString(),
-        }], { onConflict: 'address' });
+        if (supabase && typeof supabase.from === 'function') {
+          await supabase.from('wallets').upsert([{
+            user_id: 'default_user',
+            address,
+            chain_id: args?.chain || 'ethereum',
+            name: walletName,
+            mpc_provider: 'non-custodial',
+            wallet_status: 'active',
+            created_at: new Date().toISOString(),
+          }], { onConflict: 'address' });
+        }
       } catch (e) {}
 
       return {
@@ -5226,8 +5207,8 @@ ${simulation.warnings.length > 0 ? `> **Warnings**: \`${simulation.warnings.join
 
 > **Vault Address**: \`${address}\`  
 > **Wallet Label**: \`${walletName}\`  
-> **Custody Model**: 🟢 **NON-CUSTODIAL CONTROL PLANE**  
-> **Status**: **ACTIVE (Passkey-Gated Authorization Enabled)**
+> **Custody Model**: 🟢 **NON-CUSTODIAL CONTROL PLANE (Zero Secret Ingestion)**  
+> **Status**: **ACTIVE (Device-Gated Authorization Enabled)**
 `,
         address,
         walletName,
@@ -5330,31 +5311,38 @@ ${simulation.warnings.length > 0 ? `> **Warnings**: \`${simulation.warnings.join
     }
 
     case 'get_transaction_status': {
-      const reqIdOrToken = args.requestId || args.approvalToken || args.token || args.tx_hash || args.txHash || args.hash || args.request_id || args.approval_token || args.id || '';
+      const reqIdOrToken = (args.requestId || args.approvalToken || args.token || args.tx_hash || args.txHash || args.hash || args.request_id || args.approval_token || args.id || '').trim();
 
-      let stagedReq: any = reqIdOrToken ? inMemoryTxRequests.get(reqIdOrToken) : null;
-      if (!stagedReq && reqIdOrToken) {
+      if (!reqIdOrToken) {
+        throw new Error('INVALID_ARGUMENT: requestId, approvalToken, or txHash is required.');
+      }
+
+      let stagedReq: any = inMemoryTxRequests.get(reqIdOrToken);
+      if (!stagedReq) {
+        for (const req of inMemoryTxRequests.values()) {
+          if (req.requestId === reqIdOrToken || req.approvalToken === reqIdOrToken || req.txHash === reqIdOrToken) {
+            stagedReq = req;
+            break;
+          }
+        }
+      }
+
+      if (!stagedReq) {
         try {
           const { data } = await supabase
             .from('transaction_requests')
             .select('*')
-            .or(`request_id.eq.${reqIdOrToken},approval_token.eq.${reqIdOrToken}`)
+            .or(`request_id.eq.${reqIdOrToken},approval_token.eq.${reqIdOrToken},tx_hash.eq.${reqIdOrToken}`)
             .maybeSingle();
           if (data) stagedReq = data;
         } catch (e) {}
       }
 
       if (!stagedReq) {
-        for (const req of inMemoryTxRequests.values()) {
-          stagedReq = req;
-          break;
-        }
-      }
-
-      if (!stagedReq) {
         return {
-          formattedMarkdown: `### 🔍 TRANSACTION STATUS\n\n> **Status**: 🟢 **CONFIRMED**\n> **Query**: \`${reqIdOrToken || 'latest'}\`\n> **Explorer Link**: [View on Block Explorer](https://sepolia.etherscan.io/)`,
-          status: 'confirmed',
+          formattedMarkdown: `### 🔍 TRANSACTION STATUS: NOT FOUND\n\n> **Status**: 🔴 **NOT_FOUND**\n> **Query**: \`${reqIdOrToken}\`\n> **Message**: No matching transaction request or hash found.`,
+          status: 'not_found',
+          error: 'TRANSACTION_NOT_FOUND',
         };
       }
 

@@ -1580,14 +1580,21 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
       }
 
+      if (!prep.unsignedSerialized && !prep.unsignedTransaction) {
+        throw new Error('TRANSACTION_PREPARATION_FAILED: Missing unsigned transaction payload.');
+      }
+
       const broadcastRes = await MpcWalletService.broadcastTransaction({
         approvalToken: prep.approvalToken || prep.requestId,
         requestId: prep.requestId,
-        signedTransaction: prep.unsignedSerialized || prep.approvalToken || `signed_${Date.now()}`,
+        signedTransaction: prep.unsignedSerialized || '',
         passkeyAssertion,
       });
 
-      const txHash = broadcastRes.txHash || broadcastRes.transactionHash || `0x${Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b => b.toString(16).padStart(2, '0')).join('')}`;
+      const txHash = broadcastRes.txHash || broadcastRes.transactionHash;
+      if (!txHash || txHash.startsWith('signed_')) {
+        throw new Error('BROADCAST_FAILED: Blockchain node did not return a valid transaction hash.');
+      }
 
       const newTx: Transaction = {
         id: `tx-${Date.now()}`,
@@ -1801,14 +1808,21 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
       }
 
+      if (!prep.unsignedSerialized && !prep.unsignedTransaction) {
+        throw new Error('TRANSACTION_PREPARATION_FAILED: Missing unsigned transaction payload.');
+      }
+
       const broadcastRes = await MpcWalletService.broadcastTransaction({
         approvalToken: prep.approvalToken || prep.requestId,
         requestId: prep.requestId,
-        signedTransaction: prep.unsignedSerialized || prep.approvalToken || `signed_${Date.now()}`,
+        signedTransaction: prep.unsignedSerialized || '',
         passkeyAssertion,
       });
 
-      const txHash = broadcastRes.txHash || broadcastRes.transactionHash || `0x${Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b => b.toString(16).padStart(2, '0')).join('')}`;
+      const txHash = broadcastRes.txHash || broadcastRes.transactionHash;
+      if (!txHash || txHash.startsWith('signed_')) {
+        throw new Error('BROADCAST_FAILED: Blockchain node did not return a valid transaction hash.');
+      }
 
       const newTx: Transaction = {
         id: `tx-${Date.now()}`,

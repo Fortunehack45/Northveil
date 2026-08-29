@@ -753,7 +753,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'create_wallet',
-    description: 'Provisions a new self-sovereign multi-chain vault wallet. Generates a fresh BIP-39 12-word recovery seed phrase and private key for full self-custody and control. Returns the public wallet address, 12-word seed phrase, and private key.',
+    description: 'Registers and provisions a new non-custodial multi-chain vault address on the Northveil control plane. Operating under strict non-custodial invariants, private keys and seed phrases remain strictly on the user client and are never returned or accessible over MCP.',
     annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
