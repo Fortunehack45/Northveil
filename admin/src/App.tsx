@@ -87,8 +87,8 @@ export const App: React.FC = () => {
       if (saved) return JSON.parse(saved);
     } catch (e) {}
     return [
-      { id: '1', name: 'Primary Web App Key', key: 'nv_live_9f82a17b09c82415d8a9', created: '2026-08-01', rateLimit: '1000 req/min' },
-      { id: '2', name: 'Claude Desktop MCP Connector', key: 'nv_live_4b772c1092e411fa34c1', created: '2026-08-05', rateLimit: '500 req/min' },
+      { id: '1', name: 'Primary Web App Key', key: 'nv_live_9f82a17b09c82415d8a9', created: '2026-08-01', rateLimit: 'Unlimited' },
+      { id: '2', name: 'Claude Desktop MCP Connector', key: 'nv_live_4b772c1092e411fa34c1', created: '2026-08-05', rateLimit: 'Unlimited' },
       { id: '3', name: 'Autonomous Agent Runtime', key: 'nv_live_8c221a84f33190ab77e2', created: '2026-08-15', rateLimit: 'Unlimited' },
     ];
   });
@@ -220,7 +220,7 @@ export const App: React.FC = () => {
       name: `Developer Key #${apiKeys.length + 1}`,
       key: `nv_live_${Math.random().toString(36).substring(2, 12)}${Math.random().toString(36).substring(2, 12)}`,
       created: new Date().toISOString().split('T')[0],
-      rateLimit: '500 req/min',
+      rateLimit: 'Unlimited',
     };
     const updated = [...apiKeys, newKey];
     setApiKeys(updated);

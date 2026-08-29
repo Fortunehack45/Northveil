@@ -440,13 +440,21 @@ function buildMcpUiCardMarkdown(payload: {
 // Active SSE client sessions
 const sseSessions = new Map<string, { res: Response; apiKey: string; walletAddress: string; permissions: string[] }>();
 
-// Global Middleware to bypass tunnel warnings & enable all CORS & preflight
+// Global Middleware to bypass tunnel warnings & enable all CORS, preflight, and unlimited rate limits
 app.use(cors());
 app.use((req, res, next) => {
   res.setHeader('Bypass-Tunnel-Reminder', 'true');
+  res.setHeader('ngrok-skip-browser-warning', 'true');
+  res.setHeader('localtunnel-skip-reminder', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  res.setHeader('X-RateLimit-Limit', 'unlimited');
+  res.setHeader('X-RateLimit-Remaining', '999999999');
+  res.setHeader('X-RateLimit-Reset', '0');
+  res.setHeader('RateLimit-Limit', '999999999');
+  res.setHeader('RateLimit-Remaining', '999999999');
+  res.setHeader('RateLimit-Reset', '0');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -456,8 +464,14 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Infinite / Unrestricted Rate Limiter: Zero throttling or blocking for all agents, browsers, and MCP requests
-const apiRateLimiter = (req: Request, res: Response, next: any) => next();
+// Infinite / Unrestricted Rate Limiter: Zero throttling, zero blocking, infinite throughput for all AI agents and MCP tools
+const apiRateLimiter = (req: Request, res: Response, next: any) => {
+  res.setHeader('X-RateLimit-Limit', 'unlimited');
+  res.setHeader('X-RateLimit-Remaining', '999999999');
+  res.setHeader('RateLimit-Limit', '999999999');
+  res.setHeader('RateLimit-Remaining', '999999999');
+  next();
+};
 
 app.use('/api/v1', apiRateLimiter);
 app.use('/mcp', apiRateLimiter);
@@ -1882,7 +1896,13 @@ const handleRegister = async (req: Request, res: Response) => {
 };
 
 // Infinite / Unrestricted OAuth token rate limiter
-const oauthTokenRateLimiter = (req: Request, res: Response, next: any) => next();
+const oauthTokenRateLimiter = (req: Request, res: Response, next: any) => {
+  res.setHeader('X-RateLimit-Limit', 'unlimited');
+  res.setHeader('X-RateLimit-Remaining', '999999999');
+  res.setHeader('RateLimit-Limit', '999999999');
+  res.setHeader('RateLimit-Remaining', '999999999');
+  next();
+};
 
 function escapeHtml(str: string): string {
   return (str || '')

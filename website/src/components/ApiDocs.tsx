@@ -77,7 +77,7 @@ export const ApiDocs: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="bg-black border-2 border-[#ccff00] p-4 space-y-1">
               <span className="text-[#ccff00] font-black block uppercase">RATE LIMIT POLICY:</span>
-              <span className="text-slate-300">100 requests per 15-minute window per IP / API key.</span>
+              <span className="text-slate-300">Unlimited: Infinite throughput, zero throttling or blocking for all AI agents and developers.</span>
             </div>
             <div className="bg-black border-2 border-[#ff007f] p-4 space-y-1">
               <span className="text-[#ff007f] font-black block uppercase">SCOPED PERMISSIONS:</span>
