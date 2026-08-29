@@ -4606,18 +4606,105 @@ export async function executeRealTool(name: string, args: any, walletAddress: st
     }
 
     case 'northveil_get_tx': {
-      const hash = (args?.txHash || args?.hash || '').trim();
-      const reqId = (args?.requestId || args?.id || '').trim();
-      const network = (args?.network || 'base').toLowerCase();
-      const explorerBase = network === 'sepolia' ? 'https://sepolia.etherscan.io/tx/' : 'https://basescan.org/tx/';
+      const hash = (args?.txHash || args?.hash || args?.tx_hash || '').trim();
+      const reqId = (args?.requestId || args?.id || args?.request_id || args?.approvalToken || args?.approval_token || '').trim();
+      const network = (args?.network || 'sepolia').toLowerCase();
+      const explorerBase = getExplorerUrlForNetwork(network);
+
+      let stagedReq: any = null;
+      if (reqId) {
+        stagedReq = inMemoryTxRequests.get(reqId);
+        if (!stagedReq) {
+          for (const req of inMemoryTxRequests.values()) {
+            if (req.requestId === reqId || req.approvalToken === reqId || req.txHash === reqId) {
+              stagedReq = req;
+              break;
+            }
+          }
+        }
+      }
+      if (!stagedReq && hash) {
+        for (const req of inMemoryTxRequests.values()) {
+          if (req.txHash?.toLowerCase() === hash.toLowerCase()) {
+            stagedReq = req;
+            break;
+          }
+        }
+      }
+
+      if (!stagedReq && supabase && typeof supabase.from === 'function') {
+        try {
+          const query = reqId || hash;
+          if (query) {
+            const { data } = await supabase
+              .from('transaction_requests')
+              .select('*')
+              .or(`request_id.eq.${query},approval_token.eq.${query},tx_hash.eq.${query}`)
+              .maybeSingle();
+            if (data) stagedReq = data;
+          }
+        } catch {}
+      }
+
+      const activeTxHash = hash || stagedReq?.tx_hash || stagedReq?.txHash || null;
+      let finalStatus = stagedReq?.status || (activeTxHash ? 'confirmed' : 'pending');
+      let finalBlockNumber = stagedReq?.block_number || stagedReq?.blockNumber || null;
+      let finalContractAddress = stagedReq?.contract_address || stagedReq?.contractAddress || null;
+
+      // Verify on-chain via live RPC provider if txHash exists
+      if (activeTxHash && activeTxHash.startsWith('0x') && activeTxHash.length === 66) {
+        try {
+          const provider = ProviderService.getEVMProvider(stagedReq?.network || network);
+          const receipt = await provider.getTransactionReceipt(activeTxHash);
+          if (receipt) {
+            finalStatus = receipt.status === 1 ? 'confirmed' : 'failed';
+            finalBlockNumber = Number(receipt.blockNumber);
+            if (receipt.contractAddress) {
+              finalContractAddress = receipt.contractAddress;
+            }
+          }
+        } catch {}
+      }
+
+      const isContract = Boolean(
+        finalContractAddress ||
+        stagedReq?.is_deploy ||
+        stagedReq?.isDeploy ||
+        stagedReq?.operation === 'DEPLOY_CONTRACT' ||
+        stagedReq?.asset === 'DEPLOY'
+      );
+
+      if (isContract && !finalContractAddress && (stagedReq?.wallet_address || stagedReq?.walletAddress)) {
+        try {
+          finalContractAddress = ethers.getCreateAddress({
+            from: stagedReq.wallet_address || stagedReq.walletAddress,
+            nonce: stagedReq.nonce || 0,
+          });
+        } catch {}
+      }
+
+      const expUrl = activeTxHash ? `${explorerBase}/tx/${activeTxHash}` : null;
+      const statusEmoji = finalStatus === 'confirmed' ? '🟢' : finalStatus === 'pending' ? '🟡' : '🔴';
 
       return {
         ok: true,
-        txHash: hash || '0x948cf10ebf59ecab7daa00b4d6993421efc55762cde4767f00998f70d4144e02',
-        requestId: reqId || 'req_completed',
-        status: 'confirmed',
-        explorerUrl: hash ? `${explorerBase}${hash}` : `${explorerBase}0x948cf10ebf59ecab7daa00b4d6993421efc55762cde4767f00998f70d4144e02`,
-        formattedMarkdown: `### 📜 TRANSACTION STATUS\n\n> **Status**: 🟢 **CONFIRMED ON-CHAIN**\n> **Hash**: \`${hash || '0x948cf10ebf59ecab7daa00b4d6993421efc55762cde4767f00998f70d4144e02'}\`\n> **Explorer**: [View on Block Explorer](${explorerBase}${hash || '0x948cf10ebf59ecab7daa00b4d6993421efc55762cde4767f00998f70d4144e02'})`,
+        success: true,
+        status: finalStatus,
+        txHash: activeTxHash,
+        requestId: reqId || stagedReq?.request_id || stagedReq?.requestId,
+        blockNumber: finalBlockNumber,
+        contractAddress: finalContractAddress,
+        isDeployed: isContract && finalStatus === 'confirmed',
+        explorerUrl: expUrl,
+        network: stagedReq?.network || network,
+        formattedMarkdown: `### 📜 TRANSACTION STATUS: ${statusEmoji} ${finalStatus.toUpperCase()}
+
+> **Status**: ${statusEmoji} **${finalStatus.toUpperCase()}**  
+${activeTxHash ? `> **Transaction Hash**: [\`${activeTxHash}\`](${expUrl})` : '> **Transaction Hash**: *Awaiting Broadcast*'}  
+${finalContractAddress ? `> **Deployed Contract Address**: \`${finalContractAddress}\`` : ''}  
+${finalBlockNumber ? `> **Block Number**: \`${finalBlockNumber}\`` : ''}  
+${expUrl ? `> **Explorer Link**: [View on Block Explorer](${expUrl})` : ''}
+`,
       };
     }
 
@@ -4878,24 +4965,61 @@ export async function executeRealTool(name: string, args: any, walletAddress: st
     }
 
     case 'northveil_get_approval_status': {
-      const approvalId = (args?.approval_id || args?.approvalId || args?.id || args?.token || args?.approvalToken || '').trim();
+      const approvalId = (args?.approval_id || args?.approvalId || args?.id || args?.token || args?.approvalToken || args?.requestId || args?.request_id || '').trim();
       if (!approvalId) throw new Error('Missing approval_id parameter.');
 
-      const staged = inMemoryTxRequests.get(approvalId);
+      let staged: any = inMemoryTxRequests.get(approvalId);
+      if (!staged) {
+        for (const req of inMemoryTxRequests.values()) {
+          if (req.requestId === approvalId || req.approvalToken === approvalId || req.txHash === approvalId) {
+            staged = req;
+            break;
+          }
+        }
+      }
+
+      if (!staged && supabase && typeof supabase.from === 'function') {
+        try {
+          const { data } = await supabase
+            .from('transaction_requests')
+            .select('*')
+            .or(`approval_token.eq.${approvalId},request_id.eq.${approvalId},tx_hash.eq.${approvalId}`)
+            .maybeSingle();
+          if (data) staged = data;
+        } catch {}
+      }
+
       const status = staged ? staged.status : 'not_found';
+      const txHash = staged?.tx_hash || staged?.txHash || null;
+      const contractAddress = staged?.contract_address || staged?.contractAddress || null;
+      const explorerUrl = staged?.explorer_url || staged?.explorerUrl || (txHash ? `https://sepolia.etherscan.io/tx/${txHash}` : null);
 
       return {
         ok: true,
+        success: status !== 'not_found',
         approval_id: approvalId,
         status,
+        txHash,
+        contractAddress,
+        isDeployed: Boolean(contractAddress && status === 'confirmed'),
+        explorerUrl,
         details: staged ? {
           recipient: staged.recipient,
           amount: staged.amount,
           asset: staged.asset,
           network: staged.network,
-          expires_at: staged.expiresAt,
+          txHash,
+          contractAddress,
+          expires_at: staged.expires_at || staged.expiresAt,
         } : null,
-        formattedMarkdown: `### 🔍 APPROVAL STATUS\n\n> **Approval ID**: \`${approvalId}\`\n> **Status**: \`${status.toUpperCase()}\``,
+        formattedMarkdown: `### 🔍 APPROVAL STATUS: ${status.toUpperCase()}
+
+> **Approval ID**: \`${approvalId}\`  
+> **Status**: **${status.toUpperCase()}**  
+${txHash ? `> **Transaction Hash**: [\`${txHash}\`](${explorerUrl})` : ''}  
+${contractAddress ? `> **Deployed Contract Address**: \`${contractAddress}\`` : ''}  
+${explorerUrl ? `> **Explorer**: [View on Block Explorer](${explorerUrl})` : ''}
+`,
       };
     }
 
@@ -5397,28 +5521,69 @@ ${simulation.warnings.length > 0 ? `> **Warnings**: \`${simulation.warnings.join
         };
       }
 
-      const statusEmoji = stagedReq.status === 'confirmed' ? '🟢' : stagedReq.status === 'pending' ? '🟡' : '🔴';
-      const reqId = (stagedReq as any).request_id || stagedReq.requestId || 'req_latest';
-      const vaultAddr = (stagedReq as any).wallet_address || stagedReq.walletAddress || cleanAddress;
-      const txH = (stagedReq as any).tx_hash || stagedReq.txHash || null;
+      let txH = (stagedReq as any).tx_hash || stagedReq.txHash || null;
+      let finalStatus = stagedReq.status || (txH ? 'confirmed' : 'pending');
+      let blkNum = (stagedReq as any).block_number || stagedReq.blockNumber || null;
+      let contractAddr = (stagedReq as any).contract_address || stagedReq.contractAddress || null;
+      const targetNet = (stagedReq as any).network || stagedReq.network || 'sepolia';
+
+      // Check on-chain receipt if txHash is present
+      if (txH && txH.startsWith('0x') && txH.length === 66) {
+        try {
+          const provider = ProviderService.getEVMProvider(targetNet);
+          const receipt = await provider.getTransactionReceipt(txH);
+          if (receipt) {
+            finalStatus = receipt.status === 1 ? 'confirmed' : 'failed';
+            blkNum = Number(receipt.blockNumber);
+            if (receipt.contractAddress) {
+              contractAddr = receipt.contractAddress;
+            }
+          }
+        } catch {}
+      }
+
+      const isContract = Boolean(
+        contractAddr ||
+        (stagedReq as any).is_deploy ||
+        stagedReq.isDeploy ||
+        (stagedReq as any).operation === 'DEPLOY_CONTRACT' ||
+        stagedReq.operation === 'DEPLOY_CONTRACT' ||
+        (stagedReq as any).asset === 'DEPLOY' ||
+        stagedReq.asset === 'DEPLOY'
+      );
+
+      if (isContract && !contractAddr && vaultAddr) {
+        try {
+          contractAddr = ethers.getCreateAddress({
+            from: vaultAddr,
+            nonce: stagedReq.nonce || 0,
+          });
+        } catch {}
+      }
+
+      const statusEmoji = finalStatus === 'confirmed' ? '🟢' : finalStatus === 'pending' ? '🟡' : '🔴';
       const expLink = txH ? ((stagedReq as any).explorer_url || stagedReq.explorerUrl || `https://sepolia.etherscan.io/tx/${txH}`) : null;
-      const blkNum = (stagedReq as any).block_number || stagedReq.blockNumber || null;
       const expAt = (stagedReq as any).expires_at || stagedReq.expiresAt || new Date().toISOString();
 
       return {
         formattedMarkdown: `
-### 🔍 TRANSACTION REQUEST STATUS: ${statusEmoji} ${stagedReq.status?.toUpperCase()}
+### 🔍 TRANSACTION REQUEST STATUS: ${statusEmoji} ${finalStatus.toUpperCase()}
 
 > **Request ID**: \`${reqId}\`  
-> **Status**: **${stagedReq.status?.toUpperCase()}**  
+> **Status**: **${finalStatus.toUpperCase()}**  
 > **Sender Vault**: \`${vaultAddr}\`  
-> **Recipient**: \`${stagedReq.recipient || '0x000000000000000000000000000000000000dEaD'}\`  
-> **Amount**: **${stagedReq.amount || '0.001'} ${stagedReq.asset || 'ETH'}**  
-${txH ? `> **Transaction Hash**: [\`${txH}\`](${expLink || '#'})` : ''}
-${blkNum ? `> **Block Number**: \`${blkNum}\`` : ''}
+${isContract ? `> **Transaction Type**: 📜 **Smart Contract Deployment**\n> **Deployed Contract Address**: \`${contractAddr || 'Computing on-chain...'}\`` : `> **Recipient**: \`${stagedReq.recipient || '0x000000000000000000000000000000000000dEaD'}\`\n> **Amount**: **${stagedReq.amount || '0.001'} ${stagedReq.asset || 'ETH'}**`}  
+${txH ? `> **Transaction Hash**: [\`${txH}\`](${expLink || '#'})` : ''}  
+${blkNum ? `> **Block Number**: \`${blkNum}\`` : ''}  
 > **Expires At**: \`${expAt}\`
 `,
         ...stagedReq,
+        status: finalStatus,
+        txHash: txH,
+        contractAddress: contractAddr,
+        isDeployed: isContract && finalStatus === 'confirmed',
+        blockNumber: blkNum,
+        explorerUrl: expLink,
       };
     }
 

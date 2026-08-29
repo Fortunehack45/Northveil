@@ -116,12 +116,14 @@ export interface StagedTransactionRequest {
   status: 'pending' | 'signed' | 'broadcasted' | 'confirmed' | 'rejected' | 'expired' | 'failed';
   userId: string;
   reason?: string;
+  isDeploy?: boolean;
+  operation?: string;
+  contractAddress?: string;
   expiresAt: string;
   createdAt: string;
   txHash?: string;
   blockNumber?: number;
   gasUsed?: string;
-  contractAddress?: string;
   explorerUrl?: string;
 }
 
@@ -1477,18 +1479,33 @@ export async function validateAndBroadcastSignedTransaction(
 
   try {
     if (supabase && typeof supabase.from === 'function') {
+      const isContract = Boolean(contractAddress || req.isDeploy || req.operation === 'DEPLOY_CONTRACT' || req.asset === 'DEPLOY');
+      const deployedAddr = contractAddress || (isContract ? ethers.getCreateAddress({ from: req.walletAddress, nonce: req.nonce || 0 }) : undefined);
+
       await supabase.from('transaction_requests').update({
         status: 'confirmed',
         tx_hash: txHash,
         explorer_url: explorerUrl,
         block_number: blockNumber,
         gas_used: gasUsed,
+        contract_address: deployedAddr || null,
         raw_signed_tx: cleanSignedHex,
         recovered_sender: recoveredSender,
         validation_status: 'valid',
         token_used: true,
         updated_at: new Date().toISOString(),
       }).or(`approval_token.eq.${req.approvalToken},request_id.eq.${req.requestId}`);
+
+      if (isContract && deployedAddr) {
+        try {
+          await supabase.from('contracts').update({
+            status: 'DEPLOYED',
+            contract_address: deployedAddr,
+            tx_hash: txHash,
+            updated_at: new Date().toISOString(),
+          }).eq('wallet_address', req.walletAddress.toLowerCase()).eq('status', 'PREPARED');
+        } catch {}
+      }
     }
   } catch (e: any) {
     console.warn('[Supabase Tx Update Notice]:', e.message);

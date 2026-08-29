@@ -186,7 +186,7 @@ export const ApprovalsView: React.FC = () => {
 
         // Look up staged request parameters from local state or server response
         const targetNetwork = prepResult?.network || currentRecord?.parameters?.network || 'sepolia';
-        const targetRecipient = prepResult?.recipient || currentRecord?.parameters?.recipient;
+        const targetRecipient = prepResult?.recipient || prepResult?.to || currentRecord?.parameters?.recipient || currentRecord?.parameters?.to;
         const targetAmount = prepResult?.amount !== undefined ? prepResult.amount : currentRecord?.parameters?.amount;
 
         // Check if this is a smart contract deployment transaction
@@ -199,18 +199,40 @@ export const ApprovalsView: React.FC = () => {
           (!targetRecipient && (prepResult?.calldata || prepResult?.unsignedTransaction?.data || currentRecord?.parameters?.calldata))
         );
 
-        // Check if local private key is available
+        // Robust client-side private key resolution across vault, seed, and storage
         let privateKey = activeSubWallet?.privateKey;
-        if (!privateKey && activeSubWallet?.id) {
-          privateKey = (await getDecryptedPrivateKey(activeSubWallet.id)) || undefined;
+        if (!privateKey && activeSubWallet?.id && typeof getDecryptedPrivateKey === 'function') {
+          try {
+            privateKey = (await getDecryptedPrivateKey(activeSubWallet.id)) || undefined;
+          } catch {}
         }
         if (!privateKey && seedPhrase && seedPhrase.length > 0) {
-          if (seedPhrase.length === 1) {
+          if (seedPhrase.length === 1 && seedPhrase[0]) {
             privateKey = seedPhrase[0];
           } else if (seedPhrase.length >= 12) {
-            const derived = WalletService.deriveEVMAddress(seedPhrase, activeSubWallet?.accountIndex || 0);
-            privateKey = derived.privateKey;
+            try {
+              const derived = WalletService.deriveEVMAddress(seedPhrase, activeSubWallet?.accountIndex || 0);
+              privateKey = derived.privateKey;
+            } catch {}
           }
+        }
+        if (!privateKey && typeof window !== 'undefined') {
+          try {
+            const rawStoredSeed = localStorage.getItem('northveil_seed_phrase') || localStorage.getItem('northveil_seed');
+            if (rawStoredSeed) {
+              const words = rawStoredSeed.trim().split(/\s+/).filter(Boolean);
+              if (words.length >= 12) {
+                const derived = WalletService.deriveEVMAddress(words, activeSubWallet?.accountIndex || 0);
+                privateKey = derived.privateKey;
+              } else if (words.length === 1 && words[0]) {
+                privateKey = words[0];
+              }
+            }
+            if (!privateKey) {
+              const directPk = localStorage.getItem('northveil_vault_pk') || localStorage.getItem('northveil_imported_pk') || localStorage.getItem('northveil_active_pk');
+              if (directPk && directPk.trim()) privateKey = directPk.trim();
+            }
+          } catch {}
         }
 
         if (privateKey && (targetRecipient || isDeployTx)) {
@@ -231,9 +253,10 @@ export const ApprovalsView: React.FC = () => {
               unsignedTx.to = targetRecipient;
             }
           } else {
-            // In EVM contract deployment, `to` MUST be undefined/omitted
-            if (isDeployTx || !unsignedTx.to || unsignedTx.to === ethers.ZeroAddress || unsignedTx.to === '') {
+            if (isDeployTx) {
               delete unsignedTx.to;
+            } else if (targetRecipient && targetRecipient !== ethers.ZeroAddress && targetRecipient !== '') {
+              unsignedTx.to = targetRecipient;
             }
             if (unsignedTx.value !== undefined) {
               unsignedTx.value = parseEtherSafe(unsignedTx.value);
