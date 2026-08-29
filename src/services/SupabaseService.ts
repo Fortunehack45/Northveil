@@ -268,20 +268,57 @@ export class SupabaseService {
           calculatedStatus = 'PENDING';
         }
 
-        return {
-          id,
-          request_id: item.request_id || id,
-          approval_token: item.approval_token || id,
-          tool_name: item.contract_summary ? `execute_tx: ${item.contract_summary}` : (item.operation ? `northveil_prepare_${item.operation.toLowerCase()}` : 'token_transfer'),
-          status: calculatedStatus,
-          parameters: {
+        const isContractDeploy = Boolean(
+          item.is_deploy ||
+          item.operation === 'DEPLOY' ||
+          item.operation === 'DEPLOY_CONTRACT' ||
+          item.asset === 'DEPLOY' ||
+          (item.reason && item.reason.toLowerCase().includes('deploy')) ||
+          (item.contract_summary && item.contract_summary.toLowerCase().includes('deploy')) ||
+          ((!item.recipient || item.recipient === '0x0000000000000000000000000000000000000000' || item.recipient === '') && item.unsigned_payload?.data && item.unsigned_payload.data !== '0x')
+        );
+
+        let toolName = 'token_transfer';
+        let parameters: any = {};
+
+        if (isContractDeploy) {
+          const deployLabel = item.contract_summary || item.reason || 'Smart Contract';
+          toolName = deployLabel.startsWith('Deploy') ? deployLabel : `Deploy Smart Contract: ${deployLabel}`;
+          parameters = {
+            contract: deployLabel,
+            type: 'Smart Contract Deployment',
+            network: item.network || 'sepolia',
+            isDeploy: true,
+            calldata: item.unsigned_payload?.data || '0x',
+            calldataSize: item.unsigned_payload?.data && item.unsigned_payload.data !== '0x'
+              ? `${Math.floor((item.unsigned_payload.data.length - 2) / 2)} bytes`
+              : 'Compiled Bytecode',
+            summary: deployLabel,
+            approvalToken: item.approval_token || id,
+          };
+        } else {
+          toolName = item.contract_summary
+            ? `execute_tx: ${item.contract_summary}`
+            : item.operation
+            ? `northveil_prepare_${item.operation.toLowerCase()}`
+            : 'token_transfer';
+          parameters = {
             recipient: item.recipient,
             amount: `${item.amount} ${item.asset || 'ETH'}`,
             network: item.network || 'sepolia',
             estimatedFee: `$${item.estimated_fee_usd || '0.05'} USD`,
             summary: item.contract_summary || item.reason || 'Multi-chain Action',
             approvalToken: item.approval_token || id,
-          },
+          };
+        }
+
+        return {
+          id,
+          request_id: item.request_id || id,
+          approval_token: item.approval_token || id,
+          tool_name: toolName,
+          status: calculatedStatus,
+          parameters,
           response: {
             txHash: item.tx_hash,
             explorerUrl: item.explorer_url,

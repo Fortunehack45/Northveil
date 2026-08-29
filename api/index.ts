@@ -5853,14 +5853,15 @@ contract ${safeContractName} is ERC20, ERC20Burnable, Ownable {
       // Prepare deployment transaction request non-custodially
       const prep = await prepareTransactionRequest({
         walletAddress: cleanAddress,
-        recipient: ethers.ZeroAddress,
+        recipient: '',
         amount: 0,
         asset: 'DEPLOY',
         network,
         chainId,
         calldata: compiledBytecode,
-        gasLimit: 3000000,
-        operationType: 'DEPLOY',
+        gasLimit: 3500000,
+        operationType: 'DEPLOY_CONTRACT',
+        reason: `Deploy Smart Contract: ${nameStr} ($${symbolStr})`,
         userId: 'default_user',
         isDeploy: true,
       });

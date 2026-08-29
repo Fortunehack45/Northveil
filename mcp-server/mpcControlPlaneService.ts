@@ -43,7 +43,7 @@ export interface UnsignedTxPreview {
   walletAddress: string;
   chain: string;
   chainId: number;
-  action: 'TRANSFER' | 'SWAP' | 'DEPLOY' | 'CONTRACT_CALL' | 'SIGN_MESSAGE';
+  action: 'TRANSFER' | 'SWAP' | 'DEPLOY' | 'DEPLOY_CONTRACT' | 'CONTRACT_CALL' | 'SIGN_MESSAGE';
   to: string;
   contractAddress?: string;
   functionSelector?: string;
@@ -1029,10 +1029,11 @@ export interface TransactionPreparationParams {
   chainId?: number;
   calldata?: string;
   gasLimit?: number | string;
-  operationType?: 'TRANSFER' | 'SWAP' | 'DEPLOY' | 'CONTRACT_CALL' | 'SIGN_MESSAGE';
+  operationType?: 'TRANSFER' | 'SWAP' | 'DEPLOY' | 'DEPLOY_CONTRACT' | 'CONTRACT_CALL' | 'SIGN_MESSAGE';
   userId?: string;
   agentClientId?: string;
   isDeploy?: boolean;
+  reason?: string;
 }
 
 /**
@@ -1094,7 +1095,7 @@ export async function prepareTransactionRequest(
 
   // 6. Recipient formatting
   let targetTo: string | undefined = undefined;
-  if (!isDeploy && recipient && recipient !== ethers.ZeroAddress) {
+  if (!isDeploy && recipient && recipient !== ethers.ZeroAddress && recipient !== '') {
     try {
       targetTo = ethers.getAddress(recipient.trim().toLowerCase());
     } catch {
@@ -1103,9 +1104,9 @@ export async function prepareTransactionRequest(
   }
 
   // 7. Gas Limit Estimation / Default
-  let estimatedGasLimit = isDeploy ? 3000000 : 21000;
+  let estimatedGasLimit = isDeploy ? 3500000 : 21000;
   if (calldata && calldata !== '0x') {
-    estimatedGasLimit = Math.max(estimatedGasLimit, 100000);
+    estimatedGasLimit = Math.max(estimatedGasLimit, isDeploy ? 3000000 : 100000);
   }
   if (params.gasLimit) {
     estimatedGasLimit = Number(params.gasLimit);
@@ -1122,7 +1123,7 @@ export async function prepareTransactionRequest(
     chainId: targetChainId,
     type: 2,
   };
-  if (targetTo) {
+  if (!isDeploy && targetTo) {
     txToSign.to = targetTo;
   }
 
@@ -1136,15 +1137,16 @@ export async function prepareTransactionRequest(
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minute window
 
   const approxUsd = (amount * 2600).toFixed(2); // estimated USD value
-  const estimatedFeeUsd = '0.08';
+  const estimatedFeeUsd = isDeploy ? '0.25' : '0.08';
+  const effectiveReason = params.reason || (isDeploy ? 'Deploy Smart Contract' : `${operationType} via Non-Custodial Protocol`);
 
   const preview: UnsignedTxPreview = {
     agentClientId,
     walletAddress: normSender,
     chain: network,
     chainId: targetChainId,
-    action: operationType,
-    to: targetTo || ethers.ZeroAddress,
+    action: isDeploy ? 'DEPLOY_CONTRACT' : operationType,
+    to: targetTo || (isDeploy ? 'Contract Creation' : ethers.ZeroAddress),
     amount: String(amount),
     usdValue: approxUsd,
     estimatedFeeUsd,
@@ -1163,9 +1165,9 @@ export async function prepareTransactionRequest(
   const stagedRecord: StagedTransactionRequest = {
     requestId,
     walletAddress: normSender.toLowerCase(),
-    recipient: (targetTo || ethers.ZeroAddress).toLowerCase(),
+    recipient: isDeploy ? '' : (targetTo || ethers.ZeroAddress).toLowerCase(),
     amount: Number(amount) || 0,
-    asset: asset.toUpperCase(),
+    asset: isDeploy ? 'DEPLOY' : asset.toUpperCase(),
     network: network.toLowerCase(),
     chainId: targetChainId,
     nonce,
@@ -1175,7 +1177,7 @@ export async function prepareTransactionRequest(
     passkeyChallenge,
     status: 'pending',
     userId,
-    reason: `${operationType} via Non-Custodial Protocol`,
+    reason: effectiveReason,
     expiresAt,
     createdAt,
   };
@@ -1189,9 +1191,9 @@ export async function prepareTransactionRequest(
       await supabase.from('transaction_requests').insert([{
         request_id: requestId,
         wallet_address: normSender.toLowerCase(),
-        recipient: stagedRecord.recipient,
+        recipient: isDeploy ? '' : (targetTo || ethers.ZeroAddress).toLowerCase(),
         amount: stagedRecord.amount,
-        asset: stagedRecord.asset,
+        asset: isDeploy ? 'DEPLOY' : stagedRecord.asset,
         network: stagedRecord.network,
         chain_id: targetChainId,
         nonce,
@@ -1200,7 +1202,10 @@ export async function prepareTransactionRequest(
         passkey_challenge: passkeyChallenge,
         status: 'pending',
         user_id: userId,
-        reason: stagedRecord.reason,
+        reason: effectiveReason,
+        contract_summary: isDeploy ? effectiveReason : undefined,
+        operation: isDeploy ? 'DEPLOY_CONTRACT' : operationType,
+        is_deploy: isDeploy,
         expires_at: expiresAt,
         created_at: createdAt,
       }]);

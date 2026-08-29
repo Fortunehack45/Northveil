@@ -63,21 +63,56 @@ export const ApprovalsView: React.FC = () => {
           );
           const status = isConfirmed ? 'CONFIRMED' : isRejected ? 'REJECTED' : isExpired ? 'EXPIRED' : 'PENDING';
 
-          mergedMap.set(id, {
-            id,
-            wallet_address: req.walletAddress || req.wallet_address || activeSubWallet?.address || '',
-            tool_name: req.operationType ? `northveil_prepare_${req.operationType.toLowerCase()}` : (req.action ? `northveil_prepare_${req.action.toLowerCase()}` : 'token_transfer'),
-            parameters: {
+          const isDeploy = Boolean(
+            req.isDeploy ||
+            req.is_deploy ||
+            req.operationType === 'DEPLOY_CONTRACT' ||
+            req.operation === 'DEPLOY_CONTRACT' ||
+            req.asset === 'DEPLOY' ||
+            (req.reason && req.reason.toLowerCase().includes('deploy')) ||
+            (req.contract_summary && req.contract_summary.toLowerCase().includes('deploy'))
+          );
+
+          let toolName = 'token_transfer';
+          let parameters: any = {};
+
+          if (isDeploy) {
+            const deployLabel = req.reason || req.contract_summary || 'Smart Contract';
+            toolName = deployLabel.startsWith('Deploy') ? deployLabel : `Deploy Smart Contract: ${deployLabel}`;
+            parameters = {
+              contract: deployLabel,
+              type: 'Smart Contract Deployment',
+              network: req.network || req.chain || 'sepolia',
+              isDeploy: true,
+              calldata: req.unsignedPayload?.data || req.calldata || '0x',
+              calldataSize: (req.unsignedPayload?.data || req.calldata)
+                ? `${Math.floor(((req.unsignedPayload?.data || req.calldata).length - 2) / 2)} bytes`
+                : 'Compiled Bytecode',
+              summary: deployLabel,
+              approvalToken: id,
+            };
+          } else {
+            toolName = req.operationType
+              ? `northveil_prepare_${req.operationType.toLowerCase()}`
+              : (req.action ? `northveil_prepare_${req.action.toLowerCase()}` : 'token_transfer');
+            parameters = {
               recipient: req.recipient || req.to,
               amount: req.amount,
               asset: req.asset || req.symbol || 'ETH',
               network: req.network || req.chain || 'sepolia',
               reason: req.reason || req.contract_summary || 'Transfer requested via MCP Agent',
-            },
+            };
+          }
+
+          mergedMap.set(id, {
+            id,
+            wallet_address: req.walletAddress || req.wallet_address || activeSubWallet?.address || '',
+            tool_name: toolName,
+            parameters,
             status,
             created_at: req.createdAt || req.created_at || new Date().toISOString(),
             tx_hash: req.txHash || req.tx_hash,
-            gas_fee_usd: 0.05,
+            gas_fee_usd: isDeploy ? 0.25 : 0.05,
             agent_type: 'Northveil MCP Agent',
           });
         }
@@ -132,6 +167,7 @@ export const ApprovalsView: React.FC = () => {
       
       let txHash = prepResult?.txHash;
       let explorerUrl = prepResult?.explorerUrl;
+      let deployedContractAddress: string | undefined = prepResult?.contractAddress;
 
       // 2. If signature required on client device
       if (!txHash) {
@@ -153,6 +189,16 @@ export const ApprovalsView: React.FC = () => {
         const targetRecipient = prepResult?.recipient || currentRecord?.parameters?.recipient;
         const targetAmount = prepResult?.amount || currentRecord?.parameters?.amount;
 
+        // Check if this is a smart contract deployment transaction
+        const isDeployTx = Boolean(
+          prepResult?.isDeploy ||
+          currentRecord?.parameters?.isDeploy ||
+          currentRecord?.tool_name?.toLowerCase().includes('deploy') ||
+          currentRecord?.parameters?.asset === 'DEPLOY' ||
+          prepResult?.asset === 'DEPLOY' ||
+          (!targetRecipient && (prepResult?.calldata || prepResult?.unsignedTransaction?.data || currentRecord?.parameters?.calldata))
+        );
+
         // Check if local private key is available
         let privateKey = activeSubWallet?.privateKey;
         if (!privateKey && activeSubWallet?.id) {
@@ -167,8 +213,8 @@ export const ApprovalsView: React.FC = () => {
           }
         }
 
-        if (privateKey && targetRecipient) {
-          setPasskeyNotice('Cryptographically signing transaction on user device...');
+        if (privateKey && (targetRecipient || isDeployTx)) {
+          setPasskeyNotice(isDeployTx ? 'Cryptographically signing smart contract deployment on user device...' : 'Cryptographically signing transaction on user device...');
           const cleanPk = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
           const provider = ProviderService.getEVMProvider(targetNetwork);
           const signer = new ethers.Wallet(cleanPk, provider);
@@ -180,11 +226,17 @@ export const ApprovalsView: React.FC = () => {
           let unsignedTx: any = prepResult?.unsignedTransaction;
           if (!unsignedTx) {
             unsignedTx = {
-              to: targetRecipient,
               value: cleanAmount > 0 ? ethers.parseEther(cleanAmount.toString()) : 0n,
-              data: prepResult?.calldata || '0x',
+              data: prepResult?.calldata || currentRecord?.parameters?.calldata || '0x',
             };
+            if (!isDeployTx && targetRecipient && targetRecipient !== ethers.ZeroAddress && targetRecipient !== '') {
+              unsignedTx.to = targetRecipient;
+            }
           } else {
+            // In EVM contract deployment, `to` MUST be undefined/omitted
+            if (isDeployTx || !unsignedTx.to || unsignedTx.to === ethers.ZeroAddress || unsignedTx.to === '') {
+              delete unsignedTx.to;
+            }
             if (typeof unsignedTx.value === 'string' && !unsignedTx.value.startsWith('0x')) {
               unsignedTx.value = BigInt(unsignedTx.value);
             }
@@ -193,13 +245,14 @@ export const ApprovalsView: React.FC = () => {
           const feeData = await provider.getFeeData().catch(() => null);
           const populated = await signer.populateTransaction({
             ...unsignedTx,
+            gasLimit: isDeployTx ? 3500000n : undefined,
             maxFeePerGas: feeData?.maxFeePerGas || undefined,
             maxPriorityFeePerGas: feeData?.maxPriorityFeePerGas || undefined,
           });
 
           const signedSerialized = await signer.signTransaction(populated);
 
-          setPasskeyNotice('Broadcasting signed transaction to network...');
+          setPasskeyNotice(isDeployTx ? 'Broadcasting smart contract to network...' : 'Broadcasting signed transaction to network...');
           try {
             const broadcastRes = await MpcWalletService.broadcastTransaction({
               approvalToken: id,
@@ -209,17 +262,28 @@ export const ApprovalsView: React.FC = () => {
             });
             txHash = broadcastRes.txHash || broadcastRes.tx_hash;
             explorerUrl = broadcastRes.explorerUrl || broadcastRes.explorer_url;
+            deployedContractAddress = (broadcastRes as any).contractAddress;
           } catch (bErr: any) {
             console.warn('Server broadcast fallback to direct RPC provider:', bErr.message);
             const directTx = await provider.broadcastTransaction(signedSerialized);
             txHash = directTx.hash;
             explorerUrl = `https://sepolia.etherscan.io/tx/${txHash}`;
           }
+
+          if (isDeployTx && !deployedContractAddress && activeSubWallet?.address) {
+            try {
+              deployedContractAddress = ethers.getCreateAddress({
+                from: activeSubWallet.address,
+                nonce: populated.nonce || 0,
+              });
+            } catch {}
+          }
         } else {
           // Fallback to passkey execution route
           const execRes = await MpcWalletService.approveTransactionRequestWithPasskey(id, passkeyAssertion);
           txHash = execRes.txHash;
           explorerUrl = execRes.explorerUrl;
+          deployedContractAddress = (execRes as any).contractAddress;
         }
       }
 
@@ -232,7 +296,7 @@ export const ApprovalsView: React.FC = () => {
                   ...item,
                   status: 'CONFIRMED',
                   tx_hash: txHash,
-                  response: { ...item.response, txHash, explorerUrl, status: 'confirmed' },
+                  response: { ...item.response, txHash, explorerUrl, contractAddress: deployedContractAddress, status: 'confirmed' },
                 }
               : item
           )
@@ -246,7 +310,11 @@ export const ApprovalsView: React.FC = () => {
           txHash,
           explorerUrl: explorerUrl || `https://sepolia.etherscan.io/tx/${txHash}`,
         });
-        setPasskeyNotice(`Transaction confirmed on-chain! Tx: ${txHash.slice(0, 10)}...`);
+        if (deployedContractAddress) {
+          setPasskeyNotice(`Smart contract deployed on-chain! Address: ${formatShortAddress(deployedContractAddress)} (Tx: ${txHash.slice(0, 10)}...)`);
+        } else {
+          setPasskeyNotice(`Transaction confirmed on-chain! Tx: ${txHash.slice(0, 10)}...`);
+        }
       } else {
         setPasskeyNotice('Transaction approved successfully.');
       }
