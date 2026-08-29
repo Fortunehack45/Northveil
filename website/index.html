@@ -7,7 +7,7 @@
   <!-- Primary Title & SEO -->
   <title>Northveil — AI Agent Crypto MCP Protocol & Non-Custodial Multi-Chain Vaults</title>
   <meta name="description" content="Northveil empowers autonomous AI agents with non-custodial crypto vaults, hardware TEE enclaves, biometric passkey security, spending guardrails, and 30+ native MCP tools across EVM & Solana.">
-  <meta name="keywords" content="Northveil, Northveil Protocol, crypto mcp, crypto model context protocol, mcp server crypto, ai agent crypto wallet, non-custodial ai agent vault, ai web3 wallet, tee crypto wallet, hardware enclave ai wallet, turnkey mpc wallet, webauthn crypto wallet, autonomous agent smart contracts, sepolia agent mcp, ethereum mcp server, base mcp server, solana mcp server">
+  <meta name="keywords" content="Northveil, Northveil Protocol, crypto mcp, crypto model context protocol, mcp server crypto, ai agent crypto wallet, non-custodial ai agent vault, ai web3 wallet, tee crypto wallet, hardware enclave ai wallet, northveil mpc wallet, webauthn crypto wallet, autonomous agent smart contracts, sepolia agent mcp, ethereum mcp server, base mcp server, solana mcp server">
   <meta name="author" content="Northveil Protocol">
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
   <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
@@ -116,7 +116,7 @@
         "featureList": [
           "Model Context Protocol (MCP) Standard JSON-RPC & SSE Server",
           "30+ Multi-Chain Native Crypto Tools",
-          "Hardware TEE Enclave Isolation (Turnkey MPC)",
+          "Hardware TEE Enclave Isolation (Northveil MPC)",
           "Biometric WebAuthn Passkey Signing Ceremonies",
           "24-Hour Autonomous Spending Policy Guardrails",
           "Smart Contract Compilation and On-Chain Deployment (EVM & Solana)",
@@ -132,7 +132,7 @@
             "name": "How is Northveil different from traditional crypto wallets?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Northveil is built specifically for autonomous AI agents. Unlike standard wallets that require a human to approve every popup or custodial bots that hold your private keys on a server, Northveil uses Hardware TEE Enclaves (Turnkey MPC) and WebAuthn Biometric Passkeys. You can grant your agent a strict daily spending limit (e.g. $50/day) while retaining 100% non-custodial ownership and instant kill-switch control."
+              "text": "Northveil is built specifically for autonomous AI agents. Unlike standard wallets that require a human to approve every popup or custodial bots that hold your private keys on a server, Northveil uses Hardware TEE Enclaves (Northveil MPC) and WebAuthn Biometric Passkeys. You can grant your agent a strict daily spending limit (e.g. $50/day) while retaining 100% non-custodial ownership and instant kill-switch control."
             }
           },
           {
@@ -1949,9 +1949,9 @@
             </svg>
           </div>
           <h3 class="card-title">Hardware TEE Enclave Isolation</h3>
-          <p class="card-desc">Keys are provisioned and stored exclusively inside cryptographic hardware secure enclaves (Turnkey MPC). Private keys never exist in server memory or database records.</p>
+          <p class="card-desc">Keys are provisioned and stored exclusively inside cryptographic hardware secure enclaves (Northveil MPC). Private keys never exist in server memory or database records.</p>
         </div>
-        <div class="card-tag">// TURNKEY_TEE_ENCLAVE</div>
+        <div class="card-tag">// NORTHVEIL_TEE_ENCLAVE</div>
       </div>
 
       <div class="card" onclick="selectBenefit(this, 'passkey')">
@@ -2106,7 +2106,7 @@
           <span class="tool-name">create_wallet</span>
           <span class="tool-category">Vaults</span>
         </div>
-        <p class="tool-desc">Provisions a new self-sovereign BIP-39 non-custodial vault or hardware Turnkey MPC sub-organization.</p>
+        <p class="tool-desc">Provisions a new self-sovereign BIP-39 non-custodial vault, returning address, 12-word seed phrase, and derivation path.</p>
       </div>
 
       <div class="tool-card" onclick="previewTool('get_wallet_info')">
@@ -2154,7 +2154,7 @@
           </svg>
         </button>
         <div class="faq-answer">
-          Northveil is built specifically for autonomous AI agents. Unlike standard wallets that require a human to approve every popup or custodial bots that hold your private keys on a server, Northveil uses Hardware TEE Enclaves (Turnkey MPC) and WebAuthn Biometric Passkeys. You can grant your agent a strict daily spending limit (e.g. $50/day) while retaining 100% non-custodial ownership and instant kill-switch control.
+          Northveil is built specifically for autonomous AI agents. Unlike standard wallets that require a human to approve every popup or custodial bots that hold your private keys on a server, Northveil uses Hardware TEE Enclaves (Northveil MPC) and WebAuthn Biometric Passkeys. You can grant your agent a strict daily spending limit (e.g. $50/day) while retaining 100% non-custodial ownership and instant kill-switch control.
         </div>
       </div>
 
@@ -2238,7 +2238,7 @@
         <div>
           <div class="pricing-tier">Cloud Agent Vaults</div>
           <div class="pricing-price">Free <span>/ pay gas only</span></div>
-          <p class="pricing-desc">Hosted SSE endpoints, Turnkey hardware TEE enclaves, and biometric WebAuthn relays.</p>
+          <p class="pricing-desc">Hosted SSE endpoints, Northveil hardware TEE enclaves, and biometric WebAuthn relays.</p>
           <ul class="pricing-features">
             <li>
               <svg class="pricing-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -2269,7 +2269,7 @@
           <ul class="pricing-features">
             <li>
               <svg class="pricing-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              Dedicated Turnkey Sub-Org Partitioning
+              Dedicated Hardware MPC Sub-Org Partitioning
             </li>
             <li>
               <svg class="pricing-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -2513,8 +2513,8 @@
       },
       step_passkey: {
         label: 'tee_attestation.json',
-        config: `{\n  "attestation": {\n    "enclaveType": "AWS_NITRO_TEE",\n    "pcr0": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",\n    "turnkeySubOrgId": "d982ab71-923f-4e02-b362-e93297a7e112",\n    "authMode": "WEBAUTHN_PASSKEY_BIOMETRIC",\n    "signatureType": "ECDSA_SECP256K1"\n  }\n}`,
-        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(wallet_address="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417")\n\n# Autonomous signing inside AWS Nitro Enclave (Turnkey MPC)\nsigned_payload = client.enclave.sign_transaction(\n    tx_params={\n        "to": "0x2de14bb9264acd0346e122c4bb2f0614f79a1670",\n        "value": 5000000000000000, # 0.005 ETH\n        "chainId": 11155111\n    },\n    enclave_proof=True\n)\nprint("TEE Enclave Signature Generated (Zero Key Exposure)")`,
+        config: `{\n  "attestation": {\n    "enclaveType": "AWS_NITRO_TEE",\n    "pcr0": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",\n    "enclaveSubOrgId": "d982ab71-923f-4e02-b362-e93297a7e112",\n    "authMode": "WEBAUTHN_PASSKEY_BIOMETRIC",\n    "signatureType": "ECDSA_SECP256K1"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(wallet_address="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417")\n\n# Autonomous signing inside AWS Nitro Enclave (Northveil MPC)\nsigned_payload = client.enclave.sign_transaction(\n    tx_params={\n        "to": "0x2de14bb9264acd0346e122c4bb2f0614f79a1670",\n        "value": 5000000000000000, # 0.005 ETH\n        "chainId": 11155111\n    },\n    enclave_proof=True\n)\nprint("TEE Enclave Signature Generated (Zero Key Exposure)")`,
         ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ walletAddress: '0x56f0fdbe1b...' });\n\n// Generate WebAuthn FIDO2 biometric challenge for high-value actions\nconst challenge = await vault.passkey.createChallenge({\n  action: 'DEPLOY_CONTRACT',\n  walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'\n});\n\n// Triggers native Touch ID / Face ID hardware prompt on user device\nconst assertion = await navigator.credentials.get({\n  publicKey: challenge.publicKeyOptions\n});\nconst signedTx = await vault.passkey.submitAssertion(assertion);\nconsole.log('Biometric Passkey Attested:', signedTx.attestationId);`
       },
       step_broadcast: {

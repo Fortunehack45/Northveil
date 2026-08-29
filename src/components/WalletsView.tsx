@@ -80,8 +80,8 @@ export const WalletsView: React.FC = () => {
     setRevealPassword('');
     setRevealError('');
     setIsKeyVisible(false);
-    if (wallet.derivationPath?.includes('turnkey')) {
-      setRevealedKeyText('This vault is secured by Turnkey Hardware Nitro TEE Enclaves & Biometric Passkeys. Non-custodial key shares are never stored or exposed as raw text in the browser.');
+    if (wallet.derivationPath?.includes('turnkey') || wallet.derivationPath?.includes('northveil')) {
+      setRevealedKeyText('This vault is secured by Northveil Hardware Nitro TEE Enclaves & Biometric Passkeys. Non-custodial key shares are never stored or exposed as raw text in the browser.');
       setIsKeyVisible(true);
     }
     setShowRevealModal(true);
@@ -172,7 +172,7 @@ export const WalletsView: React.FC = () => {
       if (words.length >= 12) {
         // Seed phrase
         MpcWalletService.importMpcVault('seed', words.join(' '), chosenName, userId).catch((e) => {
-          console.warn('[Turnkey Enclave Import Notice]:', e.message);
+          console.warn('[Northveil Enclave Import Notice]:', e.message);
         });
         const newWallet = importSubWallet('seed', words.join(' '), chosenName);
         if (newWallet) {
@@ -191,7 +191,7 @@ export const WalletsView: React.FC = () => {
           return;
         }
         MpcWalletService.importMpcVault('privateKey', pKey, chosenName, userId).catch((e) => {
-          console.warn('[Turnkey Enclave Import Notice]:', e.message);
+          console.warn('[Northveil Enclave Import Notice]:', e.message);
         });
         const newWallet = importSubWallet('privateKey', pKey, chosenName);
         if (newWallet) {

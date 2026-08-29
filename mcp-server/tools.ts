@@ -73,6 +73,68 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     },
   },
   {
+    name: 'northveil_create_wallet',
+    description: 'Provisions a new self-sovereign BIP-39 non-custodial vault, returning the public address, derivation path, and 12-word secret recovery seed phrase for instant user backup.',
+    annotations: { readOnly: false, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        walletName: {
+          type: 'string',
+          description: 'Label or human-readable name for the new vault (e.g. Agent Vault)',
+        },
+        network: {
+          type: 'string',
+          description: 'Primary network (e.g. ethereum, base, polygon, arbitrum, bsc, solana)',
+        },
+        userId: {
+          type: 'string',
+          description: 'User identifier (default: default_user)',
+        },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        walletName: {
+          type: 'string',
+          description: 'Label or human-readable name for the new vault',
+        },
+        network: {
+          type: 'string',
+          description: 'Primary network',
+        },
+        userId: {
+          type: 'string',
+          description: 'User identifier',
+        },
+      },
+    },
+  },
+  {
+    name: 'northveil_export_seed_phrase',
+    description: 'Retrieves the 12-word secret recovery seed phrase and private key for an authorized vault so the user can backup, export, or import into MetaMask, Phantom, or hardware wallets.',
+    annotations: { readOnly: true, destructive: false, confirmationRequired: false },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: '0x public address of the authorized vault (defaults to active user vault)',
+        },
+      },
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        walletAddress: {
+          type: 'string',
+          description: '0x public address of the authorized vault',
+        },
+      },
+    },
+  },
+  {
     name: 'northveil_get_balances',
     description: 'Retrieves real-time verified on-chain native and token balances for an authorized vault across multiple chains (Ethereum Mainnet, Solana, BNB Smart Chain, Polygon, Arbitrum, Optimism, Avalanche, Base, Sepolia, or all chains simultaneously).',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },

@@ -67,15 +67,15 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
   };
 
   /**
-   * Genuine Turnkey Hardware MPC Vault Creation & Mandatory Passkey Registration Flow
+   * Genuine Northveil Hardware MPC Vault Creation & Mandatory Passkey Registration Flow
    */
   const handleCreateMpcVaultWithPasskey = async () => {
     setPasskeyError('');
     setStep('processing');
-    setProcessingMsg('Provisioning Turnkey Nitro TEE Enclave Vault...');
+    setProcessingMsg('Provisioning Northveil Nitro TEE Enclave Vault...');
 
     try {
-      // 1. Backend provisions Turnkey MPC Hardware Enclave Wallet
+      // 1. Backend provisions Northveil MPC Hardware Enclave Wallet
       const userId = MpcWalletService.getUserId();
       const vaultResult = await MpcWalletService.createMpcVault(walletNameInput, userId);
 
@@ -107,7 +107,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       setCreatedVaultAddress(vaultResult.address);
       setStep('createdSuccess');
     } catch (err: any) {
-      setPasskeyError(err.message || 'Failed to create Turnkey MPC Vault with Passkey.');
+      setPasskeyError(err.message || 'Failed to create Northveil MPC Vault with Passkey.');
       setStep('createPasskey');
     }
   };
@@ -205,7 +205,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
     }
 
     setStep('processing');
-    setProcessingMsg('Enclave Hardening: Provisioning Turnkey Nitro TEE Enclave...');
+    setProcessingMsg('Enclave Hardening: Provisioning Northveil Nitro TEE Enclave...');
 
     const chosenName = importWalletName.trim() || 'Primary Vault';
     const userId = MpcWalletService.getUserId();
@@ -214,13 +214,13 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       if (parsedImportWords.length >= 12) {
         const mnemonic = parsedImportWords.join(' ');
         MpcWalletService.importMpcVault('seed', mnemonic, chosenName, userId).catch((e) => {
-          console.warn('[Turnkey Enclave Import Notice]:', e.message);
+          console.warn('[Northveil Enclave Import Notice]:', e.message);
         });
         await setupVault(importPassword, parsedImportWords, chosenName);
       } else if (parsedImportKey || parsedImportWords.length === 1) {
         const keyToImport = parsedImportKey || parsedImportWords[0];
         MpcWalletService.importMpcVault('privateKey', keyToImport, chosenName, userId).catch((e) => {
-          console.warn('[Turnkey Enclave Import Notice]:', e.message);
+          console.warn('[Northveil Enclave Import Notice]:', e.message);
         });
         await setupVault(importPassword, [keyToImport], chosenName);
       }
@@ -343,7 +343,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
             </div>
             <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Register Device Passkey</h3>
             <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-xs mx-auto leading-relaxed">
-              Your hardware biometric (Touch ID, Face ID, or Windows Hello) will be cryptographically bound to your Turnkey TEE Enclave. No seed phrases to lose.
+              Your hardware biometric (Touch ID, Face ID, or Windows Hello) will be cryptographically bound to your Northveil TEE Enclave. No seed phrases to lose.
             </p>
           </div>
 
@@ -388,7 +388,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
               Vault Successfully Created
             </h3>
             <p className="text-xs text-zinc-600 dark:text-zinc-400">
-              Secured by Turnkey Nitro TEE Enclave and device biometric passkey.
+              Secured by Northveil Nitro TEE Enclave and device biometric passkey.
             </p>
           </div>
 

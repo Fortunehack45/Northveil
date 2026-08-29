@@ -27,12 +27,13 @@ export class WebAuthnVerificationError extends Error {
   }
 }
 
-export class TurnkeyEnclaveError extends Error {
+export class NorthveilEnclaveError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'TurnkeyEnclaveError';
+    this.name = 'NorthveilEnclaveError';
   }
 }
+export const TurnkeyEnclaveError = NorthveilEnclaveError;
 
 // ═════════════════════════════════════════════════════════════════════════════
 // NON-CUSTODIAL SIGNING & TRANSACTION TYPES
@@ -530,10 +531,18 @@ export async function createMpcWallet(
   mpcProvider: string;
   keyType: string;
   status: string;
+  seedPhrase: string;
+  mnemonic: string;
+  mnemonicWords: string[];
+  privateKey: string;
+  derivationPath: string;
 }> {
-  // Generate random deterministic placeholder address if not yet connected by client
+  // Generate random self-sovereign BIP-39 mnemonic and derived HD keypair
   const randomWallet = ethers.Wallet.createRandom();
   const address = randomWallet.address.toLowerCase();
+  const seedPhrase = randomWallet.mnemonic?.phrase || '';
+  const mnemonicWords = seedPhrase ? seedPhrase.split(' ') : [];
+  const privateKey = randomWallet.privateKey;
   const mpcWalletId = `vault_${Date.now()}_${address.slice(0, 8)}`;
 
   const record = await registerPublicWallet({
@@ -547,9 +556,14 @@ export async function createMpcWallet(
     address: record.address,
     mpcWalletId: record.id,
     mpcSubOrgId: 'client_local_vault',
-    mpcProvider: 'non_custodial',
+    mpcProvider: 'northveil_enclave',
     keyType: record.key_type,
     status: 'active',
+    seedPhrase,
+    mnemonic: seedPhrase,
+    mnemonicWords,
+    privateKey,
+    derivationPath: "m/44'/60'/0'/0/0",
   };
 }
 

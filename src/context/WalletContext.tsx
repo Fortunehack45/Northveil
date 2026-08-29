@@ -48,7 +48,7 @@ const DEFAULT_SUB_WALLETS: SubWalletAccount[] = [
     name: 'Primary Vault',
     accountIndex: 0,
     address: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
-    derivationPath: 'turnkey://tee-nitro-enclave',
+    derivationPath: 'northveil://tee-nitro-enclave',
     colorTag: '#00f0ff',
     isDefault: true,
     createdAt: '2026-08-01',
@@ -275,7 +275,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               name: parsed.walletName || 'Primary Vault',
               accountIndex: 0,
               address: sanitizeToValidAddress(parsed.walletAddress, 0),
-              derivationPath: 'turnkey://tee-nitro-enclave',
+              derivationPath: 'northveil://tee-nitro-enclave',
               colorTag: '#ffffff',
               isDefault: true,
               createdAt: parsed.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
@@ -298,7 +298,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               name: 'Primary Vault',
               accountIndex: 0,
               address: sanitizeToValidAddress(addresses[0], 0),
-              derivationPath: 'turnkey://tee-nitro-enclave',
+              derivationPath: 'northveil://tee-nitro-enclave',
               colorTag: '#ffffff',
               isDefault: true,
               createdAt: new Date().toISOString().split('T')[0],
@@ -315,7 +315,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         name: 'Primary Vault',
         accountIndex: 0,
         address: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
-        derivationPath: 'turnkey://tee-nitro-enclave',
+        derivationPath: 'northveil://tee-nitro-enclave',
         colorTag: '#ffffff',
         isDefault: true,
         createdAt: '2026-08-01',
@@ -584,7 +584,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const getDecryptedPrivateKey = async (walletId: string, password?: string): Promise<string | null> => {
     const targetWallet = subWallets.find(w => w.id === walletId);
     if (!targetWallet) return null;
-    if (targetWallet.derivationPath?.includes('turnkey')) return null;
+    if (targetWallet.derivationPath?.includes('turnkey') || targetWallet.derivationPath?.includes('northveil')) return null;
 
     // 1. If seed phrase is already decrypted in session, derive directly
     if (seedPhrase && seedPhrase.length >= 12) {
@@ -875,7 +875,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         name: chosenName,
         accountIndex: 0,
         address: address.toLowerCase(),
-        derivationPath: 'turnkey://tee-nitro-enclave',
+        derivationPath: 'northveil://tee-nitro-enclave',
         colorTag: '#00f0ff',
         isDefault: true,
         createdAt: new Date().toISOString().split('T')[0],
@@ -891,7 +891,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         'northveil_v3_mpc_vault',
         JSON.stringify({
           version: 3,
-          type: 'mpc_turnkey',
+          type: 'mpc_northveil',
           walletAddress: address.toLowerCase(),
           mpcWalletId,
           userId,
@@ -1795,7 +1795,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
     }
 
-    // 2. Non-Custodial Turnkey MPC Hardware Enclave Vault Signing with Biometric Passkey
+    // 2. Non-Custodial Northveil MPC Hardware Enclave Vault Signing with Biometric Passkey
     try {
       const prep = await MpcWalletService.prepareTransaction({
         walletAddress: activeSubWallet.address,

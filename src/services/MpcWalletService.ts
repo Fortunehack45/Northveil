@@ -1,6 +1,6 @@
 /**
  * Northveil MPC & Passkey Client Service
- * Coordinates Non-Custodial Turnkey Hardware TEE Enclave Vault creation,
+ * Coordinates Non-Custodial Northveil Hardware TEE Enclave Vault creation,
  * WebAuthn hardware biometric authentication, and signed session tokens.
  */
 
