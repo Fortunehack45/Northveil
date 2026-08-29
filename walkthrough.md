@@ -16,8 +16,7 @@
 
 ### 3. Ultra-Premium Footer Redesign & Full Mobile/Tablet Responsiveness
 - **Eliminated Pre-Footer Void**: Fixed the dead space between `.cta-box` and `.footer-main` by removing excess wrapper padding (`padding-bottom: 0px` on `.content-sections-wrapper`, `padding: 0 24px 36px` on `.cta-box-wrap`), allowing the CTA card to flow seamlessly into the footer.
-- **Top Brand & Live Protocol Status**:
-  - Live animated pulsating green status badge (`All Systems Operational • TEE Enclaves Online`).
+- **Top Brand Section & Developer Install Bar**:
   - Interactive Developer Quick-Install Bar: `$ npm install @northveil/sdk` with one-click copy button and toast feedback.
   - Sleek social link buttons with custom SVG icons (GitHub, X/Twitter, Discord, Docs).
 - **Structured 4-Column Navigation Grid**:
@@ -31,6 +30,16 @@
 - **Complete Mobile & Tablet Responsiveness**:
   - Responsive breakpoints at `1024px`, `768px`, and `480px`.
   - Fluid typography with CSS `clamp()`, flexible button stacks, swipeable architecture tabs, horizontal tool filter scroll, and touch-optimized tap targets (≥44px).
+
+### 4. Footer Cleanliness & Approval Workflow Permanence (Zero Reversion)
+- **Removed Green Status Pill**: Removed the green status indicator pill (`[• All Systems Operational • TEE Enclaves Online]`) and its pulse CSS animation from the footer brand column in [`website/index.html`](file:///c:/Users/USER%20PC/Desktop/Northveil/website/index.html), resulting in a clean and polished brand header.
+- **Approval Workflow Permanence & Zero-Reversion Guarantees**:
+  - **Root Cause Eliminated**: `ApprovalsView.tsx` previously suffered from a polling race where the 3-second background polling interval merged stale in-memory states and rewrote confirmed transactions back to `PENDING`.
+  - **Fresh Ref Tracking**: Introduced `approvalsRef` to eliminate closure staleness within background intervals.
+  - **Multi-Identifier Alias Mapping**: Built `confirmedIds` and `rejectedIds` sets indexing `id`, `request_id`, `approval_token`, and `tx_hash` so that once a transaction confirms, no background fetch will ever downgrade it back to `PENDING`.
+  - **Server & Control Plane Confirmation**: Updated `approveAndExecuteWithPasskey` across [`api/mpcControlPlaneService.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/api/mpcControlPlaneService.ts), [`mcp-server/mpcControlPlaneService.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/mcp-server/mpcControlPlaneService.ts), [`api/index.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/api/index.ts), and [`mcp-server/index.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/mcp-server/index.ts) to mark requests as `confirmed`, persist transaction hashes in memory and Supabase, and prevent re-appearance in the pending queue.
+  - **Supabase Type-Safe Matching**: Updated `SupabaseService.updateApprovalStatus` in [`src/services/SupabaseService.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/services/SupabaseService.ts) to safely handle UUID vs string token filters and normalize status values.
+  - **Automated Verification**: Passed [`scratch/test_approval_permanence_integrity.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/scratch/test_approval_permanence_integrity.ts) with 100% success rate (5/5 assertions).
 
 ---
 

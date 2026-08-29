@@ -388,15 +388,15 @@ export class MpcWalletService {
   public static async approveTransactionRequestWithPasskey(
     requestIdOrToken: string,
     passkeyAssertion?: any,
-    userId?: string
+    userId?: string,
+    signedTransaction?: string,
+    txHash?: string
   ): Promise<{
     success: boolean;
     txHash?: string;
-    blockNumber?: number;
+    tx_hash?: string;
     explorerUrl?: string;
-    gasUsed?: string;
-    unsignedTransaction?: any;
-    unsignedSerialized?: string;
+    explorer_url?: string;
     status?: string;
     recipient?: string;
     amount?: number;
@@ -404,6 +404,7 @@ export class MpcWalletService {
     network?: string;
     calldata?: string;
     chainId?: number;
+    contractAddress?: string;
     error?: string;
   }> {
     const effectiveUserId = userId || this.getUserId();
@@ -417,6 +418,8 @@ export class MpcWalletService {
       body: JSON.stringify({
         userId: effectiveUserId,
         passkeyAssertion,
+        signedTransaction,
+        txHash,
       }),
     });
 

@@ -378,18 +378,27 @@ export class SupabaseService {
    */
   static async updateApprovalStatus(idOrToken: string, status: 'approved' | 'rejected', txHash?: string) {
     try {
+      const normalizedStatus = status === 'approved' ? 'confirmed' : status;
       const updateData: any = {
-        status,
+        status: normalizedStatus,
         updated_at: new Date().toISOString(),
       };
-      if (txHash) updateData.tx_hash = txHash;
+      if (txHash) {
+        updateData.tx_hash = txHash;
+        updateData.explorer_url = `https://sepolia.etherscan.io/tx/${txHash}`;
+        updateData.token_used = true;
+      }
 
-      // Update by id or approval_token
-      const { data, error } = await supabase
-        .from('transaction_requests')
-        .update(updateData)
-        .or(`id.eq.${idOrToken},approval_token.eq.${idOrToken}`);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrToken);
+      let query = supabase.from('transaction_requests').update(updateData);
+      
+      if (isUuid) {
+        query = query.or(`id.eq.${idOrToken},approval_token.eq.${idOrToken},request_id.eq.${idOrToken}`);
+      } else {
+        query = query.or(`approval_token.eq.${idOrToken},request_id.eq.${idOrToken}`);
+      }
 
+      const { data, error } = await query;
       if (error) console.warn('[Supabase updateApprovalStatus Error]:', error);
       return data;
     } catch (e) {

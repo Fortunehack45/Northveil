@@ -216,6 +216,8 @@ export interface McpApprovalRecord {
   created_at: string;
   tx_hash?: string;
   gas_fee_usd?: number;
+  request_id?: string;
+  approval_token?: string;
 }
 
 export interface SocialAccountsState {

@@ -3401,9 +3401,9 @@ app.post('/api/v1/dashboard/approvals/:id/approve', async (req: Request, res: Re
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
   const { id } = req.params;
-  const { passkeyAssertion, userId = 'default_user', signedTransaction } = req.body || {};
+  const { passkeyAssertion, userId = 'default_user', signedTransaction, txHash, explicitTxHash } = req.body || {};
   try {
-    const result = await approveAndExecuteWithPasskey(id, passkeyAssertion, userId, signedTransaction);
+    const result = await approveAndExecuteWithPasskey(id, passkeyAssertion, userId, signedTransaction, txHash || explicitTxHash);
     return res.json({ success: true, result });
   } catch (err: any) {
     return res.status(400).json({ success: false, error: err.message });
