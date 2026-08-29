@@ -56,6 +56,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address to check vault status for',
+        },
         userId: {
           type: 'string',
           description: 'User identifier or account handle (default: default_user)',
@@ -65,6 +69,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address',
+        },
         userId: {
           type: 'string',
           description: 'User identifier or account handle',
@@ -1386,11 +1394,15 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'get_wallet_info',
-    description: 'Retrieves current vault address, active chain, MPC provider status, and account metadata.',
+    description: 'Retrieves current vault address, active chain, MPC provider status, and account metadata. If no session wallet is connected, pass walletAddress to inspect an explicit address.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address to inspect',
+        },
         chain: {
           type: 'string',
           description: 'Optional chain filter (ethereum, solana, bitcoin, polygon, arbitrum, bsc, base)',
@@ -1400,6 +1412,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address',
+        },
         chain: {
           type: 'string',
           description: 'Optional chain filter',
@@ -1414,6 +1430,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address to fetch portfolio for',
+        },
         hideZeroBalances: {
           type: 'boolean',
           description: 'Set to true to omit assets with 0 balance',
@@ -1423,6 +1443,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address',
+        },
         hideZeroBalances: {
           type: 'boolean',
           description: 'Set to true to omit assets with 0 balance',
@@ -1441,6 +1465,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
           type: 'string',
           description: 'Token ticker symbol (e.g. ETH, USDT, SOL, BTC, UNI, LINK)',
         },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address to check token balance for',
+        },
       },
       required: ['symbol'],
     },
@@ -1450,6 +1478,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         symbol: {
           type: 'string',
           description: 'Token ticker symbol',
+        },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address',
         },
       },
       required: ['symbol'],
@@ -1462,6 +1494,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address to query transaction history for',
+        },
         limit: {
           type: 'number',
           description: 'Maximum number of transaction records to return (default 10)',
@@ -1475,6 +1511,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address',
+        },
         limit: {
           type: 'number',
           description: 'Maximum number of transaction records to return',

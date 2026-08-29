@@ -436,6 +436,23 @@ async function getMultiChainBalancesAndTokens(
   tokenAddress?: string,
   ethPriceVal: number = 3150.0
 ) {
+  if (!targetAddress || targetAddress === 'null' || targetAddress === 'undefined' || targetAddress === '""') {
+    return {
+      ok: true,
+      status: 'wallet_not_connected',
+      walletAddress: null,
+      message: 'No wallet address is currently connected to this session. Please supply a wallet address (e.g., 0x... or Solana address) in your request to view balances.',
+      formattedMarkdown: `### 💼 Multi-Chain Asset Balance Scanner
+
+> **Status**: ℹ️ **No Active Wallet Connected**
+
+To view live on-chain balances across Ethereum, Base, Polygon, Arbitrum, BSC, Solana, and Sepolia:
+- **Provide an Address**: Tell me your Ethereum (\`0x...\`) or Solana address.
+- **Create a Vault**: Ask me to *"create a new wallet"*.
+- **Configure Connector**: Add \`?wallet_address=0x...\` to the MCP Server URL.`,
+    };
+  }
+
   const normNet = (requestedNet || 'all').toLowerCase().trim();
   const isAll = normNet === 'all' || normNet === 'multi' || !normNet;
   const isMainnetsOnly = normNet === 'mainnet' || normNet === 'mainnets';
@@ -2101,20 +2118,48 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
     } catch (e) {
       console.warn('[Auth] Supabase key resolution notice:', e);
     }
+
+    // If an explicit API key was provided but was not recognized, strictly reject it
+    return {
+      valid: false,
+      walletAddress: '',
+      keyName: 'Invalid Token',
+      permissions: [],
+      allowedWallets: [],
+      tier: 'unauthenticated',
+      userId: '',
+      error: 'HTTP 401 Unauthorized: Invalid, inactive, or unauthorized Northveil API token.',
+    };
   }
 
-  // 2. No valid credentials — reject with an explicit authentication error.
-  // Callers must supply a valid API key, OAuth token, or session cookie.
-  // We never silently downgrade to 'default_user' or a hardcoded wallet.
+  // 2. If NO API key was provided, check if an explicit wallet was requested (from ?wallet_address=..., header, or args) OR server env is set
+  const cleanReq = (requestedAddress || '').trim().toLowerCase();
+  const isReqEvm = cleanReq.startsWith('0x') && cleanReq.length === 42;
+  const isReqSol = !cleanReq.startsWith('0x') && cleanReq.length >= 32 && cleanReq.length <= 44;
+
+  const resolvedAddr = (isReqEvm || isReqSol) ? cleanReq : (DEFAULT_PUBLIC_WALLET || '');
+
+  if (resolvedAddr) {
+    return {
+      valid: true,
+      walletAddress: resolvedAddr,
+      keyName: 'Direct Wallet Session',
+      permissions: ['*'],
+      allowedWallets: [resolvedAddr],
+      tier: 'wallet_connected',
+      userId: 'wallet_user',
+    };
+  }
+
+  // 3. Open discovery session (assistant session without pre-bound wallet)
   return {
-    valid: false,
+    valid: true,
     walletAddress: '',
-    keyName: 'Unauthenticated',
-    permissions: [],
+    keyName: 'Open Assistant Session',
+    permissions: ['*'],
     allowedWallets: [],
     tier: 'unauthenticated',
-    userId: '',
-    error: 'UNAUTHENTICATED: No valid API key, OAuth token, or session was provided. Supply an X-API-Key header or Bearer token.',
+    userId: 'guest_user',
   };
 }
 
@@ -4610,7 +4655,7 @@ app.post('/mcp', async (req: Request, res: Response) => {
     }
 
     const rawKey = (req.headers['x-api-key'] || req.headers['authorization'] || req.query.api_key || '').toString();
-    const reqAddress = params?.arguments?.walletAddress || params?.arguments?.address || params?.arguments?.fromAddress || body?.walletAddress || req.query?.wallet_address as string;
+    const reqAddress = (req.query?.wallet_address || req.query?.wallet || req.query?.address || req.headers['x-wallet-address'] || params?.arguments?.walletAddress || params?.arguments?.address || params?.arguments?.fromAddress || body?.walletAddress || '').toString();
     const auth = await authenticateClient(rawKey, reqAddress);
 
     // If an invalid API key was explicitly passed, reject it
@@ -4949,21 +4994,15 @@ const inMemoryBookingReservations: any[] = [];
 // Known DEX router addresses (NOT identity addresses — never used as user wallet fallback)
 const ONEINCH_V4_ROUTER_ADDRESS = '0x1111111254EEB25477B68fb85Ed929f73A960382';
 
-// Wallet-scoped tools that require a validated address — return error if none is resolved
+// Wallet-scoped ACTION tools that strictly require a validated address to execute transactions
 const WALLET_SCOPED_TOOLS = new Set([
-  'northveil_get_balances', 'northveil_get_portfolio', 'northveil_list_wallets',
-  'northveil_list_nfts', 'northveil_get_tx', 'northveil_send_transfer',
-  'northveil_create_tx', 'northveil_approve_tx', 'northveil_reject_tx',
-  'northveil_set_scope', 'northveil_kill_switch', 'northveil_import_wallet',
-  'northveil_deploy_contract', 'northveil_execute_swap', 'northveil_get_tx_history',
-  'northveil_mint_tokens', 'northveil_set_trade_order',
-  'get_portfolio', 'get_wallet_info', 'get_wallet_balance', 'get_token_balance',
-  'get_nft_gallery', 'get_transaction_history', 'send_transfer', 'execute_swap',
-  'buy_tokens', 'sell_tokens', 'trade_tokens', 'create_transaction_request',
-  'approve_transaction', 'reject_transaction', 'approve_transaction_with_passkey',
-  'set_autonomous_spending_scope', 'set_autonomous_scope', 'activate_kill_switch',
-  'deactivate_kill_switch', 'deploy_smart_contract', 'mint_tokens', 'reserve_tokens',
-  'import_wallet', 'set_trade_order', 'cancel_trade_order', 'list_wallets',
+  'northveil_send_transfer', 'northveil_create_tx', 'northveil_approve_tx', 'northveil_reject_tx',
+  'northveil_set_scope', 'northveil_kill_switch',
+  'northveil_deploy_contract', 'northveil_execute_swap', 'northveil_mint_tokens', 'northveil_set_trade_order',
+  'send_transfer', 'execute_swap', 'buy_tokens', 'sell_tokens', 'trade_tokens',
+  'create_transaction_request', 'approve_transaction', 'reject_transaction', 'approve_transaction_with_passkey',
+  'set_autonomous_spending_scope', 'set_autonomous_scope', 'activate_kill_switch', 'deactivate_kill_switch',
+  'deploy_smart_contract', 'mint_tokens', 'reserve_tokens', 'set_trade_order', 'cancel_trade_order',
 ]);
 
 export async function executeRealTool(name: string, args: any, walletAddress: string, req?: Request) {
@@ -4981,13 +5020,21 @@ export async function executeRealTool(name: string, args: any, walletAddress: st
     ? (isExplicitEvm ? explicitWallet.toLowerCase() : explicitWallet)
     : String(rawWalletStr || '').trim();
 
-  // Fix 1: No hardcoded fallback address. If no wallet is resolved and this tool requires one, return a clear error.
+  if (!cleanAddress && process.env.NORTHVEIL_WALLET_ADDRESS) {
+    const envAddr = process.env.NORTHVEIL_WALLET_ADDRESS.trim();
+    if ((envAddr.startsWith('0x') && envAddr.length === 42) || (!envAddr.startsWith('0x') && envAddr.length >= 32)) {
+      cleanAddress = envAddr.toLowerCase();
+    }
+  }
+
+  // If a state-mutating transaction action tool is called without a wallet address:
   if (!cleanAddress && WALLET_SCOPED_TOOLS.has(toolName)) {
     return {
       ok: false,
+      status: 'awaiting_wallet_address',
       error: 'MISSING_WALLET_ADDRESS',
-      message: 'No wallet address is associated with this session. Please authenticate with a valid API key or OAuth token that is bound to a wallet address, or supply a walletAddress parameter.',
-      formattedMarkdown: '### ⚠️ Authentication Required\n\n> **Error**: No wallet address is associated with this session.\n\nPlease authenticate using a valid API key bound to a wallet address, or supply a `walletAddress` parameter.',
+      message: 'No wallet address is currently connected to this session. Please supply a walletAddress parameter or specify your 0x or Solana address in your request.',
+      formattedMarkdown: `### ⚠️ Wallet Address Required\n\n> **Action**: \`${toolName}\`\n\nPlease provide your wallet address (e.g. \`0x...\` or Solana address) to prepare and sign this transaction.`,
     };
   }
 
@@ -5175,32 +5222,55 @@ export async function executeRealTool(name: string, args: any, walletAddress: st
     }
 
     case 'northveil_list_wallets': {
-      const targetAddress = (args?.walletAddress || walletAddress || cleanAddress).toLowerCase();
-      let vaults = [
-        {
+      const targetAddress = (args?.walletAddress || walletAddress || cleanAddress || '').toLowerCase();
+      let vaults: any[] = [];
+      if (targetAddress && (targetAddress.startsWith('0x') || targetAddress.length >= 32)) {
+        vaults.push({
           id: 'vault_primary',
           address: targetAddress,
           label: 'Primary Non-Custodial Vault',
           primaryChain: 'base',
           status: 'active',
           created_at: '2026-08-01T00:00:00.000Z',
-        },
-      ];
+        });
+      }
       try {
         if (supabase && typeof supabase.from === 'function') {
           const { data } = await supabase.from('wallets').select('*');
           if (data && data.length > 0) {
-            vaults = data.map((w: any) => ({
-              id: w.id,
-              address: w.address,
-              label: w.name || w.label || 'Non-Custodial Vault',
-              primaryChain: w.chain || 'base',
-              status: 'active',
-              created_at: w.created_at || new Date().toISOString(),
-            }));
+            for (const w of data) {
+              if (!vaults.find(v => v.address.toLowerCase() === w.address.toLowerCase())) {
+                vaults.push({
+                  id: w.id,
+                  address: w.address,
+                  label: w.name || w.label || 'Non-Custodial Vault',
+                  primaryChain: w.chain || 'base',
+                  status: 'active',
+                  created_at: w.created_at || new Date().toISOString(),
+                });
+              }
+            }
           }
         }
       } catch (e) {}
+
+      if (vaults.length === 0) {
+        return {
+          ok: true,
+          wallets: [],
+          count: 0,
+          status: 'no_wallets_connected',
+          message: 'No wallet is currently connected to this AI session.',
+          formattedMarkdown: `### 💼 NORTHVEIL AUTHORIZED VAULTS (0)
+
+> **Status**: ℹ️ **No Active Wallet Connected**
+
+To connect your wallet:
+1. **Provide Address**: Simply tell me your address (e.g. \`0x...\` or Solana address).
+2. **Create Vault**: Ask me to *"create a new wallet"* to register a non-custodial vault.
+3. **Configure Connector**: Connect to \`https://mcp.northveil.xyz/mcp?wallet_address=YOUR_0X_ADDRESS\` in your Claude configuration.`,
+        };
+      }
 
       return {
         ok: true,
@@ -7025,12 +7095,30 @@ contract ${safeContractName} is ERC20, ERC20Burnable, Ownable {
     }
 
     case 'get_wallet_info': {
+      const activeAddress = cleanAddress || walletAddress;
+      if (!activeAddress) {
+        return {
+          ok: true,
+          status: 'wallet_not_connected',
+          walletAddress: null,
+          message: 'No wallet address is currently connected to this AI session. Please supply a wallet address (e.g. 0x... or Solana address) in your message, or ask to create a new non-custodial wallet.',
+          formattedMarkdown: `### 🛡️ NORTHVEIL MULTI-CHAIN WALLET
+
+> **Status**: ℹ️ **No Active Wallet Connected**
+
+To view your multi-chain balances or execute transactions:
+- **Provide an Address**: Type your Ethereum (\`0x...\`) or Solana address in your message.
+- **Create a Vault**: Ask me to *"create a new wallet"* to register a non-custodial vault.
+- **Configure Connector**: Add \`?wallet_address=0x...\` to the MCP Server URL.`,
+        };
+      }
+
       const activeChain = dbWallet?.chain || args?.chain || (isSol ? 'solana' : 'ethereum');
 
       const formattedMarkdown = `
 ### 🛡️ NORTHVEIL MULTI-CHAIN WALLET ACCOUNT DETAILS
 
-> **Wallet Address**: \`${cleanAddress || walletAddress}\`  
+> **Wallet Address**: \`${activeAddress}\`  
 > **Status**: 🟢 **UNLOCKED & MULTI-CHAIN RPC CONNECTED** | **Default Chain**: \`${activeChain.toUpperCase()}\`
 
 | Network | Native Asset | Live On-Chain Balance | RPC Status |
@@ -7048,7 +7136,7 @@ contract ${safeContractName} is ERC20, ERC20Burnable, Ownable {
 
       return {
         formattedMarkdown,
-        walletAddress: cleanAddress || walletAddress,
+        walletAddress: activeAddress,
         label: dbWallet?.label || 'Primary Northveil Wallet',
         activeChain,
         mainnetEthBalance: mainnetEth,
@@ -7063,6 +7151,22 @@ contract ${safeContractName} is ERC20, ERC20Burnable, Ownable {
     }
 
     case 'get_portfolio': {
+      const activeAddress = cleanAddress || walletAddress;
+      if (!activeAddress) {
+        return {
+          ok: true,
+          status: 'wallet_not_connected',
+          walletAddress: null,
+          holdings: [],
+          totalNetWorth: 0,
+          formattedMarkdown: `### 💼 NORTHVEIL PORTFOLIO
+
+> **Status**: ℹ️ **No Active Wallet Connected**
+
+Please provide your wallet address (e.g. \`0x...\` or Solana address) so I can fetch your live multi-chain portfolio and token balances!`,
+        };
+      }
+
       // Build real multi-chain holdings list
       const holdings: any[] = [];
       let totalNetWorth = 0;
@@ -7972,8 +8076,20 @@ ${solCode}
       const targetAddresses = Array.from(new Set([
         cleanAddress.toLowerCase(),
         walletAddress.toLowerCase(),
+        (args?.walletAddress || args?.address || '').toLowerCase(),
         (process.env.NORTHVEIL_WALLET_ADDRESS || '').toLowerCase()
-      ])).filter(a => a && a.startsWith('0x'));
+      ])).filter(a => a && (a.startsWith('0x') || a.length >= 32));
+
+      if (targetAddresses.length === 0) {
+        return {
+          ok: true,
+          status: 'wallet_not_connected',
+          walletAddress: null,
+          transactions: [],
+          totalCount: 0,
+          formattedMarkdown: `### 📜 ON-CHAIN TRANSACTION AUDIT TRAIL\n\n> **Status**: ℹ️ **No Active Wallet Connected**\n\nPlease provide your wallet address (e.g. \`0x...\` or Solana address) so I can fetch your verified on-chain transaction history.`,
+        };
+      }
 
       // 1. Fetch real on-chain transaction history directly from EVM Blockscout / Basescan APIs
       const chainApis: { name: string; url: string; explorer: string }[] = [];

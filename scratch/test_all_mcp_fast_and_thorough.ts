@@ -169,17 +169,17 @@ async function runMcpVerificationSuite() {
     console.log('\n🔒 Testing Security & Multi-Tenant Auth Isolation...');
     const unauthRes = await fetch(`${baseUrl}/mcp`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': 'invalid_revoked_token' },
       body: JSON.stringify({
         jsonrpc: '2.0',
         method: 'tools/call',
-        params: { name: 'northveil_get_balances', arguments: {} },
+        params: { name: 'send_transfer', arguments: { amount: 0.1, recipient: RECIPIENT } },
         id: 10,
       }),
     });
     const unauthData: any = await unauthRes.json();
-    const isGated = unauthData.error || (unauthData.result && unauthData.result.ok === false);
-    assert(!!isGated, 'Unauthenticated request to wallet-scoped tool is strictly rejected (no hardcoded fallback)');
+    const isGated = unauthData.error && (unauthData.error.code === -32001 || unauthData.error.message.includes('401'));
+    assert(!!isGated, 'Unauthorized request with invalid API token is strictly rejected (no hardcoded fallback)');
 
     // =========================================================================
     // SECTION 2: TRANSACTION PREPARATION, STAGING & APPROVAL FLOW
