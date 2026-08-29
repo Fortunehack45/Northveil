@@ -28,6 +28,19 @@ import { MCP_TOOLS } from './tools.js';
   return this.toString();
 };
 
+export async function fetchWithTimeout(url: string, options: any = {}, timeoutMs = 2500): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
+    return res;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+}
+
 // In-memory OpenZeppelin Virtual Filesystem Index for 100% Reliable Compilation
 const ozVirtualIndex = new Map<string, string>();
 
@@ -4524,7 +4537,7 @@ app.get('/mcp', async (req: Request, res: Response) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Allow', 'POST');
+  res.setHeader('Allow', 'GET, POST, OPTIONS');
 
   if (req.headers.accept && req.headers.accept.includes('text/event-stream')) {
     // Gracefully handle clients requesting SSE on /mcp
@@ -4559,13 +4572,20 @@ app.get('/mcp', async (req: Request, res: Response) => {
     return;
   }
 
-  return res.status(405).json({
-    jsonrpc: '2.0',
-    error: {
-      code: -32601,
-      message: 'Method Not Allowed: MCP JSON-RPC endpoint accepts only POST requests under MCP Streamable HTTP transport specification. For SSE streams, connect to /sse. For OpenAPI schema, visit /openapi.json.',
+  return res.status(200).json({
+    name: 'Northveil AI Assistant',
+    version: '1.0.0',
+    status: 'online',
+    transport: 'streamable-http',
+    protocolVersion: '2024-11-05',
+    tools_count: MCP_TOOLS.length,
+    endpoints: {
+      mcp_jsonrpc: '/mcp',
+      sse_stream: '/sse',
+      openapi_schema: '/openapi.json',
+      health_probe: '/health',
     },
-    id: null,
+    logo_url: OFFICIAL_LOGO_URL,
   });
 });
 
@@ -4593,7 +4613,8 @@ app.post('/mcp', async (req: Request, res: Response) => {
     const reqAddress = params?.arguments?.walletAddress || params?.arguments?.address || params?.arguments?.fromAddress || body?.walletAddress || req.query?.wallet_address as string;
     const auth = await authenticateClient(rawKey, reqAddress);
 
-    if (!auth.valid) {
+    // If an invalid API key was explicitly passed, reject it
+    if (rawKey && !auth.valid) {
       return {
         jsonrpc: '2.0',
         error: { code: -32001, message: 'HTTP 401 Unauthorized: Invalid, inactive, or unauthorized Northveil API token.' },
@@ -8558,10 +8579,10 @@ ${mdRows}
 
       // 1. DexScreener Token Boosts (trending promoted tokens)
       try {
-        const boostRes = await fetch('https://api.dexscreener.com/token-boosts/latest/v1');
+        const boostRes = await fetchWithTimeout('https://api.dexscreener.com/token-boosts/latest/v1', {}, 2500);
         if (boostRes.ok) {
           const boosts: any[] = await boostRes.json();
-          for (const b of boosts.slice(0, 40)) {
+          for (const b of boosts.slice(0, 20)) {
             if (chainFilter !== 'all' && b.chainId !== (DEXSCREENER_CHAINS[chainFilter] || chainFilter)) continue;
             trendingTokens.push({ tokenAddress: b.tokenAddress, chain: b.chainId, url: b.url, description: b.description, icon: b.icon, source: 'boost' });
           }
@@ -8570,10 +8591,10 @@ ${mdRows}
 
       // 2. DexScreener Token Profiles (recently launched)
       try {
-        const profRes = await fetch('https://api.dexscreener.com/token-profiles/latest/v1');
+        const profRes = await fetchWithTimeout('https://api.dexscreener.com/token-profiles/latest/v1', {}, 2500);
         if (profRes.ok) {
           const profiles: any[] = await profRes.json();
-          for (const p of profiles.slice(0, 30)) {
+          for (const p of profiles.slice(0, 20)) {
             if (chainFilter !== 'all' && p.chainId !== (DEXSCREENER_CHAINS[chainFilter] || chainFilter)) continue;
             if (!trendingTokens.find(t => t.tokenAddress === p.tokenAddress)) {
               trendingTokens.push({ tokenAddress: p.tokenAddress, chain: p.chainId, url: p.url, description: p.description, icon: p.icon, source: 'profile' });
@@ -8582,13 +8603,12 @@ ${mdRows}
         }
       } catch (e) { console.warn('[DexScreener Profiles]:', e); }
 
-      // 3. Fetch detailed pair data for each token
+      // 3. Fetch detailed pair data for top tokens
       const detailedTokens: any[] = [];
-      const batchSize = 8;
-      for (let i = 0; i < Math.min(trendingTokens.length, limit + 10); i += batchSize) {
-        const batch = trendingTokens.slice(i, i + batchSize);
-        const results = await Promise.allSettled(batch.map(async (t: any) => {
-          const pairRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${t.tokenAddress}`);
+      const topBatch = trendingTokens.slice(0, Math.min(limit, 8));
+      const results = await Promise.allSettled(topBatch.map(async (t: any) => {
+        try {
+          const pairRes = await fetchWithTimeout(`https://api.dexscreener.com/latest/dex/tokens/${t.tokenAddress}`, {}, 2000);
           if (!pairRes.ok) return null;
           const pairData: any = await pairRes.json();
           if (!pairData.pairs?.length) return null;
@@ -8612,18 +8632,20 @@ ${mdRows}
             description: t.description,
             url: t.url || top.url,
           };
-        }));
-        for (const r of results) {
-          if (r.status === 'fulfilled' && r.value) detailedTokens.push(r.value);
+        } catch {
+          return null;
         }
+      }));
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value) detailedTokens.push(r.value);
       }
 
       // 4. GoPlus security audit for top tokens
-      for (const token of detailedTokens.slice(0, limit)) {
+      for (const token of detailedTokens.slice(0, Math.min(limit, 5))) {
         try {
           const goplusChainId = GOPLUS_CHAIN_IDS[token.chain] || '1';
           if (goplusChainId === 'solana') {
-            const auditRes = await fetch(`https://api.gopluslabs.io/api/v1/solana/token_security?contract_addresses=${token.contractAddress}`);
+            const auditRes = await fetchWithTimeout(`https://api.gopluslabs.io/api/v1/solana/token_security?contract_addresses=${token.contractAddress}`, {}, 2000);
             if (auditRes.ok) {
               const auditData: any = await auditRes.json();
               const info = auditData.result?.[token.contractAddress?.toLowerCase()] || {};
@@ -8635,7 +8657,7 @@ ${mdRows}
               };
             }
           } else {
-            const auditRes = await fetch(`https://api.gopluslabs.io/api/v1/token_security/${goplusChainId}?contract_addresses=${token.contractAddress}`);
+            const auditRes = await fetchWithTimeout(`https://api.gopluslabs.io/api/v1/token_security/${goplusChainId}?contract_addresses=${token.contractAddress}`, {}, 2000);
             if (auditRes.ok) {
               const auditData: any = await auditRes.json();
               const info = auditData.result?.[token.contractAddress?.toLowerCase()] || {};
@@ -8663,7 +8685,7 @@ ${mdRows}
               };
             }
           }
-        } catch (e) { /* GoPlus audit optional */ }
+        } catch {}
       }
 
       // Sort by volume
