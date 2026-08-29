@@ -5008,7 +5008,7 @@ const WALLET_SCOPED_TOOLS = new Set([
 export async function executeRealTool(name: string, args: any, walletAddress: string, req?: Request) {
   const toolName = name;
 
-  const explicitWallet = (args?.walletAddress || args?.userWallet || args?.ownerAddress || args?.fromAddress || args?.from || args?.address || args?.account || args?.solanaAddress || '').toString().trim();
+  const explicitWallet = (args?.walletAddress || args?.userWallet || args?.ownerAddress || args?.fromAddress || args?.deployerAddress || args?.creatorAddress || args?.from || args?.address || args?.account || args?.solanaAddress || '').toString().trim();
   const isExplicitEvm = explicitWallet.toLowerCase().startsWith('0x') && explicitWallet.length === 42;
   const isExplicitSol = !explicitWallet.startsWith('0x') && explicitWallet.length >= 32 && explicitWallet.length <= 44;
 
@@ -5033,8 +5033,17 @@ export async function executeRealTool(name: string, args: any, walletAddress: st
       ok: false,
       status: 'awaiting_wallet_address',
       error: 'MISSING_WALLET_ADDRESS',
-      message: 'No wallet address is currently connected to this session. Please supply a walletAddress parameter or specify your 0x or Solana address in your request.',
-      formattedMarkdown: `### ⚠️ Wallet Address Required\n\n> **Action**: \`${toolName}\`\n\nPlease provide your wallet address (e.g. \`0x...\` or Solana address) to prepare and sign this transaction.`,
+      message: `Vault address required for ${toolName}. Please pass walletAddress (e.g. walletAddress: '0x...') in your tool call, or connect with https://mcp.northveil.xyz/mcp?wallet_address=YOUR_WALLET_ADDRESS.`,
+      formattedMarkdown: `### ⚠️ Vault Address Required for \`${toolName}\`
+
+> **Action**: \`${toolName}\`  
+> **Status**: ℹ️ **Awaiting Vault Address**
+
+To compile and stage this on-chain transaction:
+1. **Pass Parameter**: Supply \`walletAddress: "0x..."\` or your Solana address directly when calling \`${toolName}\`.
+2. **Auto-Bind MCP URL**: Configure your MCP connection URL in Claude Desktop / Cursor settings as:
+   \`https://mcp.northveil.xyz/mcp?wallet_address=YOUR_WALLET_ADDRESS\`
+3. **Generate a Vault**: Ask to \`create_wallet\` to create a new non-custodial MPC vault.`,
     };
   }
 
