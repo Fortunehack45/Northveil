@@ -346,15 +346,22 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Phase 0 Fix 4: Express Rate Limiter (100 requests per 15 minutes per IP)
+// Express Rate Limiter: High capacity for agents & dashboard polling, bypasses localhost, internal SSE, and active sessions
 const apiRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 5000, // 5000 requests per minute
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    const ip = req.ip || req.socket?.remoteAddress || '';
+    const isLocal = ip === '127.0.0.1' || ip === '::1' || ip.includes('127.0.0.1') || ip === 'localhost';
+    const hasAuthKey = Boolean(req.headers.authorization || req.headers['x-api-key']);
+    const isPollingPath = req.path.includes('/pending') || req.path.includes('/status') || req.path.includes('/health') || req.path.includes('/sse');
+    return isLocal || hasAuthKey || isPollingPath;
+  },
   message: {
     jsonrpc: '2.0',
-    error: { code: -32000, message: 'Too many requests. Rate limit exceeded (100 requests per 15 minutes).' },
+    error: { code: -32000, message: 'Too many requests. Rate limit exceeded.' },
     id: null,
   },
 });

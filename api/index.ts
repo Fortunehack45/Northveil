@@ -346,15 +346,22 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Phase 0 Fix 4: Express Rate Limiter (100 requests per 15 minutes per IP)
+// Express Rate Limiter: High capacity for agents & dashboard polling, bypasses localhost, internal SSE, and active sessions
 const apiRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 5000, // 5000 requests per minute
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    const ip = req.ip || req.socket?.remoteAddress || '';
+    const isLocal = ip === '127.0.0.1' || ip === '::1' || ip.includes('127.0.0.1') || ip === 'localhost';
+    const hasAuthKey = Boolean(req.headers.authorization || req.headers['x-api-key']);
+    const isPollingPath = req.path.includes('/pending') || req.path.includes('/status') || req.path.includes('/health') || req.path.includes('/sse');
+    return isLocal || hasAuthKey || isPollingPath;
+  },
   message: {
     jsonrpc: '2.0',
-    error: { code: -32000, message: 'Too many requests. Rate limit exceeded (100 requests per 15 minutes).' },
+    error: { code: -32000, message: 'Too many requests. Rate limit exceeded.' },
     id: null,
   },
 });
@@ -4651,10 +4658,12 @@ export async function executeRealTool(name: string, args: any, walletAddress: st
       let finalBlockNumber = stagedReq?.block_number || stagedReq?.blockNumber || null;
       let finalContractAddress = stagedReq?.contract_address || stagedReq?.contractAddress || null;
 
+      const targetNet = stagedReq?.network || network;
+
       // Verify on-chain via live RPC provider if txHash exists
       if (activeTxHash && activeTxHash.startsWith('0x') && activeTxHash.length === 66) {
         try {
-          const provider = ProviderService.getEVMProvider(stagedReq?.network || network);
+          const provider = getProviderForNetwork(targetNet);
           const receipt = await provider.getTransactionReceipt(activeTxHash);
           if (receipt) {
             finalStatus = receipt.status === 1 ? 'confirmed' : 'failed';
@@ -4683,7 +4692,7 @@ export async function executeRealTool(name: string, args: any, walletAddress: st
         } catch {}
       }
 
-      const expUrl = activeTxHash ? `${explorerBase}/tx/${activeTxHash}` : null;
+      const expUrl = activeTxHash ? getExplorerUrlForHash(targetNet, activeTxHash) : null;
       const statusEmoji = finalStatus === 'confirmed' ? '🟢' : finalStatus === 'pending' ? '🟡' : '🔴';
 
       return {
@@ -5521,6 +5530,8 @@ ${simulation.warnings.length > 0 ? `> **Warnings**: \`${simulation.warnings.join
         };
       }
 
+      const reqId = (stagedReq as any).request_id || stagedReq.requestId || reqIdOrToken || 'req_latest';
+      const vaultAddr = (stagedReq as any).wallet_address || stagedReq.walletAddress || cleanAddress || '';
       let txH = (stagedReq as any).tx_hash || stagedReq.txHash || null;
       let finalStatus = stagedReq.status || (txH ? 'confirmed' : 'pending');
       let blkNum = (stagedReq as any).block_number || stagedReq.blockNumber || null;
@@ -5530,7 +5541,7 @@ ${simulation.warnings.length > 0 ? `> **Warnings**: \`${simulation.warnings.join
       // Check on-chain receipt if txHash is present
       if (txH && txH.startsWith('0x') && txH.length === 66) {
         try {
-          const provider = ProviderService.getEVMProvider(targetNet);
+          const provider = getProviderForNetwork(targetNet);
           const receipt = await provider.getTransactionReceipt(txH);
           if (receipt) {
             finalStatus = receipt.status === 1 ? 'confirmed' : 'failed';
@@ -5562,7 +5573,7 @@ ${simulation.warnings.length > 0 ? `> **Warnings**: \`${simulation.warnings.join
       }
 
       const statusEmoji = finalStatus === 'confirmed' ? '🟢' : finalStatus === 'pending' ? '🟡' : '🔴';
-      const expLink = txH ? ((stagedReq as any).explorer_url || stagedReq.explorerUrl || `https://sepolia.etherscan.io/tx/${txH}`) : null;
+      const expLink = txH ? getExplorerUrlForHash(targetNet, txH) : null;
       const expAt = (stagedReq as any).expires_at || stagedReq.expiresAt || new Date().toISOString();
 
       return {
