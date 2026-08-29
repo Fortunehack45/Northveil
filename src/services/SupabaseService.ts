@@ -242,90 +242,47 @@ export class SupabaseService {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      let logsQuery = supabase
-        .from('mcp_activity_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(60);
-
       if (cleanAddr) {
         txQuery = txQuery.eq('wallet_address', cleanAddr);
       }
 
-      const [txReqsRes, logsRes] = await Promise.allSettled([txQuery, logsQuery]);
+      const { data, error } = await txQuery;
+      if (error || !data) return [];
 
-      const list: any[] = [];
+      const list: any[] = data.map((item: any) => {
+        const id = item.approval_token || item.request_id || item.id;
+        return {
+          id,
+          request_id: item.request_id || id,
+          approval_token: item.approval_token || id,
+          tool_name: item.contract_summary ? `execute_tx: ${item.contract_summary}` : (item.operation ? `northveil_prepare_${item.operation.toLowerCase()}` : 'token_transfer'),
+          status:
+            item.status === 'confirmed' || item.status === 'approved' || item.status === 'completed' || item.status === 'broadcasted'
+              ? 'CONFIRMED'
+              : item.status === 'rejected'
+              ? 'REJECTED'
+              : 'PENDING',
+          parameters: {
+            recipient: item.recipient,
+            amount: `${item.amount} ${item.asset || 'ETH'}`,
+            network: item.network || 'sepolia',
+            estimatedFee: `$${item.estimated_fee_usd || '0.05'} USD`,
+            summary: item.contract_summary || item.reason || 'Multi-chain Action',
+            approvalToken: item.approval_token || id,
+          },
+          response: {
+            txHash: item.tx_hash,
+            explorerUrl: item.explorer_url,
+            status: item.status,
+          },
+          wallet_address: item.wallet_address || cleanAddr,
+          agent_type: 'Autonomous MCP Agent',
+          created_at: item.created_at || new Date().toISOString(),
+          tx_hash: item.tx_hash || undefined,
+          gas_fee_usd: parseFloat(item.estimated_fee_usd || '0.05'),
+        };
+      });
 
-      if (txReqsRes.status === 'fulfilled' && txReqsRes.value.data) {
-        txReqsRes.value.data.forEach((item: any) => {
-          list.push({
-            id: item.id || item.approval_token || `txreq-${Math.random()}`,
-            tool_name: item.contract_summary ? `execute_tx: ${item.contract_summary}` : 'send_transaction',
-            status:
-              item.status === 'approved' || item.status === 'completed' || item.status === 'broadcasted'
-                ? 'CONFIRMED'
-                : item.status === 'rejected'
-                ? 'REJECTED'
-                : 'PENDING',
-            parameters: {
-              recipient: item.recipient,
-              amount: `${item.amount} ${item.asset || 'ETH'}`,
-              network: item.network || 'sepolia',
-              estimatedFee: `$${item.estimated_fee_usd || '0.08'} USD`,
-              summary: item.contract_summary || 'Multi-chain Action',
-              approvalToken: item.approval_token || 'N/A',
-            },
-            response: {
-              txHash: item.tx_hash,
-              explorerUrl: item.explorer_url,
-              status: item.status,
-            },
-            wallet_address: item.wallet_address || cleanAddr,
-            agent_type: 'Autonomous MCP Agent',
-            created_at: item.created_at || new Date().toISOString(),
-            tx_hash: item.tx_hash || undefined,
-            gas_fee_usd: parseFloat(item.estimated_fee_usd || '0.08'),
-            approval_token: item.approval_token,
-          });
-        });
-      }
-
-      if (logsRes.status === 'fulfilled' && logsRes.value.data) {
-        logsRes.value.data.forEach((item: any) => {
-          const recipient =
-            item.parameters?.recipientAddress ||
-            item.parameters?.recipient ||
-            item.parameters?.walletAddress ||
-            item.parameters?.sender ||
-            item.parameters?.senderAddress;
-
-          // Check if related to active wallet or include general agent records
-          if (!cleanAddr || !recipient || recipient.toLowerCase() === cleanAddr || item.wallet_address?.toLowerCase() === cleanAddr || !item.parameters?.walletAddress) {
-            if (!list.some((existing) => existing.id === item.id)) {
-              list.push({
-                id: item.id || `log-${Math.random()}`,
-                tool_name: item.tool_name || 'mcp_action',
-                status:
-                  item.status === 'CONFIRMED' || item.status === 'SUCCESS' || item.status === 'approved' || item.status === 'broadcasted'
-                    ? 'CONFIRMED'
-                    : item.status === 'PENDING'
-                    ? 'PENDING'
-                    : 'REJECTED',
-                parameters: item.parameters || {},
-                response: item.response || {},
-                wallet_address: recipient || cleanAddr,
-                agent_type: item.api_key?.includes('claude') ? 'Claude Desktop' : 'AI Agent',
-                created_at: item.created_at || new Date().toISOString(),
-                tx_hash: item.response?.txHash || item.response?.hash || (typeof item.response === 'string' && item.response.startsWith('0x') ? item.response : undefined),
-                gas_fee_usd: 0.08,
-              });
-            }
-          }
-        });
-      }
-
-      // Sort newest first
-      list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       return list;
     } catch (e) {
       console.warn('[Supabase fetchApprovalsForWallet Error]:', e);
@@ -334,44 +291,36 @@ export class SupabaseService {
   }
 
   /**
-   * Create a live pending transaction request in Supabase for testing approval workflows
+   * Create a live pending transaction request for testing approval workflows
    */
   static async createPendingApprovalRequest(walletAddress: string, actionType: string = 'token_transfer', recipientAddress?: string) {
     try {
       const cleanAddr = walletAddress.toLowerCase();
-      const targetRecipient = (recipientAddress || cleanAddr).toLowerCase();
-      const approvalToken = `tok_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`;
-      const requestId = `req_${Math.random().toString(36).substring(2, 10)}`;
+      const targetRecipient = (recipientAddress || '0x59148d6a9dff263a772b5a84280bc88530f38636').toLowerCase();
+      
+      const baseUrl = (process.env.VITE_MCP_SERVER_URL || process.env.VITE_API_URL || 'https://mcp.northveil.xyz').replace(/\/$/, '');
+      const res = await fetch(`${baseUrl}/api/v1/transactions/prepare`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: cleanAddr,
+          recipient: targetRecipient,
+          amount: 0.00005,
+          asset: 'ETH',
+          network: 'sepolia',
+          operationType: 'TRANSFER',
+        }),
+      });
 
-      const { data, error } = await supabase
-        .from('transaction_requests')
-        .insert([
-          {
-            request_id: requestId,
-            wallet_address: cleanAddr,
-            user_id: 'default_user',
-            recipient: targetRecipient,
-            amount: '0.005',
-            asset: 'ETH',
-            network: 'sepolia',
-            chain_id: '11155111',
-            estimated_fee_usd: '0.08',
-            contract_summary: actionType === 'token_transfer' ? 'Transfer of 0.005 Sepolia ETH via MCP Agent' : 'Contract Deployment via Claude Agent',
-            total_amount: '0.005024',
-            nonce: '0',
-            unsigned_payload: { to: targetRecipient, value: '5000000000000000' },
-            status: 'pending',
-            approval_token: approvalToken,
-            token_used: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ]);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Failed to stage real live transaction request');
+      }
 
-      if (error) console.warn('[Supabase createPendingApprovalRequest Error]:', error);
-      return { data, approvalToken, requestId };
+      return await res.json();
     } catch (e) {
-      console.warn('[Supabase createPendingApprovalRequest Exception]:', e);
+      console.error('Failed to create live pending request:', e);
+      throw e;
     }
   }
 

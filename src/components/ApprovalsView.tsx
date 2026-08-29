@@ -144,16 +144,27 @@ export const ApprovalsView: React.FC = () => {
         }
 
         if (privateKey && targetRecipient) {
-          setPasskeyNotice('Cryptographically signing transaction in hardware enclave...');
+          setPasskeyNotice('Cryptographically signing transaction on user device...');
           const cleanPk = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
           const provider = ProviderService.getEVMProvider(targetNetwork);
           const signer = new ethers.Wallet(cleanPk, provider);
 
-          const unsignedTx = prepResult.unsignedTransaction || {
-            to: targetRecipient,
-            value: targetAmount ? ethers.parseEther(String(targetAmount)) : 0n,
-            data: prepResult.calldata || '0x',
-          };
+          const cleanAmount = typeof targetAmount === 'number'
+            ? targetAmount
+            : parseFloat(String(targetAmount || '0').replace(/[^0-9.]/g, '')) || 0;
+
+          let unsignedTx: any = prepResult.unsignedTransaction;
+          if (!unsignedTx) {
+            unsignedTx = {
+              to: targetRecipient,
+              value: cleanAmount > 0 ? ethers.parseEther(cleanAmount.toString()) : 0n,
+              data: prepResult.calldata || '0x',
+            };
+          } else {
+            if (typeof unsignedTx.value === 'string' && !unsignedTx.value.startsWith('0x')) {
+              unsignedTx.value = BigInt(unsignedTx.value);
+            }
+          }
 
           const feeData = await provider.getFeeData().catch(() => null);
           const populated = await signer.populateTransaction({
