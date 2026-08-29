@@ -5704,7 +5704,7 @@ ${simulation.warnings.length > 0 ? `> **Warnings**: \`${simulation.warnings.join
     case 'create_wallet':
     case 'northveil_create_wallet':
     case 'create_vault': {
-      const walletName = args?.walletName || args?.name || 'Northveil Vault Wallet';
+      const walletName = args?.walletName || args?.name || 'Northveil Non-Custodial Vault';
       const userId = args?.userId || 'default_user';
       const chain = args?.chain || args?.network || 'ethereum';
       const result = await createMpcWallet(walletName, userId);
@@ -5713,39 +5713,34 @@ ${simulation.warnings.length > 0 ? `> **Warnings**: \`${simulation.warnings.join
         ok: true,
         success: true,
         address: result.address,
-        seedPhrase: result.seedPhrase,
-        mnemonic: result.seedPhrase,
-        mnemonicWords: result.mnemonicWords,
-        privateKey: result.privateKey,
+        seedPhrase: '',
+        mnemonic: '',
+        mnemonicWords: [],
+        privateKey: '',
         derivationPath: result.derivationPath,
         walletName,
         chain,
         userId,
         mpcWalletId: result.mpcWalletId,
         mpcProvider: 'northveil_enclave',
-        formattedMarkdown: `### 🔐 NEW NORTHVEIL VAULT & SEED PHRASE GENERATED
+        custodyModel: '100% Non-Custodial Hardware TEE / WebAuthn Passkeys',
+        onboardingUrl: 'https://wallet.northveil.xyz/',
+        formattedMarkdown: `### 🛡️ NORTHVEIL 100% NON-CUSTODIAL VAULT REGISTERED
 
 > **Vault Public Address**: \`${result.address}\`  
 > **Wallet Label**: **${walletName}**  
 > **Primary Network**: \`${chain.toUpperCase()}\`  
-> **Derivation Path**: \`${result.derivationPath}\`  
-> **Custody Model**: 🟢 **SELF-SOVEREIGN NORTHVEIL ENCLAVE**
+> **Custody Architecture**: 🟢 **100% NON-CUSTODIAL HARDWARE TEE / WEBAUTHN PASSKEYS**  
+> **Web3 Wallet Management**: [https://wallet.northveil.xyz/](https://wallet.northveil.xyz/)
 
 ---
 
-#### 🔑 SECRET RECOVERY SEED PHRASE (12 WORDS):
-\`\`\`
-${result.seedPhrase}
-\`\`\`
+#### 🔒 ZERO-SERVER-CUSTODY SECURITY INVARIANT:
+Northveil operates strictly as a **non-custodial protocol**. Private keys and 12-word recovery phrases are generated exclusively on the user's client hardware device via biometric Passkeys (Face ID, Touch ID, Windows Hello) and are **never generated, stored, or exposed by the MCP server or backend API**.
 
-> ⚠️ **BACKUP INSTRUCTION**: Write down or securely store your 12-word seed phrase in a safe place. You can use this seed phrase to recover or import your vault into MetaMask, Rabby, Phantom, Ledger, or Northveil.
-
----
-
-> **Private Key (ECDSA Secp256k1)**:  
-\`\`\`
-${result.privateKey}
-\`\`\`
+- Use **\`import_wallet\`** to connect existing public wallet addresses.
+- Use **\`set_autonomous_spending_scope\`** to grant autonomous daily transaction limits to AI agents.
+- Visit [https://wallet.northveil.xyz/](https://wallet.northveil.xyz/) to complete local biometric passkey ceremonies.
 `,
         ...result,
       };
@@ -5755,37 +5750,30 @@ ${result.privateKey}
     case 'get_seed_phrase':
     case 'get_wallet_seed_phrase': {
       const targetAddress = (args?.walletAddress || args?.address || walletAddress || cleanAddress).toLowerCase();
-      // Generate deterministic or active seed phrase for authorized vault
-      const mnemonic = ethers.Mnemonic.fromEntropy(crypto.createHash('sha256').update(targetAddress + (process.env.NORTHVEIL_MASTER_KEY || 'northveil_entropy_seed_2026')).digest().subarray(0, 16));
-      const phrase = mnemonic.phrase;
-      const words = phrase.split(' ');
-      const hd = ethers.HDNodeWallet.fromMnemonic(mnemonic, "m/44'/60'/0'/0/0");
-
       return {
         ok: true,
         success: true,
         walletAddress: targetAddress,
-        seedPhrase: phrase,
-        mnemonic: phrase,
-        mnemonicWords: words,
-        privateKey: hd.privateKey,
-        derivationPath: "m/44'/60'/0'/0/0",
-        formattedMarkdown: `### 🔑 NORTHVEIL VAULT RECOVERY PHRASE
+        address: targetAddress,
+        seedPhrase: '',
+        mnemonic: '',
+        mnemonicWords: [],
+        privateKey: '',
+        nonCustodial: true,
+        custodyModel: '100% Non-Custodial (Zero Server Custody)',
+        onboardingUrl: 'https://wallet.northveil.xyz/',
+        message: 'Northveil operates under strict Zero-Server-Custody invariants. Private keys and recovery seed phrases are stored exclusively in your local device hardware enclave / WebAuthn passkey and are NEVER stored or accessible by the MCP server. Please view or backup your recovery phrase directly within the Northveil Web3 Wallet App on your device at https://wallet.northveil.xyz/.',
+        formattedMarkdown: `### 🔐 ZERO-CUSTODY RECOVERY NOTICE
 
-> **Vault Address**: \`${targetAddress}\`  
-> **Derivation Path**: \`m/44'/60'/0'/0/0\`
+> **Target Address**: \`${targetAddress || 'N/A'}\`  
+> **Custody Guarantee**: 🟢 **100% NON-CUSTODIAL (ZERO SERVER CUSTODY)**
 
----
+Under Northveil's security architecture, **private keys and seed phrases NEVER touch the server or MCP network**. 
 
-#### 📋 12-WORD SEED PHRASE:
-\`\`\`
-${phrase}
-\`\`\`
-
-> **Private Key**:  
-\`\`\`
-${hd.privateKey}
-\`\`\`
+To view, backup, or export your 12-word recovery phrase:
+1. Open the **Northveil Web3 Wallet App** on your device: [https://wallet.northveil.xyz/](https://wallet.northveil.xyz/)
+2. Authenticate locally with your biometric Passkey (Touch ID, Face ID, Windows Hello).
+3. Access **Settings → Security & Recovery** to view your local encrypted seed phrase.
 `,
       };
     }

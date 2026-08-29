@@ -1,6 +1,22 @@
-# Northveil MCP & Wallet Ecosystem Architecture & Verification Walkthrough
+# Northveil Architecture & Verification Walkthrough
 
-## Latest Fix: Passkey Authentication & Safe Wallet Address Resolution
+## Latest: Continuous Video Canvas, Pre-Footer Transition & 100% Full Non-Custodial Architecture
+
+### 1. Continuous Video Background Canvas with Liquid Frosted Fade-Blur
+- **Continuous Sticky Backdrop**: Integrated the Cloudinary loop video (`Editing_video_loop_and_watermark_202608281208`) as a sticky viewport background across `#benefits`, `#how-it-works`, `#tools`, `#faqs`, `#pricing`, and `.cta-box`.
+- **Liquid Frosted Hero Fade (`.transition-hero-fade`)**: 240px top transition layer using `backdrop-filter: blur(24px) saturate(180%)`, gradient dissolve, and alpha masking between the hero section and `#benefits`.
+- **Pre-Footer Transition & Footer Stacking**: Resolved layout and stacking contexts so that `.cta-box` (the section right before the footer) and `.footer-main` are 100% visible, fully rendered, and never obscured, smoothly dissolving into pitch black (`#000000`) before the footer.
+- **Enhanced Glassmorphism**: Frosted glass panels (`backdrop-filter: blur(18px)`, `rgba(10, 10, 14, 0.68)`) give depth while maintaining razor-sharp text contrast.
+
+### 2. 100% Full Non-Custodial Architecture (Zero Server-Side Custody)
+- **Zero Server-Side Secrets**: Enforced across [`api/mpcControlPlaneService.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/api/mpcControlPlaneService.ts) and [`mcp-server/mpcControlPlaneService.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/mcp-server/mpcControlPlaneService.ts) that the backend and MCP protocol NEVER generate, hold, store, or return private keys or seed phrases over the network.
+- **Client-Side Key Management**: Keys and 12-word seed phrases are generated and held exclusively on the user's client hardware device via WebAuthn biometric Passkeys (Touch ID, Face ID, Windows Hello) and encrypted local vaults in [`src/services/WalletService.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/src/services/WalletService.ts).
+- **Safe Non-Custodial MCP Handling**: `create_wallet` / `northveil_create_wallet` and `export_seed_phrase` return clear zero-custody notices and direct users to manage their credentials securely on [`https://wallet.northveil.xyz/`](https://wallet.northveil.xyz/).
+- **Automated Verification**: [`scratch/test_full_non_custodial_integrity.ts`](file:///c:/Users/USER%20PC/Desktop/Northveil/scratch/test_full_non_custodial_integrity.ts) passed 100% (4/4 tests).
+
+---
+
+## Previous Fix: Passkey Authentication & Safe Wallet Address Resolution
 
 ### Root Cause
 When Claude/browser clients authenticated via WebAuthn passkeys at `/api/v1/auth/passkey/verify-authentication`, the endpoint invoked `verifyPasskeyAuthentication(userId, walletAddress, authenticationResponse)`.

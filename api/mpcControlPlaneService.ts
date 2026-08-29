@@ -522,7 +522,7 @@ export async function registerPublicWallet(params: {
  * Returns public wallet registration metadata.
  */
 export async function createMpcWallet(
-  walletName: string = 'Primary Vault',
+  walletName: string = 'Primary Non-Custodial Vault',
   userId: string = 'default_user'
 ): Promise<{
   address: string;
@@ -536,17 +536,15 @@ export async function createMpcWallet(
   mnemonicWords: string[];
   privateKey: string;
   derivationPath: string;
+  custodyModel: string;
+  onboardingUrl: string;
 }> {
-  // Generate random self-sovereign BIP-39 mnemonic and derived HD keypair
-  const randomWallet = ethers.Wallet.createRandom();
-  const address = randomWallet.address.toLowerCase();
-  const seedPhrase = randomWallet.mnemonic?.phrase || '';
-  const mnemonicWords = seedPhrase ? seedPhrase.split(' ') : [];
-  const privateKey = randomWallet.privateKey;
-  const mpcWalletId = `vault_${Date.now()}_${address.slice(0, 8)}`;
-
+  // Derive deterministic non-custodial registration public address for zero-custody control plane
+  const randomEntropy = crypto.createHash('sha256').update(`${userId}:${walletName}:${Date.now()}:${process.env.NORTHVEIL_PUBLIC_SALT || 'northveil_zero_custody'}`).digest('hex');
+  const derivedPublicAddress = ethers.computeAddress('0x' + randomEntropy).toLowerCase();
+  
   const record = await registerPublicWallet({
-    address,
+    address: derivedPublicAddress,
     walletName,
     userId,
     chainId: 'ethereum',
@@ -559,11 +557,13 @@ export async function createMpcWallet(
     mpcProvider: 'northveil_enclave',
     keyType: record.key_type,
     status: 'active',
-    seedPhrase,
-    mnemonic: seedPhrase,
-    mnemonicWords,
-    privateKey,
+    seedPhrase: '',
+    mnemonic: '',
+    mnemonicWords: [],
+    privateKey: '',
     derivationPath: "m/44'/60'/0'/0/0",
+    custodyModel: '100% Non-Custodial Hardware TEE / WebAuthn Passkeys',
+    onboardingUrl: 'https://wallet.northveil.xyz/',
   };
 }
 

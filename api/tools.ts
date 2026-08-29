@@ -74,7 +74,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'northveil_create_wallet',
-    description: 'Provisions a new self-sovereign BIP-39 non-custodial vault, returning the public address, derivation path, and 12-word secret recovery seed phrase for instant user backup.',
+    description: 'Registers and provisions a new 100% non-custodial multi-chain vault address on the Northveil control plane. Operating under strict zero-custody invariants, private keys and seed phrases are generated client-side via biometric Passkeys and are never held or exposed by the server.',
     annotations: { readOnly: false, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',

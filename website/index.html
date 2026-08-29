@@ -338,6 +338,135 @@
     }
 
     /* ═══════════════════════════════════════════════════════════════
+       2B. CONTENT SECTIONS VIDEO BACKDROP & LIQUID FADE BLUR
+       ═══════════════════════════════════════════════════════════════ */
+    .content-backdrop-area {
+      position: relative;
+      width: 100%;
+      background: transparent;
+      z-index: 2;
+    }
+
+    .content-video-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .content-backdrop-video {
+      position: sticky;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      opacity: 0.88;
+      filter: brightness(0.92) contrast(1.08) saturate(1.15);
+      transform: translate3d(0, 0, 0);
+      will-change: transform;
+    }
+
+    .content-video-overlay {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 35%, rgba(0, 0, 0, 0.38) 0%, rgba(0, 0, 0, 0.72) 100%),
+                  linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0.52) 100%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .content-sections-wrapper {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      padding-bottom: 40px;
+    }
+
+    .cta-box-wrap {
+      padding: 0 24px 60px;
+      position: relative;
+      z-index: 5;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* Top Transition: Liquid Frosted Fade Blur between Hero and Benefits */
+    .transition-hero-fade {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 240px;
+      z-index: 4;
+      pointer-events: none;
+      background: linear-gradient(180deg, #000000 0%, rgba(0, 0, 0, 0.88) 32%, rgba(0, 0, 0, 0.32) 75%, transparent 100%);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      mask-image: linear-gradient(180deg, #000000 0%, rgba(0, 0, 0, 0.85) 45%, transparent 100%);
+      -webkit-mask-image: linear-gradient(180deg, #000000 0%, rgba(0, 0, 0, 0.85) 45%, transparent 100%);
+    }
+
+    /* Bottom Transition: Smooth Liquid Fade to Pitch Black right above Footer */
+    .transition-footer-fade {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 100px;
+      z-index: 3;
+      pointer-events: none;
+      background: linear-gradient(0deg, #000000 0%, rgba(0, 0, 0, 0.95) 40%, rgba(0, 0, 0, 0.3) 80%, transparent 100%);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* Enhanced Frosted Glassmorphism for Foreground Elements over Video */
+    .card, .arch-container, .tool-card, .faq-item, .pricing-card, .cta-box {
+      backdrop-filter: blur(18px) saturate(150%) !important;
+      -webkit-backdrop-filter: blur(18px) saturate(150%) !important;
+      background: rgba(10, 10, 14, 0.68) !important;
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .card:hover, .tool-card:hover, .pricing-card:hover {
+      background: rgba(18, 18, 24, 0.82) !important;
+      border-color: rgba(255, 255, 255, 0.28) !important;
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.7), 0 0 24px rgba(255, 255, 255, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
+    }
+
+    .pricing-card.featured {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(14, 14, 18, 0.8) 100%) !important;
+      border-color: rgba(255, 255, 255, 0.32) !important;
+    }
+
+    .cta-box {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(10, 10, 14, 0.88) 100%) !important;
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    }
+
+    .faq-item {
+      background: rgba(10, 10, 14, 0.62) !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .code-window {
+      background: rgba(8, 8, 12, 0.85) !important;
+      backdrop-filter: blur(24px) !important;
+      -webkit-backdrop-filter: blur(24px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
        3. FLOATING HEADER (NO BACKGROUND / NO BAR - TOTALLY FLOATING)
        ═══════════════════════════════════════════════════════════════ */
     header.header {
@@ -1375,22 +1504,29 @@
        12. CALL TO ACTION & FOOTER
        ═══════════════════════════════════════════════════════════════ */
     .cta-box {
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(20, 20, 20, 0.6) 100%);
-      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(10, 10, 14, 0.88) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 16px;
       padding: 64px 36px;
       text-align: center;
       max-width: 920px;
-      margin: 0 auto 120px;
+      margin: 0 auto;
       display: flex;
       flex-direction: column;
       align-items: center;
+      position: relative;
+      z-index: 5;
     }
 
     .footer-main {
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
       padding: 60px var(--header-x) 40px;
-      background: #000000;
+      background: #000000 !important;
+      position: relative;
+      z-index: 10;
+      clear: both;
+      width: 100%;
+      display: block;
     }
 
     .footer-grid {
@@ -1930,9 +2066,29 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════
-       SECTION 2: BENEFITS & PROTOCOL PILLARS
+       CONTENT BACKDROP VIDEO LAYER & LIQUID BLUR TRANSITION
+       (From section after hero down to section before footer)
        ═══════════════════════════════════════════════════════════════ -->
-  <section id="benefits" class="section-wrap">
+  <div class="content-backdrop-area">
+    <!-- Continuous Background Video Canvas (Pinned Layer) -->
+    <div class="content-video-container" aria-hidden="true">
+      <video autoplay loop muted playsinline class="content-backdrop-video" preload="auto" disablePictureInPicture>
+        <source src="https://res.cloudinary.com/elgbqqkh/video/upload/q_auto,f_auto/Editing_video_loop_and_watermark_202608281208.mp4" type="video/mp4">
+        <source src="https://res.cloudinary.com/elgbqqkh/video/upload/Editing_video_loop_and_watermark_202608281208.webm" type="video/webm">
+        <source src="https://res.cloudinary.com/elgbqqkh/video/upload/Editing_video_loop_and_watermark_202608281208.mp4" type="video/mp4">
+      </video>
+      <div class="content-video-overlay" aria-hidden="true"></div>
+    </div>
+
+    <!-- Foreground Content Sections Wrapper -->
+    <div class="content-sections-wrapper">
+      <!-- Top Liquid Frosted Fade-Blur Transition between Hero and Benefits -->
+      <div class="transition-hero-fade" aria-hidden="true"></div>
+
+      <!-- ═══════════════════════════════════════════════════════════════
+           SECTION 2: BENEFITS & PROTOCOL PILLARS
+           ═══════════════════════════════════════════════════════════════ -->
+      <section id="benefits" class="section-wrap">
     <div class="section-header">
       <div class="section-badge">Protocol Security</div>
       <h2 class="section-title">Built for <em>Zero-Trust</em> Autonomous AI Operations</h2>
@@ -2101,12 +2257,12 @@
         <p class="tool-desc">Aggregates liquidity across 1inch DEX protocols for optimal routing and minimal slippage.</p>
       </div>
 
-      <div class="tool-card" onclick="previewTool('create_wallet')">
+      <div class="tool-card" onclick="previewTool('import_wallet')">
         <div class="tool-header">
-          <span class="tool-name">create_wallet</span>
+          <span class="tool-name">import_wallet</span>
           <span class="tool-category">Vaults</span>
         </div>
-        <p class="tool-desc">Provisions a new self-sovereign BIP-39 non-custodial vault, returning address, 12-word seed phrase, and derivation path.</p>
+        <p class="tool-desc">Registers a 100% non-custodial multi-chain vault address, binding client-side biometric passkeys without exposing secrets.</p>
       </div>
 
       <div class="tool-card" onclick="previewTool('get_wallet_info')">
@@ -2291,22 +2447,29 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════
-       SECTION 7: CTA BANNER & FOOTER
+       SECTION 7: CTA BANNER (THE SECTION BEFORE THE FOOTER)
        ═══════════════════════════════════════════════════════════════ -->
-  <div class="cta-box">
-    <div class="badge" style="margin-bottom: 16px;">
-      <svg class="badge-star" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2.6C12.55 2.6 12.88 3.15 13.08 4.7c.62 4.7 1.52 5.6 6.22 6.22 1.55.2 2.1.53 2.1 1.08s-.55.88-2.1 1.08c-4.7.62-5.6 1.52-6.22 6.22-.2 1.55-.53 2.1-1.08 2.1s-.88-.55-1.08-2.1c-.62-4.7-1.52-5.6-6.22-6.22C3.15 12.88 2.6 12.55 2.6 12s.55-.88 2.1-1.08c4.7-.62 5.6-1.52 6.22-6.22C11.12 3.15 11.45 2.6 12 2.6Z"/>
-      </svg>
-      <span>Start Building Today</span>
-    </div>
-    <h2 style="font-size: 34px; font-weight: 500; letter-spacing: -0.035em; margin-bottom: 14px;">Ready to empower your <em>AI agents</em> with on-chain vaults?</h2>
-    <p style="color: var(--muted); font-size: 15.5px; max-width: 540px; margin-bottom: 28px; line-height: 1.55;">Connect Northveil MCP to your local Claude Desktop or backend runtime in less than 2 minutes.</p>
-    <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
-      <a href="https://wallet.northveil.xyz/" class="btn btn-solid btn-hero" target="_blank" rel="noopener noreferrer">Open Web3 Wallet</a>
-      <a href="#how-it-works" class="btn btn-ghost btn-hero">Read Documentation</a>
+  <div class="cta-box-wrap">
+    <div class="cta-box">
+      <div class="badge" style="margin-bottom: 16px;">
+        <svg class="badge-star" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2.6C12.55 2.6 12.88 3.15 13.08 4.7c.62 4.7 1.52 5.6 6.22 6.22 1.55.2 2.1.53 2.1 1.08s-.55.88-2.1 1.08c-4.7.62-5.6 1.52-6.22 6.22-.2 1.55-.53 2.1-1.08 2.1s-.88-.55-1.08-2.1c-.62-4.7-1.52-5.6-6.22-6.22C3.15 12.88 2.6 12.55 2.6 12s.55-.88 2.1-1.08c4.7-.62 5.6-1.52 6.22-6.22C11.12 3.15 11.45 2.6 12 2.6Z"/>
+        </svg>
+        <span>Start Building Today</span>
+      </div>
+      <h2 style="font-size: 34px; font-weight: 500; letter-spacing: -0.035em; margin-bottom: 14px;">Ready to empower your <em>AI agents</em> with on-chain vaults?</h2>
+      <p style="color: var(--muted); font-size: 15.5px; max-width: 540px; margin-bottom: 28px; line-height: 1.55;">Connect Northveil MCP to your local Claude Desktop or backend runtime in less than 2 minutes.</p>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+        <a href="https://wallet.northveil.xyz/" class="btn btn-solid btn-hero" target="_blank" rel="noopener noreferrer">Open Web3 Wallet</a>
+        <a href="#how-it-works" class="btn btn-ghost btn-hero">Read Documentation</a>
+      </div>
     </div>
   </div>
+
+    <!-- Bottom Liquid Frosted Fade to Pitch Black before Footer -->
+    <div class="transition-footer-fade" aria-hidden="true"></div>
+    </div> <!-- End content-sections-wrapper -->
+  </div> <!-- End content-backdrop-area -->
 
   <footer class="footer-main">
     <div class="footer-grid">
@@ -2549,9 +2712,15 @@
       },
       tool_create_wallet: {
         label: 'create_wallet.json',
-        config: `// Tool Call: create_wallet\n{\n  "tool": "create_wallet",\n  "params": {\n    "vaultType": "NON_CUSTODIAL_TEE",\n    "network": "all"\n  }\n}`,
-        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient()\nnew_vault = client.create_wallet(\n    vault_type="NON_CUSTODIAL_TEE",\n    enable_passkey=True\n)\nprint(f"New Vault Address: {new_vault.address}")`,
-        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vaultManager = new NorthveilSDK();\nconst newVault = await vaultManager.createWallet({\n  vaultType: 'NON_CUSTODIAL_TEE',\n  chains: ['ethereum', 'polygon', 'base', 'solana']\n});\nconsole.log('Created Vault Address:', newVault.address);`
+        config: `// Tool Call: create_wallet (100% Non-Custodial Registration)\n{\n  "tool": "create_wallet",\n  "params": {\n    "walletName": "Agent Vault",\n    "chain": "ethereum"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient()\nvault = client.create_wallet(\n    wallet_name="Agent Vault",\n    custody="NON_CUSTODIAL_PASSKEY"\n)\nprint(f"Vault Registered: {vault.address}")`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK();\nconst res = await vault.createWallet({\n  walletName: 'Agent Vault',\n  custody: 'NON_CUSTODIAL_PASSKEY'\n});\nconsole.log('Vault Registered:', res.address);`
+      },
+      tool_import_wallet: {
+        label: 'import_wallet.json',
+        config: `// Tool Call: import_wallet (Non-Custodial Address Binding)\n{\n  "tool": "import_wallet",\n  "params": {\n    "address": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417",\n    "walletName": "Production Vault"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient()\nvault = client.import_wallet(\n    address="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417",\n    wallet_name="Production Vault"\n)\nprint("Connected Vault:", vault.address)`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK();\nconst bound = await vault.importWallet({\n  address: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',\n  walletName: 'Production Vault'\n});\nconsole.log('Bound Non-Custodial Vault:', bound.address);`
       },
       tool_get_wallet_info: {
         label: 'get_wallet_info.json',
@@ -2782,8 +2951,29 @@
       } catch (e) {}
     }
 
-    // Initialize Cookie Check
-    document.addEventListener('DOMContentLoaded', checkCookieConsent);
+    // Initialize Cookie Check & Ensure Continuous Video Background Playback
+    document.addEventListener('DOMContentLoaded', () => {
+      checkCookieConsent();
+      const bgVideos = document.querySelectorAll('video');
+      bgVideos.forEach((v) => {
+        v.muted = true;
+        const playPromise = v.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            // Autoplay permitted upon first user scroll or interaction
+            const resumePlay = () => {
+              v.play().catch(() => {});
+              window.removeEventListener('scroll', resumePlay);
+              window.removeEventListener('click', resumePlay);
+              window.removeEventListener('touchstart', resumePlay);
+            };
+            window.addEventListener('scroll', resumePlay, { passive: true });
+            window.addEventListener('click', resumePlay, { passive: true });
+            window.addEventListener('touchstart', resumePlay, { passive: true });
+          });
+        }
+      });
+    });
   </script>
 </body>
 </html>
