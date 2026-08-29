@@ -136,18 +136,18 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'northveil_get_balances',
-    description: 'Retrieves real-time verified on-chain native and token balances for an authorized vault across multiple chains (Ethereum Mainnet, Solana, BNB Smart Chain, Polygon, Arbitrum, Optimism, Avalanche, Base, Sepolia, or all chains simultaneously).',
+    description: 'Retrieves real-time verified on-chain native and token balances for an authorized vault across multiple chains across both mainnets and testnets (Ethereum Mainnet, Sepolia, Base, Base Sepolia, BNB Smart Chain, BSC Testnet, Solana Mainnet, Solana Devnet, Polygon PoS, Polygon Amoy, Arbitrum One, Arbitrum Sepolia, Optimism, OP Sepolia, Avalanche, Sonic, or "all" to scan all networks simultaneously).',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
         walletAddress: {
           type: 'string',
-          description: '0x or Solana public address of the vault wallet (defaults to active user vault)',
+          description: '0x EVM or Solana public address of the vault wallet (defaults to active user vault)',
         },
         network: {
           type: 'string',
-          description: 'Target blockchain network: ethereum, solana, bsc, polygon, arbitrum, optimism, avalanche, base, sepolia, or "all" to scan all networks simultaneously. Default: all',
+          description: 'Target blockchain network: ethereum, sepolia, base, base_sepolia, bsc, bsc_testnet, solana, solana_devnet, polygon, polygon_amoy, arbitrum, arbitrum_sepolia, optimism, optimism_sepolia, avalanche, sonic, "mainnet", "testnet", or "all" to scan all networks simultaneously. Default: all',
         },
         tokenAddress: {
           type: 'string',
@@ -160,11 +160,11 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         walletAddress: {
           type: 'string',
-          description: '0x or Solana public address of the vault wallet',
+          description: '0x EVM or Solana public address of the vault wallet',
         },
         network: {
           type: 'string',
-          description: 'Target blockchain network: ethereum, solana, bsc, polygon, arbitrum, optimism, avalanche, base, sepolia, or all',
+          description: 'Target blockchain network (e.g. ethereum, sepolia, base, base_sepolia, bsc, bsc_testnet, solana, solana_devnet, polygon, arbitrum, all, testnet, mainnet)',
         },
         tokenAddress: {
           type: 'string',
@@ -175,14 +175,14 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'northveil_get_portfolio',
-    description: 'Aggregates multi-chain token holdings, native balances, and total USD net worth across all supported networks.',
+    description: 'Aggregates multi-chain token holdings, native balances, and total USD net worth across all supported networks on both mainnet and testnet.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
         walletAddress: {
           type: 'string',
-          description: '0x public address of the vault wallet (defaults to active user vault)',
+          description: '0x EVM or Solana public address of the vault wallet (defaults to active user vault)',
         },
       },
     },
@@ -191,7 +191,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         walletAddress: {
           type: 'string',
-          description: '0x public address of the vault wallet',
+          description: '0x EVM or Solana public address of the vault wallet',
         },
       },
     },
@@ -231,7 +231,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'northveil_list_networks',
-    description: 'Lists all 37+ supported blockchain networks (Ethereum, Solana, Base, Arbitrum, BSC, Polygon, Avalanche, Optimism, Linea, Scroll, Mantle, zkSync, Blast, etc.) with chain IDs, block times, and explorer URLs.',
+    description: 'Lists all 37+ supported blockchain networks (Ethereum, Solana, Base, Arbitrum, BSC, Polygon, Avalanche, Optimism, Linea, Scroll, Mantle, zkSync, Blast, Sepolia, Base Sepolia, BSC Testnet, Solana Devnet, Amoy, etc.) with chain IDs, block times, and explorer URLs.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
@@ -244,18 +244,22 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'northveil_list_nfts',
-    description: 'Retrieves verified NFT digital collectibles, contract metadata, token IDs, and floor valuations across multiple chains (Ethereum Mainnet, Solana, Base, Polygon, Arbitrum, BSC, Sepolia, or all).',
+    description: 'Retrieves verified NFT digital collectibles, user-deployed NFT contracts, metadata images, token IDs, and floor valuations across multiple chains on both mainnet and testnet (Ethereum, Sepolia, Base, Base Sepolia, BNB Smart Chain, BSC Testnet, Solana, Solana Devnet, Polygon, Amoy, Arbitrum, Arbitrum Sepolia, or all).',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
         walletAddress: {
           type: 'string',
-          description: '0x or Solana public address of the vault wallet',
+          description: '0x EVM or Solana public address of the vault wallet',
         },
         network: {
           type: 'string',
-          description: 'Target blockchain network: ethereum, solana, base, polygon, arbitrum, bsc, sepolia, or "all". Default: all',
+          description: 'Target blockchain network: ethereum, sepolia, base, base_sepolia, bsc, bsc_testnet, solana, solana_devnet, polygon, arbitrum, "mainnet", "testnet", or "all". Default: all',
+        },
+        contractAddress: {
+          type: 'string',
+          description: 'Optional contract address of a specific NFT collection to query',
         },
       },
     },
@@ -264,11 +268,15 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         walletAddress: {
           type: 'string',
-          description: '0x or Solana public address of the vault wallet',
+          description: '0x EVM or Solana public address of the vault wallet',
         },
         network: {
           type: 'string',
-          description: 'Blockchain network (e.g. ethereum, solana, base, polygon, arbitrum, bsc, sepolia, all)',
+          description: 'Blockchain network (e.g. ethereum, sepolia, base, base_sepolia, bsc, bsc_testnet, solana, solana_devnet, polygon, arbitrum, all, testnet, mainnet)',
+        },
+        contractAddress: {
+          type: 'string',
+          description: 'Optional NFT contract address',
         },
       },
     },

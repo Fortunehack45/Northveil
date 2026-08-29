@@ -234,6 +234,11 @@ export const RPC_FALLBACK_POOLS: Record<string, string[]> = {
   bsc_testnet: ['https://bsc-testnet-rpc.publicnode.com', 'https://data-seed-prebsc-1-s1.binance.org:8545/'],
   avalanche: ['https://api.avax.network/ext/bc/C/rpc', 'https://rpc.ankr.com/avalanche', 'https://avalanche.drpc.org'],
   optimism: ['https://mainnet.optimism.io', 'https://optimism.drpc.org', 'https://1rpc.io/op'],
+  optimism_sepolia: ['https://sepolia.optimism.io', 'https://optimism-sepolia-rpc.publicnode.com', 'https://op-sepolia.drpc.org'],
+  avalanche_fuji: ['https://api.avax-test.network/ext/bc/C/rpc', 'https://avalanche-fuji-c-chain-rpc.publicnode.com'],
+  sonic_testnet: ['https://rpc.blaze.soniclabs.com'],
+  monad_testnet: ['https://testnet-rpc.monad.xyz'],
+  holesky: ['https://ethereum-holesky-rpc.publicnode.com', 'https://holesky.drpc.org'],
   linea: ['https://rpc.linea.build', 'https://linea.drpc.org'],
   scroll: ['https://rpc.scroll.io', 'https://scroll.drpc.org'],
   mantle: ['https://rpc.mantle.xyz', 'https://mantle.drpc.org'],
@@ -266,6 +271,7 @@ export const RPC_FALLBACK_POOLS: Record<string, string[]> = {
 const NETWORK_CHAIN_IDS: Record<string, number> = {
   ethereum: 1, mainnet: 1, eth: 1,
   sepolia: 11155111,
+  holesky: 17000,
   base: 8453,
   base_sepolia: 84532,
   arbitrum: 42161, arb: 42161, arbitrum_one: 42161,
@@ -277,7 +283,12 @@ const NETWORK_CHAIN_IDS: Record<string, number> = {
   polygon_amoy: 80002, amoy: 80002,
   polygon_zkevm: 1101,
   avalanche: 43114, avax: 43114,
+  avalanche_fuji: 43113, fuji: 43113,
   optimism: 10, op: 10,
+  optimism_sepolia: 11155420,
+  sonic: 146, fantom: 146,
+  sonic_testnet: 57054,
+  monad_testnet: 10143,
   linea: 59144,
   scroll: 534352,
   mantle: 5000,
@@ -539,30 +550,44 @@ export async function createMpcWallet(
   custodyModel: string;
   onboardingUrl: string;
 }> {
-  // Derive deterministic non-custodial registration public address for zero-custody control plane
-  const randomEntropy = crypto.createHash('sha256').update(`${userId}:${walletName}:${Date.now()}:${process.env.NORTHVEIL_PUBLIC_SALT || 'northveil_zero_custody'}`).digest('hex');
-  const derivedPublicAddress = ethers.computeAddress('0x' + randomEntropy).toLowerCase();
-  
-  const record = await registerPublicWallet({
-    address: derivedPublicAddress,
-    walletName,
-    userId,
-    chainId: 'ethereum',
-  });
+  // Fix 3: Key generation happens exclusively on the client device (browser / native app).
+  // The server MUST NOT derive or compute addresses from server-side entropy — doing so would
+  // create a server-accessible private key, violating the non-custodial security boundary.
+  // This function creates a registration placeholder and directs the user to the client app
+  // to complete the actual key generation ceremony using WebAuthn / local hardware.
+  const pendingId = `pending_${crypto.randomUUID()}`;
+
+  // Persist the registration intent so the client app can complete it
+  try {
+    if (supabase && typeof supabase.from === 'function') {
+      await supabase.from('wallets').insert([{
+        id: pendingId,
+        user_id: userId,
+        name: walletName,
+        wallet_status: 'pending_client_keygen',
+        mpc_provider: 'northveil_client_keygen',
+        key_type: 'ecdsa_secp256k1',
+        chain_id: 'ethereum',
+        created_at: new Date().toISOString(),
+      }]);
+    }
+  } catch (e) {
+    // Non-fatal — the in-memory record is still returned
+  }
 
   return {
-    address: record.address,
-    mpcWalletId: record.id,
+    address: '',   // Empty until the user completes key generation in the client app
+    mpcWalletId: pendingId,
     mpcSubOrgId: 'client_local_vault',
-    mpcProvider: 'northveil_enclave',
-    keyType: record.key_type,
-    status: 'active',
+    mpcProvider: 'northveil_client_keygen',
+    keyType: 'ecdsa_secp256k1',
+    status: 'pending_client_keygen',
     seedPhrase: '',
     mnemonic: '',
     mnemonicWords: [],
     privateKey: '',
     derivationPath: "m/44'/60'/0'/0/0",
-    custodyModel: '100% Non-Custodial Hardware TEE / WebAuthn Passkeys',
+    custodyModel: 'Client-Side Key Generation (Non-Custodial) — Complete setup in Northveil Wallet App',
     onboardingUrl: 'https://wallet.northveil.xyz/',
   };
 }
@@ -792,7 +817,7 @@ export async function verifyPasskeyAuthentication(
     ? arg2
     : (typeof arg3 === 'string' && arg3.startsWith('0x'))
     ? arg3
-    : process.env.NORTHVEIL_WALLET_ADDRESS || '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+    : process.env.NORTHVEIL_WALLET_ADDRESS || '';
 
   const resolvedWallet = typeof rawWallet === 'string' ? rawWallet : String(rawWallet || '');
 

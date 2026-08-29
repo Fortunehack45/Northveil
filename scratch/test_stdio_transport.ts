@@ -4,10 +4,11 @@ import path from 'path';
 async function testStdio() {
   console.log('Testing MCP stdio transport...');
 
-  const serverProcess = spawn('npx', ['tsx', 'mcp-server/index.ts', '--stdio'], {
+  const tsxCli = path.resolve('node_modules/tsx/dist/cli.mjs');
+  const serverProcess = spawn(process.execPath, [tsxCli, 'mcp-server/index.ts', '--stdio'], {
     cwd: path.resolve('.'),
     env: { ...process.env, NODE_ENV: 'test', MCP_TRANSPORT: 'stdio', NO_SERVER_LISTEN: 'true' },
-    shell: true,
+    shell: false,
   });
 
   let buffer = '';
