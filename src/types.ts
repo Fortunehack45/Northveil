@@ -208,7 +208,7 @@ export interface AgentConnection {
 export interface McpApprovalRecord {
   id: string;
   tool_name: string;
-  status: 'CONFIRMED' | 'PENDING' | 'REJECTED' | 'FAILED';
+  status: 'CONFIRMED' | 'PENDING' | 'REJECTED' | 'FAILED' | 'EXPIRED';
   parameters: any;
   response?: any;
   wallet_address: string;

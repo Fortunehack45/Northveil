@@ -3225,38 +3225,52 @@ app.get('/api/v1/dashboard/approvals/pending', async (req: Request, res: Respons
       let query = supabase
         .from('transaction_requests')
         .select('*')
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .is('tx_hash', null)
+        .order('created_at', { ascending: false })
+        .limit(20);
       if (walletAddress) {
         query = query.eq('wallet_address', walletAddress);
       }
       const { data } = await query;
       if (data && data.length > 0) {
-        pendingApprovals = data.map((d: any) => ({
-          approval_token: d.approval_token,
-          approvalToken: d.approval_token,
-          requestId: d.request_id,
-          request_id: d.request_id,
-          walletAddress: d.wallet_address,
-          wallet_address: d.wallet_address,
-          recipient: d.recipient,
-          amount: d.amount,
-          asset: d.asset,
-          network: d.network,
-          chainId: d.chain_id,
-          nonce: d.nonce,
-          unsignedPayload: d.unsigned_payload,
-          reason: d.reason,
-          status: d.status,
-          createdAt: d.created_at,
-          expiresAt: d.expires_at,
-        }));
+        const now = Date.now();
+        pendingApprovals = data
+          .filter((d: any) => {
+            if (d.tx_hash || d.token_used) return false;
+            if (d.expires_at && new Date(d.expires_at).getTime() <= now) return false;
+            // Also reject stale un-expired requests older than 2 hours
+            if (d.created_at && now - new Date(d.created_at).getTime() > 2 * 3600 * 1000) return false;
+            return true;
+          })
+          .map((d: any) => ({
+            approval_token: d.approval_token,
+            approvalToken: d.approval_token,
+            requestId: d.request_id,
+            request_id: d.request_id,
+            walletAddress: d.wallet_address,
+            wallet_address: d.wallet_address,
+            recipient: d.recipient,
+            amount: d.amount,
+            asset: d.asset,
+            network: d.network,
+            chainId: d.chain_id,
+            nonce: d.nonce,
+            unsignedPayload: d.unsigned_payload,
+            reason: d.reason,
+            status: d.status,
+            createdAt: d.created_at,
+            expiresAt: d.expires_at,
+          }));
       }
     }
   } catch (e) {}
 
   if (pendingApprovals.length === 0) {
+    const now = Date.now();
     for (const [token, reqObj] of inMemoryTxRequests.entries()) {
-      if ((reqObj.status as string).toLowerCase() === 'pending') {
+      if ((reqObj.status as string).toLowerCase() === 'pending' && !reqObj.txHash) {
+        if (reqObj.expiresAt && new Date(reqObj.expiresAt).getTime() <= now) continue;
         if (!walletAddress || reqObj.walletAddress?.toLowerCase() === walletAddress) {
           pendingApprovals.push({
             approval_token: token,

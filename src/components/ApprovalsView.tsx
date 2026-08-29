@@ -27,7 +27,7 @@ import { ethers } from 'ethers';
 export const ApprovalsView: React.FC = () => {
   const { activeSubWallet, seedPhrase, getDecryptedPrivateKey } = useWallet();
 
-  const [filterStatus, setFilterStatus] = useState<'ALL' | 'CONFIRMED' | 'PENDING' | 'REJECTED'>('ALL');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'CONFIRMED' | 'PENDING' | 'REJECTED' | 'EXPIRED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,10 +49,20 @@ export const ApprovalsView: React.FC = () => {
       const mergedMap = new Map<string, McpApprovalRecord>();
       (liveApprovals || []).forEach((item) => mergedMap.set(item.id, item));
 
+      const now = Date.now();
       // Merge any pending staged requests from MCP control plane
       (stagedPending || []).forEach((req: any) => {
         const id = req.requestId || req.id || req.request_id || req.approvalToken || req.approval_token;
         if (id) {
+          const isConfirmed = Boolean(req.txHash || req.tx_hash || req.status === 'confirmed' || req.status === 'broadcasted');
+          const isRejected = req.status === 'rejected';
+          const isExpired = !isConfirmed && (
+            req.token_used ||
+            (req.expiresAt && new Date(req.expiresAt).getTime() <= now) ||
+            (req.createdAt && now - new Date(req.createdAt).getTime() > 2 * 3600 * 1000)
+          );
+          const status = isConfirmed ? 'CONFIRMED' : isRejected ? 'REJECTED' : isExpired ? 'EXPIRED' : 'PENDING';
+
           mergedMap.set(id, {
             id,
             wallet_address: req.walletAddress || req.wallet_address || activeSubWallet?.address || '',
@@ -64,7 +74,7 @@ export const ApprovalsView: React.FC = () => {
               network: req.network || req.chain || 'sepolia',
               reason: req.reason || req.contract_summary || 'Transfer requested via MCP Agent',
             },
-            status: req.status === 'confirmed' || req.status === 'broadcasted' ? 'CONFIRMED' : req.status === 'rejected' ? 'REJECTED' : 'PENDING',
+            status,
             created_at: req.createdAt || req.created_at || new Date().toISOString(),
             tx_hash: req.txHash || req.tx_hash,
             gas_fee_usd: 0.05,
@@ -99,6 +109,16 @@ export const ApprovalsView: React.FC = () => {
   };
 
   const handleApprove = async (id: string) => {
+    const currentRecord = approvals.find((a) => a.id === id);
+    if (currentRecord?.status === 'CONFIRMED' || currentRecord?.tx_hash) {
+      setPasskeyNotice('Transaction already confirmed on-chain.');
+      return;
+    }
+    if (currentRecord?.status === 'EXPIRED') {
+      setPasskeyNotice('This signing request has expired. Please stage a new request.');
+      return;
+    }
+
     setActionProcessingId(id);
     setPasskeyNotice('Preparing transaction signature...');
     try {
@@ -129,7 +149,6 @@ export const ApprovalsView: React.FC = () => {
         }
 
         // Look up staged request parameters from local state or server response
-        const currentRecord = approvals.find((a) => a.id === id);
         const targetNetwork = prepResult?.network || currentRecord?.parameters?.network || 'sepolia';
         const targetRecipient = prepResult?.recipient || currentRecord?.parameters?.recipient;
         const targetAmount = prepResult?.amount || currentRecord?.parameters?.amount;
@@ -204,10 +223,24 @@ export const ApprovalsView: React.FC = () => {
         }
       }
 
-      // 3. Update Supabase record
-      await SupabaseService.updateApprovalStatus(id, 'approved', txHash);
-
+      // 3. Update local state immediately so Approve button disappears instantaneously
       if (txHash) {
+        setApprovals((prev) =>
+          prev.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  status: 'CONFIRMED',
+                  tx_hash: txHash,
+                  response: { ...item.response, txHash, explorerUrl, status: 'confirmed' },
+                }
+              : item
+          )
+        );
+
+        // 4. Update Supabase record
+        await SupabaseService.updateApprovalStatus(id, 'approved', txHash);
+
         setConfirmedTxFeedback({
           id,
           txHash,
@@ -231,6 +264,17 @@ export const ApprovalsView: React.FC = () => {
   const handleReject = async (id: string) => {
     setActionProcessingId(id);
     try {
+      setApprovals((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                status: 'REJECTED',
+                response: { ...item.response, status: 'rejected' },
+              }
+            : item
+        )
+      );
       await MpcWalletService.rejectTransactionRequest(id).catch(() => {});
       await SupabaseService.updateApprovalStatus(id, 'rejected');
       setPasskeyNotice('Approval token burned and voided immediately.');
@@ -320,6 +364,7 @@ export const ApprovalsView: React.FC = () => {
             { id: 'ALL', label: 'All' },
             { id: 'CONFIRMED', label: 'Confirmed' },
             { id: 'PENDING', label: 'Pending' },
+            { id: 'EXPIRED', label: 'Expired' },
             { id: 'REJECTED', label: 'Failed' },
           ].map((tab) => (
             <button
@@ -384,8 +429,10 @@ export const ApprovalsView: React.FC = () => {
       ) : (
         <div className="space-y-3.5">
           {filteredApprovals.map((item) => {
-            const isConfirmed = item.status === 'CONFIRMED';
-            const isPending = item.status === 'PENDING';
+            const isConfirmed = item.status === 'CONFIRMED' || Boolean(item.tx_hash);
+            const isRejected = item.status === 'REJECTED';
+            const isExpired = item.status === 'EXPIRED';
+            const isPending = item.status === 'PENDING' && !item.tx_hash && !isExpired;
 
             return (
               <div
@@ -418,6 +465,8 @@ export const ApprovalsView: React.FC = () => {
                         ? 'bg-black/[0.06] dark:bg-white/[0.1] text-zinc-900 dark:text-white'
                         : isPending
                         ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                        : isExpired
+                        ? 'bg-zinc-500/10 text-zinc-500 dark:text-zinc-400'
                         : 'bg-red-500/10 text-red-600 dark:text-red-400'
                     }`}
                   >
@@ -425,6 +474,8 @@ export const ApprovalsView: React.FC = () => {
                       <CheckCircle2 className="w-3.5 h-3.5 text-zinc-900 dark:text-white" />
                     ) : isPending ? (
                       <Clock className="w-3.5 h-3.5 text-amber-500" />
+                    ) : isExpired ? (
+                      <Clock className="w-3.5 h-3.5 text-zinc-400" />
                     ) : (
                       <XCircle className="w-3.5 h-3.5 text-red-500" />
                     )}

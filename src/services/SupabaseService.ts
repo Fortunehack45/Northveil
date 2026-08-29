@@ -249,19 +249,31 @@ export class SupabaseService {
       const { data, error } = await txQuery;
       if (error || !data) return [];
 
+      const now = Date.now();
       const list: any[] = data.map((item: any) => {
         const id = item.approval_token || item.request_id || item.id;
+        
+        let calculatedStatus: 'CONFIRMED' | 'REJECTED' | 'EXPIRED' | 'PENDING' = 'PENDING';
+        if (item.tx_hash || item.status === 'confirmed' || item.status === 'approved' || item.status === 'completed' || item.status === 'broadcasted') {
+          calculatedStatus = 'CONFIRMED';
+        } else if (item.status === 'rejected') {
+          calculatedStatus = 'REJECTED';
+        } else if (
+          item.token_used ||
+          (item.expires_at && new Date(item.expires_at).getTime() <= now) ||
+          (item.created_at && now - new Date(item.created_at).getTime() > 2 * 3600 * 1000)
+        ) {
+          calculatedStatus = 'EXPIRED';
+        } else {
+          calculatedStatus = 'PENDING';
+        }
+
         return {
           id,
           request_id: item.request_id || id,
           approval_token: item.approval_token || id,
           tool_name: item.contract_summary ? `execute_tx: ${item.contract_summary}` : (item.operation ? `northveil_prepare_${item.operation.toLowerCase()}` : 'token_transfer'),
-          status:
-            item.status === 'confirmed' || item.status === 'approved' || item.status === 'completed' || item.status === 'broadcasted'
-              ? 'CONFIRMED'
-              : item.status === 'rejected'
-              ? 'REJECTED'
-              : 'PENDING',
+          status: calculatedStatus,
           parameters: {
             recipient: item.recipient,
             amount: `${item.amount} ${item.asset || 'ETH'}`,
