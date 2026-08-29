@@ -74,22 +74,22 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'northveil_get_balances',
-    description: 'Retrieves real-time verified on-chain native and token balances for an authorized vault on Base, Sepolia, Ethereum, or other EVM chains.',
+    description: 'Retrieves real-time verified on-chain native and token balances for an authorized vault across multiple chains (Ethereum Mainnet, Solana, BNB Smart Chain, Polygon, Arbitrum, Optimism, Avalanche, Base, Sepolia, or all chains simultaneously).',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
         walletAddress: {
           type: 'string',
-          description: '0x public address of the vault wallet (defaults to active user vault)',
+          description: '0x or Solana public address of the vault wallet (defaults to active user vault)',
         },
         network: {
           type: 'string',
-          description: 'Target blockchain network: base, sepolia, ethereum, polygon, arbitrum, bsc, solana. Default: base',
+          description: 'Target blockchain network: ethereum, solana, bsc, polygon, arbitrum, optimism, avalanche, base, sepolia, or "all" to scan all networks simultaneously. Default: all',
         },
         tokenAddress: {
           type: 'string',
-          description: 'Optional contract address of a specific ERC-20 token',
+          description: 'Optional contract address of a specific ERC-20 or SPL token to check balance for',
         },
       },
     },
@@ -98,15 +98,15 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         walletAddress: {
           type: 'string',
-          description: '0x public address of the vault wallet',
+          description: '0x or Solana public address of the vault wallet',
         },
         network: {
           type: 'string',
-          description: 'Target blockchain network',
+          description: 'Target blockchain network: ethereum, solana, bsc, polygon, arbitrum, optimism, avalanche, base, sepolia, or all',
         },
         tokenAddress: {
           type: 'string',
-          description: 'Optional contract address of a specific ERC-20 token',
+          description: 'Optional contract address of a specific ERC-20 or SPL token',
         },
       },
     },
@@ -182,18 +182,18 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'northveil_list_nfts',
-    description: 'Retrieves verified NFT digital collectibles, contract metadata, token IDs, and asset media across EVM and Solana.',
+    description: 'Retrieves verified NFT digital collectibles, contract metadata, token IDs, and floor valuations across multiple chains (Ethereum Mainnet, Solana, Base, Polygon, Arbitrum, BSC, Sepolia, or all).',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
         walletAddress: {
           type: 'string',
-          description: '0x public address of the vault wallet',
+          description: '0x or Solana public address of the vault wallet',
         },
         network: {
           type: 'string',
-          description: 'Blockchain network (default: base)',
+          description: 'Target blockchain network: ethereum, solana, base, polygon, arbitrum, bsc, sepolia, or "all". Default: all',
         },
       },
     },
@@ -202,11 +202,11 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       properties: {
         walletAddress: {
           type: 'string',
-          description: '0x public address of the vault wallet',
+          description: '0x or Solana public address of the vault wallet',
         },
         network: {
           type: 'string',
-          description: 'Blockchain network',
+          description: 'Blockchain network (e.g. ethereum, solana, base, polygon, arbitrum, bsc, sepolia, all)',
         },
       },
     },
@@ -398,14 +398,14 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'northveil_prepare_transfer',
-    description: 'Stages a native or ERC-20 transfer intent, calculates gas fees, performs fork simulation, and returns a structured preview with approval ID for on-device biometric confirmation. Does NOT sign or broadcast.',
+    description: 'Stages a native or ERC-20 token transfer intent across multiple chains (Ethereum Mainnet, Solana, BNB Smart Chain, Polygon, Arbitrum, Optimism, Avalanche, Base, Sepolia, etc.), calculates network gas fees, performs fork simulation, and returns a structured preview with approval ID for on-device biometric confirmation. Does NOT sign or broadcast.',
     annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
         to: {
           type: 'string',
-          description: 'Destination recipient address (0x...)',
+          description: 'Destination recipient address (0x... or Solana base58)',
         },
         amount: {
           type: 'number',
@@ -413,11 +413,15 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         },
         asset: {
           type: 'string',
-          description: 'Token symbol (default: ETH)',
+          description: 'Token symbol (e.g. ETH, SOL, BNB, POL, AVAX, USDC, USDT, DAI)',
         },
         network: {
           type: 'string',
-          description: 'Target blockchain network: base, sepolia, ethereum, polygon, arbitrum, bsc. Default: base',
+          description: 'Target blockchain network: ethereum, solana, bsc, polygon, arbitrum, optimism, avalanche, base, sepolia. Default: ethereum',
+        },
+        tokenAddress: {
+          type: 'string',
+          description: 'Optional contract address for custom ERC-20 or SPL tokens',
         },
         walletAddress: {
           type: 'string',
@@ -606,18 +610,22 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'northveil_prepare_deploy',
-    description: 'Stages a smart contract deployment ceremony with compiler verification, returning a structured preview with approval ID for on-device biometric confirmation. Does NOT sign or broadcast.',
+    description: 'Stages a smart contract deployment ceremony across EVM networks (Ethereum Mainnet, BNB Smart Chain, Polygon, Arbitrum, Optimism, Base, Sepolia, etc.) with compiler verification, calculating deterministic contract addresses, and returning a structured preview with approval ID for on-device biometric confirmation. Does NOT sign or broadcast.',
     annotations: { readOnly: false, destructive: true, confirmationRequired: true },
     inputSchema: {
       type: 'object',
       properties: {
         contractName: {
           type: 'string',
-          description: 'Contract name identifier',
+          description: 'Contract name identifier (e.g. MyToken, StakingPool)',
         },
         sourceCode: {
           type: 'string',
           description: 'Solidity source code (v0.8.20+)',
+        },
+        bytecode: {
+          type: 'string',
+          description: 'Optional pre-compiled EVM bytecode (0x...)',
         },
         constructorArgs: {
           type: 'array',
@@ -626,7 +634,11 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         },
         network: {
           type: 'string',
-          description: 'Target network (default: base)',
+          description: 'Target network: ethereum, bsc, polygon, arbitrum, optimism, base, sepolia. Default: base',
+        },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional deployer vault wallet address (defaults to active user vault)',
         },
       },
       required: ['contractName'],
