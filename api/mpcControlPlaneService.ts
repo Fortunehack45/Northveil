@@ -298,7 +298,6 @@ const NETWORK_CHAIN_IDS: Record<string, number> = {
   gnosis: 100, xdai: 100,
   cronos: 25,
   celo: 42220,
-  sonic: 146, fantom: 146,
   sei: 1329,
   berachain: 80094,
   abstract: 2741,
@@ -1333,7 +1332,7 @@ export async function stageTransactionRequest(
   }
 
   const prep = await prepareTransactionRequest({
-    walletAddress: walletAddressOrOptions,
+    walletAddress: typeof walletAddressOrOptions === 'string' ? walletAddressOrOptions : (walletAddressOrOptions as any)?.walletAddress || '',
     recipient: recipient || '',
     amount: amount || 0,
     asset: asset || 'ETH',

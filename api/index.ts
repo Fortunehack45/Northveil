@@ -1811,6 +1811,7 @@ export interface AuthResult {
   allowedWallets: string[];
   tier: string;
   userId: string;
+  error?: string;
 }
 
 // In-Memory OAuth Token Registry for ephemeral tokens & rapid token validation
@@ -9452,9 +9453,9 @@ ${orderRows}
       ]);
 
       const balances: any[] = [];
-      const addBal = (name: string, sym: string, result: PromiseSettledResult<bigint>, price: number) => {
+      const addBal = (name: string, sym: string, result: PromiseSettledResult<any>, price: number) => {
         if (result.status === 'fulfilled') {
-          const bal = Number(ethers.formatEther(result.value));
+          const bal = Number(ethers.formatEther(result.value || 0n));
           balances.push({ chain: name, symbol: sym, balance: bal, valueUsd: bal * price });
         } else {
           balances.push({ chain: name, symbol: sym, balance: 0, valueUsd: 0, error: 'RPC Timeout' });

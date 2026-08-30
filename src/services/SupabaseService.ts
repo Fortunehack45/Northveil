@@ -334,7 +334,7 @@ export class SupabaseService {
             explorerUrl: item.explorer_url,
             status: item.status,
           },
-          wallet_address: item.wallet_address || cleanAddr,
+          wallet_address: item.wallet_address || (addrs[0] || ''),
           agent_type: 'Autonomous MCP Agent',
           created_at: item.created_at || new Date().toISOString(),
           tx_hash: item.tx_hash || undefined,
