@@ -244,19 +244,12 @@ export class SupabaseService {
     }
 
     try {
-      let txQuery = supabase
+      const { data, error } = await supabase
         .from('transaction_requests')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
 
-      if (addrs.length === 1) {
-        txQuery = txQuery.or(`wallet_address.eq.${addrs[0]},status.eq.pending`);
-      } else if (addrs.length > 1) {
-        txQuery = txQuery.or(`wallet_address.in.(${addrs.join(',')}),status.eq.pending`);
-      }
-
-      const { data, error } = await txQuery;
       if (error || !data) return [];
 
       const now = Date.now();

@@ -374,13 +374,18 @@ export class MpcWalletService {
 
     const candidateUrls = [
       `${this.getBaseUrl()}/api/v1/dashboard/approvals/pending?${queryStr}`,
+      `${this.getBaseUrl()}/api/v1/dashboard/approvals/pending`,
       `${this.getBaseUrl()}/api/v1/approvals/pending?${queryStr}`,
+      `${this.getBaseUrl()}/api/v1/approvals/pending`,
       `/api/v1/dashboard/approvals/pending?${queryStr}`,
+      `/api/v1/dashboard/approvals/pending`,
       `/api/v1/approvals/pending?${queryStr}`,
+      `/api/v1/approvals/pending`,
     ];
 
     if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
       candidateUrls.push(`http://127.0.0.1:3001/api/v1/dashboard/approvals/pending?${queryStr}`);
+      candidateUrls.push(`http://127.0.0.1:3001/api/v1/dashboard/approvals/pending`);
     }
 
     for (const url of candidateUrls) {

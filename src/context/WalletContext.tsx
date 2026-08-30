@@ -188,16 +188,18 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   useEffect(() => {
     localStorage.removeItem('northveil_v3_transactions');
     try {
-      const stored = localStorage.getItem('northveil_v3_assets');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          const hasStale = parsed.some((p: any) => p.balance === 1.45 || p.balance === 1250 || p.balance === 6.8 || p.balance === 3.4 || p.balance === 0.05);
-          if (hasStale) {
-            localStorage.removeItem('northveil_v3_assets');
+      localStorage.removeItem('northveil_v3_assets');
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('northveil_v3_assets_')) {
+          const val = localStorage.getItem(k);
+          if (val && (val.includes('trx-token') || val.includes('link-eth') || val.includes('usdc-eth') || val.includes('usdt-eth') || val.includes('1.45') || val.includes('1250'))) {
+            keysToRemove.push(k);
           }
         }
       }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
     } catch {}
   }, []);
 
@@ -396,13 +398,16 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            const cleanedAssets = parsed.map((a: any) => {
-              const numBal = typeof a.balance === 'number' && !isNaN(a.balance) ? a.balance : 0;
-              if (numBal === 1.45 || numBal === 1250 || numBal === 6.8 || numBal === 3.4 || numBal === 0.05 || numBal === 100) {
-                return { ...a, balance: 0 };
-              }
-              return { ...a, balance: numBal };
-            });
+            const validIds = new Set(INITIAL_ASSETS.map(a => a.id));
+            const cleanedAssets = parsed
+              .filter((a: any) => validIds.has(a.id) || (typeof a.balance === 'number' && a.balance > 0))
+              .map((a: any) => {
+                const numBal = typeof a.balance === 'number' && !isNaN(a.balance) ? a.balance : 0;
+                if (numBal === 1.45 || numBal === 1250 || numBal === 6.8 || numBal === 3.4 || numBal === 0.05 || numBal === 100) {
+                  return { ...a, balance: 0 };
+                }
+                return { ...a, balance: numBal };
+              });
             const existingIds = new Set(cleanedAssets.map((a: any) => a.id));
             const missingNatives = INITIAL_ASSETS.filter(a => !existingIds.has(a.id));
             baseAssets = [...cleanedAssets, ...missingNatives];

@@ -69,17 +69,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     }
   };
 
-  // Strictly filter: tokens with balance > 0 on top, plus only ETH, USDC, SOL if 0 balance
+  // Strictly filter: tokens with balance > 0 on top, plus only core native assets (ETH, Base ETH, SOL, BTC) if 0 balance
   const visibleAssets = useMemo(() => {
     const withBalance = assets
       .filter((a) => Number(a.balance) > 0)
       .sort((a, b) => (b.balance * b.priceUsd) - (a.balance * a.priceUsd));
 
     const ethZero = assets.find((a) => (a.id === 'eth-main' || a.symbol === 'ETH') && a.network === 'ethereum');
-    const usdcZero = assets.find((a) => (a.id === 'usdc-eth' || a.symbol === 'USDC') && a.network === 'ethereum');
-    const solZero = assets.find((a) => (a.id === 'sol-main' || a.symbol === 'SOL') && a.network === 'solana');
+    const baseZero = assets.find((a) => (a.id === 'base-native' || a.symbol === 'ETH (Base)') && a.network === 'base');
+    const solZero = assets.find((a) => (a.id === 'sol-native' || a.symbol === 'SOL') && a.network === 'solana');
+    const btcZero = assets.find((a) => (a.id === 'btc-native' || a.symbol === 'BTC') && a.network === 'bitcoin');
 
-    const coreZero = [ethZero, usdcZero, solZero].filter(
+    const coreZero = [ethZero, baseZero, solZero, btcZero].filter(
       (item): item is CryptoAsset => !!item && !withBalance.some((t) => t.id === item.id)
     );
 
