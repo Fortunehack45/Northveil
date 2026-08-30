@@ -56,6 +56,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address to check vault status for',
+        },
         userId: {
           type: 'string',
           description: 'User identifier or account handle (default: default_user)',
@@ -65,6 +69,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address',
+        },
         userId: {
           type: 'string',
           description: 'User identifier or account handle',
@@ -936,6 +944,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
           type: 'string',
           description: 'Target EVM network: sepolia, base, ethereum, polygon, arbitrum, bsc. Default: sepolia',
         },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional sender vault address (0x... or Solana address) to send transfer from',
+        },
       },
       required: ['toAddress', 'amount'],
     },
@@ -957,6 +969,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         network: {
           type: 'string',
           description: 'Target EVM network',
+        },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional sender vault address',
         },
       },
       required: ['toAddress', 'amount'],
@@ -989,6 +1005,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
           type: 'number',
           description: 'Slippage percentage tolerance (default: 0.5%)',
         },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional vault address (0x... or Solana) to execute the swap from',
+        },
       },
       required: ['fromToken', 'toToken', 'amount'],
     },
@@ -1015,6 +1035,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
           type: 'number',
           description: 'Slippage percentage tolerance',
         },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional vault address',
+        },
       },
       required: ['fromToken', 'toToken', 'amount'],
     },
@@ -1030,6 +1054,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         amount: { type: 'number', description: 'Amount of native crypto or payment token to spend' },
         fromToken: { type: 'string', description: 'Payment token symbol (default: ETH)' },
         network: { type: 'string', description: 'Blockchain network (default: sepolia)' },
+        walletAddress: { type: 'string', description: 'Optional vault address to execute purchase from' },
       },
       required: ['token', 'amount'],
     },
@@ -1040,6 +1065,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         amount: { type: 'number', description: 'Amount of payment token to spend' },
         fromToken: { type: 'string', description: 'Payment token symbol' },
         network: { type: 'string', description: 'Blockchain network' },
+        walletAddress: { type: 'string', description: 'Optional vault address' },
       },
       required: ['token', 'amount'],
     },
@@ -1055,6 +1081,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         amount: { type: 'number', description: 'Amount of token to sell' },
         toToken: { type: 'string', description: 'Destination asset symbol (default: ETH)' },
         network: { type: 'string', description: 'Blockchain network (default: sepolia)' },
+        walletAddress: { type: 'string', description: 'Optional vault address to sell from' },
       },
       required: ['token', 'amount'],
     },
@@ -1065,6 +1092,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         amount: { type: 'number', description: 'Amount to sell' },
         toToken: { type: 'string', description: 'Destination asset symbol' },
         network: { type: 'string', description: 'Blockchain network' },
+        walletAddress: { type: 'string', description: 'Optional vault address' },
       },
       required: ['token', 'amount'],
     },
@@ -1123,7 +1151,11 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         },
         network: {
           type: 'string',
-          description: 'Target EVM network: sepolia, ethereum, base, polygon, arbitrum, bsc',
+          description: 'Target EVM network: sepolia, ethereum, base, polygon, arbitrum, bsc. Default: sepolia',
+        },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional deployer vault address (0x...) to deploy this smart contract from',
         },
       },
       required: ['contractName'],
@@ -1180,6 +1212,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
           type: 'string',
           description: 'Target EVM network.',
         },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional deployer vault address',
+        },
       },
       required: ['contractName'],
     },
@@ -1198,6 +1234,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         tokenId: { type: 'number', description: 'Optional specific token ID for NFT minting' },
         isNft: { type: 'boolean', description: 'Set to true if minting an ERC-721 NFT' },
         network: { type: 'string', description: 'Target blockchain: sepolia, base, ethereum, polygon, arbitrum, bsc' },
+        walletAddress: { type: 'string', description: 'Optional minter vault address (0x...) to execute mint from' },
       },
       required: ['contractAddress'],
     },
@@ -1211,6 +1248,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         tokenId: { type: 'number', description: 'Token ID' },
         isNft: { type: 'boolean', description: 'Is NFT' },
         network: { type: 'string', description: 'Target network' },
+        walletAddress: { type: 'string', description: 'Optional minter vault address' },
       },
       required: ['contractAddress'],
     },
@@ -1227,6 +1265,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         uri: { type: 'string', description: 'Metadata URI for the NFT (e.g. ipfs://... or https://...)' },
         tokenId: { type: 'number', description: 'Optional specific token ID to mint' },
         network: { type: 'string', description: 'Target blockchain network (default: sepolia)' },
+        walletAddress: { type: 'string', description: 'Optional minter vault address (0x...) to mint from' },
       },
       required: ['contractAddress', 'recipientAddress'],
     },
@@ -1238,8 +1277,40 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         uri: { type: 'string', description: 'Metadata URI' },
         tokenId: { type: 'number', description: 'Token ID' },
         network: { type: 'string', description: 'Target network' },
+        walletAddress: { type: 'string', description: 'Optional minter vault address' },
       },
       required: ['contractAddress', 'recipientAddress'],
+    },
+  },
+  {
+    name: 'transfer_nft',
+    description: 'Transfers an NFT (ERC-721 or ERC-1155) from the connected vault to a recipient address. Stages a SIGNATURE_REQUIRED request — no funds move until the user signs the approval.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        contractAddress: { type: 'string', description: '0x-prefixed address of the ERC-721 or ERC-1155 NFT contract' },
+        tokenId: { type: 'string', description: 'Token ID of the NFT to transfer (as a string or number)' },
+        recipientAddress: { type: 'string', description: '0x-prefixed recipient wallet address' },
+        walletAddress: { type: 'string', description: 'Optional sender vault address (0x...) — defaults to connected wallet' },
+        network: { type: 'string', description: 'Target network (e.g. sepolia, ethereum, base, polygon). Defaults to sepolia.' },
+        standard: { type: 'string', description: 'NFT standard: "ERC-721" or "ERC-1155". Defaults to ERC-721.', enum: ['ERC-721', 'ERC-1155'] },
+        amount: { type: 'string', description: 'Amount to transfer (ERC-1155 only, default "1")' },
+      },
+      required: ['contractAddress', 'tokenId', 'recipientAddress'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        contractAddress: { type: 'string', description: 'NFT contract address' },
+        tokenId: { type: 'string', description: 'Token ID' },
+        recipientAddress: { type: 'string', description: 'Recipient address' },
+        walletAddress: { type: 'string', description: 'Sender vault address' },
+        network: { type: 'string', description: 'Target network' },
+        standard: { type: 'string', description: 'ERC-721 or ERC-1155' },
+        amount: { type: 'string', description: 'Amount (ERC-1155)' },
+      },
+      required: ['contractAddress', 'tokenId', 'recipientAddress'],
     },
   },
   {
@@ -1269,6 +1340,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
           type: 'string',
           description: 'Summary of the transaction or contract call',
         },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional sender vault address (0x...) to stage transaction for',
+        },
       },
       required: ['recipient', 'amount'],
     },
@@ -1294,6 +1369,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         contractSummary: {
           type: 'string',
           description: 'Summary of the transaction',
+        },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional sender vault address',
         },
       },
       required: ['recipient', 'amount'],
@@ -1386,11 +1465,15 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
   },
   {
     name: 'get_wallet_info',
-    description: 'Retrieves current vault address, active chain, MPC provider status, and account metadata.',
+    description: 'Retrieves current vault address, active chain, MPC provider status, and account metadata. If no session wallet is connected, pass walletAddress to inspect an explicit address.',
     annotations: { readOnly: true, destructive: false, confirmationRequired: false },
     inputSchema: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address to inspect',
+        },
         chain: {
           type: 'string',
           description: 'Optional chain filter (ethereum, solana, bitcoin, polygon, arbitrum, bsc, base)',
@@ -1400,6 +1483,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address',
+        },
         chain: {
           type: 'string',
           description: 'Optional chain filter',
@@ -1414,6 +1501,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address to fetch portfolio for',
+        },
         hideZeroBalances: {
           type: 'boolean',
           description: 'Set to true to omit assets with 0 balance',
@@ -1423,6 +1514,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address',
+        },
         hideZeroBalances: {
           type: 'boolean',
           description: 'Set to true to omit assets with 0 balance',
@@ -1441,6 +1536,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
           type: 'string',
           description: 'Token ticker symbol (e.g. ETH, USDT, SOL, BTC, UNI, LINK)',
         },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address to check token balance for',
+        },
       },
       required: ['symbol'],
     },
@@ -1450,6 +1549,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         symbol: {
           type: 'string',
           description: 'Token ticker symbol',
+        },
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address',
         },
       },
       required: ['symbol'],
@@ -1462,6 +1565,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address to query transaction history for',
+        },
         limit: {
           type: 'number',
           description: 'Maximum number of transaction records to return (default 10)',
@@ -1475,6 +1582,10 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
+        walletAddress: {
+          type: 'string',
+          description: 'Optional 0x EVM or Solana wallet address',
+        },
         limit: {
           type: 'number',
           description: 'Maximum number of transaction records to return',
@@ -1648,6 +1759,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         triggerPrice: { type: 'number', description: 'USD price that triggers the order execution' },
         amount: { type: 'number', description: 'Amount of tokens to sell when triggered' },
         chain: { type: 'string', description: 'Blockchain: sepolia, base, ethereum, polygon, arbitrum (default: sepolia)' },
+        walletAddress: { type: 'string', description: 'Optional vault wallet address (0x...) to configure trade order for' },
       },
       required: ['token', 'orderType', 'triggerPrice', 'amount'],
     },
@@ -1659,6 +1771,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         triggerPrice: { type: 'number', description: 'USD trigger price' },
         amount: { type: 'number', description: 'Token amount to trade' },
         chain: { type: 'string', description: 'Blockchain network' },
+        walletAddress: { type: 'string', description: 'Optional vault wallet address' },
       },
       required: ['token', 'orderType', 'triggerPrice', 'amount'],
     },
@@ -1671,12 +1784,14 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       type: 'object',
       properties: {
         status: { type: 'string', description: 'Filter by status: ACTIVE, EXECUTED, CANCELLED, FAILED, or "all"' },
+        walletAddress: { type: 'string', description: 'Optional vault wallet address (0x...) to query orders for' },
       },
     },
     parameters: {
       type: 'object',
       properties: {
         status: { type: 'string', description: 'Filter by order status' },
+        walletAddress: { type: 'string', description: 'Optional vault wallet address' },
       },
     },
   },
@@ -1688,6 +1803,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       type: 'object',
       properties: {
         orderId: { type: 'string', description: 'UUID of the trade order to cancel' },
+        walletAddress: { type: 'string', description: 'Optional vault wallet address (0x...) associated with order' },
       },
       required: ['orderId'],
     },
@@ -1695,6 +1811,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
       type: 'object',
       properties: {
         orderId: { type: 'string', description: 'UUID of the trade order to cancel' },
+        walletAddress: { type: 'string', description: 'Optional vault wallet address' },
       },
       required: ['orderId'],
     },
@@ -1727,6 +1844,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         contractName: { type: 'string', description: 'Name of the smart contract' },
         sourceCode: { type: 'string', description: 'Solidity smart contract source code' },
         network: { type: 'string', description: 'Blockchain network: sepolia, ethereum, base, polygon, arbitrum' },
+        walletAddress: { type: 'string', description: 'Optional deployer wallet address (0x...)' },
       },
       required: ['contractAddress', 'contractName'],
     },
@@ -1737,6 +1855,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         contractName: { type: 'string', description: 'Contract name' },
         sourceCode: { type: 'string', description: 'Solidity source code' },
         network: { type: 'string', description: 'Target network' },
+        walletAddress: { type: 'string', description: 'Optional deployer wallet address' },
       },
       required: ['contractAddress', 'contractName'],
     },
@@ -1753,6 +1872,7 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
         symbol: { type: 'string', description: 'Token ticker symbol' },
         contractType: { type: 'string', description: 'Template category (erc20, erc721, nft, custom)' },
         totalSupply: { type: 'number', description: 'Total token supply' },
+        walletAddress: { type: 'string', description: 'Optional creator/owner wallet address (0x...)' },
       },
       required: ['prompt'],
     },

@@ -1283,6 +1283,37 @@ export const MCP_TOOLS: MCPToolDefinition[] = [
     },
   },
   {
+    name: 'transfer_nft',
+    description: 'Transfers an NFT (ERC-721 or ERC-1155) from the connected vault to a recipient address. Stages a SIGNATURE_REQUIRED request — no funds move until the user signs the approval.',
+    annotations: { readOnly: false, destructive: true, confirmationRequired: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        contractAddress: { type: 'string', description: '0x-prefixed address of the ERC-721 or ERC-1155 NFT contract' },
+        tokenId: { type: 'string', description: 'Token ID of the NFT to transfer (as a string or number)' },
+        recipientAddress: { type: 'string', description: '0x-prefixed recipient wallet address' },
+        walletAddress: { type: 'string', description: 'Optional sender vault address (0x...) — defaults to connected wallet' },
+        network: { type: 'string', description: 'Target network (e.g. sepolia, ethereum, base, polygon). Defaults to sepolia.' },
+        standard: { type: 'string', description: 'NFT standard: "ERC-721" or "ERC-1155". Defaults to ERC-721.', enum: ['ERC-721', 'ERC-1155'] },
+        amount: { type: 'string', description: 'Amount to transfer (ERC-1155 only, default "1")' },
+      },
+      required: ['contractAddress', 'tokenId', 'recipientAddress'],
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        contractAddress: { type: 'string', description: 'NFT contract address' },
+        tokenId: { type: 'string', description: 'Token ID' },
+        recipientAddress: { type: 'string', description: 'Recipient address' },
+        walletAddress: { type: 'string', description: 'Sender vault address' },
+        network: { type: 'string', description: 'Target network' },
+        standard: { type: 'string', description: 'ERC-721 or ERC-1155' },
+        amount: { type: 'string', description: 'Amount (ERC-1155)' },
+      },
+      required: ['contractAddress', 'tokenId', 'recipientAddress'],
+    },
+  },
+  {
     name: 'create_transaction_request',
     description: 'Prepares an unsigned transaction request, calculates gas fees & total cost, generates a single-use approval token and WebAuthn Passkey challenge. Returns an approval URL for human confirmation.',
     annotations: { readOnly: false, destructive: false, confirmationRequired: false },

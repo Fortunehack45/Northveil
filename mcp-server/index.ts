@@ -1031,8 +1031,10 @@ const DEXSCREENER_CHAINS: Record<string, string> = {
 function formatCryptoAmount(num: number | string): string {
   const val = typeof num === 'string' ? parseFloat(num) : num;
   if (isNaN(val) || val === 0) return '0.00';
-  if (val < 0.000001) return val.toFixed(10).replace(/0+$/, '');
-  if (val < 0.01) return val.toFixed(8).replace(/0+$/, '');
+  // Handle dust/micro balances like 0.00000006 (6e-8) with full precision
+  if (val > 0 && val < 0.0000001) return val.toFixed(12).replace(/\.?0+$/, '') || val.toExponential(4);
+  if (val < 0.000001) return val.toFixed(10).replace(/\.?0+$/, '');
+  if (val < 0.01) return val.toFixed(8).replace(/\.?0+$/, '');
   return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 });
 }
 
@@ -3635,17 +3637,61 @@ app.get(['/approve', '/approve-transaction', '/approvals'], async (req: Request,
   res.send(html);
 });
 
+// CORS pre-flight for approval endpoints
+app.options(['/api/v1/approvals/execute', '/api/approve', '/api/v1/approve'], (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, x-wallet-address, Origin, Accept');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  return res.status(204).send();
+});
+
 // REST API for executing approvals & broadcasting signed transactions
 app.post(['/api/v1/approvals/execute', '/api/approve', '/api/v1/approve'], async (req: Request, res: Response) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, x-wallet-address, Origin, Accept');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   try {
     const token = (req.body?.token || req.body?.approvalToken || req.body?.requestId || req.body?.approval_token || req.query?.token || '').toString().trim();
     const signedTransaction = req.body?.signedTransaction || req.body?.signed_transaction || req.body?.rawSignedTx;
     const passkeyAssertion = req.body?.passkeyAssertion;
+    // explicitTxHash: a real on-chain tx hash already broadcast by MetaMask / user wallet
+    const explicitTxHash = (req.body?.explicitTxHash || req.body?.txHash || req.body?.tx_hash || req.query?.txHash || '').toString().trim();
 
-    if (!token && !signedTransaction) {
+    if (!token && !signedTransaction && !explicitTxHash) {
       return res.status(400).json({ success: false, error: 'Missing approval token or signed transaction parameter.' });
+    }
+
+    // If user already broadcast via MetaMask and provides the real tx hash — record it and mark confirmed
+    if (explicitTxHash && explicitTxHash.startsWith('0x') && explicitTxHash.length === 66) {
+      // Persist to in-memory store if we have the token
+      if (token && inMemoryTxRequests.has(token)) {
+        const staged = inMemoryTxRequests.get(token);
+        if (staged) {
+          staged.status = 'confirmed';
+          staged.txHash = explicitTxHash;
+          inMemoryTxRequests.set(token, staged);
+        }
+      }
+      // Persist to Supabase
+      try {
+        if (token && supabase && typeof supabase.from === 'function') {
+          await supabase.from('transaction_requests').update({
+            status: 'CONFIRMED',
+            tx_hash: explicitTxHash,
+            updated_at: new Date().toISOString(),
+          }).or(`approval_token.eq.${token},request_id.eq.${token}`);
+        }
+      } catch (dbErr) {
+        console.warn('[Approval Confirm] Supabase update note:', dbErr);
+      }
+      return res.json({
+        success: true,
+        status: 'CONFIRMED',
+        txHash: explicitTxHash,
+        message: 'Transaction confirmed. Your on-chain transaction hash has been recorded.',
+        explorerUrl: `https://sepolia.etherscan.io/tx/${explicitTxHash}`,
+      });
     }
 
     if (signedTransaction) {
@@ -3664,6 +3710,7 @@ app.post(['/api/v1/approvals/execute', '/api/approve', '/api/v1/approve'], async
     return res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 // Non-Custodial REST Endpoint: Prepare Transaction Request
 app.post(['/api/v1/transactions/prepare', '/api/transactions/prepare'], async (req: Request, res: Response) => {
@@ -5087,22 +5134,36 @@ const WALLET_SCOPED_TOOLS = new Set([
   'create_transaction_request', 'approve_transaction', 'reject_transaction', 'approve_transaction_with_passkey',
   'set_autonomous_spending_scope', 'set_autonomous_scope', 'activate_kill_switch', 'deactivate_kill_switch',
   'deploy_smart_contract', 'mint_tokens', 'reserve_tokens', 'set_trade_order', 'cancel_trade_order',
+  'transfer_nft', 'mint_nft',
 ]);
 
 export async function executeRealTool(name: string, args: any, walletAddress: string, req?: Request) {
   const toolName = name;
 
-  const explicitWallet = (args?.walletAddress || args?.userWallet || args?.ownerAddress || args?.fromAddress || args?.deployerAddress || args?.creatorAddress || args?.recipientAddress || args?.recipient || args?.targetAddress || args?.toAddress || args?.from || args?.address || args?.account || args?.solanaAddress || '').toString().trim();
-  const isExplicitEvm = explicitWallet.toLowerCase().startsWith('0x') && explicitWallet.length === 42;
-  const isExplicitSol = !explicitWallet.startsWith('0x') && explicitWallet.length >= 32 && explicitWallet.length <= 44;
+  // Only use args fields that unambiguously identify the SENDER / OWNER vault.
+  // Deliberately exclude: recipientAddress, recipient, toAddress, targetAddress, to
+  // — those are destinations, not the caller's vault.
+  const senderWalletRaw = (
+    args?.walletAddress || args?.userWallet || args?.ownerAddress ||
+    args?.fromAddress || args?.deployerAddress || args?.creatorAddress ||
+    args?.from || args?.address || args?.account || args?.solanaAddress || ''
+  ).toString().trim();
+
+  const isExplicitEvm = senderWalletRaw.toLowerCase().startsWith('0x') && senderWalletRaw.length === 42;
+  const isExplicitSol = !senderWalletRaw.startsWith('0x') && senderWalletRaw.length >= 32 && senderWalletRaw.length <= 44;
 
   const rawWalletStr = typeof walletAddress === 'string'
     ? walletAddress
     : (walletAddress && typeof (walletAddress as any).walletAddress === 'string' ? (walletAddress as any).walletAddress : '');
 
+  // Priority order:
+  // 1. Explicit sender field from args (walletAddress=, from=, ownerAddress=, etc.)
+  // 2. Session-bound wallet (from authenticateClient / JWT / ?wallet_address= query param)
+  // 3. NORTHVEIL_WALLET_ADDRESS env var
+  // 4. First in-memory MPC vault (lowest priority — stale if user switched wallets)
   let cleanAddress = (isExplicitEvm || isExplicitSol)
-    ? (isExplicitEvm ? explicitWallet.toLowerCase() : explicitWallet)
-    : String(rawWalletStr || '').trim();
+    ? (isExplicitEvm ? senderWalletRaw.toLowerCase() : senderWalletRaw)
+    : String(rawWalletStr || '').trim().toLowerCase();
 
   if (!cleanAddress && process.env.NORTHVEIL_WALLET_ADDRESS) {
     const envAddr = process.env.NORTHVEIL_WALLET_ADDRESS.trim();
@@ -5111,8 +5172,8 @@ export async function executeRealTool(name: string, args: any, walletAddress: st
     }
   }
 
-  // If still not resolved, check in-memory registered MPC vaults
-  if (!cleanAddress && inMemoryMpcWallets && inMemoryMpcWallets.size > 0) {
+  // Only fall back to inMemoryMpcWallets if no session wallet was provided at all
+  if (!cleanAddress && !rawWalletStr && inMemoryMpcWallets && inMemoryMpcWallets.size > 0) {
     const firstVault = Array.from(inMemoryMpcWallets.values())[0];
     if (firstVault?.walletAddress && ethers.isAddress(firstVault.walletAddress)) {
       cleanAddress = firstVault.walletAddress.toLowerCase();
@@ -5181,7 +5242,7 @@ To compile and stage this on-chain transaction:
   }
 
   // Fast lazy-loaded balance fetching with 15s in-memory TTL cache & 2.5s RPC timeout protection
-  const isBalanceQueryTool = ['get_portfolio', 'get_wallet_info', 'get_wallet_balance', 'get_balance', 'get_token_balance', 'get_nft_gallery'].includes(name);
+  const isBalanceQueryTool = ['get_portfolio', 'get_wallet_info', 'get_wallet_balance', 'get_balance', 'get_token_balance', 'get_nft_gallery', 'get_balances'].includes(name);
 
   let mainnetEth = 0;
   let sepoliaEth = 0;
@@ -5310,15 +5371,17 @@ To compile and stage this on-chain transaction:
 
   switch (toolName) {
     case 'northveil_health': {
+      const activeWallet = cleanAddress || walletAddress || '';
       return {
         ok: true,
         serverVersion: '1.0.0',
         authStatus: 'authenticated',
         signerStatus: 'online',
         defaultNetwork: 'base',
+        connectedWallet: activeWallet || null,
         supportedChains: ['base', 'sepolia', 'ethereum', 'polygon', 'arbitrum', 'bsc', 'solana'],
         timestamp: new Date().toISOString(),
-        formattedMarkdown: `### 🟢 NORTHVEIL MCP SERVER HEALTH\n\n> **Status**: **ONLINE (Operational)**  \n> **Server Version**: \`1.0.0\`  \n> **Auth Status**: \`AUTHENTICATED\`  \n> **Device Signer**: 🟢 **ONLINE**  \n> **Default Chain**: \`Base Mainnet (8453)\`  \n> **Supported Chains**: \`base\`, \`sepolia\`, \`ethereum\`, \`polygon\`, \`arbitrum\`, \`bsc\`, \`solana\``,
+        formattedMarkdown: `### 🟢 NORTHVEIL MCP SERVER HEALTH\n\n> **Status**: **ONLINE (Operational)**  \n> **Server Version**: \`1.0.0\`  \n> **Auth Status**: \`AUTHENTICATED\`  \n> **Device Signer**: 🟢 **ONLINE**  \n> **Connected Vault**: \`${activeWallet || 'Not connected — pass wallet_address to bind'}\`  \n> **Default Chain**: \`Base Mainnet (8453)\`  \n> **Supported Chains**: \`base\`, \`sepolia\`, \`ethereum\`, \`polygon\`, \`arbitrum\`, \`bsc\`, \`solana\``,
       };
     }
 
@@ -9998,6 +10061,133 @@ ${isNftContract ? `> **Metadata URI**: \`${metadataUri}\`  \n` : ''}> **Network*
         unsignedPayload: prep.unsignedTransaction,
         unsignedSerialized: prep.unsignedSerialized,
         expiresAt: prep.expiresAt,
+      };
+    }
+
+    case 'transfer_nft': {
+      const nftContract = (args.contractAddress || args.contract || '').trim();
+      const nftTokenId = String(args.tokenId ?? args.token_id ?? '0').trim();
+      const nftRecipient = (args.recipientAddress || args.recipient || args.to || '').trim().toLowerCase();
+      const nftNetwork = (args.network || args.chain || 'sepolia').toLowerCase();
+      const nftStandard = (args.standard || args.type || 'ERC-721').toUpperCase().includes('1155') ? 'ERC-1155' : 'ERC-721';
+      const nftAmount = String(args.amount || '1');
+      const senderAddr = cleanAddress;
+
+      if (!nftContract || !nftContract.startsWith('0x') || nftContract.length !== 42) {
+        throw new Error('Valid NFT contract address (0x...) is required for transfer_nft');
+      }
+      if (!nftRecipient || !nftRecipient.startsWith('0x') || nftRecipient.length !== 42) {
+        throw new Error('Valid recipient address (0x...) is required for transfer_nft');
+      }
+      if (!senderAddr) {
+        return {
+          ok: false,
+          error: 'MISSING_WALLET_ADDRESS',
+          message: 'Please connect your wallet first. Pass walletAddress in your request or configure ?wallet_address=0x... in your MCP URL.',
+        };
+      }
+
+      // Resolve chainId + explorer
+      let nftChainName = 'Ethereum Sepolia Testnet';
+      let nftChainId = 11155111;
+      let nftExplorer = 'https://sepolia.etherscan.io';
+      if (nftNetwork === 'ethereum' || nftNetwork === 'mainnet') {
+        nftChainName = 'Ethereum Mainnet'; nftChainId = 1; nftExplorer = 'https://etherscan.io';
+      } else if (nftNetwork === 'polygon' || nftNetwork === 'matic') {
+        nftChainName = 'Polygon Mainnet'; nftChainId = 137; nftExplorer = 'https://polygonscan.com';
+      } else if (nftNetwork === 'base') {
+        nftChainName = 'Base Mainnet'; nftChainId = 8453; nftExplorer = 'https://basescan.org';
+      } else if (nftNetwork === 'arbitrum') {
+        nftChainName = 'Arbitrum One'; nftChainId = 42161; nftExplorer = 'https://arbiscan.io';
+      } else if (nftNetwork === 'bsc' || nftNetwork === 'binance') {
+        nftChainName = 'BNB Smart Chain'; nftChainId = 56; nftExplorer = 'https://bscscan.com';
+      }
+
+      // Build calldata
+      let nftCalldata = '0x';
+      try {
+        if (nftStandard === 'ERC-1155') {
+          const iface = new ethers.Interface([
+            'function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data)'
+          ]);
+          nftCalldata = iface.encodeFunctionData('safeTransferFrom', [
+            senderAddr, nftRecipient, BigInt(nftTokenId), BigInt(nftAmount), '0x'
+          ]);
+        } else {
+          // ERC-721
+          const iface = new ethers.Interface([
+            'function transferFrom(address from, address to, uint256 tokenId)',
+            'function safeTransferFrom(address from, address to, uint256 tokenId)'
+          ]);
+          try {
+            nftCalldata = iface.encodeFunctionData('safeTransferFrom(address,address,uint256)', [
+              senderAddr, nftRecipient, BigInt(nftTokenId)
+            ]);
+          } catch {
+            nftCalldata = iface.encodeFunctionData('transferFrom', [
+              senderAddr, nftRecipient, BigInt(nftTokenId)
+            ]);
+          }
+        }
+      } catch (encErr: any) {
+        throw new Error(`Failed to encode NFT transfer calldata: ${encErr.message}`);
+      }
+
+      // Stage the transaction
+      const nftPrep = await prepareTransactionRequest({
+        walletAddress: senderAddr,
+        recipient: nftContract,
+        amount: 0,
+        asset: nftStandard,
+        network: nftNetwork,
+        chainId: nftChainId,
+        calldata: nftCalldata,
+        gasLimit: 120000,
+        operationType: 'CONTRACT_CALL',
+        userId: 'default_user',
+      });
+
+      const host = req?.headers?.host || 'mcp.northveil.xyz';
+      const proto = req?.headers?.['x-forwarded-proto'] || 'https';
+      const approvalUrl = `${proto}://${host}/approve?token=${nftPrep.approvalToken}`;
+
+      return {
+        formattedMarkdown: `
+### 🖼️ NFT TRANSFER PREPARED (SIGNATURE REQUIRED)
+
+| Field | Value |
+|:---|:---|
+| **Action** | ${nftStandard} NFT Transfer |
+| **Contract** | \`${nftContract}\` |
+| **Token ID** | \`#${nftTokenId}\` |
+| **From (Sender)** | \`${senderAddr}\` |
+| **To (Recipient)** | \`${nftRecipient}\` |
+${nftStandard === 'ERC-1155' ? `| **Amount** | \`${nftAmount}\` |\n` : ''}| **Network** | **${nftChainName}** (Chain ID: \`${nftChainId}\`) |
+| **Request ID** | \`${nftPrep.requestId}\` |
+| **Approval Token** | \`${nftPrep.approvalToken}\` |
+| **Status** | 🟡 **Awaiting Your Signature** |
+
+**👆 To confirm this NFT transfer, open the approval link:**
+> [Sign & Broadcast NFT Transfer](${approvalUrl})
+
+*No assets will move until you sign and approve this transaction.*
+`,
+        status: 'SIGNATURE_REQUIRED',
+        requestId: nftPrep.requestId,
+        approvalToken: nftPrep.approvalToken,
+        approvalUrl,
+        walletAddress: senderAddr,
+        contractAddress: nftContract,
+        tokenId: nftTokenId,
+        recipientAddress: nftRecipient,
+        standard: nftStandard,
+        amount: nftAmount,
+        network: nftChainName,
+        chainId: nftChainId,
+        nonce: nftPrep.nonce,
+        unsignedPayload: nftPrep.unsignedTransaction,
+        unsignedSerialized: nftPrep.unsignedSerialized,
+        expiresAt: nftPrep.expiresAt,
       };
     }
 
