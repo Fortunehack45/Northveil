@@ -409,19 +409,41 @@ export class MpcWalletService {
   }> {
     const effectiveUserId = userId || this.getUserId();
     const token = this.getSessionToken();
-    const res = await fetch(`${this.getBaseUrl()}/api/v1/dashboard/approvals/${encodeURIComponent(requestIdOrToken)}/approve`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({
-        userId: effectiveUserId,
-        passkeyAssertion,
-        signedTransaction,
-        txHash,
-      }),
+    const endpoint = `/api/v1/dashboard/approvals/${encodeURIComponent(requestIdOrToken)}/approve`;
+    const payload = JSON.stringify({
+      userId: effectiveUserId,
+      passkeyAssertion,
+      signedTransaction,
+      txHash,
     });
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    let res: Response;
+    try {
+      res = await fetch(`${this.getBaseUrl()}${endpoint}`, {
+        method: 'POST',
+        headers,
+        body: payload,
+      });
+    } catch (fetchErr) {
+      // Fallback to relative URL if cross-origin fetch had a network or CORS issue
+      if (typeof window !== 'undefined') {
+        try {
+          res = await fetch(endpoint, {
+            method: 'POST',
+            headers,
+            body: payload,
+          });
+        } catch {
+          throw fetchErr;
+        }
+      } else {
+        throw fetchErr;
+      }
+    }
 
     const json = await res.json();
     if (!res.ok || !json.success) {

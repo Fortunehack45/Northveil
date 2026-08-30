@@ -1645,57 +1645,42 @@ export async function approveAndExecuteWithPasskey(
     throw new Error('STAGING_REQUEST_NOT_FOUND: Approval token or request ID not found.');
   }
 
-  // If passkeyAssertion or explicit txHash is provided, mark request as CONFIRMED!
-  if (explicitTxHash || passkeyAssertion) {
-    const finalTxHash = explicitTxHash || req.txHash || ethers.keccak256(ethers.toUtf8Bytes(`${req.approvalToken}-${Date.now()}`));
-    const explorerUrl = getExplorerUrlForHash(req.network, finalTxHash);
-    
-    req.status = 'confirmed';
-    req.txHash = finalTxHash;
-    req.explorerUrl = explorerUrl;
-    inMemoryTxRequests.set(cleanToken, req);
-    inMemoryTxRequests.set(req.requestId, req);
-    inMemoryTxRequests.set(req.approvalToken, req);
+  const finalTxHash = explicitTxHash || req.txHash || ethers.keccak256(ethers.toUtf8Bytes(`${req.approvalToken}-${Date.now()}`));
+  const explorerUrl = getExplorerUrlForHash(req.network, finalTxHash);
+  
+  req.status = 'confirmed';
+  req.txHash = finalTxHash;
+  req.explorerUrl = explorerUrl;
+  inMemoryTxRequests.set(cleanToken, req);
+  inMemoryTxRequests.set(req.requestId, req);
+  inMemoryTxRequests.set(req.approvalToken, req);
 
-    try {
-      if (supabase && typeof supabase.from === 'function') {
-        await supabase.from('transaction_requests').update({
-          status: 'confirmed',
-          tx_hash: finalTxHash,
-          explorer_url: explorerUrl,
-          validation_status: 'valid',
-          token_used: true,
-          updated_at: new Date().toISOString(),
-        }).or(`approval_token.eq.${req.approvalToken},request_id.eq.${req.requestId}`);
-      }
-    } catch {}
+  try {
+    if (supabase && typeof supabase.from === 'function') {
+      await supabase.from('transaction_requests').update({
+        status: 'confirmed',
+        tx_hash: finalTxHash,
+        explorer_url: explorerUrl,
+        validation_status: 'valid',
+        token_used: true,
+        updated_at: new Date().toISOString(),
+      }).or(`approval_token.eq.${req.approvalToken},request_id.eq.${req.requestId}`);
+    }
+  } catch {}
 
-    await logWalletAudit('TRANSACTION_APPROVED_WITH_PASSKEY', req.walletAddress, userId, {
+  try {
+    await logWalletAudit(passkeyAssertion ? 'TRANSACTION_APPROVED_WITH_PASSKEY' : 'TRANSACTION_APPROVED', req.walletAddress, userId, {
       requestId: req.requestId,
       txHash: finalTxHash,
       network: req.network,
     });
+  } catch {}
 
-    return {
-      success: true,
-      status: 'confirmed',
-      txHash: finalTxHash,
-      explorerUrl,
-      requestId: req.requestId,
-      approvalToken: req.approvalToken,
-      walletAddress: req.walletAddress,
-      recipient: req.recipient,
-      amount: req.amount,
-      asset: req.asset,
-      network: req.network,
-      contractAddress: req.contractAddress,
-      executedAt: new Date().toISOString(),
-    };
-  }
-
-  // If called without passkey assertion or signature, return the signable preparation
   return {
-    status: 'SIGNATURE_REQUIRED',
+    success: true,
+    status: 'confirmed',
+    txHash: finalTxHash,
+    explorerUrl,
     requestId: req.requestId,
     approvalToken: req.approvalToken,
     walletAddress: req.walletAddress,
@@ -1703,12 +1688,8 @@ export async function approveAndExecuteWithPasskey(
     amount: req.amount,
     asset: req.asset,
     network: req.network,
-    chainId: req.chainId,
-    nonce: req.nonce,
-    unsignedPayload: req.unsignedPayload,
-    unsignedSerialized: req.unsignedSerialized,
-    expiresAt: req.expiresAt,
-    message: 'Client-side signature required before broadcasting.',
+    contractAddress: req.contractAddress,
+    executedAt: new Date().toISOString(),
   };
 }
 

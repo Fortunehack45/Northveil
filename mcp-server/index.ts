@@ -4246,24 +4246,34 @@ app.get(['/api/v1/dashboard/approvals/pending', '/api/v1/dashboard/approvals'], 
   });
 });
 
-// 5. APPROVE TRANSACTION (WITH PASKEY BIOMETRIC CONFIRMATION)
-app.post('/api/v1/dashboard/approvals/:id/approve', async (req: Request, res: Response) => {
+// 5. APPROVE TRANSACTION (WITH PASSKEY / NON-CUSTODIAL BIOMETRIC CONFIRMATION)
+app.options(['/api/v1/dashboard/approvals/:id/approve', '/api/v1/dashboard/approvals/:id/reject', '/api/v1/dashboard/approvals/:id/broadcast', '/api/v1/dashboard/approvals', '/api/v1/approvals/:id/approve', '/api/v1/approvals/:id/reject'], (req: Request, res: Response) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, x-wallet-address, Origin, Accept');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  return res.status(204).send();
+});
+
+app.post(['/api/v1/dashboard/approvals/:id/approve', '/api/v1/approvals/:id/approve'], async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, x-wallet-address, Origin, Accept');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   const { id } = req.params;
   const { passkeyAssertion, userId = 'default_user', signedTransaction, txHash, explicitTxHash } = req.body || {};
   try {
     const result = await approveAndExecuteWithPasskey(id, passkeyAssertion, userId, signedTransaction, txHash || explicitTxHash);
-    return res.json({ success: true, result });
+    return res.json({ success: true, ...result, result });
   } catch (err: any) {
     return res.status(400).json({ success: false, error: err.message });
   }
 });
 
 // 5b. BROADCAST CLIENT-SIGNED TRANSACTION
-app.post('/api/v1/dashboard/approvals/:id/broadcast', async (req: Request, res: Response) => {
+app.post(['/api/v1/dashboard/approvals/:id/broadcast', '/api/v1/approvals/:id/broadcast'], async (req: Request, res: Response) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, x-wallet-address, Origin, Accept');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   const { id } = req.params;
   const { signedTransaction, passkeyAssertion, userId = 'default_user' } = req.body || {};
   try {

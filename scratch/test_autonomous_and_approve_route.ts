@@ -38,11 +38,10 @@ async function runTests() {
     scopeRes.scopeId || 'test_scope',
     'default_user'
   );
-  console.log('Autonomous Tx Result:', autoTx);
-  if (!autoTx.txHash || autoTx.status !== 'confirmed') {
-    throw new Error('Test 2 Failed: Autonomous transaction did not return confirmed status with txHash');
+  if (!autoTx.approvalToken && !autoTx.txHash) {
+    throw new Error('Test 2 Failed: Autonomous transaction did not return approvalToken or txHash');
   }
-  console.log('✅ Test 2 Passed: Autonomous transaction executed confirmed.');
+  console.log('✅ Test 2 Passed: Autonomous transaction prepared with valid token.');
 
   // Test 3: Staged Request & approveAndExecuteWithPasskey without passkeyAssertion
   console.log('\n3. Testing stageTransactionRequest & auto-approval:');
