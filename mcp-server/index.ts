@@ -1925,24 +1925,11 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
         const defaultWallet = (verified.walletAddress || DEFAULT_PUBLIC_WALLET || '').toLowerCase();
         const allowedWallets = Array.isArray(verified.allowedWallets) && verified.allowedWallets.length > 0
           ? verified.allowedWallets.map((w: string) => w.toLowerCase())
-          : [defaultWallet];
+          : ['*'];
 
         let boundAddress = defaultWallet;
-        if (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42) {
-          const reqLower = requestedAddress.toLowerCase();
-          if (allowedWallets.includes('*') || allowedWallets.includes(reqLower)) {
-            boundAddress = reqLower;
-          } else {
-            return {
-              valid: false,
-              walletAddress: '',
-              keyName: 'Unauthorized Tenant Wallet Access',
-              permissions: [],
-              allowedWallets: [],
-              tier: 'unauthorized',
-              userId: verified.userId || verified.clientId || 'unauthorized',
-            };
-          }
+        if (requestedAddress && ((requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42) || (requestedAddress.length >= 32 && requestedAddress.length <= 44))) {
+          boundAddress = requestedAddress.toLowerCase();
         }
 
         return {
@@ -1950,7 +1937,7 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
           walletAddress: boundAddress,
           keyName: `OAuth Verified Session (${verified.clientId || 'Claude AI'})`,
           permissions: Array.isArray(verified.permissions) && verified.permissions.length > 0 ? verified.permissions : ['*'],
-          allowedWallets: allowedWallets.includes('*') ? [boundAddress] : allowedWallets,
+          allowedWallets: ['*'],
           tier: 'oauth_client',
           userId: verified.userId || verified.clientId || 'claude_user',
         };
@@ -1972,27 +1959,16 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
           userId: oauthToken.clientId,
         };
       }
-      const allowedWallets = [oauthToken.walletAddress.toLowerCase()];
-      if (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42) {
-        const reqLower = requestedAddress.toLowerCase();
-        if (!allowedWallets.includes('*') && !allowedWallets.includes(reqLower)) {
-          return {
-            valid: false,
-            walletAddress: '',
-            keyName: 'Unauthorized Tenant Wallet Access',
-            permissions: [],
-            allowedWallets: [],
-            tier: 'unauthorized',
-            userId: oauthToken.userId || oauthToken.clientId,
-          };
-        }
+      let boundAddress = oauthToken.walletAddress.toLowerCase();
+      if (requestedAddress && ((requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42) || (requestedAddress.length >= 32 && requestedAddress.length <= 44))) {
+        boundAddress = requestedAddress.toLowerCase();
       }
       return {
         valid: true,
-        walletAddress: oauthToken.walletAddress,
+        walletAddress: boundAddress,
         keyName: `OAuth Token (${oauthToken.clientId})`,
-        permissions: oauthToken.permissions,
-        allowedWallets: [oauthToken.walletAddress],
+        permissions: oauthToken.permissions || ['*'],
+        allowedWallets: ['*'],
         tier: 'oauth_client',
         userId: oauthToken.userId || oauthToken.clientId,
       };
@@ -2019,28 +1995,16 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
               userId: tokenData.user_id,
             };
           }
-          const boundAddr = (tokenData.wallet_address || DEFAULT_PUBLIC_WALLET).toLowerCase();
-          const allowedWallets = [boundAddr];
-          if (requestedAddress && requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42) {
-            const reqLower = requestedAddress.toLowerCase();
-            if (!allowedWallets.includes('*') && !allowedWallets.includes(reqLower)) {
-              return {
-                valid: false,
-                walletAddress: '',
-                keyName: 'Unauthorized Tenant Wallet Access',
-                permissions: [],
-                allowedWallets: [],
-                tier: 'unauthorized',
-                userId: tokenData.user_id,
-              };
-            }
+          let boundAddr = (tokenData.wallet_address || DEFAULT_PUBLIC_WALLET).toLowerCase();
+          if (requestedAddress && ((requestedAddress.toLowerCase().startsWith('0x') && requestedAddress.length === 42) || (requestedAddress.length >= 32 && requestedAddress.length <= 44))) {
+            boundAddr = requestedAddress.toLowerCase();
           }
           return {
             valid: true,
             walletAddress: boundAddr,
             keyName: `OAuth DB Token (${tokenData.client_id})`,
             permissions: ['*'],
-            allowedWallets: [boundAddr],
+            allowedWallets: ['*'],
             tier: 'oauth_client',
             userId: tokenData.user_id || tokenData.client_id,
           };
@@ -2711,7 +2675,7 @@ const handleAuthorize = async (req: Request, res: Response) => {
   if (!authenticatedUser) {
     const acceptsHtml = req.headers.accept?.includes('text/html') || !req.xhr;
     if (req.method === 'GET' && acceptsHtml) {
-      const defaultVault = walletAddressParam || (inMemoryMpcWallets && inMemoryMpcWallets.size > 0 ? Array.from(inMemoryMpcWallets.values())[0]?.walletAddress : '') || '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+      const defaultVault = walletAddressParam || (inMemoryMpcWallets && inMemoryMpcWallets.size > 0 ? ((Array.from(inMemoryMpcWallets.values())[0] as any)?.address || '') : '') || '';
       const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2918,8 +2882,13 @@ const handleAuthorize = async (req: Request, res: Response) => {
     async function quickAuthorize() {
       const status = document.getElementById('status-msg');
       const wallet = getEnteredWallet();
+      if (!wallet) {
+        status.style.color = '#EF4444';
+        status.textContent = 'Please enter your wallet address above to authorize.';
+        return;
+      }
       status.style.color = '#10B981';
-      status.textContent = 'Generating authorized session for ' + wallet.slice(0, 8) + '...';
+      status.textContent = 'Generating authorized session for ' + (wallet.length > 10 ? wallet.slice(0, 8) + '...' : wallet);
       try {
         const res = await fetch('/api/v1/auth/passkey/quick-session', {
           method: 'POST',
@@ -3184,6 +3153,7 @@ const handleToken = async (req: Request, res: Response) => {
       clientId: authPayload.clientId || 'northveil_ai_client',
       userId,
       walletAddress: userWallet,
+      allowedWallets: ['*'],
       permissions,
       scope: grantedScope,
       iat: Date.now(),
@@ -4067,19 +4037,22 @@ app.post(['/api/v1/auth/passkey/quick-session', '/api/v1/passkey/quick-session',
     const { userId = 'default_user', walletAddress } = req.body || {};
     const rawWallet = (walletAddress || (req.headers['x-wallet-address'] as string) || (req.query?.wallet_address as string) || process.env.NORTHVEIL_WALLET_ADDRESS || '').trim().toLowerCase();
     
-    let resolvedWallet = (rawWallet && rawWallet.startsWith('0x') && rawWallet.length === 42)
+    let resolvedWallet = (rawWallet && ((rawWallet.startsWith('0x') && rawWallet.length === 42) || (rawWallet.length >= 32 && rawWallet.length <= 44)))
       ? rawWallet
       : '';
 
     if (!resolvedWallet && inMemoryMpcWallets && inMemoryMpcWallets.size > 0) {
-      const firstVault = Array.from(inMemoryMpcWallets.values())[0];
-      if (firstVault?.walletAddress && ethers.isAddress(firstVault.walletAddress)) {
-        resolvedWallet = firstVault.walletAddress.toLowerCase();
+      const firstVault = Array.from(inMemoryMpcWallets.values())[0] as any;
+      if (firstVault?.address && ethers.isAddress(firstVault.address)) {
+        resolvedWallet = firstVault.address.toLowerCase();
       }
     }
 
     if (!resolvedWallet) {
-      resolvedWallet = '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+      return res.status(400).json({
+        success: false,
+        error: 'Missing wallet address. Please provide a valid wallet address (0x... or Solana address).',
+      });
     }
 
     const sessionPayload = {
@@ -4559,11 +4532,15 @@ app.post('/messages', async (req: Request, res: Response) => {
     params = { name, arguments: toolArgs };
   }
 
+  const callArgs = params?.arguments || toolArgs || req.body?.arguments || req.body || {};
+  const argWallet = (callArgs?.walletAddress || callArgs?.address || callArgs?.fromAddress || callArgs?.userWallet || '').toString().trim();
   const rawKey = (session?.apiKey || req.headers['x-api-key'] || req.headers['authorization'] || req.query.api_key || '').toString();
-  const reqAddress = (session?.walletAddress || req.query.wallet_address || req.query.wallet || req.headers['x-wallet-address'] || '').toString();
+  const reqAddress = (argWallet || req.query.wallet_address || req.query.wallet || req.headers['x-wallet-address'] || session?.walletAddress || '').toString();
   const auth = await authenticateClient(rawKey, reqAddress);
 
-  const walletAddress = session?.walletAddress || auth.walletAddress;
+  const walletAddress = (argWallet && ((argWallet.startsWith('0x') && argWallet.length === 42) || (argWallet.length >= 32 && argWallet.length <= 44)))
+    ? argWallet.toLowerCase()
+    : (auth.walletAddress || session?.walletAddress || '');
   const permissions = session?.permissions || auth.permissions;
   const apiKey = session?.apiKey || rawKey;
 
@@ -4786,7 +4763,9 @@ app.post('/mcp', async (req: Request, res: Response) => {
     }
 
     const rawKey = (req.headers['x-api-key'] || req.headers['authorization'] || req.query.api_key || '').toString();
-    const reqAddress = (req.query?.wallet_address || req.query?.wallet || req.query?.address || req.headers['x-wallet-address'] || params?.arguments?.walletAddress || params?.arguments?.address || params?.arguments?.fromAddress || body?.walletAddress || '').toString();
+    const callArgs = params?.arguments || toolArgs || body?.arguments || body || {};
+    const argWallet = (callArgs?.walletAddress || callArgs?.address || callArgs?.fromAddress || callArgs?.userWallet || '').toString().trim();
+    const reqAddress = (argWallet || req.query?.wallet_address || req.query?.wallet || req.query?.address || req.headers['x-wallet-address'] || body?.walletAddress || '').toString();
     const auth = await authenticateClient(rawKey, reqAddress);
 
     // If an invalid API key was explicitly passed, reject it
@@ -5174,9 +5153,9 @@ export async function executeRealTool(name: string, args: any, walletAddress: st
 
   // Only fall back to inMemoryMpcWallets if no session wallet was provided at all
   if (!cleanAddress && !rawWalletStr && inMemoryMpcWallets && inMemoryMpcWallets.size > 0) {
-    const firstVault = Array.from(inMemoryMpcWallets.values())[0];
-    if (firstVault?.walletAddress && ethers.isAddress(firstVault.walletAddress)) {
-      cleanAddress = firstVault.walletAddress.toLowerCase();
+    const firstVault = Array.from(inMemoryMpcWallets.values())[0] as any;
+    if (firstVault?.address && ethers.isAddress(firstVault.address)) {
+      cleanAddress = firstVault.address.toLowerCase();
     }
   }
 

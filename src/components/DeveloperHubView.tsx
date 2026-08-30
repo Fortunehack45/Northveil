@@ -34,8 +34,7 @@ export const DeveloperHubView: React.FC = () => {
   const isLocalhost =
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  const baseMcpUrl = isLocalhost ? 'http://localhost:3001' : 'https://mcp.northveil.xyz';
-  const currentAddress = activeSubWallet?.address || '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+  const currentAddress = activeSubWallet?.address || '';
 
   const getMcpSnippet = (client: 'claudeweb' | 'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http' | 'sse') => {
     switch (client) {

@@ -47,11 +47,11 @@ const DEFAULT_SUB_WALLETS: SubWalletAccount[] = [
     id: 'acc-0',
     name: 'Primary Vault',
     accountIndex: 0,
-    address: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
+    address: '0x0000000000000000000000000000000000000000',
     derivationPath: 'northveil://tee-nitro-enclave',
     colorTag: '#00f0ff',
     isDefault: true,
-    createdAt: '2026-08-01',
+    createdAt: new Date().toISOString().split('T')[0],
     balanceMultiplier: 1,
   },
   {
@@ -244,22 +244,27 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Multi-Wallet Sub-Account State
   const [subWallets, setSubWallets] = useState<SubWalletAccount[]>(() => {
     const saved = localStorage.getItem('northveil_v3_subwallets');
+    const DEMO_ADDR = '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.address) {
-          return parsed.map((w, idx) => {
-            const { privateKey, ...safeWallet } = w;
-            const cleanName =
-              !safeWallet.name ||
-              safeWallet.name === 'Imported Key Vault' ||
-              safeWallet.name === 'Imported Seed Vault' ||
-              safeWallet.name === 'Main Trading Vault'
-                ? 'Primary Vault'
-                : safeWallet.name;
-            const cleanAddress = sanitizeToValidAddress(safeWallet.address, safeWallet.accountIndex ?? idx);
-            return { ...safeWallet, name: cleanName, address: cleanAddress };
-          });
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const nonDemo = parsed.filter(w => w?.address && w.address.toLowerCase() !== DEMO_ADDR.toLowerCase());
+          const targetList = nonDemo.length > 0 ? nonDemo : parsed;
+          if (targetList[0]?.address && targetList[0].address.toLowerCase() !== DEMO_ADDR.toLowerCase()) {
+            return targetList.map((w, idx) => {
+              const { privateKey, ...safeWallet } = w;
+              const cleanName =
+                !safeWallet.name ||
+                safeWallet.name === 'Imported Key Vault' ||
+                safeWallet.name === 'Imported Seed Vault' ||
+                safeWallet.name === 'Main Trading Vault'
+                  ? 'Primary Vault'
+                  : safeWallet.name;
+              const cleanAddress = sanitizeToValidAddress(safeWallet.address, safeWallet.accountIndex ?? idx);
+              return { ...safeWallet, name: cleanName, address: cleanAddress };
+            });
+          }
         }
       } catch {}
     }
@@ -268,7 +273,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (mpcVault) {
       try {
         const parsed = JSON.parse(mpcVault);
-        if (parsed && parsed.walletAddress) {
+        if (parsed && parsed.walletAddress && parsed.walletAddress.toLowerCase() !== DEMO_ADDR.toLowerCase()) {
           return [
             {
               id: 'acc-0',
@@ -290,7 +295,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (passkeysMap) {
       try {
         const parsed = JSON.parse(passkeysMap);
-        const addresses = Object.keys(parsed);
+        const addresses = Object.keys(parsed).filter(a => a.toLowerCase() !== DEMO_ADDR.toLowerCase());
         if (addresses.length > 0) {
           return [
             {
@@ -314,11 +319,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         id: 'acc-0',
         name: 'Primary Vault',
         accountIndex: 0,
-        address: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
+        address: '0x0000000000000000000000000000000000000000',
         derivationPath: 'northveil://tee-nitro-enclave',
         colorTag: '#ffffff',
         isDefault: true,
-        createdAt: '2026-08-01',
+        createdAt: new Date().toISOString().split('T')[0],
         balanceMultiplier: 1.0,
       },
     ];

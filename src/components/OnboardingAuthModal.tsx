@@ -146,7 +146,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       }
 
       if (!resolvedAddress) {
-        resolvedAddress = '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+        throw new Error('No registered vault found for this passkey. Please create a new vault.');
       }
 
       await setupMpcVault(
