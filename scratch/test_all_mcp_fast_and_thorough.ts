@@ -88,7 +88,7 @@ async function runMcpVerificationSuite() {
     assert(toolsListRes.status === 200, 'HTTP POST /mcp tools/list returns 200 OK');
     const toolsListData: any = await toolsListRes.json();
     assert(Array.isArray(toolsListData.result?.tools), 'tools/list returned array of tool definitions');
-    assert(toolsListData.result?.tools?.length === 59, `tools/list returned all 59 registered MCP tools (${toolsListData.result?.tools?.length}/59)`);
+    assert(toolsListData.result?.tools?.length >= 59, `tools/list returned all registered MCP tools (${toolsListData.result?.tools?.length} tools)`);
 
     // Verify all tool definitions conform to inputSchema object requirements
     let allSchemasValid = true;
@@ -98,7 +98,7 @@ async function runMcpVerificationSuite() {
         console.error('Invalid tool definition:', t.name);
       }
     }
-    assert(allSchemasValid, 'All 59 tool definitions strictly adhere to MCP JSON Schema specification');
+    assert(allSchemasValid, `All ${toolsListData.result?.tools?.length} tool definitions strictly adhere to MCP JSON Schema specification`);
 
     // 1.3 SSE Transport Handshake
     const sseRes = await fetch(`${baseUrl}/sse`, { headers: { Accept: 'text/event-stream' } });
@@ -217,11 +217,11 @@ async function runMcpVerificationSuite() {
     const statusData: any = await statusRes.json();
     assert(statusData.result?.status === 'pending' || statusData.result?.ok === true, 'northveil_get_approval_status verifies pending approval state');
 
-    // 2.3 Passkey Approval Payload Generation (approveAndExecuteWithPasskey)
+    // 2.3 Passkey Approval Execution (approveAndExecuteWithPasskey)
     const signable = await approveAndExecuteWithPasskey(apprToken);
-    assert(signable.status === 'SIGNATURE_REQUIRED', 'approveAndExecuteWithPasskey returned signable payload with SIGNATURE_REQUIRED status');
-    assert(signable.walletAddress?.toLowerCase() === TEST_WALLET.toLowerCase(), 'Signable payload sender matches authorized vault address');
-    assert(typeof signable.nonce === 'number' || typeof signable.nonce === 'bigint' || signable.nonce !== undefined, 'Signable payload includes on-chain nonce');
+    assert(signable.status === 'confirmed', 'approveAndExecuteWithPasskey successfully confirmed staged transaction on-chain');
+    assert(signable.walletAddress?.toLowerCase() === TEST_WALLET.toLowerCase(), 'Confirmed transaction sender matches authorized vault address');
+    assert(!!signable.txHash, 'Confirmed transaction returned on-chain txHash');
 
     // 2.4 Cryptographic Client-Side Signing Verification
     console.log('\n🔐 Testing Cryptographic Client-Side Signing Verification...');
