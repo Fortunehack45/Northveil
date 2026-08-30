@@ -174,14 +174,46 @@ export function initSupabase(client: SupabaseClient) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// IN-MEMORY CACHES (Ephemeral fast lookups alongside DB persistence)
+// IN-MEMORY CACHES — EPHEMERAL SAME-PROCESS CACHE ONLY
 // ═════════════════════════════════════════════════════════════════════════════
+/**
+ * WARNING: These maps are ephemeral caches for the current process only.
+ * Vercel functions are stateless — in-memory state does NOT persist across
+ * invocations or between the mcp-server/ and api/ deployments.
+ * Supabase is the SINGLE SOURCE OF TRUTH for all persistent data.
+ * Never treat these maps as the only place a record lives.
+ */
 export const inMemoryTxRequests = new Map<string, StagedTransactionRequest>();
 export const inMemoryMpcWallets = new Map<string, NonCustodialWalletRecord>();
 export const inMemoryPasskeys = new Map<string, PasskeyCredentialRecord>();
 export const inMemoryPasskeyChallenges = new Map<string, { challenge: string; expiresAt: number; userId: string }>();
 export const inMemoryKillSwitches = new Map<string, { walletAddress: string; userId: string; isKilled: boolean; reason?: string; timestamp: number }>();
 export const inMemorySpendingScopes = new Map<string, AutonomousSpendingScope>();
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SUPABASE HEALTH CHECK
+// ═════════════════════════════════════════════════════════════════════════════
+/**
+ * Verifies that SUPABASE_URL and SUPABASE_ANON_KEY are set and that a
+ * lightweight query against transaction_requests succeeds.
+ * Used by the /health endpoint to surface misconfigurations.
+ */
+export async function verifySupabaseConnection(): Promise<{ connected: boolean; error?: string }> {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    const missing = [!SUPABASE_URL && 'SUPABASE_URL', !SUPABASE_ANON_KEY && 'SUPABASE_ANON_KEY'].filter(Boolean);
+    return { connected: false, error: `Missing env vars: ${missing.join(', ')}` };
+  }
+  if (!supabase || typeof supabase.from !== 'function') {
+    return { connected: false, error: 'Supabase client not initialized' };
+  }
+  try {
+    const { error } = await supabase.from('transaction_requests').select('request_id', { count: 'exact', head: true });
+    if (error) return { connected: false, error: error.message };
+    return { connected: true };
+  } catch (e: any) {
+    return { connected: false, error: e.message || 'Unknown Supabase connectivity error' };
+  }
+}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // WEBAUTHN BIOMETRIC PASSKEY CEREMONY CONFIGURATION
@@ -1183,7 +1215,7 @@ export async function prepareTransactionRequest(
   const approvalToken = `tok_${crypto.randomBytes(24).toString('hex')}`;
   const passkeyChallenge = crypto.randomBytes(32).toString('base64url');
   const createdAt = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minute window
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour window — 10 min was too short for human review
 
   const approxUsd = (amount * 2600).toFixed(2); // estimated USD value
   const estimatedFeeUsd = isDeploy ? '0.25' : '0.08';
@@ -1234,34 +1266,40 @@ export async function prepareTransactionRequest(
   inMemoryTxRequests.set(approvalToken, stagedRecord);
   inMemoryTxRequests.set(requestId, stagedRecord);
 
-  // Persist to Supabase
+  // Persist to Supabase — MANDATORY. Supabase is the single source of truth.
+  // A failed insert must propagate as an error, not silently succeed.
+  let supabaseInsertOk = false;
   try {
-    if (supabase && typeof supabase.from === 'function') {
-      await supabase.from('transaction_requests').insert([{
-        request_id: requestId,
-        wallet_address: normSender.toLowerCase(),
-        recipient: isDeploy ? '' : (targetTo || ethers.ZeroAddress).toLowerCase(),
-        amount: stagedRecord.amount,
-        asset: isDeploy ? 'DEPLOY' : stagedRecord.asset,
-        network: stagedRecord.network,
-        chain_id: targetChainId,
-        nonce,
-        unsigned_payload: txToSign,
-        approval_token: approvalToken,
-        passkey_challenge: passkeyChallenge,
-        status: 'pending',
-        user_id: userId,
-        reason: effectiveReason,
-        contract_summary: isDeploy ? effectiveReason : undefined,
-        operation: isDeploy ? 'DEPLOY_CONTRACT' : operationType,
-        is_deploy: isDeploy,
-        expires_at: expiresAt,
-        created_at: createdAt,
-      }]);
+    if (!supabase || typeof supabase.from !== 'function') {
+      throw new Error('Supabase client not initialized — cannot persist approval request');
     }
+    const { error: insertError } = await supabase.from('transaction_requests').insert([{
+      request_id: requestId,
+      wallet_address: normSender.toLowerCase(),
+      recipient: isDeploy ? '' : (targetTo || ethers.ZeroAddress).toLowerCase(),
+      amount: stagedRecord.amount,
+      asset: isDeploy ? 'DEPLOY' : stagedRecord.asset,
+      network: stagedRecord.network,
+      chain_id: targetChainId,
+      nonce,
+      unsigned_payload: txToSign,
+      approval_token: approvalToken,
+      status: 'pending',
+      user_id: userId,
+      contract_summary: effectiveReason,
+      expires_at: expiresAt,
+      created_at: createdAt,
+    }]);
+    if (insertError) {
+      throw new Error(`Supabase insert error: ${insertError.message}`);
+    }
+    supabaseInsertOk = true;
   } catch (e: any) {
-    console.warn('[Supabase Stage Notice]:', e.message);
+    console.error('[NORTHVEIL_TELEMETRY] TX_STAGE_FAILED requestId=' + requestId + ' wallet_address=' + normSender.toLowerCase() + ' error=' + e.message);
+    throw new Error(`PERSIST_FAILED: Failed to persist approval request to database. The transaction was NOT staged. Reason: ${e.message}`);
   }
+
+  console.log('[NORTHVEIL_TELEMETRY] TX_STAGED requestId=' + requestId + ' approvalToken=' + approvalToken + ' wallet_address=' + normSender.toLowerCase() + ' supabase_insert=SUCCESS');
 
   await logWalletAudit('TX_REQUEST_PREPARED', normSender, userId, {
     requestId,
@@ -1751,19 +1789,74 @@ export async function rejectTransactionRequest(approvalToken: string, userId: st
 }
 
 /**
- * Returns all active pending in-memory approval requests (filtered optionally by wallet address).
+ * Returns all active pending approval requests.
+ * Queries Supabase as the primary source of truth, with in-memory map as fallback.
  */
-export function getPendingApprovals(walletAddress?: string): StagedTransactionRequest[] {
-  const list: StagedTransactionRequest[] = [];
+export async function getPendingApprovals(walletAddress?: string): Promise<StagedTransactionRequest[]> {
   const seen = new Set<string>();
+  const list: StagedTransactionRequest[] = [];
+
+  // 1. Primary: Query Supabase
+  try {
+    if (supabase && typeof supabase.from === 'function') {
+      let query = supabase
+        .from('transaction_requests')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (walletAddress) {
+        query = query.eq('wallet_address', walletAddress.toLowerCase());
+      }
+
+      const { data } = await query;
+      if (data && data.length > 0) {
+        for (const d of data) {
+          const reqId = d.request_id || d.id;
+          if (reqId && !seen.has(reqId)) {
+            seen.add(reqId);
+            list.push({
+              requestId: d.request_id,
+              walletAddress: d.wallet_address,
+              recipient: d.recipient,
+              amount: Number(d.amount) || 0,
+              asset: d.asset || 'ETH',
+              network: d.network || 'sepolia',
+              chainId: Number(d.chain_id) || getChainIdForNetwork(d.network || 'sepolia'),
+              nonce: d.nonce !== undefined ? Number(d.nonce) : undefined,
+              unsignedPayload: d.unsigned_payload,
+              unsignedSerialized: d.unsigned_serialized,
+              approvalToken: d.approval_token,
+              passkeyChallenge: d.passkey_challenge || '',
+              status: d.status || 'pending',
+              userId: d.user_id || 'default_user',
+              reason: d.reason,
+              isDeploy: d.is_deploy,
+              operation: d.operation,
+              expiresAt: d.expires_at,
+              createdAt: d.created_at,
+              txHash: d.tx_hash,
+              explorerUrl: d.explorer_url,
+            });
+          }
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn('[getPendingApprovals] Supabase query failed, falling back to in-memory:', e.message);
+  }
+
+  // 2. Fallback: Merge in-memory cache entries not already found in DB
   for (const req of inMemoryTxRequests.values()) {
-    if (!walletAddress || !req.walletAddress || req.walletAddress.toLowerCase() === walletAddress.toLowerCase()) {
-      if (req.status === 'pending' && !seen.has(req.requestId)) {
+    if (req.status === 'pending' && !seen.has(req.requestId)) {
+      if (!walletAddress || !req.walletAddress || req.walletAddress.toLowerCase() === walletAddress.toLowerCase()) {
         seen.add(req.requestId);
         list.push(req);
       }
     }
   }
+
   return list;
 }
 

@@ -237,18 +237,31 @@ export class SupabaseService {
     const addrs: string[] = [];
     if (Array.isArray(walletAddresses)) {
       walletAddresses.forEach((a) => {
-        if (a && typeof a === 'string') addrs.push(a.toLowerCase());
+        if (a && typeof a === 'string' && a.trim()) addrs.push(a.trim().toLowerCase());
       });
     } else if (typeof walletAddresses === 'string' && walletAddresses.trim()) {
       addrs.push(walletAddresses.trim().toLowerCase());
     }
 
+    if (addrs.length === 0) {
+      // Don't fetch without address filter to prevent cross-wallet data exposure
+      return [];
+    }
+
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('transaction_requests')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
+
+      if (addrs.length === 1) {
+        query = query.eq('wallet_address', addrs[0]);
+      } else {
+        query = query.in('wallet_address', addrs);
+      }
+
+      const { data, error } = await query;
 
       if (error || !data) return [];
 
@@ -263,8 +276,8 @@ export class SupabaseService {
           calculatedStatus = 'REJECTED';
         } else if (
           item.token_used ||
-          (item.expires_at && new Date(item.expires_at).getTime() <= now) ||
-          (item.created_at && now - new Date(item.created_at).getTime() > 2 * 3600 * 1000)
+          item.status === 'expired' ||
+          (item.expires_at && new Date(item.expires_at).getTime() <= now)
         ) {
           calculatedStatus = 'EXPIRED';
         } else {
@@ -335,6 +348,7 @@ export class SupabaseService {
         };
       });
 
+      console.log(`[NORTHVEIL_TELEMETRY] APPROVALS_FETCHED addresses=${JSON.stringify(addrs)} count=${list.length}`);
       return list;
     } catch (e) {
       console.warn('[Supabase fetchApprovalsForWallet Error]:', e);

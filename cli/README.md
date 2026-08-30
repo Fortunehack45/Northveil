@@ -1,11 +1,11 @@
-# @northveil/cli
+# northveil-cli
 
-> The Official Developer CLI for Northveil Protocol — Multi-Chain Web3, Travel Settlement & Autonomous AI Tooling.
+> The Official Developer CLI for Northveil Protocol — Multi-Chain Web3, Smart Contracts, Trading Intelligence & MCP AI Tooling.
 
 ```bash
-npm install -g @northveil/cli
+npm install -g northveil-cli
 # or use directly with npx:
-npx @northveil/cli --help
+npx northveil-cli --help
 ```
 
 ---
@@ -17,21 +17,22 @@ npx @northveil/cli --help
 northveil init my-web3-app --template dapp
 ```
 
-### 2. Live International Flights & Airline Search
+### 2. Real-Time Token Prices & Market Intelligence
 ```bash
-# Search London (LHR) to New York (JFK) with live crypto rates (ETH/USDC/SOL)
-northveil flights --from LHR --to JFK --date 2026-09-20 --class business --passengers 2
+# Fetch live real-time token prices across Ethereum, Base, Solana, Arbitrum
+northveil prices ETH BTC SOL USDC
 ```
 
-### 3. Global Hotels & Luxury Resorts
+### 3. Trending Memecoin Discovery with Automated Safety Audits
 ```bash
-northveil hotels --city Tokyo --checkin 2026-10-05 --checkout 2026-10-08 --guests 2
+# Scan trending tokens and check honeypot/safety scores
+northveil memecoins --chain all --limit 10
 ```
 
-### 4. Real-time PNR & Ticket Verification
+### 4. Deep Token Contract Audit
 ```bash
-# Check official 6-character IATA PNR code
-northveil status 7X9K2B
+# Analyze contract for honeypots, buy/sell taxes, hidden owners, and mintability
+northveil audit-token 0x... --chain ethereum
 ```
 
 ### 5. Multi-Chain Portfolio & Health Audit
@@ -40,29 +41,41 @@ northveil wallet 0x1111111111111111111111111111111111111111
 northveil health 0x1111111111111111111111111111111111111111
 ```
 
-### 6. Smart Contract Deployment & Verification
+### 6. Multi-Chain Transfer & DEX Swap
+```bash
+# Non-custodially prepare and stage a transfer
+northveil send --to 0x... --amount 0.05 --token ETH --network sepolia
+
+# Prepare an optimal DEX swap
+northveil swap --from ETH --to USDC --amount 0.1 --network base
+```
+
+### 7. Smart Contract Deployment & Minting
 ```bash
 northveil deploy --type erc20 --name "AlphaToken" --symbol "ALPHA" --supply 1000000 --network sepolia
 northveil mint --contract 0x... --amount 50000 --network sepolia
 ```
 
-### 7. Static Code Vulnerability & Backdoor Audit
+### 8. Static Code Vulnerability & Backdoor Audit
 ```bash
 northveil audit ./contracts/MyToken.sol
 ```
 
-### 8. Webhook Dispatch & Testing
+### 9. Gateway Health Check & Webhook Testing
 ```bash
+northveil server-health
 northveil webhooks --test https://myapi.com/webhooks --event tx.confirmed
 ```
 
-### 9. Claude Desktop & Cursor MCP Config
+### 10. Claude Desktop, Cursor & Windsurf MCP Config
 ```bash
 northveil mcp --claude
 northveil mcp --cursor
+northveil mcp --windsurf
 ```
 
 ---
 
 ## License
 MIT © Northveil Protocol
+

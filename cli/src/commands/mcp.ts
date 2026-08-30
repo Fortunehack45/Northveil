@@ -54,7 +54,7 @@ export function registerMcpCommands(program: any) {
           mcpServers: {
             'northveil-wallet': {
               command: 'npx',
-              args: ['-y', '@northveil/cli', 'mcp'],
+              args: ['-y', 'northveil-cli', 'mcp'],
               env: {
                 NORTHVEIL_API_KEY: cfg.apiKey,
                 NORTHVEIL_WALLET_ADDRESS: cfg.walletAddress,

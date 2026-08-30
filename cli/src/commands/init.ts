@@ -24,7 +24,7 @@ export function registerInitCommand(program: any) {
           build: 'tsc',
         },
         dependencies: {
-          '@northveil/sdk': '^1.0.0',
+          'northveil-sdk': '^1.1.0',
           ethers: '^6.13.1',
         },
       };
@@ -38,7 +38,7 @@ NORTHVEIL_WALLET_ADDRESS=0xYourWalletAddressHere
       fs.writeFileSync(path.join(targetDir, '.env.example'), envExample);
 
       // 3. index.ts / starter code
-      const starterCode = `import { NorthveilClient } from '@northveil/sdk';
+      const starterCode = `import { NorthveilClient } from 'northveil-sdk';
 
 const client = new NorthveilClient({
   baseUrl: process.env.NORTHVEIL_API_URL || 'https://mcp.northveil.xyz',

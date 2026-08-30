@@ -103,7 +103,155 @@ export declare class NorthveilClient {
     searchEvents(params?: EventSearchParams): Promise<EventSearchResult>;
     /** Query booking confirmation status by official airline PNR or Northveil reference */
     getBookingStatus(bookingReferenceOrPnr: string): Promise<BookingStatusResult>;
+    /** Prepare an unsigned transaction request for local client signing */
+    prepareTransaction(params: {
+        walletAddress?: string;
+        recipient: string;
+        amount: number;
+        asset?: string;
+        network?: string;
+        chainId?: number;
+        calldata?: string;
+        operationType?: 'TRANSFER' | 'SWAP' | 'DEPLOY' | 'CONTRACT_CALL';
+    }): Promise<{
+        success: boolean;
+        requestId: string;
+        approvalToken: string;
+        walletAddress: string;
+        recipient: string;
+        amount: number;
+        asset: string;
+        network: string;
+        chainId: number;
+        nonce: number;
+        unsignedTransaction: any;
+        unsignedSerialized?: string;
+        expiresAt: string;
+    }>;
+    /** Broadcast an already signed raw transaction on-chain */
+    broadcastTransaction(params: {
+        approvalToken?: string;
+        requestId?: string;
+        signedTransaction: string;
+    }): Promise<{
+        success: boolean;
+        status: string;
+        requestId: string;
+        walletAddress: string;
+        recipient: string;
+        amount: number;
+        asset: string;
+        network: string;
+        txHash: string;
+        blockNumber: number;
+        gasUsed: string;
+        explorerUrl: string;
+    }>;
+    /** Register public wallet metadata non-custodially */
+    registerWallet(params: {
+        address: string;
+        walletName?: string;
+        chainId?: string;
+    }): Promise<{
+        success: boolean;
+        wallet: any;
+        address: string;
+        mpcWalletId: string;
+    }>;
     /** Get full OpenAPI 3.0.3 schema for ChatGPT & REST Action integration */
     getOpenApiSchema(): Promise<any>;
+    /** List permitted non-custodial wallets */
+    listWallets(): Promise<{
+        wallets: string[];
+        active: string;
+        count: number;
+    }>;
+    /** Get live multi-chain native and token balances */
+    getBalances(network?: string, walletAddress?: string): Promise<any>;
+    /** Simulate transaction execution on a fork */
+    simulateTx(params: {
+        from: string;
+        to: string;
+        value?: string;
+        data?: string;
+        network?: string;
+    }): Promise<any>;
+    /** Estimate live EIP-1559 gas consumption and USD cost */
+    estimateGas(params?: {
+        network?: string;
+        to?: string;
+        value?: string;
+    }): Promise<any>;
+    /** Audit smart contract security and bytecode */
+    auditContract(params: {
+        contractAddress?: string;
+        code?: string;
+        network?: string;
+    }): Promise<any>;
+    /** Non-custodially prepare an unsigned native or token transfer */
+    prepareTransfer(params: {
+        recipient: string;
+        amount: number;
+        asset?: string;
+        network?: string;
+    }): Promise<any>;
+    /** Non-custodially prepare an optimal DEX swap */
+    prepareSwap(params: {
+        fromToken: string;
+        toToken: string;
+        amount: number;
+        slippage?: number;
+        network?: string;
+    }): Promise<any>;
+    /** Request passkey biometric signature for a staged approval */
+    requestSignature(params: {
+        approvalToken: string;
+        userId?: string;
+    }): Promise<any>;
+    /** Request on-chain broadcast of a client-signed raw transaction */
+    requestBroadcast(params: {
+        approvalToken?: string;
+        signedTransaction: string;
+    }): Promise<any>;
+    /** List pending transaction approvals */
+    listPendingApprovals(): Promise<any>;
+    /** Get approval status for an approval token */
+    getApprovalStatus(approvalToken: string): Promise<any>;
+    /** Fetch RFC 9728 OAuth 2.0 Protected Resource Metadata */
+    getOAuthProtectedResourceMetadata(): Promise<any>;
+    /** Fetch RFC 8414 OAuth 2.0 Authorization Server Metadata */
+    getOAuthServerMetadata(): Promise<any>;
+    /** Register an OAuth 2.0 client dynamically (RFC 7591) */
+    registerOAuthClient(params: {
+        client_name?: string;
+        redirect_uris: string[];
+        grant_types?: string[];
+        response_types?: string[];
+        scope?: string;
+    }): Promise<{
+        client_id: string;
+        client_secret?: string;
+        client_name: string;
+        redirect_uris: string[];
+        grant_types: string[];
+        response_types: string[];
+        scope: string;
+    }>;
+    /**
+     * Check live server & database connectivity health
+     */
+    getHealth(): Promise<{
+        status: string;
+        service?: string;
+        supabase?: {
+            connected: boolean;
+            error?: string;
+        };
+        env?: {
+            SUPABASE_URL: boolean;
+            SUPABASE_ANON_KEY: boolean;
+        };
+        timestamp: string;
+    }>;
 }
 //# sourceMappingURL=client.d.ts.map

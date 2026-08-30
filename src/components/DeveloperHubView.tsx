@@ -14,6 +14,12 @@ import {
   Bot,
   Zap,
   Sparkles,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { CustomSelect } from './CustomSelect';
 import { ProviderService } from '../services/ProviderService';
@@ -24,13 +30,48 @@ import { ethers } from 'ethers';
 import { getMcpServerUrl } from '../config/endpointConfig';
 
 export const DeveloperHubView: React.FC = () => {
-  const { activeSubWallet, activeNetwork } = useWallet();
+  const { activeSubWallet, subWallets, agents, addAgentConnection, revokeAgentConnection, activeNetwork } = useWallet();
 
-  const [activeTab, setActiveTab] = useState<'mcp' | 'cli' | 'sdk' | 'webhooks' | 'playground'>('mcp');
+  const [activeTab, setActiveTab] = useState<'mcp' | 'cli' | 'sdk' | 'keys' | 'webhooks' | 'playground'>('mcp');
   const [selectedMcpClient, setSelectedMcpClient] = useState<
     'claudeweb' | 'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http' | 'sse'
   >('claudeweb');
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
+
+  // API Keys state
+  const [showCreateKeyModal, setShowCreateKeyModal] = useState(false);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [newKeyWallet, setNewKeyWallet] = useState(activeSubWallet?.address || '');
+  const [newKeyDuration, setNewKeyDuration] = useState<'1h' | '24h' | '7d' | '30d' | 'never'>('never');
+  const [newKeyPermissions, setNewKeyPermissions] = useState<string[]>(['*']);
+  const [createdKeyResult, setCreatedKeyResult] = useState<any | null>(null);
+  const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({});
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+
+  const toggleRevealKey = (id: string) => {
+    setRevealedKeys((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleCopyKey = (keyText: string, id: string) => {
+    navigator.clipboard.writeText(keyText);
+    setCopiedKeyId(id);
+    setTimeout(() => setCopiedKeyId(null), 2000);
+  };
+
+  const handleCreateApiKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = newKeyName.trim() || 'Developer API Key';
+    const walletAddress = newKeyWallet || activeSubWallet?.address || '0x0000000000000000000000000000000000000000';
+    const newAgent = addAgentConnection({
+      name,
+      walletAddress,
+      permissions: newKeyPermissions,
+      duration: newKeyDuration,
+      type: 'custom',
+    });
+    setCreatedKeyResult(newAgent);
+    setNewKeyName('');
+  };
 
   const baseMcpUrl = getMcpServerUrl();
   const currentAddress = activeSubWallet?.address || '';
@@ -707,6 +748,7 @@ export const DeveloperHubView: React.FC = () => {
           { id: 'mcp', label: 'MCP Protocol', icon: Bot },
           { id: 'cli', label: 'CLI', icon: Terminal },
           { id: 'sdk', label: 'SDK', icon: Code2 },
+          { id: 'keys', label: 'API Keys', icon: Key },
           { id: 'webhooks', label: 'Webhooks', icon: Webhook },
           { id: 'playground', label: 'Playground', icon: Play },
         ].map((tab) => {
@@ -1163,6 +1205,372 @@ const result = await client.sendTransfer({
 });
 console.log('Transaction hash:', result.txHash);`}
           </pre>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* TAB: API KEYS MANAGEMENT */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'keys' && (
+        <div className="space-y-6">
+          {/* Header Card */}
+          <div className="rounded-3xl p-6 sm:p-7 bg-white dark:bg-[#0f0f12] border border-black/[0.06] dark:border-white/[0.06] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white flex items-center justify-center font-bold shrink-0">
+                <Key className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Developer API Keys</h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Generate scoped API keys to authenticate the Northveil CLI, Python/TypeScript SDKs, Cursor IDE, Claude Desktop, and autonomous agents.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setCreatedKeyResult(null);
+                setShowCreateKeyModal(true);
+              }}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-black text-white dark:bg-white dark:text-black text-xs font-semibold hover:opacity-85 active:scale-[0.98] transition-all cursor-pointer shadow-md shrink-0"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              Create API Key
+            </button>
+          </div>
+
+          {/* Active Keys List */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">
+                Active Keys ({agents.length})
+              </h3>
+            </div>
+
+            {agents.length === 0 ? (
+              <div className="rounded-3xl p-8 sm:p-12 text-center bg-white dark:bg-[#0f0f12] border border-dashed border-black/[0.08] dark:border-white/[0.08] space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-black/[0.04] dark:bg-white/[0.06] text-zinc-400 dark:text-zinc-500 flex items-center justify-center mx-auto">
+                  <Key className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">No API Keys Generated Yet</h4>
+                  <p className="text-xs text-zinc-500 max-w-md mx-auto">
+                    Create your first API key to connect external tools, IDEs, and scripts to your Northveil wallet.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setCreatedKeyResult(null);
+                    setShowCreateKeyModal(true);
+                  }}
+                  className="px-5 py-2.5 rounded-full bg-black text-white dark:bg-white dark:text-black text-xs font-semibold hover:opacity-85 transition-all cursor-pointer shadow-sm"
+                >
+                  + Create First API Key
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {agents.map((agent) => {
+                  const isRevoked = agent.status === 'revoked';
+                  const isRevealed = revealedKeys[agent.id];
+                  const displayKey = isRevealed
+                    ? agent.apiKey
+                    : `${agent.apiKey.slice(0, 10)}${'•'.repeat(18)}${agent.apiKey.slice(-4)}`;
+
+                  return (
+                    <div
+                      key={agent.id}
+                      className={`rounded-3xl p-5 sm:p-6 bg-white dark:bg-[#0f0f12] border transition-all space-y-4 shadow-sm ${
+                        isRevoked
+                          ? 'border-red-500/20 opacity-60'
+                          : 'border-black/[0.06] dark:border-white/[0.06] hover:border-black/10 dark:hover:border-white/10'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 rounded-2xl bg-black/[0.04] dark:bg-white/[0.06] text-zinc-900 dark:text-white">
+                            <Key className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-bold text-zinc-900 dark:text-white font-mono">
+                                {agent.name}
+                              </h4>
+                              <span
+                                className={`text-[10px] font-mono font-semibold px-2.5 py-0.5 rounded-full ${
+                                  isRevoked
+                                    ? 'bg-red-500/10 text-red-500'
+                                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                }`}
+                              >
+                                {isRevoked ? 'REVOKED' : 'ACTIVE'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-zinc-500 font-mono mt-0.5">
+                              Created {new Date(agent.createdAt).toLocaleDateString()}
+                              {agent.expiresAt ? ` • Expires ${new Date(agent.expiresAt).toLocaleDateString()}` : ' • Never Expires'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {!isRevoked && (
+                          <button
+                            onClick={() => revokeAgentConnection(agent.id)}
+                            className="self-start sm:self-center px-3 py-1.5 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Revoke
+                          </button>
+                        )}
+                      </div>
+
+                      {/* API Key Box */}
+                      <div className="p-3 bg-black/[0.03] dark:bg-black/40 rounded-2xl border border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between gap-3">
+                        <span className="font-mono text-xs text-zinc-900 dark:text-zinc-200 truncate select-all">
+                          {displayKey}
+                        </span>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => toggleRevealKey(agent.id)}
+                            className="p-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-zinc-600 dark:text-zinc-300 transition-colors cursor-pointer"
+                            title={isRevealed ? 'Mask key' : 'Reveal key'}
+                          >
+                            {isRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            onClick={() => handleCopyKey(agent.apiKey, agent.id)}
+                            className="p-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-zinc-600 dark:text-zinc-300 transition-colors cursor-pointer flex items-center gap-1"
+                            title="Copy API Key"
+                          >
+                            {copiedKeyId === agent.id ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Metadata row */}
+                      <div className="flex flex-wrap items-center gap-3 text-xs font-mono pt-1">
+                        <div className="flex items-center gap-1.5 text-zinc-500">
+                          <span>Vault:</span>
+                          <span className="text-zinc-900 dark:text-white font-medium bg-black/[0.04] dark:bg-white/[0.06] px-2 py-0.5 rounded-md truncate max-w-[200px]">
+                            {agent.walletAddress || 'All Wallets (*)'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-zinc-500">
+                          <span>Permissions:</span>
+                          <span className="text-zinc-900 dark:text-white font-medium bg-black/[0.04] dark:bg-white/[0.06] px-2 py-0.5 rounded-md">
+                            {(agent.permissions || ['*']).join(', ')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Quick Integration Guide */}
+          <div className="rounded-3xl p-6 sm:p-7 bg-white dark:bg-[#0f0f12] border border-black/[0.06] dark:border-white/[0.06] shadow-sm space-y-4">
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+              <Terminal className="w-4 h-4" />
+              CLI & SDK Quickstart
+            </h3>
+            <p className="text-xs text-zinc-500">Authenticate your CLI session or initialize the TypeScript/Python SDK:</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <span className="text-[11px] font-mono font-medium text-zinc-500">Authenticate CLI:</span>
+                <pre className="p-3 bg-black/[0.04] dark:bg-black rounded-2xl font-mono text-xs text-zinc-900 dark:text-zinc-200 border border-black/[0.04] dark:border-transparent overflow-x-auto select-all">
+                  {`npx northveil-cli login --key ${agents[0]?.apiKey || 'nv_live_YOUR_API_KEY'}`}
+                </pre>
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-[11px] font-mono font-medium text-zinc-500">TypeScript SDK Init:</span>
+                <pre className="p-3 bg-black/[0.04] dark:bg-black rounded-2xl font-mono text-xs text-zinc-900 dark:text-zinc-200 border border-black/[0.04] dark:border-transparent overflow-x-auto select-all">
+                  {`const client = new NorthveilClient({ apiKey: '${agents[0]?.apiKey || 'nv_live_YOUR_API_KEY'}' });`}
+                </pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* MODAL: CREATE API KEY */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {showCreateKeyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl p-6 sm:p-7 bg-white dark:bg-[#121216] border border-black/[0.08] dark:border-white/[0.08] shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-black/[0.06] dark:bg-white/[0.08] flex items-center justify-center">
+                  <Key className="w-5 h-5 text-zinc-900 dark:text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-white">
+                    {createdKeyResult ? 'API Key Generated' : 'Create Developer API Key'}
+                  </h3>
+                  <p className="text-xs text-zinc-500">
+                    {createdKeyResult
+                      ? 'Copy your API key now. It will be stored securely under your account.'
+                      : 'Provision a scoped API key for tools, scripts, or agents.'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowCreateKeyModal(false);
+                  setCreatedKeyResult(null);
+                }}
+                className="p-2 rounded-full hover:bg-black/[0.05] dark:hover:bg-white/[0.05] text-zinc-500 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {createdKeyResult ? (
+              <div className="space-y-4 pt-1">
+                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-2">
+                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-xs">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Key Successfully Generated & Registered
+                  </div>
+                  <div className="p-3 bg-white dark:bg-black/60 rounded-xl border border-emerald-500/20 flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs text-zinc-900 dark:text-zinc-100 truncate select-all">
+                      {createdKeyResult.apiKey}
+                    </span>
+                    <button
+                      onClick={() => handleCopyKey(createdKeyResult.apiKey, 'modal-key')}
+                      className="px-3 py-1.5 rounded-lg bg-black text-white dark:bg-white dark:text-black text-xs font-semibold hover:opacity-85 transition-opacity cursor-pointer shrink-0 flex items-center gap-1"
+                    >
+                      {copiedKeyId === 'modal-key' ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" /> Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" /> Copy
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[11px] font-mono text-zinc-500">Quick CLI Authentication:</span>
+                  <pre className="p-3 bg-black/[0.04] dark:bg-black rounded-xl font-mono text-xs text-zinc-900 dark:text-zinc-200 overflow-x-auto select-all">
+                    {`npx northveil-cli login --key ${createdKeyResult.apiKey}`}
+                  </pre>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setShowCreateKeyModal(false);
+                    setCreatedKeyResult(null);
+                  }}
+                  className="w-full py-2.5 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs hover:opacity-85 cursor-pointer shadow-sm"
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleCreateApiKey} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                    Key Label / Identifier
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Cursor IDE, Claude Desktop, Python Bot"
+                    value={newKeyName}
+                    onChange={(e) => setNewKeyName(e.target.value)}
+                    className="w-full bg-black/[0.04] dark:bg-black border border-black/[0.08] dark:border-white/[0.08] rounded-xl p-3 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-black dark:focus:border-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                    Bound Vault Address
+                  </label>
+                  <CustomSelect
+                    options={[
+                      { value: activeSubWallet?.address || '0x', label: `Active Wallet (${formatShortAddress(activeSubWallet?.address || '')})` },
+                      ...(subWallets || []).map((w) => ({
+                        value: w.address,
+                        label: `${w.name || 'Vault'} (${formatShortAddress(w.address)})`,
+                      })),
+                      { value: '*', label: 'All Wallets (*)' },
+                    ]}
+                    value={newKeyWallet || activeSubWallet?.address || ''}
+                    onChange={(val) => setNewKeyWallet(val)}
+                    variant="form"
+                    placeholder="Select Wallet"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                      Permissions
+                    </label>
+                    <CustomSelect
+                      options={[
+                        { value: '*', label: 'Full Access (*)' },
+                        { value: 'read_only', label: 'Read-Only (Balances & Queries)' },
+                        { value: 'trading', label: 'Trading & Swaps' },
+                      ]}
+                      value={newKeyPermissions[0] || '*'}
+                      onChange={(val) => setNewKeyPermissions([val])}
+                      variant="form"
+                      placeholder="Permissions"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                      Expiration
+                    </label>
+                    <CustomSelect
+                      options={[
+                        { value: 'never', label: 'Never Expires' },
+                        { value: '30d', label: '30 Days' },
+                        { value: '7d', label: '7 Days' },
+                        { value: '24h', label: '24 Hours' },
+                      ]}
+                      value={newKeyDuration}
+                      onChange={(val) => setNewKeyDuration(val as any)}
+                      variant="form"
+                      placeholder="Duration"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateKeyModal(false)}
+                    className="px-4 py-2.5 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs hover:opacity-85 cursor-pointer shadow-sm"
+                  >
+                    Generate Key
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       )}
 

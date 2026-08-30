@@ -367,9 +367,12 @@ export class MpcWalletService {
    */
   public static async getPendingApprovals(walletAddressOrUserId?: string): Promise<any[]> {
     const token = this.getSessionToken();
-    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-
     const cleanParam = (walletAddressOrUserId || '').trim();
+    const headers: Record<string, string> = {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(cleanParam.startsWith('0x') ? { 'x-wallet-address': cleanParam } : {}),
+    };
+
     const queryStr = cleanParam.startsWith('0x') ? `walletAddress=${cleanParam}` : `userId=${cleanParam || this.getUserId()}`;
 
     const candidateUrls = [

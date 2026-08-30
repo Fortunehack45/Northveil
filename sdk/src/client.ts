@@ -468,6 +468,19 @@ export class NorthveilClient {
       body: JSON.stringify(params),
     });
   }
+
+  /**
+   * Check live server & database connectivity health
+   */
+  async getHealth(): Promise<{
+    status: string;
+    service?: string;
+    supabase?: { connected: boolean; error?: string };
+    env?: { SUPABASE_URL: boolean; SUPABASE_ANON_KEY: boolean };
+    timestamp: string;
+  }> {
+    return this.request('/health');
+  }
 }
 
 

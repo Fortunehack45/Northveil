@@ -14,6 +14,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   Fingerprint,
+  AlertTriangle,
 } from 'lucide-react';
 import { McpApprovalRecord } from '../types';
 import { SupabaseService, supabase } from '../services/SupabaseService';
@@ -220,6 +221,7 @@ export const ApprovalsView: React.FC = () => {
       });
 
       const sorted = Array.from(mergedMap.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      console.log(`[NORTHVEIL_TELEMETRY] APPROVALS_VIEW_POLL addresses=${JSON.stringify(allAddresses)} merged_count=${sorted.length}`);
       setApprovals(sorted);
       try {
         localStorage.setItem('northveil_approval_history', JSON.stringify(sorted.slice(0, 100)));
@@ -658,11 +660,30 @@ export const ApprovalsView: React.FC = () => {
             const isExpired = item.status === 'EXPIRED';
             const isPending = item.status === 'PENDING' && !item.tx_hash && !isExpired;
 
+            const connectedAddresses = new Set([
+              activeSubWallet?.address?.toLowerCase(),
+              ...(subWallets || []).map((w) => w.address?.toLowerCase()),
+            ].filter(Boolean));
+            const itemWallet = (item.wallet_address || '').toLowerCase();
+            const isWalletMismatch = Boolean(itemWallet && connectedAddresses.size > 0 && !connectedAddresses.has(itemWallet));
+
             return (
               <div
                 key={item.id}
                 className="rounded-3xl p-5 sm:p-6 bg-white dark:bg-[#0f0f12] hover:bg-zinc-50 dark:hover:bg-[#141418] border border-black/[0.06] dark:border-white/[0.06] transition-all space-y-4 shadow-sm"
               >
+                {/* Wallet Identity Mismatch Warning Banner */}
+                {isWalletMismatch && (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-2.5 text-xs text-amber-700 dark:text-amber-400 font-sans">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <span className="font-semibold">Wallet Identity Mismatch</span>
+                      <p className="font-mono text-[11px] break-all text-amber-800/80 dark:text-amber-300/80">
+                        Staged under <span className="font-bold underline">{item.wallet_address}</span> — this address is not present in your connected wallet's seed. You will not be able to sign it here.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-2xl bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white">

@@ -201,10 +201,113 @@ class NorthveilClient {
     async getBookingStatus(bookingReferenceOrPnr) {
         return this.mcpCall('get_booking_status', { bookingReference: bookingReferenceOrPnr });
     }
+    /** Prepare an unsigned transaction request for local client signing */
+    async prepareTransaction(params) {
+        return this.request('/api/v1/transactions/prepare', {
+            method: 'POST',
+            body: JSON.stringify({
+                walletAddress: params.walletAddress || this.walletAddress,
+                ...params,
+            }),
+        });
+    }
+    /** Broadcast an already signed raw transaction on-chain */
+    async broadcastTransaction(params) {
+        return this.request('/api/v1/transactions/broadcast', {
+            method: 'POST',
+            body: JSON.stringify(params),
+        });
+    }
+    /** Register public wallet metadata non-custodially */
+    async registerWallet(params) {
+        return this.request('/api/v1/wallets/register', {
+            method: 'POST',
+            body: JSON.stringify(params),
+        });
+    }
     /** Get full OpenAPI 3.0.3 schema for ChatGPT & REST Action integration */
     async getOpenApiSchema() {
         const res = await fetch(`${this.baseUrl}/openapi.json`);
         return res.json();
+    }
+    // ═══════════════════════════════════════════════════════
+    // CANONICAL 18 MCP TOOLS (NON-CUSTODIAL & ASYNC APPROVALS)
+    // ═══════════════════════════════════════════════════════
+    /** List permitted non-custodial wallets */
+    async listWallets() {
+        return this.mcpCall('northveil_list_wallets');
+    }
+    /** Get live multi-chain native and token balances */
+    async getBalances(network = 'base', walletAddress) {
+        return this.mcpCall('northveil_get_balances', { network, walletAddress: walletAddress || this.walletAddress });
+    }
+    /** Simulate transaction execution on a fork */
+    async simulateTx(params) {
+        return this.mcpCall('northveil_simulate_tx', params);
+    }
+    /** Estimate live EIP-1559 gas consumption and USD cost */
+    async estimateGas(params = {}) {
+        return this.mcpCall('northveil_estimate_gas', params);
+    }
+    /** Audit smart contract security and bytecode */
+    async auditContract(params) {
+        return this.mcpCall('northveil_audit_contract', params);
+    }
+    /** Non-custodially prepare an unsigned native or token transfer */
+    async prepareTransfer(params) {
+        return this.mcpCall('northveil_prepare_transfer', {
+            walletAddress: this.walletAddress,
+            ...params,
+        });
+    }
+    /** Non-custodially prepare an optimal DEX swap */
+    async prepareSwap(params) {
+        return this.mcpCall('northveil_prepare_swap', {
+            walletAddress: this.walletAddress,
+            ...params,
+        });
+    }
+    /** Request passkey biometric signature for a staged approval */
+    async requestSignature(params) {
+        return this.mcpCall('northveil_request_signature', params);
+    }
+    /** Request on-chain broadcast of a client-signed raw transaction */
+    async requestBroadcast(params) {
+        return this.mcpCall('northveil_request_broadcast', params);
+    }
+    /** List pending transaction approvals */
+    async listPendingApprovals() {
+        return this.mcpCall('northveil_list_pending_approvals');
+    }
+    /** Get approval status for an approval token */
+    async getApprovalStatus(approvalToken) {
+        return this.mcpCall('northveil_get_approval_status', { approvalToken });
+    }
+    // ═══════════════════════════════════════════════════════
+    // OAUTH 2.0 & RFC METADATA DISCOVERY
+    // ═══════════════════════════════════════════════════════
+    /** Fetch RFC 9728 OAuth 2.0 Protected Resource Metadata */
+    async getOAuthProtectedResourceMetadata() {
+        const res = await fetch(`${this.baseUrl}/.well-known/oauth-protected-resource`);
+        return res.json();
+    }
+    /** Fetch RFC 8414 OAuth 2.0 Authorization Server Metadata */
+    async getOAuthServerMetadata() {
+        const res = await fetch(`${this.baseUrl}/.well-known/oauth-authorization-server`);
+        return res.json();
+    }
+    /** Register an OAuth 2.0 client dynamically (RFC 7591) */
+    async registerOAuthClient(params) {
+        return this.request('/oauth/register', {
+            method: 'POST',
+            body: JSON.stringify(params),
+        });
+    }
+    /**
+     * Check live server & database connectivity health
+     */
+    async getHealth() {
+        return this.request('/health');
     }
 }
 exports.NorthveilClient = NorthveilClient;

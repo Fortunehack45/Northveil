@@ -161,6 +161,7 @@ import {
   getAccurateFeeData,
   getProviderForNetwork,
   getExplorerUrlForHash,
+  verifySupabaseConnection,
 } from './mpcControlPlaneService.js';
 
 const app = express();
@@ -1185,6 +1186,28 @@ const apiRateLimiter = (req: Request, res: Response, next: any) => {
 app.use('/api/v1', apiRateLimiter);
 app.use('/mcp', apiRateLimiter);
 app.use('/sse', apiRateLimiter);
+
+// ═══════════════════════════════════════════════════════════════════
+// HEALTH CHECK ENDPOINT
+// ═══════════════════════════════════════════════════════════════════
+app.get(['/health', '/api/health', '/api/v1/health'], async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const supabaseStatus = await verifySupabaseConnection();
+  const status = supabaseStatus.connected ? 'ok' : 'degraded';
+  if (!supabaseStatus.connected) {
+    console.warn('[NORTHVEIL_TELEMETRY] HEALTH_CHECK_DEGRADED supabase_error=' + (supabaseStatus.error || 'unknown'));
+  }
+  return res.json({
+    status,
+    service: 'northveil-api',
+    supabase: supabaseStatus,
+    env: {
+      SUPABASE_URL: Boolean(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL),
+      SUPABASE_ANON_KEY: Boolean(process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY),
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // Direct Favicon & Icon Serving for Browser, Claude & MCP Clients
 let cachedLogoBuffer: Buffer | null = null;
@@ -4252,7 +4275,17 @@ app.get([
         .order('created_at', { ascending: false })
         .limit(100);
       if (walletAddress) {
-        query = query.or(`wallet_address.eq.${walletAddress},status.eq.pending`);
+        // FIX: Strict wallet filtering — the old .or() leaked ALL pending rows for ALL wallets
+        query = query.eq('wallet_address', walletAddress);
+      } else {
+        // No wallet specified — return empty to prevent data exposure
+        return res.json({
+          success: true,
+          pendingApprovals: [],
+          approvals: [],
+          count: 0,
+          warning: 'walletAddress query parameter is required to fetch approvals.',
+        });
       }
       const { data } = await query;
       if (data && data.length > 0) {
@@ -4286,9 +4319,9 @@ app.get([
     }
   } catch (e) {}
 
-  // Merge all in-memory requests
+  // Merge in-memory requests — strict wallet filter only
   for (const [token, reqObj] of inMemoryTxRequests.entries()) {
-    const isWalletMatch = !walletAddress || !reqObj.walletAddress || reqObj.walletAddress?.toLowerCase() === walletAddress || (reqObj.status || '').toLowerCase() === 'pending';
+    const isWalletMatch = walletAddress && reqObj.walletAddress && reqObj.walletAddress.toLowerCase() === walletAddress;
     if (isWalletMatch) {
       const id = reqObj.requestId || token;
       allApprovalsMap.set(id, {
@@ -7815,6 +7848,8 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
 | **Request ID** | \`${prep.requestId}\` |
 | **Approval Token** | \`${prep.approvalToken}\` |
 | **Status** | 🟡 **Awaiting Client Cryptographic Signature** |
+
+> ⚠️ **Wallet Address Note**: Staged under \`${cleanAddress}\`. Ensure this address matches your connected browser wallet to review and sign in the Approvals view.
 
 *Transaction request prepared successfully. Please sign the unsigned payload locally on your device and submit to broadcast on-chain.*
 `,

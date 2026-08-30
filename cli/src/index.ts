@@ -1,7 +1,7 @@
 import { Command } from 'commander';
-import { printBanner } from './utils';
+import { printBanner, getApi } from './utils';
 import { registerInitCommand } from './commands/init';
-import { registerTravelCommands } from './commands/travel';
+import { registerTradeCommands } from './commands/trade';
 import { registerWalletCommands } from './commands/wallet';
 import { registerContractCommands } from './commands/contracts';
 import { registerAuditCommand } from './commands/audit';
@@ -15,8 +15,8 @@ printBanner();
 
 program
   .name('northveil')
-  .description('Official Northveil CLI for Web3 development, travel booking, smart contracts & MCP AI tools')
-  .version('1.0.0');
+  .description('Official Northveil CLI for Web3 development, smart contracts & MCP AI tools')
+  .version('1.1.0');
 
 // Authentication & Identity Commands
 program
@@ -36,9 +36,25 @@ program
   .description('Clear saved local authentication credentials')
   .action(logoutCommand);
 
+program
+  .command('server-health')
+  .description('Verify live Northveil API Gateway and Supabase Database connectivity')
+  .action(async () => {
+    console.log('\n🩺 Checking Northveil API Gateway & Database health...');
+    try {
+      const data = await getApi('/health');
+      console.log('✅ Gateway Status:  ', data.status?.toUpperCase());
+      console.log('📦 Service:         ', data.service || 'northveil-api');
+      console.log('🗄️  Supabase DB:     ', data.supabase?.connected ? 'CONNECTED (Healthy)' : 'DEGRADED (' + (data.supabase?.error || 'Unavailable') + ')');
+      console.log('⏱️  Server Time:     ', data.timestamp);
+    } catch (e: any) {
+      console.error('❌ Health Check Failed:', e.message);
+    }
+  });
+
 // Register all modular commands
 registerInitCommand(program);
-registerTravelCommands(program);
+registerTradeCommands(program);
 registerWalletCommands(program);
 registerContractCommands(program);
 registerAuditCommand(program);
