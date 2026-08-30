@@ -2,6 +2,14 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Redirect logging in stdio mode so process.stdout remains strictly pure JSON-RPC
+export const isStdioMode = process.argv.includes('--stdio') || process.env.MCP_TRANSPORT === 'stdio';
+if (isStdioMode) {
+  console.log = (...args: any[]) => process.stderr.write(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ') + '\n');
+  console.info = (...args: any[]) => process.stderr.write(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ') + '\n');
+  console.warn = (...args: any[]) => process.stderr.write(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ') + '\n');
+}
+
 // Load .env from multiple locations: local dir first, then parent (project root)
 const __filename_local = fileURLToPath(import.meta.url);
 const __dirname_local = path.dirname(__filename_local);
@@ -10922,21 +10930,30 @@ if (process.argv.includes('--stdio') || process.env.MCP_TRANSPORT === 'stdio') {
       } else if (method === 'tools/call') {
         const { name: toolName, arguments: toolArgs } = params || {};
         const walletFromEnv = process.env.NORTHVEIL_WALLET_ADDRESS || '';
-        const result = await executeRealTool(toolName, toolArgs, walletFromEnv);
-        const resp = {
-          jsonrpc: '2.0',
-          result: {
-            content: [
-              {
-                type: 'text',
-                text: result?.formattedMarkdown || (typeof result === 'string' ? result : JSON.stringify(result, null, 2)),
-              },
-            ],
-            ...(typeof result === 'object' && result !== null ? result : {}),
-          },
-          id,
-        };
-        process.stdout.write(JSON.stringify(resp) + '\n');
+        try {
+          const result = await executeRealTool(toolName, toolArgs, walletFromEnv);
+          const resp = {
+            jsonrpc: '2.0',
+            result: {
+              content: [
+                {
+                  type: 'text',
+                  text: result?.formattedMarkdown || (typeof result === 'string' ? result : JSON.stringify(result, null, 2)),
+                },
+              ],
+              ...(typeof result === 'object' && result !== null ? result : {}),
+            },
+            id,
+          };
+          process.stdout.write(JSON.stringify(resp) + '\n');
+        } catch (toolErr: any) {
+          const errResp = {
+            jsonrpc: '2.0',
+            error: { code: -32603, message: toolErr.message || 'Internal tool execution error' },
+            id: id ?? null,
+          };
+          process.stdout.write(JSON.stringify(errResp) + '\n');
+        }
       } else {
         const resp = {
           jsonrpc: '2.0',
@@ -10956,7 +10973,7 @@ if (process.argv.includes('--stdio') || process.env.MCP_TRANSPORT === 'stdio') {
   });
 }
 
-if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL && !process.env.NO_SERVER_LISTEN) {
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL && !process.env.NO_SERVER_LISTEN && !isStdioMode) {
   const server = app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`⚡ Northveil UNIVERSAL AI Server listening on http://0.0.0.0:${PORT}`);
     console.log(`🔌 HTTP JSON-RPC endpoint: http://localhost:${PORT}/mcp`);

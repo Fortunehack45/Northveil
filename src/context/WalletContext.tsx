@@ -179,20 +179,26 @@ const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [assets, setAssets] = useState<CryptoAsset[]>(() => {
-    const saved = localStorage.getItem('northveil_v3_assets');
-    return saved ? JSON.parse(saved) : INITIAL_ASSETS;
+    return INITIAL_ASSETS.map((a) => ({ ...a, balance: 0 }));
   });
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  // Purge legacy un-scoped transactions cache on mount
+  // Purge legacy un-scoped transactions and stale mock assets cache on mount
   useEffect(() => {
     localStorage.removeItem('northveil_v3_transactions');
-  }, []);
-
-  // Purge legacy un-scoped transactions cache on mount
-  useEffect(() => {
-    localStorage.removeItem('northveil_v3_transactions');
+    try {
+      const stored = localStorage.getItem('northveil_v3_assets');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          const hasStale = parsed.some((p: any) => p.balance === 1.45 || p.balance === 1250 || p.balance === 6.8 || p.balance === 3.4 || p.balance === 0.05);
+          if (hasStale) {
+            localStorage.removeItem('northveil_v3_assets');
+          }
+        }
+      }
+    } catch {}
   }, []);
 
   const [stakingPositions, setStakingPositions] = useState<StakingPosition[]>(() => {
@@ -391,12 +397,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
             const cleanedAssets = parsed.map((a: any) => {
-              if (a.balance === 1.45 || a.balance === 1250 || a.balance === 6.8 || a.balance === 3.4 || a.balance === 0.05) {
+              const numBal = typeof a.balance === 'number' && !isNaN(a.balance) ? a.balance : 0;
+              if (numBal === 1.45 || numBal === 1250 || numBal === 6.8 || numBal === 3.4 || numBal === 0.05 || numBal === 100) {
                 return { ...a, balance: 0 };
               }
-              return a;
+              return { ...a, balance: numBal };
             });
-            // Merge any missing native assets from INITIAL_ASSETS (such as Base ETH, Polygon POL, OP ETH) into parsed list
             const existingIds = new Set(cleanedAssets.map((a: any) => a.id));
             const missingNatives = INITIAL_ASSETS.filter(a => !existingIds.has(a.id));
             baseAssets = [...cleanedAssets, ...missingNatives];
