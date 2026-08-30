@@ -233,18 +233,27 @@ export class SupabaseService {
   /**
    * Fetch Approvals & Transaction Requests dynamically from Supabase
    */
-  static async fetchApprovalsForWallet(walletAddress?: string): Promise<any[]> {
-    const cleanAddr = walletAddress ? walletAddress.toLowerCase() : '';
+  static async fetchApprovalsForWallet(walletAddresses?: string | string[]): Promise<any[]> {
+    const addrs: string[] = [];
+    if (Array.isArray(walletAddresses)) {
+      walletAddresses.forEach((a) => {
+        if (a && typeof a === 'string') addrs.push(a.toLowerCase());
+      });
+    } else if (typeof walletAddresses === 'string' && walletAddresses.trim()) {
+      addrs.push(walletAddresses.trim().toLowerCase());
+    }
 
     try {
       let txQuery = supabase
         .from('transaction_requests')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
-      if (cleanAddr) {
-        txQuery = txQuery.eq('wallet_address', cleanAddr);
+      if (addrs.length === 1) {
+        txQuery = txQuery.or(`wallet_address.eq.${addrs[0]},status.eq.pending`);
+      } else if (addrs.length > 1) {
+        txQuery = txQuery.or(`wallet_address.in.(${addrs.join(',')}),status.eq.pending`);
       }
 
       const { data, error } = await txQuery;

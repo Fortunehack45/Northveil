@@ -363,23 +363,43 @@ export class MpcWalletService {
   }
 
   /**
-   * Fetch pending approval requests for human review
+   * Fetch pending approval requests for human review with multi-endpoint fallback
    */
-  public static async getPendingApprovals(userId?: string): Promise<any[]> {
-    const effectiveUserId = userId || this.getUserId();
+  public static async getPendingApprovals(walletAddressOrUserId?: string): Promise<any[]> {
     const token = this.getSessionToken();
-    try {
-      const res = await fetch(`${this.getBaseUrl()}/api/v1/dashboard/approvals/pending?userId=${effectiveUserId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        return [];
-      }
-      return json.pendingApprovals || json.data || json.approvals || [];
-    } catch {
-      return [];
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
+    const cleanParam = (walletAddressOrUserId || '').trim();
+    const queryStr = cleanParam.startsWith('0x') ? `walletAddress=${cleanParam}` : `userId=${cleanParam || this.getUserId()}`;
+
+    const candidateUrls = [
+      `${this.getBaseUrl()}/api/v1/dashboard/approvals/pending?${queryStr}`,
+      `${this.getBaseUrl()}/api/v1/approvals/pending?${queryStr}`,
+      `/api/v1/dashboard/approvals/pending?${queryStr}`,
+      `/api/v1/approvals/pending?${queryStr}`,
+    ];
+
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      candidateUrls.push(`http://127.0.0.1:3001/api/v1/dashboard/approvals/pending?${queryStr}`);
     }
+
+    for (const url of candidateUrls) {
+      try {
+        const res = await fetch(url, { headers, signal: AbortSignal.timeout(2000) });
+        if (res.ok) {
+          const json = await res.json();
+          const list = json.pendingApprovals || json.data || json.approvals || [];
+          if (Array.isArray(list) && list.length > 0) {
+            return list;
+          }
+          if (json.success) {
+            return list;
+          }
+        }
+      } catch {}
+    }
+
+    return [];
   }
 
   /**

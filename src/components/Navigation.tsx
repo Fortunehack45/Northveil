@@ -4,6 +4,7 @@ import { useWallet } from '../context/WalletContext';
 import { BlockiesAvatar } from './BlockiesAvatar';
 import { formatShortAddress } from '../services/addressUtils';
 import { MpcWalletService } from '../services/MpcWalletService';
+import { SupabaseService } from '../services/SupabaseService';
 import {
   LayoutGrid,
   Wallet,
@@ -45,21 +46,40 @@ export const Navigation: React.FC<NavigationProps> = ({
   onOpenOnboarding,
   onOpenTour,
 }) => {
-  const { lockWallet, logOut, activeSubWallet, theme, toggleTheme } = useWallet();
+  const { lockWallet, logOut, activeSubWallet, subWallets, theme, toggleTheme } = useWallet();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [pendingCount, setPendingCount] = useState<number>(0);
 
   useEffect(() => {
     const checkPending = async () => {
       try {
-        const pending = await MpcWalletService.getPendingApprovals();
-        setPendingCount(pending?.length || 0);
+        const allAddresses = Array.from(new Set([
+          activeSubWallet?.address,
+          ...(subWallets || []).map((w) => w.address),
+        ])).filter(Boolean) as string[];
+
+        const [stagedPending, liveApprovals] = await Promise.all([
+          MpcWalletService.getPendingApprovals(activeSubWallet?.address).catch(() => []),
+          SupabaseService.fetchApprovalsForWallet(allAddresses).catch(() => []),
+        ]);
+
+        const pendingIds = new Set<string>();
+        (stagedPending || []).forEach((p: any) => {
+          const id = p.requestId || p.id || p.approvalToken;
+          if (id && (p.status || '').toLowerCase() === 'pending') pendingIds.add(id);
+        });
+        (liveApprovals || []).forEach((a: any) => {
+          const id = a.request_id || a.id || a.approval_token;
+          if (id && a.status === 'PENDING') pendingIds.add(id);
+        });
+
+        setPendingCount(pendingIds.size);
       } catch {}
     };
     checkPending();
-    const interval = setInterval(checkPending, 3000);
+    const interval = setInterval(checkPending, 2000);
     return () => clearInterval(interval);
-  }, [activeSubWallet?.address]);
+  }, [activeSubWallet?.address, subWallets]);
 
   const navItems: {
     id: TabType;

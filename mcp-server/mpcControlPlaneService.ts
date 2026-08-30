@@ -1294,24 +1294,54 @@ export async function prepareTransactionRequest(
 }
 
 export async function stageTransactionRequest(
-  walletAddress: string,
-  recipient: string,
-  amount: number,
-  asset: string,
-  network: string,
-  unsignedPayload: any,
+  walletAddressOrOptions: string | {
+    walletAddress: string;
+    recipient: string;
+    amount: number;
+    asset?: string;
+    network?: string;
+    calldata?: string;
+    gasLimit?: string;
+    userId?: string;
+    reason?: string;
+    isDeploy?: boolean;
+    unsignedPayload?: any;
+  },
+  recipient?: string,
+  amount?: number,
+  asset?: string,
+  network?: string,
+  unsignedPayload?: any,
   userId: string = 'default_user',
   reason?: string
 ): Promise<StagedTransactionRequest> {
+  if (typeof walletAddressOrOptions === 'object' && walletAddressOrOptions !== null) {
+    const opts = walletAddressOrOptions;
+    const prep = await prepareTransactionRequest({
+      walletAddress: opts.walletAddress,
+      recipient: opts.recipient,
+      amount: opts.amount,
+      asset: opts.asset || 'ETH',
+      network: opts.network || 'sepolia',
+      calldata: opts.calldata || opts.unsignedPayload?.data || '0x',
+      gasLimit: opts.gasLimit || opts.unsignedPayload?.gasLimit,
+      userId: opts.userId || 'default_user',
+      reason: opts.reason,
+      isDeploy: opts.isDeploy || opts.asset === 'DEPLOY' || opts.unsignedPayload?.isDeploy,
+    });
+    return inMemoryTxRequests.get(prep.approvalToken)!;
+  }
+
   const prep = await prepareTransactionRequest({
-    walletAddress,
-    recipient,
-    amount,
-    asset,
-    network,
+    walletAddress: walletAddressOrOptions,
+    recipient: recipient || '',
+    amount: amount || 0,
+    asset: asset || 'ETH',
+    network: network || 'sepolia',
     calldata: unsignedPayload?.data || '0x',
     gasLimit: unsignedPayload?.gasLimit,
     userId,
+    reason,
     isDeploy: unsignedPayload?.isDeploy || asset === 'DEPLOY',
   });
 
@@ -1718,6 +1748,23 @@ export async function rejectTransactionRequest(approvalToken: string, userId: st
   });
 
   return { success: true, status: 'rejected', approvalToken: cleanToken };
+}
+
+/**
+ * Returns all active pending in-memory approval requests (filtered optionally by wallet address).
+ */
+export function getPendingApprovals(walletAddress?: string): StagedTransactionRequest[] {
+  const list: StagedTransactionRequest[] = [];
+  const seen = new Set<string>();
+  for (const req of inMemoryTxRequests.values()) {
+    if (!walletAddress || !req.walletAddress || req.walletAddress.toLowerCase() === walletAddress.toLowerCase()) {
+      if (req.status === 'pending' && !seen.has(req.requestId)) {
+        seen.add(req.requestId);
+        list.push(req);
+      }
+    }
+  }
+  return list;
 }
 
 /**

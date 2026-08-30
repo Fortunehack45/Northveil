@@ -16,7 +16,7 @@ import {
   Fingerprint,
 } from 'lucide-react';
 import { McpApprovalRecord } from '../types';
-import { SupabaseService } from '../services/SupabaseService';
+import { SupabaseService, supabase } from '../services/SupabaseService';
 import { MpcWalletService } from '../services/MpcWalletService';
 import { WebAuthnService } from '../services/WebAuthnService';
 import { ProviderService } from '../services/ProviderService';
@@ -37,7 +37,7 @@ const getExplorerLink = (net: string, hash: string): string => {
 };
 
 export const ApprovalsView: React.FC = () => {
-  const { activeSubWallet, seedPhrase, getDecryptedPrivateKey } = useWallet();
+  const { activeSubWallet, subWallets, seedPhrase, getDecryptedPrivateKey } = useWallet();
 
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'CONFIRMED' | 'PENDING' | 'REJECTED' | 'EXPIRED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,10 +64,15 @@ export const ApprovalsView: React.FC = () => {
 
   const fetchLogs = async () => {
     try {
-      // Fetch from Supabase and in-memory pending approvals endpoint
+      const allAddresses = Array.from(new Set([
+        activeSubWallet?.address,
+        ...(subWallets || []).map((w) => w.address),
+      ])).filter(Boolean) as string[];
+
+      // Fetch from Supabase, MCP server pending approvals, and relative endpoints
       const [liveApprovals, stagedPending] = await Promise.all([
-        SupabaseService.fetchApprovalsForWallet(activeSubWallet?.address).catch(() => []),
-        MpcWalletService.getPendingApprovals().catch(() => []),
+        SupabaseService.fetchApprovalsForWallet(allAddresses).catch(() => []),
+        MpcWalletService.getPendingApprovals(activeSubWallet?.address).catch(() => []),
       ]);
 
       const mergedMap = new Map<string, McpApprovalRecord>();
@@ -226,9 +231,42 @@ export const ApprovalsView: React.FC = () => {
 
   useEffect(() => {
     fetchLogs();
-    const interval = setInterval(fetchLogs, 3000);
-    return () => clearInterval(interval);
-  }, [activeSubWallet?.address]);
+    const interval = setInterval(fetchLogs, 2000);
+    const onFocus = () => fetchLogs();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', onFocus);
+    }
+
+    let channel: any = null;
+    try {
+      if (supabase && typeof supabase.channel === 'function') {
+        channel = supabase
+          .channel('public:transaction_requests_realtime')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'transaction_requests',
+            },
+            () => {
+              fetchLogs();
+            }
+          )
+          .subscribe();
+      }
+    } catch {}
+
+    return () => {
+      clearInterval(interval);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', onFocus);
+      }
+      if (channel && supabase && typeof supabase.removeChannel === 'function') {
+        try { supabase.removeChannel(channel); } catch {}
+      }
+    };
+  }, [activeSubWallet?.address, subWallets]);
 
   const handleCreateTestRequest = async () => {
     if (!activeSubWallet?.address) return;

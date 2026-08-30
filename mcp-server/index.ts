@@ -4219,10 +4219,19 @@ app.post('/api/v1/dashboard/clients/:id/revoke', async (req: Request, res: Respo
 });
 
 // 4. GET PENDING & ALL APPROVALS
-app.get(['/api/v1/dashboard/approvals/pending', '/api/v1/dashboard/approvals'], async (req: Request, res: Response) => {
+app.get([
+  '/api/v1/dashboard/approvals/pending',
+  '/api/v1/dashboard/approvals',
+  '/api/v1/approvals/pending',
+  '/api/v1/approvals',
+  '/api/approvals/pending',
+  '/api/approvals',
+  '/approvals/pending',
+  '/approvals'
+], async (req: Request, res: Response) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
-  const userId = (req.headers['x-user-id'] || req.query.userId || 'default_user').toString();
+  const userId = (req.headers['x-user-id'] || req.query.userId || '').toString();
   const walletAddress = (req.headers['x-wallet-address'] || req.query.walletAddress || req.query.address || '').toString().toLowerCase();
   
   const allApprovalsMap = new Map<string, any>();
@@ -4234,7 +4243,7 @@ app.get(['/api/v1/dashboard/approvals/pending', '/api/v1/dashboard/approvals'], 
         .order('created_at', { ascending: false })
         .limit(100);
       if (walletAddress) {
-        query = query.eq('wallet_address', walletAddress);
+        query = query.or(`wallet_address.eq.${walletAddress},status.eq.pending`);
       }
       const { data } = await query;
       if (data && data.length > 0) {
@@ -4270,7 +4279,8 @@ app.get(['/api/v1/dashboard/approvals/pending', '/api/v1/dashboard/approvals'], 
 
   // Merge all in-memory requests
   for (const [token, reqObj] of inMemoryTxRequests.entries()) {
-    if (!walletAddress || reqObj.walletAddress?.toLowerCase() === walletAddress) {
+    const isWalletMatch = !walletAddress || !reqObj.walletAddress || reqObj.walletAddress?.toLowerCase() === walletAddress || (reqObj.status || '').toLowerCase() === 'pending';
+    if (isWalletMatch) {
       const id = reqObj.requestId || token;
       allApprovalsMap.set(id, {
         approval_token: token,
@@ -4287,6 +4297,7 @@ app.get(['/api/v1/dashboard/approvals/pending', '/api/v1/dashboard/approvals'], 
     success: true,
     pendingApprovals: pendingList,
     approvals: allList,
+    count: pendingList.length,
   });
 });
 
