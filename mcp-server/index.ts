@@ -5192,9 +5192,10 @@ To compile and stage this on-chain transaction:
   const isEvm = cleanAddress.startsWith('0x') && cleanAddress.length === 42;
   const isSol = !cleanAddress.startsWith('0x') && cleanAddress.length >= 32 && cleanAddress.length <= 44;
 
-  const host = req?.headers.host || 'localhost:3001';
-  const protocol = req?.headers['x-forwarded-proto'] || (req?.secure ? 'https' : 'http');
+  const host = req?.headers.host || (process.env.PUBLIC_URL ? new URL(process.env.PUBLIC_URL).host : 'northveil.xyz');
+  const protocol = req?.headers['x-forwarded-proto'] || (req?.secure ? 'https' : (host.includes('localhost') || host.includes('127.0.0.1') ? 'http' : 'https'));
   const widgetBaseUrl = `${protocol}://${host}/ui/widget`;
+  const approvalBaseUrl = `${protocol}://${host}`;
 
   // Fetch real wallet record from Supabase DB
   let dbWallet: any = null;
@@ -6533,7 +6534,7 @@ To view, backup, or export your 12-word recovery phrase:
 > **Amount**: **${amount} ${asset}**  
 > **Target Network**: \`${network}\`  
 > **Expires At**: \`${res.expiresAt}\`  
-> **Passkey Authorization Link**: [Authorize Transaction](https://mcp.northveil.xyz/approve?token=${res.approvalToken})  
+> **Passkey Authorization Link**: [Authorize Transaction](${approvalBaseUrl}/approve?token=${res.approvalToken})  
 
 *Please prompt the user to complete WebAuthn Passkey authorization on their device or call \`approve_transaction\` with the approvalToken.*
 `,
@@ -7632,7 +7633,7 @@ ${holdings.map((h: any) => `| **${h.symbol}** | **${formatCryptoAmount(h.balance
 | **Network** | **Solana Mainnet-Beta** |
 | **Request ID** | \`${autoResult.requestId}\` |
 | **Approval Token** | \`${autoResult.approvalToken}\` |
-| **Passkey Authorization Link** | [Authorize Transaction](https://mcp.northveil.xyz/approve?token=${autoResult.approvalToken}) |
+| **Passkey Authorization Link** | [Authorize Transaction](${approvalBaseUrl}/approve?token=${autoResult.approvalToken}) |
 | **Status** | 🟡 **Awaiting Client Cryptographic Signature** |
 
 *Transaction request staged. Please authorize via your biometric passkey or Web3 wallet.*

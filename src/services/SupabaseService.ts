@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getMcpServerUrl } from '../config/endpointConfig';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://ulkbchewsrksgvlbzjzl.supabase.co';
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsa2JjaGV3c3Jrc2d2bGJ6anpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NzkzMDIsImV4cCI6MjEwMTI1NTMwMn0.L8d4ZI9f1mJda9mraZRb5O_Tjc9wzSur84pB_Y0vjTA';
@@ -347,7 +348,7 @@ export class SupabaseService {
       const cleanAddr = walletAddress.toLowerCase();
       const targetRecipient = (recipientAddress || '0x59148d6a9dff263a772b5a84280bc88530f38636').toLowerCase();
       
-      const baseUrl = (process.env.VITE_MCP_SERVER_URL || process.env.VITE_API_URL || 'https://mcp.northveil.xyz').replace(/\/$/, '');
+      const baseUrl = getMcpServerUrl();
       const res = await fetch(`${baseUrl}/api/v1/transactions/prepare`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

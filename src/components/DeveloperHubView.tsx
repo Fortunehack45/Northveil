@@ -21,6 +21,7 @@ import { SwapService } from '../services/SwapService';
 import { SupabaseService } from '../services/SupabaseService';
 import { MpcWalletService } from '../services/MpcWalletService';
 import { ethers } from 'ethers';
+import { getMcpServerUrl } from '../config/endpointConfig';
 
 export const DeveloperHubView: React.FC = () => {
   const { activeSubWallet, activeNetwork } = useWallet();
@@ -31,9 +32,7 @@ export const DeveloperHubView: React.FC = () => {
   >('claudeweb');
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
-  const isLocalhost =
-    typeof window !== 'undefined' &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const baseMcpUrl = getMcpServerUrl();
   const currentAddress = activeSubWallet?.address || '';
 
   const getMcpSnippet = (client: 'claudeweb' | 'claude' | 'cursor' | 'chatgpt' | 'claudecode' | 'windsurf' | 'http' | 'sse') => {

@@ -19,6 +19,7 @@ import {
 import { AgentConnection } from '../types';
 import { CustomSelect } from './CustomSelect';
 import { formatShortAddress, sanitizeToValidAddress } from '../services/addressUtils';
+import { getMcpServerUrl } from '../config/endpointConfig';
 
 export const AgentsView: React.FC = () => {
   const {
@@ -67,11 +68,7 @@ export const AgentsView: React.FC = () => {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const isLocalhost =
-    typeof window !== 'undefined' &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-
-  const baseMcpUrl = isLocalhost ? 'http://localhost:3001' : 'https://mcp.northveil.xyz';
+  const baseMcpUrl = getMcpServerUrl();
   const targetWallet = selectedWalletAddr || activeSubWallet?.address || '0x0000000000000000000000000000000000000000';
   const generatedSseUrl = `${baseMcpUrl}/sse?wallet_address=${targetWallet}`;
 
