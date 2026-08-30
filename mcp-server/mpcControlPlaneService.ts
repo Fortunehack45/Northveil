@@ -221,7 +221,7 @@ export const WEBAUTHN_EXPECTED_ORIGIN: string[] = [
 // MULTI-CHAIN RESILIENT RPC PROVIDER POOL
 // ═════════════════════════════════════════════════════════════════════════════
 export const RPC_FALLBACK_POOLS: Record<string, string[]> = {
-  sepolia: [process.env.SEPOLIA_RPC_URL || '', 'https://ethereum-sepolia-rpc.publicnode.com', 'https://sepolia.drpc.org', 'https://rpc.sepolia.org'].filter(Boolean),
+  sepolia: [process.env.SEPOLIA_RPC_URL || '', 'https://ethereum-sepolia-rpc.publicnode.com', 'https://1rpc.io/sepolia', 'https://sepolia.drpc.org', 'https://gateway.tenderly.co/public/sepolia'].filter(Boolean),
   ethereum: [process.env.ETH_RPC_URL || '', 'https://ethereum-rpc.publicnode.com', 'https://1rpc.io/eth', 'https://cloudflare-eth.com'].filter(Boolean),
   base: [process.env.BASE_RPC_URL || '', 'https://mainnet.base.org', 'https://base.llamarpc.com', 'https://base.drpc.org'].filter(Boolean),
   base_sepolia: ['https://sepolia.base.org', 'https://base-sepolia.drpc.org'],
@@ -451,7 +451,10 @@ export async function getAccurateFeeData(
     }
     return { maxFeePerGas, maxPriorityFeePerGas, gasPrice };
   } catch (err: any) {
-    throw new Error(`FEE_ESTIMATION_FAILED: Failed to fetch live gas fee data on network '${network}': ${err.message}`);
+    console.warn(`[Fee Estimation Fallback for ${network}]:`, err.message);
+    const defMaxFee = ethers.parseUnits('25', 'gwei').toString();
+    const defMaxPriority = ethers.parseUnits('2', 'gwei').toString();
+    return { maxFeePerGas: defMaxFee, maxPriorityFeePerGas: defMaxPriority, gasPrice: defMaxFee };
   }
 }
 

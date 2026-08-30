@@ -21,10 +21,10 @@ export class ProviderService {
     const rpcUrls: string[] = [];
     switch (network) {
       case 'ethereum':
-        rpcUrls.push('https://eth.llamarpc.com', 'https://cloudflare-eth.com');
+        rpcUrls.push('https://eth.llamarpc.com', 'https://rpc.ankr.com/eth', 'https://cloudflare-eth.com');
         break;
       case 'sepolia':
-        rpcUrls.push('https://ethereum-sepolia-rpc.publicnode.com', 'https://1rpc.io/sepolia', 'https://rpc2.sepolia.org');
+        rpcUrls.push('https://rpc.ankr.com/eth_sepolia', 'https://ethereum-sepolia-rpc.publicnode.com', 'https://sepolia.drpc.org', 'https://1rpc.io/sepolia');
         break;
       case 'polygon':
         rpcUrls.push('https://polygon-rpc.com', 'https://rpc-mainnet.maticvigil.com');

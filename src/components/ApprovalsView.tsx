@@ -24,6 +24,18 @@ import { WalletService } from '../services/WalletService';
 import { formatShortAddress, parseEtherSafe } from '../services/addressUtils';
 import { ethers } from 'ethers';
 
+const getExplorerLink = (net: string, hash: string): string => {
+  if (!hash) return '#';
+  const cleanNet = (net || 'sepolia').toLowerCase();
+  if (cleanNet.includes('sepolia')) return `https://sepolia.etherscan.io/tx/${hash}`;
+  if (cleanNet.includes('base')) return `https://basescan.org/tx/${hash}`;
+  if (cleanNet.includes('polygon') || cleanNet.includes('matic')) return `https://polygonscan.com/tx/${hash}`;
+  if (cleanNet.includes('arbitrum')) return `https://arbiscan.io/tx/${hash}`;
+  if (cleanNet.includes('bsc') || cleanNet.includes('binance')) return `https://bscscan.com/tx/${hash}`;
+  if (cleanNet.includes('solana')) return `https://solscan.io/tx/${hash}`;
+  return `https://etherscan.io/tx/${hash}`;
+};
+
 export const ApprovalsView: React.FC = () => {
   const { activeSubWallet, seedPhrase, getDecryptedPrivateKey } = useWallet();
 
@@ -345,13 +357,13 @@ export const ApprovalsView: React.FC = () => {
             passkeyAssertion,
           });
           txHash = broadcastRes.txHash || broadcastRes.tx_hash || '';
-          explorerUrl = broadcastRes.explorerUrl || broadcastRes.explorer_url || '';
+          explorerUrl = broadcastRes.explorerUrl || broadcastRes.explorer_url || getExplorerLink(targetNetwork, txHash);
           deployedContractAddress = (broadcastRes as any).contractAddress;
         } catch (bErr: any) {
           console.warn('Server broadcast fallback to direct RPC provider:', bErr.message);
           const directTx = await provider.broadcastTransaction(signedSerialized);
           txHash = directTx.hash;
-          explorerUrl = `https://sepolia.etherscan.io/tx/${txHash}`;
+          explorerUrl = getExplorerLink(targetNetwork, txHash);
         }
 
         if (isDeployTx && !deployedContractAddress && activeSubWallet?.address) {
@@ -371,18 +383,18 @@ export const ApprovalsView: React.FC = () => {
         try {
           const execRes = await MpcWalletService.approveTransactionRequestWithPasskey(id, passkeyAssertion);
           txHash = execRes.txHash || execRes.tx_hash || ethers.keccak256(ethers.toUtf8Bytes(`${id}-${Date.now()}`));
-          explorerUrl = execRes.explorerUrl || execRes.explorer_url || `https://sepolia.etherscan.io/tx/${txHash}`;
+          explorerUrl = execRes.explorerUrl || execRes.explorer_url || getExplorerLink(targetNetwork, txHash);
           deployedContractAddress = execRes.contractAddress;
         } catch (serverErr: any) {
           console.warn('[Server Approve Fallback]:', serverErr);
           txHash = ethers.keccak256(ethers.toUtf8Bytes(`${id}-${Date.now()}`));
-          explorerUrl = `https://sepolia.etherscan.io/tx/${txHash}`;
+          explorerUrl = getExplorerLink(targetNetwork, txHash);
         }
       }
 
       if (!txHash) {
         txHash = ethers.keccak256(ethers.toUtf8Bytes(`${id}-${Date.now()}`));
-        explorerUrl = `https://sepolia.etherscan.io/tx/${txHash}`;
+        explorerUrl = getExplorerLink(targetNetwork, txHash);
       }
 
       // 3. Update local state and persist to localStorage permanently
@@ -410,7 +422,7 @@ export const ApprovalsView: React.FC = () => {
       setConfirmedTxFeedback({
         id,
         txHash,
-        explorerUrl: explorerUrl || `https://sepolia.etherscan.io/tx/${txHash}`,
+        explorerUrl: explorerUrl || getExplorerLink(targetNetwork, txHash),
       });
       if (deployedContractAddress) {
         setPasskeyNotice(`Smart contract deployed on-chain! Address: ${formatShortAddress(deployedContractAddress)} (Tx: ${txHash.slice(0, 10)}...)`);

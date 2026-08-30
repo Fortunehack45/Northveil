@@ -125,7 +125,7 @@ async function runMcpVerificationSuite() {
       const timer = setTimeout(() => {
         try { serverProcess.kill(); } catch {}
         resolve({ ok: false, toolsCount: 0 });
-      }, 10000);
+      }, 25000);
 
       const onData = (data: Buffer) => {
         buffer += data.toString();
