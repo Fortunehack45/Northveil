@@ -185,7 +185,7 @@ fun AgentsScreen(
                         )
                     }
                     Text(
-                        text = "1. AI reads on-chain portfolio via MCP stdio/SSE stream.\n2. When requesting a swap or transfer, a pending ticket is created.\n3. You confirm with your mobile biometric passkey to sign in Turnkey TEE.",
+                        text = "1. AI reads on-chain portfolio via MCP stdio/SSE stream.\n2. When requesting a swap or transfer, a pending ticket is created.\n3. You confirm with your mobile biometric passkey to sign on-device.",
                         color = colorScheme.onSurfaceVariant,
                         fontSize = 11.sp,
                         lineHeight = 16.sp

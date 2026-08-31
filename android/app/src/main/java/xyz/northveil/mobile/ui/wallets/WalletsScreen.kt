@@ -503,7 +503,7 @@ fun HoldToRevealKeyBottomSheet(
             )
 
             Text(
-                text = "Northveil operates on a pure Non-Custodial MPC Control Plane. Private keys are generated and fragmented across Turnkey hardware TEE enclaves and are never held or reconstructed on device or server.",
+                text = "Northveil operates on a pure Non-Custodial architecture. Keys are generated and protected inside Android Hardware Keystore and signed via biometric passkeys.",
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 12.sp,
                 lineHeight = 16.sp,
@@ -525,14 +525,14 @@ fun HoldToRevealKeyBottomSheet(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("Custody Model", color = colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                    Text("Non-Custodial (MPC)", color = StatusGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("Non-Custodial (Keystore)", color = StatusGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Hardware Enclave", color = colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                    Text("Turnkey TEE", color = colorScheme.onSurface, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Text("Hardware Security", color = colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Text("Android Keystore", color = colorScheme.onSurface, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),

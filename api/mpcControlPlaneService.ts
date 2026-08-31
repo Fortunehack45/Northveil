@@ -878,7 +878,7 @@ export async function verifyPasskeyAuthentication(
   }
 
   if (!credRecord) {
-    return { success: true, verified: true, userId: sessionKey, credentialId, walletAddress: resolvedWallet };
+    throw new WebAuthnVerificationError(`Unknown or unregistered passkey credential: ${credentialId}`);
   }
 
   try {
@@ -908,6 +908,15 @@ export async function verifyPasskeyAuthentication(
     credRecord.lastUsedAt = new Date().toISOString();
     inMemoryPasskeys.set(credentialId, credRecord);
 
+    try {
+      if (supabase && typeof supabase.from === 'function') {
+        await supabase.from('passkey_credentials').update({
+          counter: credRecord.counter,
+          last_used_at: credRecord.lastUsedAt,
+        }).eq('credential_id', credentialId);
+      }
+    } catch {}
+
     return {
       success: true,
       verified: true,
@@ -916,15 +925,7 @@ export async function verifyPasskeyAuthentication(
       walletAddress: resolvedWallet,
     };
   } catch (err: any) {
-    if (credentialId?.startsWith('passkey_cred_test') || process.env.NODE_ENV === 'test') {
-      return {
-        success: true,
-        verified: true,
-        userId: credRecord ? credRecord.userId : sessionKey,
-        credentialId,
-        walletAddress: resolvedWallet,
-      };
-    }
+    if (err instanceof WebAuthnVerificationError) throw err;
     throw new WebAuthnVerificationError(`Passkey authentication failed: ${err.message}`);
   }
 }
@@ -936,9 +937,80 @@ export async function verifyPasskeyAssertion(
   userId: string,
   walletAddress?: string
 ): Promise<boolean> {
-  if (!passkeyAssertion || !passkeyAssertion.signature) {
+  if (!passkeyAssertion) {
+    throw new WebAuthnVerificationError('Missing passkey assertion payload.');
+  }
+
+  const credentialId = passkeyAssertion.id || passkeyAssertion.rawId || passkeyAssertion.credentialId;
+  if (!credentialId) {
+    throw new WebAuthnVerificationError('Passkey assertion missing credential identifier.');
+  }
+
+  let credRecord = inMemoryPasskeys.get(credentialId);
+  if (!credRecord && supabase && typeof supabase.from === 'function') {
+    try {
+      const { data } = await supabase.from('passkey_credentials').select('*').eq('credential_id', credentialId).maybeSingle();
+      if (data) {
+        credRecord = {
+          userId: data.user_id,
+          credentialId: data.credential_id,
+          publicKey: data.public_key,
+          counter: Number(data.counter) || 0,
+          deviceName: data.device_name,
+        };
+      }
+    } catch {}
+  }
+
+  if (!credRecord) {
+    throw new WebAuthnVerificationError(`Unknown or unregistered passkey credential: ${credentialId}`);
+  }
+
+  // Verify full WebAuthn authentication response
+  if (passkeyAssertion.response || (passkeyAssertion.clientDataJSON && passkeyAssertion.authenticatorData)) {
+    const rawResponse = passkeyAssertion.response || passkeyAssertion;
+    const verification = await (verifyAuthenticationResponse as any)({
+      response: rawResponse,
+      expectedChallenge: challenge,
+      expectedOrigin: WEBAUTHN_EXPECTED_ORIGIN,
+      expectedRPID: WEBAUTHN_PERMITTED_RP_IDS,
+      credential: {
+        id: credRecord.credentialId,
+        publicKey: isoBase64URL.toBuffer(credRecord.publicKey),
+        counter: credRecord.counter,
+      },
+      authenticator: {
+        credentialID: isoBase64URL.toBuffer(credRecord.credentialId),
+        credentialPublicKey: isoBase64URL.toBuffer(credRecord.publicKey),
+        counter: credRecord.counter,
+      },
+      requireUserVerification: false,
+    });
+
+    if (!verification.verified) {
+      throw new WebAuthnVerificationError('Passkey cryptographic signature verification failed.');
+    }
+
+    credRecord.counter = verification.authenticationInfo.newCounter;
+    credRecord.lastUsedAt = new Date().toISOString();
+    inMemoryPasskeys.set(credentialId, credRecord);
+
+    try {
+      if (supabase && typeof supabase.from === 'function') {
+        await supabase.from('passkey_credentials').update({
+          counter: credRecord.counter,
+          last_used_at: credRecord.lastUsedAt,
+        }).eq('credential_id', credentialId);
+      }
+    } catch {}
+
+    return true;
+  }
+
+  if (!passkeyAssertion.signature) {
     throw new WebAuthnVerificationError('Missing passkey assertion signature.');
   }
+
   return true;
 }
 
@@ -1069,9 +1141,22 @@ export async function evaluateAutonomousScope(
 
   if (!activeScope) {
     return {
-      inScope: true,
-      scopeId: `scp_default_${normAddr.slice(0, 6)}`,
+      inScope: false,
+      reason: 'NO_AUTONOMOUS_SCOPE: No active autonomous spending scope configured for this wallet.',
     };
+  }
+
+  // Re-validate ownership and active status at execution time
+  if (activeScope.walletAddress.toLowerCase() !== normAddr) {
+    return { inScope: false, reason: 'OWNERSHIP_MISMATCH: Autonomous scope wallet does not match target wallet.' };
+  }
+
+  if (activeScope.expiresAt && new Date(activeScope.expiresAt).getTime() <= Date.now()) {
+    return { inScope: false, reason: 'SCOPE_EXPIRED: Autonomous spending scope has expired.' };
+  }
+
+  if (!activeScope.isActive) {
+    return { inScope: false, reason: 'SCOPE_INACTIVE: Autonomous spending scope is deactivated.' };
   }
 
   if (activeScope.allowedChains && !activeScope.allowedChains.includes(chainId)) {
@@ -1715,51 +1800,27 @@ export async function approveAndExecuteWithPasskey(
     throw new Error('STAGING_REQUEST_NOT_FOUND: Approval token or request ID not found.');
   }
 
-  const finalTxHash = explicitTxHash || req.txHash || ethers.keccak256(ethers.toUtf8Bytes(`${req.approvalToken}-${Date.now()}`));
-  const explorerUrl = getExplorerUrlForHash(req.network, finalTxHash);
-  
-  req.status = 'confirmed';
-  req.txHash = finalTxHash;
-  req.explorerUrl = explorerUrl;
-  inMemoryTxRequests.set(cleanToken, req);
-  inMemoryTxRequests.set(req.requestId, req);
-  inMemoryTxRequests.set(req.approvalToken, req);
+  // If a passkey assertion is present but no signed transaction was supplied, client must supply signed hex
+  if (passkeyAssertion) {
+    throw new Error('SIGNATURE_REQUIRED: A signed transaction payload is required to broadcast and confirm.');
+  }
 
-  try {
-    if (supabase && typeof supabase.from === 'function') {
-      await supabase.from('transaction_requests').update({
-        status: 'confirmed',
-        tx_hash: finalTxHash,
-        explorer_url: explorerUrl,
-        validation_status: 'valid',
-        token_used: true,
-        updated_at: new Date().toISOString(),
-      }).or(`approval_token.eq.${req.approvalToken},request_id.eq.${req.requestId}`);
-    }
-  } catch {}
-
-  try {
-    await logWalletAudit(passkeyAssertion ? 'TRANSACTION_APPROVED_WITH_PASSKEY' : 'TRANSACTION_APPROVED', req.walletAddress, userId, {
-      requestId: req.requestId,
-      txHash: finalTxHash,
-      network: req.network,
-    });
-  } catch {}
-
+  // Return unsigned payload details for client-side signing
   return {
     success: true,
-    status: 'confirmed',
-    txHash: finalTxHash,
-    explorerUrl,
+    status: 'SIGNATURE_REQUIRED',
     requestId: req.requestId,
     approvalToken: req.approvalToken,
+    unsignedPayload: req.unsignedPayload,
+    unsignedSerialized: req.unsignedSerialized,
     walletAddress: req.walletAddress,
     recipient: req.recipient,
     amount: req.amount,
     asset: req.asset,
     network: req.network,
-    contractAddress: req.contractAddress,
-    executedAt: new Date().toISOString(),
+    chainId: req.chainId,
+    nonce: req.nonce,
+    passkeyChallenge: req.passkeyChallenge,
   };
 }
 

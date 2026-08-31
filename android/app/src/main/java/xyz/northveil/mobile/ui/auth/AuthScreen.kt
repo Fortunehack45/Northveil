@@ -99,7 +99,7 @@ fun AuthScreen(
                         )
                     }
                     Text(
-                        text = "HARDWARE-ISOLATED TEE ENCLAVES",
+                        text = "HARDWARE-BACKED KEYSTORE SECURITY",
                         color = StatusGreen,
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
@@ -108,7 +108,7 @@ fun AuthScreen(
                 }
 
                 Text(
-                    text = "Northveil MPC generates and fragments vault keys inside Turnkey hardware secure enclaves. Zero seed phrases or private keys exist on your device or server.",
+                    text = "Northveil protects vault keys inside Android Hardware Keystore with AES-256-GCM encryption. All on-chain actions require biometric passkey authorization.",
                     color = colorScheme.onSurfaceVariant,
                     fontSize = 12.sp,
                     lineHeight = 17.sp

@@ -29,7 +29,8 @@ data class ApprovalsUiState(
 class ApprovalsViewModel @Inject constructor(
     private val approvalsRepository: ApprovalsRepository,
     private val walletRepository: WalletRepository,
-    private val biometricPromptManager: BiometricPromptManager
+    private val biometricPromptManager: BiometricPromptManager,
+    private val keystoreManager: EncryptedKeystoreManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ApprovalsUiState())
@@ -70,23 +71,28 @@ class ApprovalsViewModel @Inject constructor(
         _uiState.update { it.copy(actionProcessingId = record.id) }
 
         if (!biometricPromptManager.isBiometricAvailable(activity)) {
-            viewModelScope.launch {
-                approvalsRepository.updateDecision(record.id, true)
-                _uiState.update { it.copy(actionProcessingId = null) }
-                onSuccess()
-            }
+            val errMsg = "Biometric hardware authentication required to approve and sign transactions."
+            _uiState.update { it.copy(actionProcessingId = null, errorMessage = errMsg) }
+            onError(errMsg)
             return
         }
 
         biometricPromptManager.authenticate(
             activity = activity,
-            title = "Authorize Non-Custodial Action",
+            title = "Authorize On-Chain Action",
             subtitle = "Biometric Passkey for ${record.toolName}",
             onSuccess = { _ ->
                 viewModelScope.launch {
-                    approvalsRepository.updateDecision(record.id, true)
+                    val signedTx = keystoreManager.signTransactionPayload(record.parametersJson)
+                    val result = approvalsRepository.updateDecision(record.id, true, signedTx)
                     _uiState.update { it.copy(actionProcessingId = null) }
-                    onSuccess()
+                    result.onSuccess {
+                        onSuccess()
+                    }.onFailure { err ->
+                        val msg = err.message ?: "Failed to broadcast transaction on-chain"
+                        _uiState.update { it.copy(errorMessage = msg) }
+                        onError(msg)
+                    }
                 }
             },
             onError = { err ->
@@ -99,8 +105,11 @@ class ApprovalsViewModel @Inject constructor(
     fun rejectRequest(recordId: String) {
         _uiState.update { it.copy(actionProcessingId = recordId) }
         viewModelScope.launch {
-            approvalsRepository.updateDecision(recordId, false)
+            val result = approvalsRepository.updateDecision(recordId, false)
             _uiState.update { it.copy(actionProcessingId = null) }
+            result.onFailure { err ->
+                _uiState.update { it.copy(errorMessage = err.message) }
+            }
         }
     }
 
@@ -123,11 +132,17 @@ class ApprovalsViewModel @Inject constructor(
         }
     }
 
-    fun submitDecision(recordId: String, approved: Boolean) {
+    fun submitDecision(recordId: String, approved: Boolean, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
         _uiState.update { it.copy(actionProcessingId = recordId) }
         viewModelScope.launch {
-            approvalsRepository.updateDecision(recordId, approved)
+            val signedTx = if (approved) keystoreManager.signTransactionPayload(recordId) else null
+            val result = approvalsRepository.updateDecision(recordId, approved, signedTx)
             _uiState.update { it.copy(actionProcessingId = null) }
+            result.onSuccess { onSuccess() }.onFailure { err ->
+                val msg = err.message ?: "Failed to submit decision"
+                _uiState.update { it.copy(errorMessage = msg) }
+                onError(msg)
+            }
         }
     }
 

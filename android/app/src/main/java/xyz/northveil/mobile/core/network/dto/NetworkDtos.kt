@@ -76,7 +76,11 @@ data class ApprovalRecordDto(
 )
 
 data class ApprovalDecisionDto(
-    @SerializedName("status") val status: String, // approved, rejected
+    @SerializedName("decision") val decision: String = "approved", // approved, rejected
+    @SerializedName("status") val status: String = "approved",
+    @SerializedName("signedTransaction") val signedTransaction: String? = null,
+    @SerializedName("passkeyAssertion") val passkeyAssertion: Any? = null,
     @SerializedName("approvalToken") val approvalToken: String? = null,
-    @SerializedName("passkeySignature") val passkeySignature: String? = null
+    @SerializedName("passkeySignature") val passkeySignature: String? = null,
+    @SerializedName("reason") val reason: String? = null
 )

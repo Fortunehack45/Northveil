@@ -2116,51 +2116,47 @@ async function authenticateClient(apiKey?: string, requestedAddress?: string): P
       console.warn('[Auth] Supabase key resolution notice:', e);
     }
 
-    // If an explicit API key was provided but was not recognized, gracefully fallback to open developer session
-    const cleanReqFallback = (requestedAddress || '').trim().toLowerCase();
-    const isReqEvm = cleanReqFallback.startsWith('0x') && cleanReqFallback.length === 42;
-    const isReqSol = !cleanReqFallback.startsWith('0x') && cleanReqFallback.length >= 32 && cleanReqFallback.length <= 44;
-    const fallbackAddr = (isReqEvm || isReqSol) ? cleanReqFallback : (DEFAULT_PUBLIC_WALLET || '');
-
+    // If an explicit API key was provided but was not recognized, fail closed
     return {
-      valid: true,
-      walletAddress: fallbackAddr,
-      keyName: 'Open Developer Session',
-      permissions: ['*'],
-      allowedWallets: fallbackAddr ? [fallbackAddr] : ['*'],
-      tier: 'developer',
-      userId: 'dev_guest_user',
+      valid: false,
+      walletAddress: '',
+      keyName: 'Unrecognized API Key',
+      permissions: [],
+      allowedWallets: [],
+      tier: 'unauthorized',
+      userId: '',
     };
   }
 
-  // 2. If NO API key was provided, check if an explicit wallet was requested (from ?wallet_address=..., header, or args) OR server env is set
-  const cleanReq = (requestedAddress || '').trim().toLowerCase();
-  const isReqEvm = cleanReq.startsWith('0x') && cleanReq.length === 42;
-  const isReqSol = !cleanReq.startsWith('0x') && cleanReq.length >= 32 && cleanReq.length <= 44;
-
-  const resolvedAddr = (isReqEvm || isReqSol) ? cleanReq : (DEFAULT_PUBLIC_WALLET || '');
-
-  if (resolvedAddr) {
+  // 2. If NO API key was provided, check if a server-configured DEFAULT_PUBLIC_WALLET exists
+  if (DEFAULT_PUBLIC_WALLET) {
+    let boundAddr = DEFAULT_PUBLIC_WALLET;
+    const cleanReq = (requestedAddress || '').trim().toLowerCase();
+    const isReqEvm = cleanReq.startsWith('0x') && cleanReq.length === 42;
+    const isReqSol = !cleanReq.startsWith('0x') && cleanReq.length >= 32 && cleanReq.length <= 44;
+    if (isReqEvm || isReqSol) {
+      boundAddr = cleanReq;
+    }
     return {
       valid: true,
-      walletAddress: resolvedAddr,
-      keyName: 'Direct Wallet Session',
+      walletAddress: boundAddr,
+      keyName: 'Server Configured Public Wallet Session',
       permissions: ['*'],
-      allowedWallets: [resolvedAddr],
-      tier: 'wallet_connected',
-      userId: 'wallet_user',
+      allowedWallets: [boundAddr],
+      tier: 'server_default',
+      userId: 'server_default_user',
     };
   }
 
-  // 3. Open discovery session (assistant session without pre-bound wallet)
+  // 3. Unauthenticated session (no API key, no verified session, no DEFAULT_PUBLIC_WALLET) -> fail closed
   return {
-    valid: true,
+    valid: false,
     walletAddress: '',
-    keyName: 'Open Assistant Session',
-    permissions: ['*'],
-    allowedWallets: ['*'],
-    tier: 'developer',
-    userId: 'guest_user',
+    keyName: 'Unauthenticated Session',
+    permissions: [],
+    allowedWallets: [],
+    tier: 'unauthenticated',
+    userId: '',
   };
 }
 
@@ -4347,12 +4343,39 @@ app.get([
 });
 
 // 5. APPROVE TRANSACTION (WITH PASSKEY / NON-CUSTODIAL BIOMETRIC CONFIRMATION)
-app.options(['/api/v1/dashboard/approvals/:id/approve', '/api/v1/dashboard/approvals/:id/reject', '/api/v1/dashboard/approvals/:id/broadcast', '/api/v1/dashboard/approvals', '/api/v1/approvals/:id/approve', '/api/v1/approvals/:id/reject'], (req: Request, res: Response) => {
+app.options(['/api/v1/dashboard/approvals/:id/approve', '/api/v1/dashboard/approvals/:id/reject', '/api/v1/dashboard/approvals/:id/broadcast', '/api/v1/dashboard/approvals', '/api/v1/approvals/:id/approve', '/api/v1/approvals/:id/reject', '/api/approvals/:id/decision', '/api/v1/approvals/:id/decision'], (req: Request, res: Response) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, x-wallet-address, Origin, Accept');
   res.setHeader('Access-Control-Max-Age', '86400');
   return res.status(204).send();
+});
+
+app.post(['/api/approvals/:id/decision', '/api/v1/approvals/:id/decision'], async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, x-wallet-address, Origin, Accept');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  const { id } = req.params;
+  const { decision, signedTransaction, passkeyAssertion, userId = 'default_user', reason } = req.body || {};
+  try {
+    if (decision === 'approved' || decision === 'CONFIRMED') {
+      if (!signedTransaction) {
+        return res.status(400).json({ success: false, error: 'SIGNATURE_REQUIRED: A signed transaction payload is required to confirm and broadcast.' });
+      }
+      const result = await validateAndBroadcastSignedTransaction({
+        approvalToken: id,
+        signedTransaction,
+        passkeyAssertion,
+        userId,
+      });
+      return res.json({ success: true, ...result });
+    } else {
+      const result = await rejectTransactionRequest(id, reason || 'Rejected via decision endpoint');
+      return res.json({ success: true, result });
+    }
+  } catch (err: any) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
 });
 
 app.post(['/api/v1/dashboard/approvals/:id/approve', '/api/v1/approvals/:id/approve'], async (req: Request, res: Response) => {
@@ -6918,7 +6941,32 @@ ${blkNum ? `> **Block Number**: \`${blkNum}\`` : ''}
 
     case 'set_autonomous_spending_scope':
     case 'set_autonomous_scope': {
-      const targetAddress = (args.walletAddress || cleanAddress).toLowerCase();
+      const sessionWallet = (walletAddress || cleanAddress).toLowerCase();
+      const targetAddress = (args.walletAddress ? args.walletAddress.trim() : sessionWallet).toLowerCase();
+
+      if (sessionWallet && targetAddress !== sessionWallet) {
+        return {
+          ok: false,
+          error: `OWNERSHIP_MISMATCH: Authenticated session (${sessionWallet}) cannot configure autonomous spending for ${targetAddress}.`,
+        };
+      }
+
+      if (!args.passkeyAssertion) {
+        return {
+          ok: false,
+          error: 'PASSKEY_REQUIRED: Configuring autonomous spending scope requires cryptographic passkey authorization (passkeyAssertion).',
+        };
+      }
+
+      try {
+        await verifyPasskeyAssertion(args.passkeyAssertion, args.challenge || `scope_${targetAddress}`, sessionWallet, targetAddress);
+      } catch (authErr: any) {
+        return {
+          ok: false,
+          error: `PASSKEY_VERIFICATION_FAILED: ${authErr.message}`,
+        };
+      }
+
       const maxAmountPerTxUsd = Number(args.maxAmountPerTxUsd) || 25.0;
       const maxDailyBudgetUsd = Number(args.maxDailyBudgetUsd) || 100.0;
       const allowedChains = Array.isArray(args.allowedChains) ? args.allowedChains : [11155111, 8453];
@@ -6927,7 +6975,7 @@ ${blkNum ? `> **Block Number**: \`${blkNum}\`` : ''}
       const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
 
       const scopeRecord = {
-        user_id: 'default_user',
+        user_id: sessionWallet,
         wallet_address: targetAddress,
         asset: allowedAssets,
         allowed_chains: allowedChains,
@@ -6963,9 +7011,18 @@ ${blkNum ? `> **Block Number**: \`${blkNum}\`` : ''}
     }
 
     case 'activate_kill_switch': {
-      const targetAddress = (args.walletAddress || cleanAddress).toLowerCase();
+      const sessionWallet = (walletAddress || cleanAddress).toLowerCase();
+      const targetAddress = (args.walletAddress ? args.walletAddress.trim() : sessionWallet).toLowerCase();
+
+      if (sessionWallet && targetAddress !== sessionWallet) {
+        return {
+          ok: false,
+          error: `OWNERSHIP_MISMATCH: Authenticated session (${sessionWallet}) cannot activate kill switch for ${targetAddress}.`,
+        };
+      }
+
       const reason = args.reason || 'Emergency lock invoked via MCP tool';
-      const res = await activateKillSwitch(targetAddress, reason, walletAddress || 'default_user');
+      const res = await activateKillSwitch(targetAddress, reason, sessionWallet);
       return {
         ok: true,
         success: true,
@@ -6983,8 +7040,33 @@ ${blkNum ? `> **Block Number**: \`${blkNum}\`` : ''}
     }
 
     case 'deactivate_kill_switch': {
-      const targetAddress = (args.walletAddress || cleanAddress).toLowerCase();
-      const res = await deactivateKillSwitch(targetAddress, 'default_user');
+      const sessionWallet = (walletAddress || cleanAddress).toLowerCase();
+      const targetAddress = (args.walletAddress ? args.walletAddress.trim() : sessionWallet).toLowerCase();
+
+      if (sessionWallet && targetAddress !== sessionWallet) {
+        return {
+          ok: false,
+          error: `OWNERSHIP_MISMATCH: Authenticated session (${sessionWallet}) cannot deactivate kill switch for ${targetAddress}.`,
+        };
+      }
+
+      if (!args.passkeyAssertion) {
+        return {
+          ok: false,
+          error: 'PASSKEY_REQUIRED: Deactivating the emergency kill switch requires cryptographic passkey verification (passkeyAssertion).',
+        };
+      }
+
+      try {
+        await verifyPasskeyAssertion(args.passkeyAssertion, args.challenge || `unlock_${targetAddress}`, sessionWallet, targetAddress);
+      } catch (authErr: any) {
+        return {
+          ok: false,
+          error: `PASSKEY_VERIFICATION_FAILED: ${authErr.message}`,
+        };
+      }
+
+      const res = await deactivateKillSwitch(targetAddress, sessionWallet);
       return {
         formattedMarkdown: `
 ### 🟢 KILL SWITCH DEACTIVATED
@@ -7069,7 +7151,6 @@ contract ${safeContractName} is ERC721, ERC721Enumerable, ERC721URIStorage, Owna
             if (_nextTokenId < maxSupply) {
                 uint256 tokenId = _nextTokenId++;
                 _safeMint(msg.sender, tokenId);
-                _safeMint(msg.sender, _nextTokenId++);
             }
         }
         ${reserveNum > 0 && reserveRecipientAddress && reserveRecipientAddress.startsWith('0x') && reserveRecipientAddress.length === 42 ? `

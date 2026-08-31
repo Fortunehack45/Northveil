@@ -337,7 +337,7 @@ fun OverviewScreen(
                     HorizontalDivider(color = colorScheme.outline)
 
                     Text(
-                        text = "Autonomous multi-chain vault backed by Turnkey Nitro TEE enclaves and hardware WebAuthn biometrics.",
+                        text = "Autonomous multi-chain vault backed by hardware Keystore encryption and biometric passkeys.",
                         color = colorScheme.onSurfaceVariant,
                         fontSize = 11.sp,
                         lineHeight = 15.sp
@@ -407,7 +407,7 @@ fun OverviewScreen(
                 )
                 StatCard(
                     title = "SECURITY",
-                    value = "TEE + Passkey",
+                    value = "Keystore + Passkey",
                     icon = Icons.Default.Lock,
                     modifier = Modifier.weight(1f)
                 )

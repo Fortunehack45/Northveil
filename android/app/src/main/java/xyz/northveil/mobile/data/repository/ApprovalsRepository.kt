@@ -56,14 +56,23 @@ class ApprovalsRepository @Inject constructor(
         approvalDao.insertApprovals(listOf(testEntity))
     }
 
-    suspend fun updateDecision(id: String, isApproved: Boolean): Result<Unit> {
-        val status = if (isApproved) "CONFIRMED" else "REJECTED"
-        approvalDao.updateApprovalStatus(id, status)
+    suspend fun updateDecision(id: String, isApproved: Boolean, signedTx: String? = null): Result<Unit> {
         return try {
-            apiService.submitApprovalDecision(id, ApprovalDecisionDto(if (isApproved) "approved" else "rejected"))
+            val decisionStr = if (isApproved) "approved" else "rejected"
+            apiService.submitApprovalDecision(
+                id,
+                ApprovalDecisionDto(
+                    decision = decisionStr,
+                    status = decisionStr,
+                    signedTransaction = signedTx,
+                    reason = if (!isApproved) "Explicitly rejected by user" else null
+                )
+            )
+            val status = if (isApproved) "CONFIRMED" else "REJECTED"
+            approvalDao.updateApprovalStatus(id, status)
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.success(Unit) // Local state updated in Room DB
+            Result.failure(e)
         }
     }
 
