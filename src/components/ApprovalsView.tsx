@@ -184,21 +184,20 @@ export const ApprovalsView: React.FC = () => {
       (stagedPending || []).forEach((req: any) => {
         const id = req.requestId || req.id || req.request_id || req.approvalToken || req.approval_token;
         if (id) {
+          const rawStatus = (req.status || '').toLowerCase();
           const isConfirmed = Boolean(
             confirmedIds.has(id) ||
             confirmedIds.has(req.requestId) ||
             confirmedIds.has(req.approvalToken) ||
             req.txHash ||
             req.tx_hash ||
-            req.status === 'confirmed' ||
-            req.status === 'broadcasted'
+            rawStatus === 'confirmed' ||
+            rawStatus === 'approved' ||
+            rawStatus === 'completed' ||
+            rawStatus === 'broadcasted'
           );
-          const isRejected = rejectedIds.has(id) || rejectedIds.has(req.requestId) || rejectedIds.has(req.approvalToken) || req.status === 'rejected';
-          const isExpired = !isConfirmed && !isRejected && (
-            req.token_used ||
-            (req.expiresAt && new Date(req.expiresAt).getTime() <= now) ||
-            (req.createdAt && now - new Date(req.createdAt).getTime() > 2 * 3600 * 1000)
-          );
+          const isRejected = rejectedIds.has(id) || rejectedIds.has(req.requestId) || rejectedIds.has(req.approvalToken) || rawStatus === 'rejected';
+          const isExpired = !isConfirmed && !isRejected && (req.token_used || rawStatus === 'expired');
           const status = isConfirmed ? 'CONFIRMED' : isRejected ? 'REJECTED' : isExpired ? 'EXPIRED' : 'PENDING';
 
           const existing = existingRecords.get(id) || existingRecords.get(req.requestId) || existingRecords.get(req.approvalToken);

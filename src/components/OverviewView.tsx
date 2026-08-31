@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useWallet } from '../context/WalletContext';
-import { formatShortAddress, sanitizeToValidAddress } from '../services/addressUtils';
+import { formatShortAddress, sanitizeToValidAddress, formatCryptoBalance, formatUsdValue } from '../services/addressUtils';
 import {
   Wallet,
   ArrowUpRight,
@@ -90,14 +90,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const activeAgents = agents.filter((a) => a.status === 'active');
   const recentTxs = transactions.slice(0, 5);
 
-  const formatUsd = (num: number) => {
-    return num.toLocaleString('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  };
+  const formatUsd = (num: number) => formatUsdValue(num);
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -238,10 +231,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
                     <div className="text-right">
                       <div className="font-semibold text-sm text-zinc-900 dark:text-white font-mono">
-                        {asset.balance.toLocaleString(undefined, {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 6,
-                        })}{' '}
+                        {formatCryptoBalance(asset.balance)}{' '}
                         {asset.symbol}
                       </div>
                       <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono block">

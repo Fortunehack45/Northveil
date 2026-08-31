@@ -125,3 +125,77 @@ export const parseEtherSafe = (value: string | number | bigint | undefined | nul
   }
 };
 
+/**
+ * Formats any crypto balance (including microscopic amounts like 0.00000000007 or 7e-11)
+ * with full mathematical precision without converting to 0 or scientific notation.
+ */
+export const formatCryptoBalance = (rawBalance: number | string | undefined | null, maxDecimals: number = 18): string => {
+  if (rawBalance === undefined || rawBalance === null || rawBalance === '') return '0';
+  
+  const num = typeof rawBalance === 'number' ? rawBalance : Number(rawBalance);
+  if (isNaN(num) || num === 0) return '0';
+
+  let str = '';
+  if (typeof rawBalance === 'string' && !rawBalance.includes('e') && !rawBalance.includes('E') && !isNaN(Number(rawBalance))) {
+    str = rawBalance.trim();
+  } else {
+    // Convert scientific notation / float to full decimal string
+    const expStr = num.toExponential();
+    const [mantissa, exponent] = expStr.split('e');
+    const exp = parseInt(exponent, 10);
+    if (exp < 0) {
+      const decimals = Math.abs(exp);
+      const parts = mantissa.split('.');
+      const cleanDigits = parts[0] + (parts[1] || '');
+      str = '0.' + '0'.repeat(decimals - 1) + cleanDigits;
+    } else if (exp > 0) {
+      const parts = mantissa.split('.');
+      const intDigits = parts[0];
+      const fracDigits = parts[1] || '';
+      if (fracDigits.length <= exp) {
+        str = intDigits + fracDigits + '0'.repeat(exp - fracDigits.length);
+      } else {
+        str = intDigits + fracDigits.slice(0, exp) + '.' + fracDigits.slice(exp);
+      }
+    } else {
+      str = mantissa;
+    }
+  }
+
+  // Split integer and fractional parts
+  const [intPart, fracPart] = str.split('.');
+  const formattedInt = BigInt(intPart || '0').toLocaleString('en-US');
+  
+  if (!fracPart) return formattedInt;
+
+  // Clean trailing zeros
+  const cleanFrac = fracPart.replace(/0+$/, '');
+  if (!cleanFrac) return formattedInt;
+
+  const limitedFrac = cleanFrac.slice(0, maxDecimals);
+  return `${formattedInt}.${limitedFrac}`;
+};
+
+/**
+ * Formats a USD valuation cleanly, providing high-precision indicators for microscopic amounts.
+ */
+export const formatUsdValue = (num: number | string | undefined | null): string => {
+  if (num === undefined || num === null || num === '') return '$0.00';
+  const val = typeof num === 'number' ? num : Number(num);
+  if (isNaN(val) || val === 0) return '$0.00';
+
+  if (val > 0 && val < 0.01) {
+    if (val < 0.000001) {
+      return '< $0.000001';
+    }
+    return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`;
+  }
+
+  return val.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+

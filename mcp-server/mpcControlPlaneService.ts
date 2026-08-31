@@ -1300,7 +1300,7 @@ export async function prepareTransactionRequest(
   const approvalToken = `tok_${crypto.randomBytes(24).toString('hex')}`;
   const passkeyChallenge = crypto.randomBytes(32).toString('base64url');
   const createdAt = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour window — 10 min was too short for human review
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24-hour window for human biometric review
 
   const approxUsd = (amount * 2600).toFixed(2); // estimated USD value
   const estimatedFeeUsd = isDeploy ? '0.25' : '0.08';

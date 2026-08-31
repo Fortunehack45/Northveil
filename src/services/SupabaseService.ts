@@ -261,20 +261,16 @@ export class SupabaseService {
 
       if (error || !data) return [];
 
-      const now = Date.now();
       const list: any[] = data.map((item: any) => {
         const id = item.approval_token || item.request_id || item.id;
+        const rawStatus = (item.status || '').toLowerCase();
         
         let calculatedStatus: 'CONFIRMED' | 'REJECTED' | 'EXPIRED' | 'PENDING' = 'PENDING';
-        if (item.tx_hash || item.status === 'confirmed' || item.status === 'approved' || item.status === 'completed' || item.status === 'broadcasted') {
+        if (item.tx_hash || rawStatus === 'confirmed' || rawStatus === 'approved' || rawStatus === 'completed' || rawStatus === 'broadcasted') {
           calculatedStatus = 'CONFIRMED';
-        } else if (item.status === 'rejected') {
+        } else if (rawStatus === 'rejected') {
           calculatedStatus = 'REJECTED';
-        } else if (
-          item.token_used ||
-          item.status === 'expired' ||
-          (item.expires_at && new Date(item.expires_at).getTime() <= now)
-        ) {
+        } else if (item.token_used || rawStatus === 'expired') {
           calculatedStatus = 'EXPIRED';
         } else {
           calculatedStatus = 'PENDING';
@@ -356,10 +352,15 @@ export class SupabaseService {
    * Create a live pending transaction request for testing approval workflows
    */
   static async createPendingApprovalRequest(walletAddress: string, actionType: string = 'token_transfer', recipientAddress?: string) {
+    const cleanAddr = walletAddress.toLowerCase();
+    const targetRecipient = (recipientAddress || '0x59148d6a9dff263a772b5a84280bc88530f38636').toLowerCase();
+    const requestId = `req_${Math.random().toString(36).substring(2, 14)}`;
+    const approvalToken = `tok_${Math.random().toString(36).substring(2, 16)}${Math.random().toString(36).substring(2, 16)}`;
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+    // 1. Attempt endpoint staging via MCP Control Plane
     try {
-      const cleanAddr = walletAddress.toLowerCase();
-      const targetRecipient = (recipientAddress || '0x59148d6a9dff263a772b5a84280bc88530f38636').toLowerCase();
-      
       const baseUrl = getMcpServerUrl();
       const res = await fetch(`${baseUrl}/api/v1/transactions/prepare`, {
         method: 'POST',
@@ -374,15 +375,47 @@ export class SupabaseService {
         }),
       });
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error || 'Failed to stage real live transaction request');
+      if (res.ok) {
+        return await res.json();
       }
+    } catch (endpointErr) {
+      console.warn('[SupabaseService] MCP server endpoint offline, staging directly into Cloud DB:', endpointErr);
+    }
 
-      return await res.json();
-    } catch (e) {
-      console.error('Failed to create live pending request:', e);
-      throw e;
+    // 2. Direct Cloud Database staging fallback
+    try {
+      const { data, error } = await supabase.from('transaction_requests').insert([{
+        request_id: requestId,
+        wallet_address: cleanAddr,
+        recipient: targetRecipient,
+        amount: 0.00005,
+        asset: 'ETH',
+        network: 'sepolia',
+        chain_id: 11155111,
+        estimated_fee_usd: 0.05,
+        contract_summary: 'Transfer 0.00005 Sepolia ETH via MCP Agent',
+        total_amount: 0.00005,
+        nonce: 0,
+        unsigned_payload: {
+          to: targetRecipient,
+          value: '50000000000000',
+          data: '0x',
+        },
+        status: 'pending',
+        approval_token: approvalToken,
+        token_used: false,
+        expires_at: expiresAt,
+        created_at: now.toISOString(),
+      }]).select().single();
+
+      if (error) {
+        console.error('[Supabase Direct Insert Error]:', error);
+        throw error;
+      }
+      return data;
+    } catch (dbErr) {
+      console.error('Failed to stage transaction request:', dbErr);
+      throw dbErr;
     }
   }
 

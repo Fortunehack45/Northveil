@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useWallet } from '../context/WalletContext';
 import { CryptoAsset } from '../types';
+import { formatCryptoBalance, formatUsdValue } from '../services/addressUtils';
 import {
   Search,
   Check,
@@ -155,11 +156,11 @@ export const TokenSearchModal: React.FC<TokenSearchModalProps> = ({
 
                   <div className="text-right font-mono text-xs">
                     <div className="font-semibold">
-                      ${token.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      {formatUsdValue(token.priceUsd)}
                     </div>
-                    {token.balance > 0 && (
+                    {Number(token.balance) > 0 && (
                       <span className={`text-[10px] ${isSelected ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-500 dark:text-zinc-400'}`}>
-                        {token.balance.toLocaleString()} {token.symbol}
+                        {formatCryptoBalance(token.balance)} {token.symbol}
                       </span>
                     )}
                   </div>

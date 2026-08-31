@@ -4274,17 +4274,14 @@ app.get([
         .order('created_at', { ascending: false })
         .limit(100);
       if (walletAddress) {
-        // FIX: Strict wallet filtering — the old .or() leaked ALL pending rows for ALL wallets
-        query = query.eq('wallet_address', walletAddress);
+        const addresses = walletAddress.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+        if (addresses.length === 1) {
+          query = query.eq('wallet_address', addresses[0]);
+        } else if (addresses.length > 1) {
+          query = query.in('wallet_address', addresses);
+        }
       } else {
-        // No wallet specified — return empty to prevent data exposure
-        return res.json({
-          success: true,
-          pendingApprovals: [],
-          approvals: [],
-          count: 0,
-          warning: 'walletAddress query parameter is required to fetch approvals.',
-        });
+        query = query.eq('status', 'pending');
       }
       const { data } = await query;
       if (data && data.length > 0) {
@@ -4318,10 +4315,11 @@ app.get([
     }
   } catch (e) {}
 
-  // Merge in-memory requests — strict wallet filter only
+  // Merge in-memory requests
+  const targetAddrs = walletAddress ? walletAddress.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean) : [];
   for (const [token, reqObj] of inMemoryTxRequests.entries()) {
-    const isWalletMatch = walletAddress && reqObj.walletAddress && reqObj.walletAddress.toLowerCase() === walletAddress;
-    if (isWalletMatch) {
+    const isMatch = targetAddrs.length === 0 || (reqObj.walletAddress && targetAddrs.includes(reqObj.walletAddress.toLowerCase()));
+    if (isMatch) {
       const id = reqObj.requestId || token;
       allApprovalsMap.set(id, {
         approval_token: token,

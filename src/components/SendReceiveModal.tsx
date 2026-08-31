@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useWallet } from '../context/WalletContext';
 import { TokenSearchModal } from './TokenSearchModal';
 import { Send, QrCode, Copy, Check, ChevronDown } from 'lucide-react';
-import { sanitizeToValidAddress } from '../services/addressUtils';
+import { sanitizeToValidAddress, formatCryptoBalance } from '../services/addressUtils';
 
 interface SendReceiveModalProps {
   mode: 'send' | 'receive';
@@ -126,7 +126,7 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
                   />
                   <div className="text-left">
                     <span className="font-semibold text-zinc-900 dark:text-white block">{asset.name} ({asset.symbol})</span>
-                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">Balance: {asset.balance.toLocaleString()} {asset.symbol}</span>
+                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">Balance: {formatCryptoBalance(asset.balance)} {asset.symbol}</span>
                   </div>
                 </div>
                 <ChevronDown className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
@@ -153,10 +153,10 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
                 <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Amount</label>
                 <button
                   type="button"
-                  onClick={() => setAmount(asset.balance.toString())}
+                  onClick={() => setAmount(formatCryptoBalance(asset.balance))}
                   className="text-[11px] text-zinc-900 dark:text-white font-semibold hover:underline font-mono cursor-pointer"
                 >
-                  MAX ({asset.balance.toLocaleString()} {asset.symbol})
+                  MAX ({formatCryptoBalance(asset.balance)} {asset.symbol})
                 </button>
               </div>
               <input
