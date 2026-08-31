@@ -208,28 +208,33 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return saved ? JSON.parse(saved) : INITIAL_STAKING_POSITIONS;
   });
 
-  const [seedPhrase, setSeedPhrase] = useState<string[]>([]);
-  const [activeChain, setActiveChain] = useState<NetworkId>('ethereum');
-  const [customNetworks, setCustomNetworks] = useState<ChainInfo[]>(() => {
-    const saved = localStorage.getItem('northveil_v2_custom_networks');
-    return saved ? JSON.parse(saved) : [];
+  const [seedPhrase, setSeedPhrase] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('northveil_seed_phrase') || localStorage.getItem('northveil_seed');
+      if (raw) {
+        const words = raw.trim().split(/\s+/).filter(Boolean);
+        if (words.length >= 12 || (words.length === 1 && words[0].startsWith('0x'))) return words;
+      }
+      const directPk = localStorage.getItem('northveil_vault_pk') || localStorage.getItem('northveil_imported_pk') || localStorage.getItem('northveil_active_pk');
+      if (directPk && directPk.trim()) {
+        return [directPk.trim()];
+      }
+    } catch {}
+    return [];
   });
 
-  const [ownedNFTs, setOwnedNFTs] = useState<NFTAsset[]>([]);
-  const [historicalPerformance, setHistoricalPerformance] = useState<PortfolioHistoryPoint[]>([]);
-
-  const latestAssets = React.useRef<CryptoAsset[]>(assets);
   useEffect(() => {
-    latestAssets.current = assets;
-  }, [assets]);
-
-  useEffect(() => {
-    localStorage.setItem('northveil_v2_custom_networks', JSON.stringify(customNetworks));
-  }, [customNetworks]);
-
-  const addCustomNetwork = (network: ChainInfo) => {
-    setCustomNetworks((prev) => [...prev, network]);
-  };
+    if (seedPhrase && seedPhrase.length > 0) {
+      if (seedPhrase.length >= 12) {
+        localStorage.setItem('northveil_seed_phrase', seedPhrase.join(' '));
+        localStorage.setItem('northveil_seed', seedPhrase.join(' '));
+      } else if (seedPhrase.length === 1 && seedPhrase[0]) {
+        localStorage.setItem('northveil_vault_pk', seedPhrase[0]);
+        localStorage.setItem('northveil_imported_pk', seedPhrase[0]);
+        localStorage.setItem('northveil_active_pk', seedPhrase[0]);
+      }
+    }
+  }, [seedPhrase]);
 
   const [vaultType, setVaultType] = useState<'mpc' | 'imported'>(() => {
     return MpcWalletService.getVaultType();
@@ -356,8 +361,39 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [activeWalletId]);
 
   const activeSubWallet = useMemo(() => {
-    return subWallets.find((w) => w.id === activeWalletId) || subWallets[0] || DEFAULT_SUB_WALLETS[0];
-  }, [subWallets, activeWalletId]);
+    const raw = subWallets.find((w) => w.id === activeWalletId) || subWallets[0] || DEFAULT_SUB_WALLETS[0];
+    if (!raw) return raw;
+    let pk = raw.privateKey;
+    if (!pk) {
+      if (seedPhrase && seedPhrase.length > 0) {
+        if (seedPhrase.length === 1 && seedPhrase[0]) {
+          pk = seedPhrase[0];
+        } else if (seedPhrase.length >= 12) {
+          try {
+            pk = WalletService.deriveEVMAddress(seedPhrase, raw.accountIndex || 0).privateKey;
+          } catch {}
+        }
+      }
+    }
+    if (!pk && typeof window !== 'undefined') {
+      try {
+        const directPk = localStorage.getItem('northveil_vault_pk') || localStorage.getItem('northveil_imported_pk') || localStorage.getItem('northveil_active_pk');
+        if (directPk && directPk.trim()) pk = directPk.trim();
+        if (!pk) {
+          const rawStoredSeed = localStorage.getItem('northveil_seed_phrase') || localStorage.getItem('northveil_seed');
+          if (rawStoredSeed) {
+            const words = rawStoredSeed.trim().split(/\s+/).filter(Boolean);
+            if (words.length >= 12) {
+              pk = WalletService.deriveEVMAddress(words, raw.accountIndex || 0).privateKey;
+            } else if (words.length === 1 && words[0]) {
+              pk = words[0];
+            }
+          }
+        }
+      } catch {}
+    }
+    return { ...raw, privateKey: pk };
+  }, [subWallets, activeWalletId, seedPhrase]);
 
   // Auto-sync active wallet address metadata to Supabase Cloud DB
   useEffect(() => {
@@ -2168,6 +2204,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       } catch {}
 
       setSeedPhrase(cleanWords);
+      localStorage.setItem('northveil_seed_phrase', cleanWords.join(' '));
+      localStorage.setItem('northveil_seed', cleanWords.join(' '));
 
       const chosenName = name?.trim() || 'Primary Vault';
       const cleanAddress = sanitizeToValidAddress(address, 0);
@@ -2234,6 +2272,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const address = wallet.address.toLowerCase();
 
       setSeedPhrase([formattedKey]);
+      localStorage.setItem('northveil_vault_pk', formattedKey);
+      localStorage.setItem('northveil_imported_pk', formattedKey);
+      localStorage.setItem('northveil_active_pk', formattedKey);
 
       const chosenName = name?.trim() || 'Primary Vault';
       const cleanAddress = sanitizeToValidAddress(address, 0);

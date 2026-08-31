@@ -243,11 +243,6 @@ export class SupabaseService {
       addrs.push(walletAddresses.trim().toLowerCase());
     }
 
-    if (addrs.length === 0) {
-      // Don't fetch without address filter to prevent cross-wallet data exposure
-      return [];
-    }
-
     try {
       let query = supabase
         .from('transaction_requests')
@@ -255,10 +250,11 @@ export class SupabaseService {
         .order('created_at', { ascending: false })
         .limit(100);
 
-      if (addrs.length === 1) {
-        query = query.eq('wallet_address', addrs[0]);
+      if (addrs.length > 0) {
+        const addrFilters = addrs.map((a) => `wallet_address.eq.${a}`).join(',');
+        query = query.or(`${addrFilters},status.eq.pending`);
       } else {
-        query = query.in('wallet_address', addrs);
+        query = query.eq('status', 'pending');
       }
 
       const { data, error } = await query;
