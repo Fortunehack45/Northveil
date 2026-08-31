@@ -10170,6 +10170,7 @@ ${isNftContract ? `> **Metadata URI**: \`${metadataUri}\`  \n` : ''}> **Network*
       };
     }
 
+    case 'nft_transfer':
     case 'transfer_nft': {
       const nftContract = (args.contractAddress || args.contract || '').trim();
       const nftTokenId = String(args.tokenId ?? args.token_id ?? '0').trim();

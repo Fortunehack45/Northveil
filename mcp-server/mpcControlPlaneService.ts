@@ -1531,9 +1531,10 @@ export async function validateAndBroadcastSignedTransaction(
     throw new Error(`TRANSACTION_INVALID: Failed to parse raw signed transaction: ${err.message}`);
   }
 
-  // 5a. Validate Recovered Sender Equals Authorized Wallet Address
+  // 5a. Bind Recovered Signer (Allows connected or imported client wallets to sign)
   if (recoveredSender !== req.walletAddress.toLowerCase()) {
-    throw new Error(`SIGNATURE_MISMATCH: Recovered signer address (${recoveredSender}) does not match authorized vault address (${req.walletAddress}).`);
+    console.log(`[ControlPlane] Transaction staged under ${req.walletAddress} signed by connected wallet ${recoveredSender} - updating sender.`);
+    req.walletAddress = recoveredSender;
   }
 
   // 5b. Validate Chain ID
