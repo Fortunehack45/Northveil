@@ -242,47 +242,56 @@ const MainContent: React.FC = () => {
   );
 };
 
-const ErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [hasError, setHasError] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
 
-  useEffect(() => {
-    const handleUncaughtError = (event: ErrorEvent) => {
-      console.error("Uncaught Northveil App Error:", event.error);
-      setHasError(true);
-      setError(event.error || new Error(event.message));
-    };
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
 
-    window.addEventListener('error', handleUncaughtError);
-    return () => window.removeEventListener('error', handleUncaughtError);
-  }, []);
-
-  if (hasError) {
-    return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 z-[99999]">
-        <div className="bg-[#0f0f12] p-8 max-w-lg w-full space-y-4 rounded-3xl shadow-2xl">
-          <h2 className="text-xl font-bold text-white">Application Notice</h2>
-          <p className="text-xs text-zinc-400">An unexpected component error occurred:</p>
-          <div className="bg-black p-3 text-xs text-zinc-300 overflow-x-auto max-h-32 rounded-xl font-mono break-all">
-            {error?.toString() || 'Unknown Runtime Error'}
-          </div>
-          <button
-            onClick={() => {
-              setHasError(false);
-              setError(null);
-              window.location.reload();
-            }}
-            className="w-full py-3 bg-white text-black font-semibold text-xs rounded-full hover:bg-zinc-200 cursor-pointer"
-          >
-            Refresh Application
-          </button>
-        </div>
-      </div>
-    );
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
   }
 
-  return <>{children}</>;
-};
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Uncaught Northveil App Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 z-[99999]">
+          <div className="bg-[#0f0f12] p-8 max-w-lg w-full space-y-4 rounded-3xl shadow-2xl">
+            <h2 className="text-xl font-bold text-white">Application Notice</h2>
+            <p className="text-xs text-zinc-400">An unexpected component error occurred:</p>
+            <div className="bg-black p-3 text-xs text-zinc-300 overflow-x-auto max-h-32 rounded-xl font-mono break-all">
+              {this.state.error?.toString() || 'Unknown Runtime Error'}
+            </div>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                window.location.reload();
+              }}
+              className="w-full py-3 bg-white text-black font-semibold text-xs rounded-full hover:bg-zinc-200 cursor-pointer"
+            >
+              Refresh Application
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 export default function App() {
   return (

@@ -236,6 +236,22 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, [seedPhrase]);
 
+  const [activeChain, setActiveChain] = useState<NetworkId>('ethereum');
+  const [customNetworks, setCustomNetworks] = useState<ChainInfo[]>(() => {
+    const saved = localStorage.getItem('northveil_v2_custom_networks');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [ownedNFTs, setOwnedNFTs] = useState<NFTAsset[]>([]);
+  const [historicalPerformance, setHistoricalPerformance] = useState<PortfolioHistoryPoint[]>([]);
+
+  const addCustomNetwork = (net: ChainInfo) => {
+    setCustomNetworks((prev) => {
+      const next = [...prev, net];
+      localStorage.setItem('northveil_v2_custom_networks', JSON.stringify(next));
+      return next;
+    });
+  };
+
   const [vaultType, setVaultType] = useState<'mpc' | 'imported'>(() => {
     return MpcWalletService.getVaultType();
   });
