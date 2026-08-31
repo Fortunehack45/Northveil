@@ -275,20 +275,7 @@ export class TokenService {
                 liveBalance = Number(ethers.formatEther(bal));
               } catch (primaryErr) {
                 // Secondary RPC failover pool
-                const rpcPool: Record<string, string[]> = {
-                  base: ['https://mainnet.base.org', 'https://base.llamarpc.com', 'https://1rpc.io/base'],
-                  ethereum: ['https://eth.llamarpc.com', 'https://cloudflare-eth.com'],
-                  sepolia: ['https://ethereum-sepolia-rpc.publicnode.com', 'https://1rpc.io/sepolia'],
-                  polygon: ['https://polygon-rpc.com', 'https://rpc-mainnet.maticvigil.com'],
-                  arbitrum: ['https://arb1.arbitrum.io/rpc', 'https://rpc.ankr.com/arbitrum'],
-                  bsc: ['https://bsc-dataseed.binance.org', 'https://bsc-dataseed1.defibit.io'],
-                  avalanche: ['https://api.avax.network/ext/bc/C/rpc'],
-                  optimism: ['https://mainnet.optimism.io'],
-                  linea: ['https://rpc.linea.build'],
-                  scroll: ['https://rpc.scroll.io'],
-                  celo: ['https://forno.celo.org'],
-                };
-                const urls = rpcPool[asset.network] || ['https://eth.llamarpc.com'];
+                const urls = ProviderService.getRpcUrls(asset.network);
                 for (const u of urls) {
                   try {
                     const altProv = new ethers.JsonRpcProvider(u);

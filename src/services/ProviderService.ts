@@ -17,147 +17,129 @@ export class ProviderService {
       return provider;
     }
 
-    // Failover RPCs to ensure reliability
-    const rpcUrls: string[] = [];
-    switch (network) {
-      case 'ethereum':
-        rpcUrls.push('https://eth.llamarpc.com', 'https://rpc.ankr.com/eth', 'https://cloudflare-eth.com');
-        break;
-      case 'sepolia':
-        rpcUrls.push('https://rpc.ankr.com/eth_sepolia', 'https://ethereum-sepolia-rpc.publicnode.com', 'https://sepolia.drpc.org', 'https://1rpc.io/sepolia');
-        break;
-      case 'polygon':
-        rpcUrls.push('https://polygon-rpc.com', 'https://rpc-mainnet.maticvigil.com');
-        break;
-      case 'polygon_amoy':
-        rpcUrls.push('https://polygon-amoy-bor-rpc.publicnode.com', 'https://1rpc.io/amoy', 'https://rpc-amoy.polygon.technology');
-        break;
-      case 'arbitrum':
-        rpcUrls.push('https://arb1.arbitrum.io/rpc', 'https://rpc.ankr.com/arbitrum');
-        break;
-      case 'bsc':
-        rpcUrls.push('https://bsc-dataseed.binance.org', 'https://bsc-dataseed1.defibit.io');
-        break;
-      case 'bsc_testnet':
-        rpcUrls.push('https://bsc-testnet-rpc.publicnode.com', 'https://data-seed-prebsc-1-s1.binance.org:8545/', 'https://data-seed-prebsc-2-s1.binance.org:8545/');
-        break;
-      case 'avalanche':
-        rpcUrls.push('https://api.avax.network/ext/bc/C/rpc', 'https://rpc.ankr.com/avalanche');
-        break;
-      case 'base':
-        rpcUrls.push(
-          'https://mainnet.base.org',
-          'https://base.llamarpc.com',
-          'https://1rpc.io/base',
-          'https://base.drpc.org',
-          'https://developer-access-mainnet.base.org'
-        );
-        break;
-      case 'abstract':
-        rpcUrls.push('https://api.mainnet.abs.xyz', 'https://abstract.rpc.subquery.network/public');
-        break;
-      case 'apechain':
-        rpcUrls.push('https://apechain.calderachain.xyz/http');
-        break;
-      case 'berachain':
-        rpcUrls.push('https://rpc.berachain.com');
-        break;
-      case 'celo':
-        rpcUrls.push('https://forno.celo.org', 'https://rpc.ankr.com/celo');
-        break;
-      case 'linea':
-        rpcUrls.push('https://rpc.linea.build', 'https://linea.drpc.org');
-        break;
-      case 'mantle':
-        rpcUrls.push('https://rpc.mantle.xyz', 'https://mantle.drpc.org');
-        break;
-      case 'optimism':
-        rpcUrls.push('https://mainnet.optimism.io', 'https://optimism.drpc.org');
-        break;
-      case 'scroll':
-        rpcUrls.push('https://rpc.scroll.io', 'https://scroll.drpc.org');
-        break;
-      case 'sei':
-        rpcUrls.push('https://evm-rpc.sei-apis.com');
-        break;
-      case 'sonic':
-        rpcUrls.push('https://rpc.soniclabs.com');
-        break;
-      case 'zksync':
-        rpcUrls.push('https://mainnet.era.zksync.io', 'https://zksync.drpc.org');
-        break;
-      case 'zora':
-        rpcUrls.push('https://rpc.zora.energy');
-        break;
-      case 'opbnb':
-        rpcUrls.push('https://opbnb-mainnet-rpc.bnbchain.org', 'https://opbnb.drpc.org');
-        break;
-      case 'blast':
-        rpcUrls.push('https://rpc.blast.io', 'https://blast.drpc.org', 'https://blast.din.lol/rpc');
-        break;
-      case 'gnosis':
-        rpcUrls.push('https://rpc.gnosischain.com', 'https://gnosis.drpc.org');
-        break;
-      case 'cronos':
-        rpcUrls.push('https://evm.cronos.org', 'https://cronos.drpc.org');
-        break;
-      case 'kava':
-        rpcUrls.push('https://evm.kava.io', 'https://kava.drpc.org');
-        break;
-      case 'moonbeam':
-        rpcUrls.push('https://rpc.api.moonbeam.network', 'https://moonbeam.drpc.org');
-        break;
-      case 'moonriver':
-        rpcUrls.push('https://rpc.api.moonriver.moonbeam.network', 'https://moonriver.drpc.org');
-        break;
-      case 'metis':
-        rpcUrls.push('https://andromeda.metis.io/?owner=1088', 'https://metis.drpc.org');
-        break;
-      case 'core':
-        rpcUrls.push('https://rpc.coredao.org', 'https://core.drpc.org');
-        break;
-      case 'taiko':
-        rpcUrls.push('https://rpc.mainnet.taiko.xyz', 'https://taiko.drpc.org');
-        break;
-      case 'mode':
-        rpcUrls.push('https://mainnet.mode.network', 'https://mode.drpc.org');
-        break;
-      case 'worldchain':
-        rpcUrls.push('https://worldchain-mainnet.g.alchemy.com/public', 'https://worldchain.drpc.org');
-        break;
-      case 'arbitrum_nova':
-        rpcUrls.push('https://nova.arbitrum.io/rpc', 'https://arbitrum-nova.drpc.org');
-        break;
-      case 'polygon_zkevm':
-        rpcUrls.push('https://zkevm-rpc.com', 'https://polygon-zkevm.drpc.org');
-        break;
-      case 'aurora':
-        rpcUrls.push('https://mainnet.aurora.dev', 'https://aurora.drpc.org');
-        break;
-      case 'telos':
-        rpcUrls.push('https://mainnet.telos.net/evm', 'https://telos.drpc.org');
-        break;
-      case 'flare':
-        rpcUrls.push('https://flare-api.flare.network/ext/C/rpc', 'https://flare.drpc.org');
-        break;
-      case 'base_sepolia':
-        rpcUrls.push('https://sepolia.base.org', 'https://base-sepolia.drpc.org');
-        break;
-      case 'arbitrum_sepolia':
-        rpcUrls.push('https://sepolia-rollup.arbitrum.io/rpc', 'https://arbitrum-sepolia.drpc.org');
-        break;
-      default:
-        rpcUrls.push('https://eth.llamarpc.com');
-    }
+    // Failover RPCs to ensure reliability (100% free open public nodes without API key blocks)
+    const rpcUrls = ProviderService.getRpcUrls(network);
 
-    // Use primary high-reliability RPC provider with fallback URL support
-    const primaryUrl = rpcUrls[0] || 'https://eth.llamarpc.com';
+    // Use primary high-reliability RPC provider with staticNetwork optimization
+    const primaryUrl = rpcUrls[0] || 'https://ethereum-rpc.publicnode.com';
     const cacheKey = `${network}_${primaryUrl}`;
 
     if (!this.evmProviders.has(cacheKey)) {
-      this.evmProviders.set(cacheKey, new JsonRpcProvider(primaryUrl));
+      this.evmProviders.set(cacheKey, new JsonRpcProvider(primaryUrl, undefined, { staticNetwork: true }));
     }
     return this.evmProviders.get(cacheKey)!;
+  }
+
+  static getRpcUrls(network: string): string[] {
+    switch (network) {
+      case 'ethereum':
+        return ['https://ethereum-rpc.publicnode.com', 'https://1rpc.io/eth', 'https://rpc.payload.de', 'https://eth.drpc.org'];
+      case 'sepolia':
+        return [
+          'https://ethereum-sepolia-rpc.publicnode.com',
+          'https://1rpc.io/sepolia',
+          'https://gateway.tenderly.co/public/sepolia',
+          'https://eth-sepolia.public.blastapi.io',
+        ];
+      case 'polygon':
+        return ['https://polygon-bor-rpc.publicnode.com', 'https://1rpc.io/matic', 'https://polygon.drpc.org'];
+      case 'polygon_amoy':
+        return ['https://polygon-amoy-bor-rpc.publicnode.com', 'https://1rpc.io/amoy', 'https://rpc-amoy.polygon.technology'];
+      case 'arbitrum':
+        return ['https://arb1.arbitrum.io/rpc', 'https://arbitrum-one-rpc.publicnode.com', 'https://1rpc.io/arb'];
+      case 'arbitrum_sepolia':
+        return ['https://sepolia-rollup.arbitrum.io/rpc', 'https://arbitrum-sepolia-rpc.publicnode.com'];
+      case 'bsc':
+        return ['https://bsc-dataseed1.defibit.io', 'https://bsc-rpc.publicnode.com', 'https://1rpc.io/bnb'];
+      case 'bsc_testnet':
+        return ['https://bsc-testnet-rpc.publicnode.com', 'https://data-seed-prebsc-1-s1.binance.org:8545/'];
+      case 'avalanche':
+        return ['https://api.avax.network/ext/bc/C/rpc', 'https://avalanche-c-chain-rpc.publicnode.com', 'https://1rpc.io/avax/c'];
+      case 'base':
+        return ['https://mainnet.base.org', 'https://1rpc.io/base', 'https://base-rpc.publicnode.com'];
+      case 'base_sepolia':
+        return ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'];
+      case 'abstract':
+        return ['https://api.mainnet.abs.xyz', 'https://abstract.rpc.subquery.network/public'];
+      case 'apechain':
+        return ['https://apechain.calderachain.xyz/http'];
+      case 'berachain':
+        return ['https://rpc.berachain.com'];
+      case 'celo':
+        return ['https://forno.celo.org', 'https://celo-rpc.publicnode.com', 'https://1rpc.io/celo'];
+      case 'linea':
+        return ['https://rpc.linea.build', 'https://linea-rpc.publicnode.com'];
+      case 'mantle':
+        return ['https://rpc.mantle.xyz', 'https://mantle-rpc.publicnode.com'];
+      case 'optimism':
+        return ['https://mainnet.optimism.io', 'https://optimism-rpc.publicnode.com', 'https://1rpc.io/op'];
+      case 'scroll':
+        return ['https://rpc.scroll.io', 'https://scroll-rpc.publicnode.com'];
+      case 'sei':
+        return ['https://evm-rpc.sei-apis.com'];
+      case 'sonic':
+        return ['https://rpc.soniclabs.com', 'https://sonic-rpc.publicnode.com'];
+      case 'zksync':
+        return ['https://mainnet.era.zksync.io', 'https://zksync-era-rpc.publicnode.com'];
+      case 'zora':
+        return ['https://rpc.zora.energy'];
+      case 'opbnb':
+        return ['https://opbnb-mainnet-rpc.bnbchain.org'];
+      case 'blast':
+        return ['https://rpc.blast.io', 'https://blast-rpc.publicnode.com'];
+      case 'gnosis':
+        return ['https://rpc.gnosischain.com', 'https://gnosis-rpc.publicnode.com'];
+      case 'cronos':
+        return ['https://evm.cronos.org'];
+      case 'kava':
+        return ['https://evm.kava.io'];
+      case 'moonbeam':
+        return ['https://rpc.api.moonbeam.network'];
+      case 'moonriver':
+        return ['https://rpc.api.moonriver.moonbeam.network'];
+      case 'metis':
+        return ['https://andromeda.metis.io/?owner=1088'];
+      case 'core':
+        return ['https://rpc.coredao.org'];
+      case 'taiko':
+        return ['https://rpc.mainnet.taiko.xyz'];
+      case 'mode':
+        return ['https://mainnet.mode.network'];
+      case 'worldchain':
+        return ['https://worldchain-mainnet.g.alchemy.com/public'];
+      case 'arbitrum_nova':
+        return ['https://nova.arbitrum.io/rpc'];
+      case 'polygon_zkevm':
+        return ['https://zkevm-rpc.com'];
+      case 'aurora':
+        return ['https://mainnet.aurora.dev'];
+      case 'telos':
+        return ['https://mainnet.telos.net/evm'];
+      case 'flare':
+        return ['https://flare-api.flare.network/ext/C/rpc'];
+      default:
+        return ['https://ethereum-rpc.publicnode.com', 'https://1rpc.io/eth'];
+    }
+  }
+
+  /**
+   * Executes an async operation with automatic RPC failover across candidate RPC endpoints.
+   */
+  static async executeWithFailover<T>(network: string, operation: (provider: ethers.JsonRpcProvider) => Promise<T>): Promise<T> {
+    const urls = this.getRpcUrls(network);
+    let lastError: any = null;
+
+    for (const url of urls) {
+      try {
+        const provider = new JsonRpcProvider(url, undefined, { staticNetwork: true });
+        return await operation(provider);
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[RPC Failover] RPC ${url} returned error for ${network}, trying next...`, err.message || err);
+      }
+    }
+
+    throw lastError || new Error(`All RPC endpoints failed for network ${network}`);
   }
 
   static getEVMWebSocketProvider(network: string): WebSocketProvider | null {

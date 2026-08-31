@@ -340,7 +340,7 @@ async function getSolanaBalanceAndTokens(
     ? ['https://api.devnet.solana.com']
     : isTestnet
     ? ['https://api.testnet.solana.com']
-    : [SOLANA_RPC_URL, 'https://api.mainnet-beta.solana.com', 'https://solana-rpc.publicnode.com', 'https://rpc.ankr.com/solana'];
+    : [SOLANA_RPC_URL, 'https://api.mainnet-beta.solana.com', 'https://solana-rpc.publicnode.com'];
 
   let nativeSol = 0;
   const tokens: any[] = [];

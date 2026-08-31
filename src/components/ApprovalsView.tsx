@@ -104,13 +104,33 @@ export const ApprovalsView: React.FC = () => {
     approvalsRef.current = approvals;
   }, [approvals]);
 
+  // Purge legacy/demo artifacts from local storage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('northveil_approval_history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const clean = parsed.filter((item: any) =>
+            item &&
+            !item.id?.startsWith('req-demo-') &&
+            !item.id?.startsWith('req-init-') &&
+            item.wallet_address !== '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417' &&
+            item.wallet_address !== 'digital bind tip drama room burst chief modify promote rib salon armed'
+          );
+          localStorage.setItem('northveil_approval_history', JSON.stringify(clean));
+          setApprovals(clean);
+        }
+      }
+    } catch {}
+  }, []);
+
   const fetchLogs = async () => {
     try {
       const allAddresses = Array.from(new Set([
         activeSubWallet?.address,
         ...(subWallets || []).map((w) => w.address),
-        '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',
-      ])).filter(Boolean) as string[];
+      ])).filter((a): a is string => Boolean(a && a.startsWith('0x')));
 
       // Fetch from Supabase, MCP server pending approvals, and relative endpoints
       const [liveApprovals, stagedPending] = await Promise.all([
@@ -264,7 +284,26 @@ export const ApprovalsView: React.FC = () => {
         }
       });
 
-      const sorted = Array.from(mergedMap.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const userAddrSet = new Set(allAddresses.map((a) => a.toLowerCase()));
+      const sorted = Array.from(mergedMap.values())
+        .filter((item) => {
+          if (!item || !item.id) return false;
+          if (item.id.startsWith('req-demo-') || item.id.startsWith('req-init-')) return false;
+          const itemAddr = (item.wallet_address || '').toLowerCase();
+          if (itemAddr && userAddrSet.size > 0 && !userAddrSet.has(itemAddr)) return false;
+          return true;
+        })
+        .map((item) => {
+          if (rejectedIds.has(item.id) || (item.request_id && rejectedIds.has(item.request_id)) || (item.approval_token && rejectedIds.has(item.approval_token))) {
+            return { ...item, status: 'REJECTED' as const };
+          }
+          if (confirmedIds.has(item.id) || (item.request_id && confirmedIds.has(item.request_id)) || (item.approval_token && confirmedIds.has(item.approval_token)) || Boolean(item.tx_hash)) {
+            return { ...item, status: 'CONFIRMED' as const };
+          }
+          return item;
+        })
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
       console.log(`[NORTHVEIL_TELEMETRY] APPROVALS_VIEW_POLL addresses=${JSON.stringify(allAddresses)} merged_count=${sorted.length}`);
       setApprovals(sorted);
       try {
@@ -416,8 +455,6 @@ export const ApprovalsView: React.FC = () => {
       if (privateKey) {
         setPasskeyNotice(isDeployTx ? 'Signing contract deployment on connected device...' : 'Signing transaction on connected device...');
         const cleanPk = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
-        const provider = ProviderService.getEVMProvider(targetNetwork);
-        const signer = new ethers.Wallet(cleanPk, provider);
         const valueInWei = isDeployTx ? 0n : parseEtherSafe(targetAmount || 0);
 
         const unsignedTx: any = {
@@ -428,25 +465,49 @@ export const ApprovalsView: React.FC = () => {
           unsignedTx.to = targetRecipient;
         }
 
-        const feeData = await provider.getFeeData().catch(() => null);
-        const nonce = await provider.getTransactionCount(signer.address, 'pending');
-
-        const populated = await signer.populateTransaction({
-          ...unsignedTx,
-          nonce,
-          gasLimit: isDeployTx ? 3500000n : (targetCalldata && targetCalldata !== '0x' ? 250000n : 21000n),
-          maxFeePerGas: feeData?.maxFeePerGas || undefined,
-          maxPriorityFeePerGas: feeData?.maxPriorityFeePerGas || undefined,
-        });
-
-        const signedSerialized = await signer.signTransaction(populated);
-
-        setPasskeyNotice(isDeployTx ? 'Broadcasting smart contract to live blockchain...' : 'Broadcasting transaction to live blockchain...');
-        
         try {
-          const directTx = await provider.broadcastTransaction(signedSerialized);
-          txHash = directTx.hash;
-          explorerUrl = getExplorerLink(targetNetwork, txHash);
+          await ProviderService.executeWithFailover(targetNetwork, async (provider) => {
+            const signer = new ethers.Wallet(cleanPk, provider);
+            const feeData = await provider.getFeeData().catch(() => null);
+            const nonce = await provider.getTransactionCount(signer.address, 'pending');
+
+            const populated = await signer.populateTransaction({
+              ...unsignedTx,
+              nonce,
+              gasLimit: isDeployTx ? 3500000n : (targetCalldata && targetCalldata !== '0x' ? 250000n : 21000n),
+              maxFeePerGas: feeData?.maxFeePerGas || undefined,
+              maxPriorityFeePerGas: feeData?.maxPriorityFeePerGas || undefined,
+            });
+
+            const signedSerialized = await signer.signTransaction(populated);
+
+            setPasskeyNotice(isDeployTx ? 'Broadcasting smart contract to live blockchain...' : 'Broadcasting transaction to live blockchain...');
+            
+            const directTx = await provider.broadcastTransaction(signedSerialized);
+            txHash = directTx.hash;
+            explorerUrl = getExplorerLink(targetNetwork, txHash);
+
+            if (isDeployTx) {
+              try {
+                deployedContractAddress = ethers.getCreateAddress({
+                  from: signer.address,
+                  nonce: populated.nonce || 0,
+                });
+              } catch {}
+            }
+
+            // Notify server control plane and Supabase of the confirmed on-chain broadcast
+            try {
+              await MpcWalletService.broadcastTransaction({
+                approvalToken: id,
+                requestId: id,
+                signedTransaction: signedSerialized,
+                passkeyAssertion,
+              });
+            } catch {}
+
+            await MpcWalletService.approveTransactionRequestWithPasskey(id, passkeyAssertion, undefined, signedSerialized, txHash).catch(() => {});
+          });
         } catch (broadcastErr: any) {
           console.error('[On-Chain Direct Broadcast Error]:', broadcastErr);
           const errMsg = broadcastErr.shortMessage || broadcastErr.message || 'RPC node rejected transaction';
@@ -455,27 +516,6 @@ export const ApprovalsView: React.FC = () => {
           setActionProcessingId(null);
           return;
         }
-
-        if (isDeployTx) {
-          try {
-            deployedContractAddress = ethers.getCreateAddress({
-              from: signer.address,
-              nonce: populated.nonce || 0,
-            });
-          } catch {}
-        }
-
-        // Notify server control plane and Supabase of the confirmed on-chain broadcast
-        try {
-          await MpcWalletService.broadcastTransaction({
-            approvalToken: id,
-            requestId: id,
-            signedTransaction: signedSerialized,
-            passkeyAssertion,
-          });
-        } catch {}
-
-        await MpcWalletService.approveTransactionRequestWithPasskey(id, passkeyAssertion, undefined, signedSerialized, txHash).catch(() => {});
       } else {
         setKeyModalTargetId(id);
         setActionProcessingId(null);
