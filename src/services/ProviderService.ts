@@ -7,21 +7,18 @@ export class ProviderService {
   private static solanaConnection: Connection | null = null;
 
   static getEVMProvider(network: string, customRpcUrl?: string): ethers.AbstractProvider {
-    if (this.evmProviders.has(network)) {
-      return this.evmProviders.get(network)!;
-    }
-
-    if (customRpcUrl) {
-      const provider = new JsonRpcProvider(customRpcUrl);
-      this.evmProviders.set(network, provider);
-      return provider;
+    // If custom RPC is provided and not a known paywalled/broken domain (e.g. ankr without key)
+    if (customRpcUrl && !customRpcUrl.includes('ankr.com') && !customRpcUrl.includes('infura.io/v3') && !customRpcUrl.includes('alchemy.com/v2')) {
+      const cacheKey = `${network}_${customRpcUrl}`;
+      if (!this.evmProviders.has(cacheKey)) {
+        this.evmProviders.set(cacheKey, new JsonRpcProvider(customRpcUrl, undefined, { staticNetwork: true }));
+      }
+      return this.evmProviders.get(cacheKey)!;
     }
 
     // Failover RPCs to ensure reliability (100% free open public nodes without API key blocks)
     const rpcUrls = ProviderService.getRpcUrls(network);
-
-    // Use primary high-reliability RPC provider with staticNetwork optimization
-    const primaryUrl = rpcUrls[0] || 'https://ethereum-rpc.publicnode.com';
+    const primaryUrl = rpcUrls[0] || 'https://ethereum-sepolia-rpc.publicnode.com';
     const cacheKey = `${network}_${primaryUrl}`;
 
     if (!this.evmProviders.has(cacheKey)) {
@@ -33,11 +30,17 @@ export class ProviderService {
   static getRpcUrls(network: string): string[] {
     switch (network) {
       case 'ethereum':
+      case 'eth':
+      case 'mainnet':
         return ['https://ethereum-rpc.publicnode.com', 'https://1rpc.io/eth', 'https://rpc.payload.de', 'https://eth.drpc.org'];
       case 'sepolia':
+      case 'ethereum_sepolia':
+      case 'eth_sepolia':
         return [
           'https://ethereum-sepolia-rpc.publicnode.com',
           'https://1rpc.io/sepolia',
+          'https://rpc.sepolia.org',
+          'https://sepolia.drpc.org',
           'https://gateway.tenderly.co/public/sepolia',
           'https://eth-sepolia.public.blastapi.io',
         ];

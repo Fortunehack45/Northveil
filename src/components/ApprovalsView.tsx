@@ -15,6 +15,7 @@ import {
   ThumbsDown,
   Fingerprint,
   AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import { McpApprovalRecord } from '../types';
 import { SupabaseService, supabase } from '../services/SupabaseService';
@@ -664,6 +665,18 @@ export const ApprovalsView: React.FC = () => {
             title="Refresh Logs from Supabase"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-zinc-900 dark:text-white' : ''}`} />
+          </button>
+          <button
+            onClick={() => {
+              try { localStorage.removeItem('northveil_approval_history'); } catch {}
+              setApprovals((prev) => prev.filter((a) => a.status === 'PENDING'));
+              approvalsRef.current = approvalsRef.current.filter((a) => a.status === 'PENDING');
+              fetchLogs();
+            }}
+            className="p-2 rounded-full bg-black/[0.04] dark:bg-white/[0.04] hover:bg-red-500/10 hover:text-red-500 text-zinc-600 dark:text-zinc-400 transition-all cursor-pointer"
+            title="Clear Dismissed / Failed History"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
           <span className="px-3 py-1 rounded-full bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white font-medium whitespace-nowrap">
             {approvals.filter((a) => a.status === 'CONFIRMED').length} Confirmed
