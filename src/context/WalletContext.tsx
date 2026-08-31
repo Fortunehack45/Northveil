@@ -244,6 +244,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return (
       !!localStorage.getItem('northveil_v3_mpc_vault') ||
       !!localStorage.getItem('northveil_v3_encrypted_vault') ||
+      !!localStorage.getItem('northveil_seed_phrase') ||
+      !!localStorage.getItem('northveil_seed') ||
+      !!localStorage.getItem('northveil_vault_pk') ||
+      !!localStorage.getItem('northveil_imported_pk') ||
+      !!localStorage.getItem('northveil_active_pk') ||
+      !!localStorage.getItem('northveil_v3_subwallets') ||
       VaultService.hasVault()
     );
   });

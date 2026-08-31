@@ -88,37 +88,44 @@ export class WalletService {
    * Derives an EVM address from a seed phrase and account index (supports optional 25th word passphrase)
    */
   static deriveEVMAddress(mnemonicWords: string[], accountIndex: number = 0, passphrase?: string): { address: string; privateKey: string; path: string } {
-    if (mnemonicWords.length === 1 && (mnemonicWords[0].startsWith('0x') || mnemonicWords[0].length === 64)) {
-      const clean = mnemonicWords[0].startsWith('0x') ? mnemonicWords[0] : `0x${mnemonicWords[0]}`;
-      if (accountIndex === 0) {
-        const wallet = new ethers.Wallet(clean);
+    try {
+      if (!mnemonicWords || mnemonicWords.length === 0) {
+        return { address: '', privateKey: '', path: '' };
+      }
+      if (mnemonicWords.length === 1 && (mnemonicWords[0].startsWith('0x') || mnemonicWords[0].length === 64)) {
+        const clean = mnemonicWords[0].startsWith('0x') ? mnemonicWords[0] : `0x${mnemonicWords[0]}`;
+        if (accountIndex === 0) {
+          const wallet = new ethers.Wallet(clean);
+          return {
+            address: wallet.address,
+            privateKey: wallet.privateKey,
+            path: 'imported_private_key',
+          };
+        }
+        // For derived sub-accounts from single private key, generate deterministic sub-key
+        const subKey = ethers.keccak256(ethers.toUtf8Bytes(`${clean}_subaccount_${accountIndex}`));
+        const subWallet = new ethers.Wallet(subKey);
         return {
-          address: wallet.address,
-          privateKey: wallet.privateKey,
-          path: 'imported_private_key',
+          address: subWallet.address,
+          privateKey: subWallet.privateKey,
+          path: `custom/sub/${accountIndex}`,
         };
       }
-      // For derived sub-accounts from single private key, generate deterministic sub-key
-      const subKey = ethers.keccak256(ethers.toUtf8Bytes(`${clean}_subaccount_${accountIndex}`));
-      const subWallet = new ethers.Wallet(subKey);
+      const mnemonic = mnemonicWords.join(' ').trim();
+      const path = `m/44'/60'/0'/0/${accountIndex}`;
+      const wallet = ethers.HDNodeWallet.fromMnemonic(
+        ethers.Mnemonic.fromPhrase(mnemonic, passphrase),
+        path
+      );
+      
       return {
-        address: subWallet.address,
-        privateKey: subWallet.privateKey,
-        path: `custom/sub/${accountIndex}`,
+        address: wallet.address,
+        privateKey: wallet.privateKey,
+        path,
       };
+    } catch (e) {
+      return { address: '', privateKey: '', path: '' };
     }
-    const mnemonic = mnemonicWords.join(' ');
-    const path = `m/44'/60'/0'/0/${accountIndex}`;
-    const wallet = ethers.HDNodeWallet.fromMnemonic(
-      ethers.Mnemonic.fromPhrase(mnemonic, passphrase),
-      path
-    );
-    
-    return {
-      address: wallet.address,
-      privateKey: wallet.privateKey,
-      path,
-    };
   }
 
   /**
