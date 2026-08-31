@@ -158,17 +158,15 @@ export interface AutonomousSpendingScope {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// SUPABASE CLIENT INITIALIZATION (Zero hardcoded fallback keys)
+// SUPABASE CLIENT INITIALIZATION (Cloud-persistent staging & audit)
 // ═════════════════════════════════════════════════════════════════════════════
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ulkbchewsrksgvlbzjzl.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsa2JjaGV3c3Jrc2d2bGJ6anpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NzkzMDIsImV4cCI6MjEwMTI1NTMwMn0.L8d4ZI9f1mJda9mraZRb5O_Tjc9wzSur84pB_Y0vjTA';
 
-let supabase: SupabaseClient = (SUPABASE_URL && SUPABASE_ANON_KEY)
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-  : ({} as any);
+let supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export function initSupabase(client: SupabaseClient) {
-  if (client) {
+  if (client && typeof client.from === 'function') {
     supabase = client;
   }
 }
@@ -330,7 +328,6 @@ const NETWORK_CHAIN_IDS: Record<string, number> = {
   gnosis: 100, xdai: 100,
   cronos: 25,
   celo: 42220,
-  sonic: 146, fantom: 146,
   sei: 1329,
   berachain: 80094,
   abstract: 2741,

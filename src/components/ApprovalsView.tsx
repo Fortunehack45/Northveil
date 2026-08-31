@@ -289,6 +289,8 @@ export const ApprovalsView: React.FC = () => {
         .filter((item) => {
           if (!item || !item.id) return false;
           if (item.id.startsWith('req-demo-') || item.id.startsWith('req-init-')) return false;
+          // All pending authorization requests staged by AI agents/MCP must always be visible
+          if (item.status === 'PENDING') return true;
           const itemAddr = (item.wallet_address || '').toLowerCase();
           if (itemAddr && userAddrSet.size > 0 && !userAddrSet.has(itemAddr)) return false;
           return true;
