@@ -28,9 +28,10 @@ import { SupabaseService } from '../services/SupabaseService';
 import { MpcWalletService } from '../services/MpcWalletService';
 import { ethers } from 'ethers';
 import { getMcpServerUrl } from '../config/endpointConfig';
+import { formatShortAddress } from '../services/addressUtils';
 
 export const DeveloperHubView: React.FC = () => {
-  const { activeSubWallet, subWallets, agents, addAgentConnection, revokeAgentConnection, activeNetwork } = useWallet();
+  const { activeSubWallet, subWallets, agents = [], addAgentConnection, revokeAgentConnection, activeNetwork } = useWallet();
 
   const [activeTab, setActiveTab] = useState<'mcp' | 'cli' | 'sdk' | 'keys' | 'webhooks' | 'playground'>('mcp');
   const [selectedMcpClient, setSelectedMcpClient] = useState<

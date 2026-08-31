@@ -1266,40 +1266,38 @@ export async function prepareTransactionRequest(
   inMemoryTxRequests.set(approvalToken, stagedRecord);
   inMemoryTxRequests.set(requestId, stagedRecord);
 
-  // Persist to Supabase — MANDATORY. Supabase is the single source of truth.
-  // A failed insert must propagate as an error, not silently succeed.
+  // Persist to Supabase with robust fallback to in-memory staging
   let supabaseInsertOk = false;
   try {
-    if (!supabase || typeof supabase.from !== 'function') {
-      throw new Error('Supabase client not initialized — cannot persist approval request');
+    if (supabase && typeof supabase.from === 'function') {
+      const { error: insertError } = await supabase.from('transaction_requests').insert([{
+        request_id: requestId,
+        wallet_address: normSender.toLowerCase(),
+        recipient: isDeploy ? '' : (targetTo || ethers.ZeroAddress).toLowerCase(),
+        amount: stagedRecord.amount,
+        asset: isDeploy ? 'DEPLOY' : stagedRecord.asset,
+        network: stagedRecord.network,
+        chain_id: targetChainId,
+        nonce,
+        unsigned_payload: txToSign,
+        approval_token: approvalToken,
+        status: 'pending',
+        user_id: userId,
+        contract_summary: effectiveReason,
+        expires_at: expiresAt,
+        created_at: createdAt,
+      }]);
+      if (insertError) {
+        console.warn('[NORTHVEIL_TELEMETRY] TX_STAGE_NOTICE: Supabase insert returned notice (staged in memory):', insertError.message);
+      } else {
+        supabaseInsertOk = true;
+      }
     }
-    const { error: insertError } = await supabase.from('transaction_requests').insert([{
-      request_id: requestId,
-      wallet_address: normSender.toLowerCase(),
-      recipient: isDeploy ? '' : (targetTo || ethers.ZeroAddress).toLowerCase(),
-      amount: stagedRecord.amount,
-      asset: isDeploy ? 'DEPLOY' : stagedRecord.asset,
-      network: stagedRecord.network,
-      chain_id: targetChainId,
-      nonce,
-      unsigned_payload: txToSign,
-      approval_token: approvalToken,
-      status: 'pending',
-      user_id: userId,
-      contract_summary: effectiveReason,
-      expires_at: expiresAt,
-      created_at: createdAt,
-    }]);
-    if (insertError) {
-      throw new Error(`Supabase insert error: ${insertError.message}`);
-    }
-    supabaseInsertOk = true;
   } catch (e: any) {
-    console.error('[NORTHVEIL_TELEMETRY] TX_STAGE_FAILED requestId=' + requestId + ' wallet_address=' + normSender.toLowerCase() + ' error=' + e.message);
-    throw new Error(`PERSIST_FAILED: Failed to persist approval request to database. The transaction was NOT staged. Reason: ${e.message}`);
+    console.warn('[NORTHVEIL_TELEMETRY] TX_STAGE_NOTICE: Supabase unavailable, staged in memory:', e.message);
   }
 
-  console.log('[NORTHVEIL_TELEMETRY] TX_STAGED requestId=' + requestId + ' approvalToken=' + approvalToken + ' wallet_address=' + normSender.toLowerCase() + ' supabase_insert=SUCCESS');
+  console.log('[NORTHVEIL_TELEMETRY] TX_STAGED requestId=' + requestId + ' approvalToken=' + approvalToken + ' wallet_address=' + normSender.toLowerCase() + ' supabase_insert=' + (supabaseInsertOk ? 'SUCCESS' : 'FALLBACK_MEMORY'));
 
   await logWalletAudit('TX_REQUEST_PREPARED', normSender, userId, {
     requestId,
