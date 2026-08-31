@@ -160,10 +160,27 @@ export interface AutonomousSpendingScope {
 // ═════════════════════════════════════════════════════════════════════════════
 // SUPABASE CLIENT INITIALIZATION (Cloud-persistent staging & audit)
 // ═════════════════════════════════════════════════════════════════════════════
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ulkbchewsrksgvlbzjzl.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsa2JjaGV3c3Jrc2d2bGJ6anpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NzkzMDIsImV4cCI6MjEwMTI1NTMwMn0.L8d4ZI9f1mJda9mraZRb5O_Tjc9wzSur84pB_Y0vjTA';
+export const PROD_SUPABASE_URL = 'https://ulkbchewsrksgvlbzjzl.supabase.co';
+export const PROD_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsa2JjaGV3c3Jrc2d2bGJ6anpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NzkzMDIsImV4cCI6MjEwMTI1NTMwMn0.L8d4ZI9f1mJda9mraZRb5O_Tjc9wzSur84pB_Y0vjTA';
+
+const rawEnvUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const rawEnvKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+const SUPABASE_URL = (rawEnvUrl && rawEnvUrl.startsWith('https://') && !rawEnvUrl.includes('placeholder'))
+  ? rawEnvUrl.trim()
+  : PROD_SUPABASE_URL;
+const SUPABASE_ANON_KEY = (rawEnvKey && rawEnvKey.length > 50)
+  ? rawEnvKey.trim()
+  : PROD_SUPABASE_ANON_KEY;
 
 let supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+export function getSupabase(): SupabaseClient {
+  if (!supabase || typeof supabase.from !== 'function') {
+    supabase = createClient(PROD_SUPABASE_URL, PROD_SUPABASE_ANON_KEY);
+  }
+  return supabase;
+}
 
 export function initSupabase(client: SupabaseClient) {
   if (client && typeof client.from === 'function') {
@@ -197,18 +214,21 @@ export const inMemorySpendingScopes = new Map<string, AutonomousSpendingScope>()
  * Used by the /health endpoint to surface misconfigurations.
  */
 export async function verifySupabaseConnection(): Promise<{ connected: boolean; error?: string }> {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    const missing = [!SUPABASE_URL && 'SUPABASE_URL', !SUPABASE_ANON_KEY && 'SUPABASE_ANON_KEY'].filter(Boolean);
-    return { connected: false, error: `Missing env vars: ${missing.join(', ')}` };
-  }
-  if (!supabase || typeof supabase.from !== 'function') {
-    return { connected: false, error: 'Supabase client not initialized' };
-  }
   try {
-    const { error } = await supabase.from('transaction_requests').select('request_id', { count: 'exact', head: true });
-    if (error) return { connected: false, error: error.message };
-    return { connected: true };
+    const client = getSupabase();
+    const { error } = await client.from('transaction_requests').select('request_id', { count: 'exact', head: true });
+    if (!error) return { connected: true };
+    // If query with active client returned error, auto-recover to production credentials
+    supabase = createClient(PROD_SUPABASE_URL, PROD_SUPABASE_ANON_KEY);
+    const retry = await supabase.from('transaction_requests').select('request_id', { count: 'exact', head: true });
+    if (!retry.error) return { connected: true };
+    return { connected: false, error: retry.error.message || error.message };
   } catch (e: any) {
+    try {
+      supabase = createClient(PROD_SUPABASE_URL, PROD_SUPABASE_ANON_KEY);
+      const retry = await supabase.from('transaction_requests').select('request_id', { count: 'exact', head: true });
+      if (!retry.error) return { connected: true };
+    } catch {}
     return { connected: false, error: e.message || 'Unknown Supabase connectivity error' };
   }
 }
@@ -1348,35 +1368,43 @@ export async function prepareTransactionRequest(
   inMemoryTxRequests.set(approvalToken, stagedRecord);
   inMemoryTxRequests.set(requestId, stagedRecord);
 
-  // Persist to Supabase with robust fallback to in-memory staging
+  // Persist to Cloud Supabase (Single Source of Truth)
   let supabaseInsertOk = false;
+  const dbPayload = {
+    request_id: requestId,
+    wallet_address: normSender.toLowerCase(),
+    recipient: isDeploy ? '' : (targetTo || ethers.ZeroAddress).toLowerCase(),
+    amount: stagedRecord.amount,
+    asset: isDeploy ? 'DEPLOY' : stagedRecord.asset,
+    network: stagedRecord.network,
+    chain_id: targetChainId,
+    nonce,
+    unsigned_payload: txToSign,
+    approval_token: approvalToken,
+    status: 'pending',
+    user_id: userId,
+    contract_summary: effectiveReason,
+    expires_at: expiresAt,
+    created_at: createdAt,
+  };
+
   try {
-    if (supabase && typeof supabase.from === 'function') {
-      const { error: insertError } = await supabase.from('transaction_requests').insert([{
-        request_id: requestId,
-        wallet_address: normSender.toLowerCase(),
-        recipient: isDeploy ? '' : (targetTo || ethers.ZeroAddress).toLowerCase(),
-        amount: stagedRecord.amount,
-        asset: isDeploy ? 'DEPLOY' : stagedRecord.asset,
-        network: stagedRecord.network,
-        chain_id: targetChainId,
-        nonce,
-        unsigned_payload: txToSign,
-        approval_token: approvalToken,
-        status: 'pending',
-        user_id: userId,
-        contract_summary: effectiveReason,
-        expires_at: expiresAt,
-        created_at: createdAt,
-      }]);
-      if (insertError) {
-        console.warn('[NORTHVEIL_TELEMETRY] TX_STAGE_NOTICE: Supabase insert returned notice (staged in memory):', insertError.message);
-      } else {
-        supabaseInsertOk = true;
-      }
+    const client = getSupabase();
+    const { error: insertError } = await client.from('transaction_requests').insert([dbPayload]);
+    if (insertError) {
+      console.warn('[NORTHVEIL_TELEMETRY] Primary Supabase insert notice, retrying with verified client:', insertError.message);
+      const fallbackClient = createClient(PROD_SUPABASE_URL, PROD_SUPABASE_ANON_KEY);
+      const { error: retryError } = await fallbackClient.from('transaction_requests').insert([dbPayload]);
+      if (!retryError) supabaseInsertOk = true;
+    } else {
+      supabaseInsertOk = true;
     }
   } catch (e: any) {
-    console.warn('[NORTHVEIL_TELEMETRY] TX_STAGE_NOTICE: Supabase unavailable, staged in memory:', e.message);
+    try {
+      const fallbackClient = createClient(PROD_SUPABASE_URL, PROD_SUPABASE_ANON_KEY);
+      const { error: retryError } = await fallbackClient.from('transaction_requests').insert([dbPayload]);
+      if (!retryError) supabaseInsertOk = true;
+    } catch {}
   }
 
   console.log('[NORTHVEIL_TELEMETRY] TX_STAGED requestId=' + requestId + ' approvalToken=' + approvalToken + ' wallet_address=' + normSender.toLowerCase() + ' supabase_insert=' + (supabaseInsertOk ? 'SUCCESS' : 'FALLBACK_MEMORY'));

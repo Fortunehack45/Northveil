@@ -2362,7 +2362,7 @@ function getOpenApiSpec(baseUrl: string) {
         summary: tool.description,
         description: tool.description,
         operationId: tool.name,
-        security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }],
+        security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }, {}],
         requestBody: {
           required: false,
           content: {
@@ -2400,18 +2400,20 @@ function getOpenApiSpec(baseUrl: string) {
       { url: baseUrl, description: 'Active Northveil MCP Server' },
       { url: 'https://northveil-mcp.vercel.app', description: 'Production Vercel Server' }
     ],
+    security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }, {}],
     components: {
       securitySchemes: {
         ApiKeyAuth: {
           type: 'apiKey',
           in: 'header',
           name: 'X-API-Key',
-          description: 'Northveil API Key (nv_live_...)',
+          description: 'Northveil API Key (nv_live_...) - Optional for wallet-scoped operations',
         },
         BearerAuth: {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'API Key',
+          description: 'Optional Bearer Authentication',
         },
       },
     },
