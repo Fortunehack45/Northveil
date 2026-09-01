@@ -474,7 +474,7 @@
       justify-content: space-between;
       align-items: center;
       padding: var(--header-y) var(--header-x) 10px;
-      z-index: 50;
+      z-index: 1000;
       position: fixed;
       top: 0;
       left: 0;
@@ -494,7 +494,13 @@
       }
     }
 
-    .logo, #site-nav, .header-right {
+    .logo, .header-right {
+      pointer-events: auto;
+      position: relative;
+      z-index: 1001;
+    }
+
+    #site-nav {
       pointer-events: auto;
     }
 
@@ -1885,15 +1891,17 @@
 
       #site-nav {
         display: none !important;
-        position: fixed;
-        inset: 0;
-        z-index: 999;
-        background: rgba(8, 8, 12, 0.98);
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        gap: 16px;
-        padding: 80px 24px 32px;
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 900 !important;
+        background: rgba(8, 8, 12, 0.98) !important;
+        backdrop-filter: blur(28px) !important;
+        -webkit-backdrop-filter: blur(28px) !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: center !important;
+        gap: 16px !important;
+        padding: 100px 24px 32px !important;
         opacity: 0;
         visibility: hidden;
         transition: opacity 0.28s ease, visibility 0.28s ease;
@@ -1907,7 +1915,7 @@
         pointer-events: auto;
       }
 
-      .burger { display: grid; }
+      .burger { display: grid; z-index: 1002; }
       
       .grid-3, .pricing-grid { grid-template-columns: repeat(2, 1fr); gap: 18px; }
       .tools-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
