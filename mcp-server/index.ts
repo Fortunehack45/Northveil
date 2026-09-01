@@ -7171,7 +7171,7 @@ contract ${safeContractName} is ERC721, ERC721Enumerable, ERC721URIStorage, Owna
         return _baseTokenURI;
     }
 
-    function tokenURI(uint256 tokenId) public view override(ERC721, ERC721Enumerable, ERC721URIStorage) returns (string memory) {
+    function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {
         return super.tokenURI(tokenId);
     }
 
@@ -8855,6 +8855,25 @@ ${solCode}
               const key = `local:${c.id}`.toLowerCase();
               if (!seenKeys.has(key)) {
                 seenKeys.add(key);
+                const chainStr = String(c.chain_id || 'Sepolia Testnet');
+                let expUrl = 'https://sepolia.etherscan.io';
+                const lowerChain = chainStr.toLowerCase();
+                if (lowerChain.includes('bnb') || lowerChain.includes('bsc') || lowerChain === '56') {
+                  expUrl = c.tx_hash ? `https://bscscan.com/tx/${c.tx_hash}` : `https://bscscan.com/token/${c.contract_address || ''}`;
+                } else if (lowerChain.includes('base') && !lowerChain.includes('sepolia')) {
+                  expUrl = c.tx_hash ? `https://basescan.org/tx/${c.tx_hash}` : `https://basescan.org/token/${c.contract_address || ''}`;
+                } else if (lowerChain.includes('polygon') || lowerChain === '137') {
+                  expUrl = c.tx_hash ? `https://polygonscan.com/tx/${c.tx_hash}` : `https://polygonscan.com/token/${c.contract_address || ''}`;
+                } else if (lowerChain.includes('arbitrum') || lowerChain === '42161') {
+                  expUrl = c.tx_hash ? `https://arbiscan.io/tx/${c.tx_hash}` : `https://arbiscan.io/token/${c.contract_address || ''}`;
+                } else if (lowerChain.includes('optimism') || lowerChain === '10') {
+                  expUrl = c.tx_hash ? `https://optimistic.etherscan.io/tx/${c.tx_hash}` : `https://optimistic.etherscan.io/token/${c.contract_address || ''}`;
+                } else if (lowerChain.includes('mainnet') || lowerChain === '1') {
+                  expUrl = c.tx_hash ? `https://etherscan.io/tx/${c.tx_hash}` : `https://etherscan.io/token/${c.contract_address || ''}`;
+                } else {
+                  expUrl = c.tx_hash ? `https://sepolia.etherscan.io/tx/${c.tx_hash}` : `https://sepolia.etherscan.io/token/${c.contract_address || ''}`;
+                }
+
                 nfts.push({
                   tokenId: '0-10000',
                   name: c.contract_name || 'NFT Collection',
@@ -8862,9 +8881,9 @@ ${solCode}
                   symbol: c.symbol,
                   contractAddress: c.contract_address || 'Deployed On-Chain',
                   imageUrl: c.image_url || 'https://northveil.xyz/logo.png',
-                  chain: c.chain_id || 'Sepolia Testnet',
+                  chain: chainStr,
                   standard: c.contract_type || 'ERC-721',
-                  explorerUrl: c.tx_hash ? `https://sepolia.etherscan.io/tx/${c.tx_hash}` : 'https://sepolia.etherscan.io',
+                  explorerUrl: expUrl,
                 });
               }
             }
