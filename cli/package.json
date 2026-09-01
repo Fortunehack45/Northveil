@@ -1,7 +1,7 @@
 {
   "name": "northveil-cli",
-  "version": "1.1.0",
-  "description": "The Official Northveil Developer CLI — Build decentralized applications, deploy smart contracts, interact with MCP AI servers, search global travel & flights, and manage multi-chain wallets.",
+  "version": "1.2.1",
+  "description": "The Official Northveil Developer CLI — Build decentralized applications, stage non-custodial MPC transactions, deploy smart contracts, and interact with MCP AI tools across 37+ blockchains.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {

@@ -17,7 +17,7 @@ printBanner();
 program
   .name('northveil')
   .description('Official Northveil CLI for Web3 development, smart contracts & MCP AI tools')
-  .version('1.1.0');
+  .version('1.2.1');
 
 // Authentication & Identity Commands
 program
