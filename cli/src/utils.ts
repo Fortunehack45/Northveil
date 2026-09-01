@@ -44,12 +44,11 @@ export async function postApi(endpoint: string, body: any): Promise<any> {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 20000);
-
-      const targetWallet = cfg.walletAddress || body?.walletAddress || '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417';
+      const targetWallet = cfg.walletAddress || body?.walletAddress || body?.fromAddress || body?.ownerAddress || '';
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'x-wallet-address': targetWallet,
         'Bypass-Tunnel-Reminder': 'true',
+        ...(targetWallet ? { 'x-wallet-address': targetWallet } : {}),
         ...(cfg.apiKey ? { 'Authorization': `Bearer ${cfg.apiKey}`, 'X-API-Key': cfg.apiKey } : {}),
       };
 
