@@ -1,24 +1,9 @@
-# Volume 8: Database Topology & DevOps Schema
+-- Northveil Non-Custodial Agent Wallet + MCP Control Plane Schema
+-- Supabase PostgreSQL DDL
 
-## 1. PostgreSQL Database Schema (Supabase)
+create extension if not exists "pgcrypto";
 
-Northveil utilizes PostgreSQL with Row-Level Security (RLS) policies for persistent state management. In strict accordance with the non-custodial security invariants, no private keys, seed phrases, or master encryption keys are stored.
-
-### Entity Relationship Diagram
-```
-users (id, email, google_sub)
-  ├── passkeys (credential_id, credential_public_key, counter)
-  ├── wallets (address, chain_family, mpc_provider, mpc_wallet_id)
-  └── agent_clients (client_key_hash, status, expires_at)
-        ├── grants (mode, wallet_ids[], spend limits, allowed recipients)
-        │     └── spend_counters (daily spent volume)
-        └── pending_approvals (payload_hash, canonical_tx, used, expires_at)
-```
-
-## 2. Table DDL Definitions
-
-```sql
--- 1. Users from Google OAuth
+-- 1. Users authenticated via Google OAuth
 create table if not exists public.users (
   id uuid primary key default gen_random_uuid(),
   email text not null,
@@ -30,7 +15,7 @@ create table if not exists public.users (
   last_login_at timestamptz
 );
 
--- 2. WebAuthn Passkeys enrolled for user verification
+-- 2. WebAuthn Passkeys enrolled for user verification and transaction step-up
 create table if not exists public.passkeys (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
@@ -42,7 +27,7 @@ create table if not exists public.passkeys (
   last_used_at timestamptz
 );
 
--- 3. Wallets (Address and MPC vendor handle ONLY - NO private keys)
+-- 3. MPC Wallets (Address and vendor partition handle ONLY - NO private keys or seeds)
 create table if not exists public.wallets (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
@@ -75,7 +60,7 @@ create table if not exists public.grants (
   mode text not null default 'always_ask', -- always_ask | autonomous
   chains text[] not null default array['eip155:8453'],
   allowed_assets text[] not null default array['ETH','USDC'],
-  allowed_recipients text[] not null default array[]::text[],
+  allowed_recipients text[] not null default array[]::text[], -- empty = new recipients need ask
   allow_any_recipient boolean not null default false,
   max_wei_per_tx numeric not null default 0,
   max_wei_per_day numeric not null default 0,
@@ -97,7 +82,7 @@ create table if not exists public.pending_approvals (
   created_at timestamptz not null default now()
 );
 
--- 7. Spend Counters (Daily volume tracking per grant)
+-- 7. Spend Counters (Atomic daily volume tracking per grant)
 create table if not exists public.spend_counters (
   grant_id uuid not null references public.grants(id) on delete cascade,
   day_utc date not null default current_date,
@@ -115,4 +100,11 @@ create table if not exists public.audit_logs (
   details jsonb not null default '{}',
   created_at timestamptz not null default now()
 );
-```
+
+-- Indexes for high-performance context resolution
+create index if not exists idx_agent_clients_user on public.agent_clients (user_id);
+create index if not exists idx_agent_clients_hash on public.agent_clients (client_key_hash);
+create index if not exists idx_wallets_user on public.wallets (user_id);
+create index if not exists idx_pending_approvals_user_used on public.pending_approvals (user_id, used);
+create index if not exists idx_grants_client on public.grants (client_id);
+create index if not exists idx_audit_logs_user on public.audit_logs (user_id);
