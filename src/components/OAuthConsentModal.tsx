@@ -109,8 +109,8 @@ export const OAuthConsentModal: React.FC<OAuthConsentModalProps> = ({
       <div className="bg-white dark:bg-[#121215] border border-black/[0.08] dark:border-white/[0.08] rounded-3xl max-w-md w-full shadow-2xl overflow-hidden p-6 sm:p-8 space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="w-14 h-14 rounded-2xl bg-black/[0.04] dark:bg-white/[0.08] flex items-center justify-center mx-auto text-zinc-900 dark:text-white">
-            <Bot className="w-7 h-7" />
+          <div className="w-14 h-14 rounded-2xl bg-black/[0.04] dark:bg-white/[0.08] flex items-center justify-center mx-auto overflow-hidden p-2 border border-black/[0.08] dark:border-white/[0.08]">
+            <img src="https://iili.io/CDS9fvn.png" alt="Northveil MCP" className="w-full h-full object-contain rounded-xl" />
           </div>
           <div>
             <h3 className="text-xl font-bold text-zinc-900 dark:text-white">
