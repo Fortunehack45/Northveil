@@ -6,10 +6,10 @@ export interface ChainInfo {
   symbol: string;
   icon: string;
   color: string;
-  rpcLatency: number; // in ms
-  blockTime: number; // in sec
+  rpcLatency?: number; // in ms
+  blockTime?: number; // in sec
   gasUnit: string;
-  nativeTokenPrice: number;
+  nativeTokenPrice?: number;
   explorerUrl: string;
   rpcUrl?: string; // added for custom networks
   chainId?: number; // added for custom networks

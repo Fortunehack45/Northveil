@@ -97,8 +97,8 @@ export const AgentsView: React.FC = () => {
                 command: 'npx',
                 args: ['-y', 'northveil-cli', 'mcp'],
                 env: {
-                  NORTHVEIL_WALLET_ADDRESS: targetWallet,
-                  NORTHVEIL_API_URL: baseMcpUrl,
+                  NORTHVEIL_API_KEY: 'YOUR_NORTHVEIL_CLIENT_KEY',
+                  NORTHVEIL_API_URL: baseMcpUrl || 'https://mcp.northveil.xyz',
                 },
               },
             },
@@ -212,13 +212,36 @@ export const AgentsView: React.FC = () => {
     setShowConnectModal(true);
   };
 
-  const handleSaveConnection = () => {
+  const handleSaveConnection = async () => {
     const name =
       connectType === 'claude'
         ? 'Claude Desktop Agent'
         : connectType === 'chatgpt'
         ? 'ChatGPT Custom Action'
         : customAgentName.trim() || 'Custom AI Agent';
+
+    try {
+      const mcpUrl = (import.meta as any).env?.VITE_NORTHVEIL_API_URL || (import.meta as any).env?.VITE_MCP_URL || 'https://mcp.northveil.xyz';
+      const token = localStorage.getItem('nv_session_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${mcpUrl}/wallet/agent-clients`, {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify({ name }),
+      });
+
+      if (res.ok) {
+        const { rawOnce, clientId } = await res.json();
+        if (rawOnce) {
+          localStorage.setItem('northveil_client_key', rawOnce);
+        }
+      }
+    } catch (e) {
+      console.warn('Issue agent key warning:', e);
+    }
 
     addAgentConnection({
       name,
@@ -228,12 +251,11 @@ export const AgentsView: React.FC = () => {
       expiresAt: null,
       status: 'active',
       permissions: [
-        'get_balance',
-        'send_transfer',
-        'execute_swap',
-        'mint_tokens',
-        'deploy_smart_contract',
-        'reserve_tokens',
+        'nv_get_balances',
+        'nv_prepare_transfer',
+        'nv_prepare_swap',
+        'nv_prepare_deploy_token',
+        'nv_prepare_contract_call',
       ],
       sseUrl: generatedSseUrl,
       recentActionsCount: 0,

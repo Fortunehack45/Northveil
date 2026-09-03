@@ -1,4 +1,3 @@
-process.env.NORTHVEIL_DEMO_MODE = 'true';
 process.env.NODE_ENV = 'test';
 
 async function run() {

@@ -33,7 +33,6 @@ console.log('✅ [PASS] Staged transaction with 0.0005 ETH value:', staged.reque
 console.log('Approval Token:', staged.approvalToken);
 
 console.log('\n--- Testing with Turnkey or Demo Mode ---');
-process.env.NORTHVEIL_DEMO_MODE = 'true';
 const approved = await approveAndExecuteWithPasskey(staged.approvalToken, undefined, 'default_user');
 console.log('✅ [PASS] Execution succeeded:', approved);
 assert.strictEqual(approved.status, 'simulated');

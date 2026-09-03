@@ -48,25 +48,68 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleConfirmSend = () => {
+  const handleConfirmSend = async () => {
     if (!recipientAddress || numAmount <= 0) return;
 
-    triggerBiometricAuth(`Authorize Send of ${numAmount} ${asset.symbol}`, async () => {
-      setIsSending(true);
-      try {
-        await sendCrypto({
-          assetId: asset.id,
-          amount: numAmount,
-          recipientAddress,
-          gasFeeUsd: 2.50,
-        });
-      } catch (e: any) {
-        console.error('Send crypto error:', e);
-      } finally {
-        setIsSending(false);
-        onClose();
+    setIsSending(true);
+    try {
+      const mcpUrl = (import.meta as any).env?.VITE_NORTHVEIL_API_URL || (import.meta as any).env?.VITE_MCP_URL || 'https://mcp.northveil.xyz';
+      const clientKey = localStorage.getItem('northveil_client_key') || localStorage.getItem('nv_session_token') || '';
+
+      const res = await fetch(`${mcpUrl}/mcp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': clientKey,
+          'Authorization': `Bearer ${clientKey}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method: 'tools/call',
+          params: {
+            name: 'nv_prepare_transfer',
+            arguments: {
+              to: recipientAddress,
+              amount: String(numAmount),
+              asset: asset.symbol,
+              network: asset.network || 'base',
+            },
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`MCP Error HTTP ${res.status}`);
       }
-    });
+
+      const data = await res.json();
+      if (data.error) {
+        throw new Error(data.error.message || 'Failed to stage transfer');
+      }
+
+      const result = data.result;
+      if (result?.status === 'APPROVAL_REQUIRED' || result?.approvalId) {
+        onClose();
+        const approvalId = result.approvalId || result.id;
+        window.location.href = `/?action=approvals&id=${encodeURIComponent(approvalId)}`;
+        return;
+      }
+
+      if (result?.status === 'EXECUTED' && result?.txHash) {
+        alert(`Transfer executed successfully!\nTx Hash: ${result.txHash}`);
+        onClose();
+        return;
+      }
+
+      onClose();
+    } catch (e: any) {
+      console.error('Send crypto error:', e);
+      alert(`Transfer failed: ${e.message || 'Unknown error'}`);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return createPortal(

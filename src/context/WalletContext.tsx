@@ -21,14 +21,9 @@ import {
 } from '../types';
 import {
   SUPPORTED_CHAINS,
-  INITIAL_ASSETS,
-  INITIAL_TRANSACTIONS,
-  INITIAL_STAKING_POSITIONS,
-  INITIAL_GAS_ESTIMATES,
-  MICROSERVICES_STATUS,
-  INITIAL_NFTS,
   DICTIONARY,
 } from '../data/initialData';
+import { fetchLivePortfolio, fetchLiveHistory, fetchLiveMe } from '../services/LivePortfolio';
 import { WalletService } from '../services/WalletService';
 import { TokenService } from '../services/TokenService';
 import { ProviderService } from '../services/ProviderService';
@@ -178,9 +173,7 @@ interface WalletContextType {
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [assets, setAssets] = useState<CryptoAsset[]>(() => {
-    return INITIAL_ASSETS.map((a) => ({ ...a, balance: 0 }));
-  });
+  const [assets, setAssets] = useState<CryptoAsset[]>([]);
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
@@ -205,7 +198,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const [stakingPositions, setStakingPositions] = useState<StakingPosition[]>(() => {
     const saved = localStorage.getItem('northveil_v3_staking');
-    return saved ? JSON.parse(saved) : INITIAL_STAKING_POSITIONS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [seedPhrase, setSeedPhrase] = useState<string[]>(() => {
@@ -407,34 +400,19 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (activeSubWallet?.address) {
       const key = `northveil_v3_assets_${activeSubWallet.address.toLowerCase()}`;
       const saved = localStorage.getItem(key);
-      let baseAssets = INITIAL_ASSETS.map(a => ({ ...a, balance: 0 }));
-
+      let baseAssets: CryptoAsset[] = [];
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const validIds = new Set(INITIAL_ASSETS.map(a => a.id));
-            const cleanedAssets = parsed
-              .filter((a: any) => validIds.has(a.id) || (typeof a.balance === 'number' && a.balance > 0))
-              .map((a: any) => {
-                const numBal = typeof a.balance === 'number' && !isNaN(a.balance) ? a.balance : 0;
-                if (numBal === 1.45 || numBal === 1250 || numBal === 6.8 || numBal === 3.4 || numBal === 0.05 || numBal === 100) {
-                  return { ...a, balance: 0 };
-                }
-                return { ...a, balance: numBal };
-              });
-            const existingIds = new Set(cleanedAssets.map((a: any) => a.id));
-            const missingNatives = INITIAL_ASSETS.filter(a => !existingIds.has(a.id));
-            baseAssets = [...cleanedAssets, ...missingNatives];
-          }
+          if (Array.isArray(parsed)) baseAssets = parsed;
         } catch (e) {}
       }
 
       const deduplicateAssets = (list: CryptoAsset[]): CryptoAsset[] => {
         const map = new Map<string, CryptoAsset>();
-        list.forEach(a => {
+        list.forEach((a) => {
           const key = `${a.network}_${a.symbol}`.toLowerCase();
-          if (!map.has(key) || (a.balance > (map.get(key)?.balance || 0))) {
+          if (!map.has(key) || a.balance > (map.get(key)?.balance || 0)) {
             map.set(key, a);
           }
         });
@@ -833,7 +811,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return defaultSettings;
   });
 
-  const [gasEstimates, setGasEstimates] = useState<ChainGasEstimate[]>(INITIAL_GAS_ESTIMATES);
+  const [gasEstimates, setGasEstimates] = useState<ChainGasEstimate[]>([]);
   const [systemMetrics] = useState<MicroserviceStatus[]>(MICROSERVICES_STATUS);
 
   // Auto-initialize vault state on mount
@@ -941,7 +919,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setTransactions([]);
       setStakingPositions([]);
       setOwnedNFTs([]);
-      setAssets(INITIAL_ASSETS.map((a) => ({ ...a, balance: 0 })));
+      setAssets([]);
 
       setIsVaultConfigured(true);
       setIsLocked(false);
@@ -1055,7 +1033,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setTransactions([]);
       setStakingPositions([]);
       setOwnedNFTs([]);
-      setAssets(INITIAL_ASSETS.map((a) => ({ ...a, balance: 0 })));
+      setAssets([]);
 
       setIsVaultConfigured(true);
       setIsLocked(false);
@@ -1116,7 +1094,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [userSettings.theme]);
 
   const refreshGasEstimates = async () => {
-    const newEstimates = [...INITIAL_GAS_ESTIMATES];
+    const newEstimates: ChainGasEstimate[] = [];
     
     // We only fetch for EVM networks using our custom RPCs to make it live
     for (const chain of SUPPORTED_CHAINS) {
@@ -1195,7 +1173,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           name: chain.symbol,
           network: chain.id as NetworkId,
           balance: 0,
-          priceUsd: chain.nativeTokenPrice,
+          priceUsd: chain.nativeTokenPrice || 0,
           change24h: 0,
           icon: chain.icon,
         }));
@@ -2223,7 +2201,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         'ethereum'
       );
 
-      setAssets(INITIAL_ASSETS.map((a) => ({ ...a, balance: 0 })));
+      setAssets([]);
       setTransactions([]);
       setStakingPositions([]);
       setOwnedNFTs([]);
@@ -2288,7 +2266,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setIsLocked(false);
       setVaultType('imported');
 
-      setAssets(INITIAL_ASSETS.map((a) => ({ ...a, balance: 0 })));
+      setAssets([]);
       setTransactions([]);
       setStakingPositions([]);
       setOwnedNFTs([]);

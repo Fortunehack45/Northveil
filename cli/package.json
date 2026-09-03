@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "northveil": "bin/northveil.js"
+    "northveil": "bin/northveil.js",
+    "northveil-cli": "bin/northveil.js"
   },
   "files": [
     "bin",
@@ -21,7 +22,6 @@
     "web3",
     "cli",
     "mcp",
-    "travel",
     "ethereum",
     "solidity",
     "blockchain",

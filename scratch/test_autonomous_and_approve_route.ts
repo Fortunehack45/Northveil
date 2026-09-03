@@ -1,4 +1,3 @@
-delete process.env.NORTHVEIL_DEMO_MODE;
 delete process.env.TURNKEY_ORGANIZATION_ID;
 process.env.NODE_ENV = 'production';
 

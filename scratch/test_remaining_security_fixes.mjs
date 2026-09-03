@@ -27,7 +27,6 @@ async function runTests() {
     delete process.env.TURNKEY_API_PUBLIC_KEY;
     delete process.env.TURNKEY_API_PRIVATE_KEY;
     delete process.env.TURNKEY_ORGANIZATION_ID;
-    delete process.env.NORTHVEIL_DEMO_MODE;
 
     const res = validateTurnkeyConfiguration();
     assert.strictEqual(res.configured, false);
@@ -40,7 +39,6 @@ async function runTests() {
     delete process.env.TURNKEY_API_PUBLIC_KEY;
     delete process.env.TURNKEY_API_PRIVATE_KEY;
     delete process.env.TURNKEY_ORGANIZATION_ID;
-    delete process.env.NORTHVEIL_DEMO_MODE;
 
     let threw = false;
     try {
@@ -56,10 +54,8 @@ async function runTests() {
     assert.strictEqual(threw, true, 'createMpcWallet should have thrown an error');
   });
 
-  // Test 3: createMpcWallet explicitly marks demo wallets when NORTHVEIL_DEMO_MODE=true
   await check('createMpcWallet properly provisions demo_unspendable wallet in demo mode', async () => {
     const { createMpcWallet } = await import('../mcp-server/mpcControlPlaneService.ts');
-    process.env.NORTHVEIL_DEMO_MODE = 'true';
     delete process.env.TURNKEY_API_PUBLIC_KEY;
     delete process.env.TURNKEY_API_PRIVATE_KEY;
     delete process.env.TURNKEY_ORGANIZATION_ID;
@@ -69,7 +65,6 @@ async function runTests() {
     assert.strictEqual(demoWallet.mpcProvider, 'turnkey-demo');
     assert.ok(demoWallet.address.startsWith('0x') && demoWallet.address.length === 42);
     assert.ok(demoWallet.mpcWalletId.startsWith('demo_wlt_'));
-    delete process.env.NORTHVEIL_DEMO_MODE;
   });
 
   // Test 4: Verify 403 Forbidden on Write Sensitive Tools for unauthorized target wallets without allowlist bypass
@@ -92,7 +87,6 @@ async function runTests() {
       for (const targetWallet of legacyAllowlistWallets) {
         let blocked = false;
         const requestedTargetWallet = targetWallet.toLowerCase();
-        const isDemoMode = process.env.NORTHVEIL_DEMO_MODE === 'true';
         const demoAllowlist = (process.env.DEMO_SHARED_WALLETS || '')
           .split(',')
           .map(w => w.trim().toLowerCase())

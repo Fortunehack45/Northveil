@@ -228,7 +228,7 @@ const MainContent: React.FC = () => {
         />
       )}
 
-      {/* Onboarding & Auth Simulator Modal */}
+      {/* Onboarding & Non-Custodial MPC Auth Modal */}
       {isOnboardingOpen && (
         <OnboardingAuthModal onClose={() => setIsOnboardingOpen(false)} />
       )}

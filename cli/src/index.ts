@@ -7,7 +7,6 @@ import { registerContractCommands } from './commands/contracts';
 import { registerAuditCommand } from './commands/audit';
 import { registerWebhookCommands } from './commands/webhooks';
 import { registerMcpCommands } from './commands/mcp';
-import { registerTravelCommands } from './commands/travel';
 import { loginCommand, whoamiCommand, logoutCommand } from './commands/auth';
 
 const program = new Command();
@@ -61,6 +60,5 @@ registerContractCommands(program);
 registerAuditCommand(program);
 registerWebhookCommands(program);
 registerMcpCommands(program);
-registerTravelCommands(program);
 
 program.parse(process.argv);

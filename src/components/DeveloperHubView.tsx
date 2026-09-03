@@ -100,8 +100,8 @@ export const DeveloperHubView: React.FC = () => {
                 command: 'npx',
                 args: ['-y', 'northveil-cli', 'mcp'],
                 env: {
-                  NORTHVEIL_WALLET_ADDRESS: currentAddress,
-                  NORTHVEIL_API_URL: baseMcpUrl,
+                  NORTHVEIL_API_KEY: 'YOUR_NORTHVEIL_CLIENT_KEY',
+                  NORTHVEIL_API_URL: baseMcpUrl || 'https://mcp.northveil.xyz',
                 },
               },
             },

@@ -192,56 +192,63 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </span>
             </div>
 
-            <div className="space-y-1.5">
-              {visibleAssets.map((asset) => {
-                const totalValue = asset.balance * asset.priceUsd;
-                return (
-                  <div
-                    key={asset.id}
-                    className="flex items-center justify-between p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-all cursor-pointer"
-                    onClick={() => onOpenSend(asset.id)}
-                  >
-                    <div className="flex items-center gap-3">
-                      {asset.icon ? (
-                        <img
-                          src={asset.icon}
-                          alt={asset.name}
-                          className="w-9 h-9 rounded-full object-cover bg-black"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-black/[0.06] dark:bg-white/[0.08] flex items-center justify-center font-bold text-xs text-zinc-900 dark:text-white">
-                          {asset.symbol.slice(0, 3)}
+            {visibleAssets.length === 0 ? (
+              <div className="p-8 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] text-center space-y-1">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">No assets found</p>
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-600 font-mono">Deposit funds to begin</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {visibleAssets.map((asset) => {
+                  const totalValue = asset.balance * (asset.priceUsd || 0);
+                  return (
+                    <div
+                      key={asset.id}
+                      className="flex items-center justify-between p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-all cursor-pointer"
+                      onClick={() => onOpenSend(asset.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        {asset.icon ? (
+                          <img
+                            src={asset.icon}
+                            alt={asset.name}
+                            className="w-9 h-9 rounded-full object-cover bg-black"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-black/[0.06] dark:bg-white/[0.08] flex items-center justify-center font-bold text-xs text-zinc-900 dark:text-white">
+                            {asset.symbol.slice(0, 3)}
+                          </div>
+                        )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-zinc-900 dark:text-white">
+                              {asset.symbol}
+                            </span>
+                            <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-md bg-black/[0.06] dark:bg-white/[0.06] text-zinc-700 dark:text-zinc-300">
+                              {asset.network}
+                            </span>
+                          </div>
+                          <span className="text-xs text-zinc-500 dark:text-zinc-400 block">{asset.name}</span>
                         </div>
-                      )}
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm text-zinc-900 dark:text-white">
-                            {asset.symbol}
-                          </span>
-                          <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-md bg-black/[0.06] dark:bg-white/[0.06] text-zinc-700 dark:text-zinc-300">
-                            {asset.network}
-                          </span>
-                        </div>
-                        <span className="text-xs text-zinc-500 dark:text-zinc-400 block">{asset.name}</span>
                       </div>
-                    </div>
 
-                    <div className="text-right">
-                      <div className="font-semibold text-sm text-zinc-900 dark:text-white font-mono">
-                        {formatCryptoBalance(asset.balance)}{' '}
-                        {asset.symbol}
+                      <div className="text-right">
+                        <div className="font-semibold text-sm text-zinc-900 dark:text-white font-mono">
+                          {formatCryptoBalance(asset.balance)}{' '}
+                          {asset.symbol}
+                        </div>
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono block">
+                          {formatUsd(totalValue)}
+                        </span>
                       </div>
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono block">
-                        {formatUsd(totalValue)}
-                      </span>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
