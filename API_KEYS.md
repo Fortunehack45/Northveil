@@ -1,74 +1,45 @@
+# Northveil Environment & Credential Configuration
 
-# 🔑 NORTHVEIL API KEYS & CREDENTIALS DIRECTORY
-
-This document contains all API keys, environment variables, Supabase Cloud database credentials, Web3 RPC endpoints, and Northveil MCP AI keys used across the Northveil project.
-
----
-
-## 1. 🌐 Web3 Data & DEX Aggregator API Keys
-
-| Service | Environment Variable | Public / Test Key | Description |
-| :--- | :--- | :--- | :--- |
-| **Moralis Web3 Data API** | `VITE_MORALIS_API_KEY` | `mIOzSC9sFGkekzPRY99n5fjvxrc5bhKF` *(or register at [moralis.io](https://moralis.io))* | Fetches real-time ERC-20 token balances, NFT metadata, and EVM transaction history |
-| **1inch DEX Aggregator** | `VITE_1INCH_API_KEY` | `mIOzSC9sFGkekzPRY99n5fjvxrc5bhKF` *(or register at [portal.1inch.dev](https://portal.1inch.dev))* | Provides live 1inch v6 swap quotes and cross-chain routing for EVM networks |
-| **Jupiter Solana Aggregator** | *No Key Required* | `https://quote-api.jup.ag/v6` | Live Solana DEX swap router & quotes |
-| **Coinpaprika Market API** | *No Key Required* | `https://api.coinpaprika.com/v1` | Live crypto market ticker prices & 24h metrics |
-| **Blockscout EVM Indexer** | *No Key Required* | `https://eth.blockscout.com/api/v2` | Open zero-key EVM indexer for Ethereum, Polygon, Arbitrum & Base |
+This document outlines required environment variables for running the Northveil Non-Custodial Control Plane and Wallet interfaces. All secrets must be provided via runtime environment variables and never committed to source control.
 
 ---
 
-## 2. ⚡ Supabase Cloud Database Credentials
+## 1. Supabase Database Configuration
 
-| Parameter | Key / Value | Description |
+| Parameter | Key | Description |
 | :--- | :--- | :--- |
-| **Supabase Project Ref** | `ulkbchewsrksgvlbzjzl` | Northveil Production Database Project |
-| **Supabase URL** | `VITE_SUPABASE_URL` = `https://ulkbchewsrksgvlbzjzl.supabase.co`<br>`SUPABASE_URL` = `https://ulkbchewsrksgvlbzjzl.supabase.co` | Database REST & Realtime URL |
-| **Supabase Anon Key** | `VITE_SUPABASE_ANON_KEY` = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsa2JjaGV3c3Jrc2d2bGJ6anpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NzkzMDIsImV4cCI6MjEwMTI1NTMwMn0.L8d4ZI9f1mJda9mraZRb5O_Tjc9wzSur84pB_Y0vjTA`<br>`SUPABASE_ANON_KEY` = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsa2JjaGV3c3Jrc2d2bGJ6anpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NzkzMDIsImV4cCI6MjEwMTI1NTMwMn0.L8d4ZI9f1mJda9mraZRb5O_Tjc9wzSur84pB_Y0vjTA` | Client & Server DB Auth Token |
+| **Supabase URL** | `SUPABASE_URL` / `VITE_SUPABASE_URL` | `https://YOUR_PROJECT.supabase.co` |
+| **Supabase Anon Key** | `SUPABASE_ANON_KEY` / `VITE_SUPABASE_ANON_KEY` | Public client token for client app |
+| **Supabase Service Role Key** | `SUPABASE_SERVICE_ROLE_KEY` | Server-side elevated key (MCP server runtime only) |
 
 ---
 
-## 3. 🤖 Northveil MCP Server & AI Keys
+## 2. Agent Client Credentials
 
-| Key Identifier | Raw Key Value | Owner Wallet / Purpose |
+| Key Identifier | Placeholder Format | Description |
 | :--- | :--- | :--- |
-| **Northveil Live Key 1** | `nv_live_9f82a17b09c82415d8a9` | Primary Production AI Key (Auto-bound to active wallet) |
-| **Northveil Test Key** | `nv_test_7a12b99c43d21100e45b` | Sandbox & Testnet Testing Key |
-| **Northveil Default Key** | `nv_live_default_northveil_key` | Northveil Public Protocol Gateway Key |
-| **OAuth 2.0 Client ID** | `northveil_ai_client` | Claude Web & Custom GPT Handshake Client ID |
-| **OAuth 2.0 Client Secret** | `northveil_ai_secret` | Claude Web & Custom GPT Handshake Client Secret |
+| **Northveil Client Key** | `YOUR_NORTHVEIL_CLIENT_KEY` (`nv_live_...`) | Scoped client key generated on `wallet.northveil.xyz` |
 
 ---
 
-## 4. 🌐 Real On-Chain RPC Node Endpoints
+## 3. On-Chain RPC Providers
 
 | Chain / Network | Environment Variable | RPC Endpoint URL |
 | :--- | :--- | :--- |
 | **Ethereum Mainnet** | `ETH_RPC_URL` | `https://cloudflare-eth.com` |
 | **Sepolia Testnet** | `SEPOLIA_RPC_URL` | `https://ethereum-sepolia-rpc.publicnode.com` |
+| **Base Mainnet** | `BASE_RPC_URL` | `https://mainnet.base.org` |
 | **Polygon Mainnet** | `POLYGON_RPC_URL` | `https://polygon-rpc.com` |
 | **Solana Mainnet** | `SOLANA_RPC_URL` | `https://api.mainnet-beta.solana.com` |
 
 ---
 
-## 5. 🤖 Google Gemini AI Studio Credentials
-
-| Service | Environment Variable | Value | Description |
-| :--- | :--- | :--- | :--- |
-| **Google Gemini AI API** | `GEMINI_API_KEY` | Managed via Google AI Studio Secrets Panel | Used for smart contract AI audits, transaction explainers, and natural language trading assistant |
-
----
-
-## 📋 Vercel Environment Variables (`.env` Copy-Paste Block)
-
-Paste this block into **Vercel Project Settings $\rightarrow$ Environment Variables**:
+## 4. Environment Template (`.env.example`)
 
 ```env
-VITE_SUPABASE_URL=https://ulkbchewsrksgvlbzjzl.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsa2JjaGV3c3Jrc2d2bGJ6anpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NzkzMDIsImV4cCI6MjEwMTI1NTMwMn0.L8d4ZI9f1mJda9mraZRb5O_Tjc9wzSur84pB_Y0vjTA
-SUPABASE_URL=https://ulkbchewsrksgvlbzjzl.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsa2JjaGV3c3Jrc2d2bGJ6anpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NzkzMDIsImV4cCI6MjEwMTI1NTMwMn0.L8d4ZI9f1mJda9mraZRb5O_Tjc9wzSur84pB_Y0vjTA
-VITE_MORALIS_API_KEY=mIOzSC9sFGkekzPRY99n5fjvxrc5bhKF
-VITE_1INCH_API_KEY=mIOzSC9sFGkekzPRY99n5fjvxrc5bhKF
-ETH_RPC_URL=https://cloudflare-eth.com
-SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
+SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+PORT=3001
+NODE_ENV=production
 ```

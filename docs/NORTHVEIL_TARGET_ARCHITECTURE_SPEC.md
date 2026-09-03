@@ -249,11 +249,11 @@ User            AI Agent (Claude)              Northveil MCP / Compiler       Po
 - **Inputs**:
   ```json
   {
-    "recipient": "0x59148d6a9dff263a772b5a84280bc88530f38636",
+    "recipient": "0xYOUR_WALLET_ADDRESS",
     "amount": "0.05",
     "token": "ETH",
     "chain": "base",
-    "walletAddress"?: "0x..."
+    "walletAddress"?: "0xYOUR_WALLET_ADDRESS"
   }
   ```
 - **Outputs**:
@@ -262,8 +262,8 @@ User            AI Agent (Claude)              Northveil MCP / Compiler       Po
     "action": "TRANSFER",
     "status": "APPROVAL_REQUIRED",
     "preview": {
-      "sender": "0x5914...",
-      "recipient": "0x59148d6a9dff263a772b5a84280bc88530f38636",
+      "sender": "0xYOUR_WALLET_ADDRESS",
+      "recipient": "0xYOUR_WALLET_ADDRESS",
       "amount": "0.05 ETH",
       "usdValue": "$165.00",
       "chain": "Base Mainnet (8453)",

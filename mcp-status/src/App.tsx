@@ -21,10 +21,10 @@ import {
   ArrowLeft
 } from 'lucide-react';
 
-const SUPABASE_URL = 'https://ulkbchewsrksgvlbzjzl.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsa2JjaGV3c3Jrc2d2bGJ6anpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NzkzMDIsImV4cCI6MjEwMTI1NTMwMn0.L8d4ZI9f1mJda9mraZRb5O_Tjc9wzSur84pB_Y0vjTA';
+const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient(SUPABASE_URL || 'https://YOUR_PROJECT.supabase.co', SUPABASE_ANON_KEY || 'placeholder-anon-key');
 
 interface ServiceStatus {
   id: string;
@@ -58,7 +58,7 @@ export const App: React.FC = () => {
     { id: '6', name: 'Polygon PoS Bor RPC', category: 'rpc', endpoint: 'https://polygon-rpc.com', status: 'OPERATIONAL', latencyMs: 28, uptimePct: 99.94 },
     { id: '7', name: 'Arbitrum One OffchainLabs RPC', category: 'rpc', endpoint: 'https://arb1.arbitrum.io/rpc', status: 'OPERATIONAL', latencyMs: 19, uptimePct: 99.98 },
     { id: '8', name: 'Solana High-Speed RPC Node', category: 'rpc', endpoint: 'https://api.mainnet-beta.solana.com', status: 'OPERATIONAL', latencyMs: 32, uptimePct: 99.91 },
-    { id: '9', name: 'Supabase Encrypted Cloud Vault', category: 'database', endpoint: 'Postgres TLS 1.3 (ulkbchewsrksgvlbzjzl)', status: 'OPERATIONAL', latencyMs: 15, uptimePct: 100 },
+    { id: '9', name: 'Supabase Encrypted Cloud Vault', category: 'database', endpoint: 'Postgres TLS 1.3', status: 'OPERATIONAL', latencyMs: 15, uptimePct: 100 },
   ]);
 
   // Real RPC Latency Test Function

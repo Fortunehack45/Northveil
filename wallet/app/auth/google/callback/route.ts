@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   response.cookies.set({
     name: 'nv_session',
-    value: 'session_' + Math.random().toString(36).slice(2, 14),
+    value: 'session_' + crypto.randomUUID().replace(/-/g, ''),
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

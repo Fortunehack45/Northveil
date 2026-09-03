@@ -7,7 +7,7 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
 DEFAULT_BASE_URL = os.getenv("NORTHVEIL_API_URL", "https://mcp.northveil.xyz")
-DEFAULT_API_KEY = os.getenv("NORTHVEIL_API_KEY", "nv_live_9f82a17b09c82415d8a9")
+DEFAULT_API_KEY = os.getenv("NORTHVEIL_API_KEY", "")
 DEFAULT_WALLET = os.getenv("NORTHVEIL_WALLET_ADDRESS", "")
 
 class NorthveilException(Exception):
@@ -18,6 +18,8 @@ class Northveil:
     """Official Python Client for Northveil Autonomous Protocol."""
 
     def __init__(self, api_key: str = DEFAULT_API_KEY, wallet_address: str = DEFAULT_WALLET, base_url: str = DEFAULT_BASE_URL):
+        if not api_key:
+            raise ValueError("Northveil API key is required. Pass api_key or set NORTHVEIL_API_KEY env var.")
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.wallet_address = wallet_address

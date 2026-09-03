@@ -8,9 +8,9 @@ export const SdkDocs: React.FC = () => {
 
 // 1. Initialize Northveil SDK Instance
 const sdk = new NorthveilSDK({
-  apiKey: "nv_live_9f82a17b09c82415d8a9",
-  walletAddress: "0x71C8891575b50d22e032d847847c234a413d4cc8",
-  baseUrl: "https://northveil.vercel.app"
+  apiKey: "YOUR_NORTHVEIL_CLIENT_KEY",
+  walletAddress: "0xYOUR_WALLET_ADDRESS",
+  baseUrl: "https://mcp.northveil.xyz"
 });
 
 // 2. Check System Health & RPC Connection
@@ -62,8 +62,8 @@ class NorthveilSDK:
 
 # Initialize SDK
 sdk = NorthveilSDK(
-    api_key="nv_live_9f82a17b09c82415d8a9",
-    wallet_address="0x71C8891575b50d22e032d847847c234a413d4cc8"
+    api_key="YOUR_NORTHVEIL_CLIENT_KEY",
+    wallet_address="0xYOUR_WALLET_ADDRESS"
 )
 
 # Fetch Portfolio

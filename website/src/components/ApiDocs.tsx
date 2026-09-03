@@ -30,9 +30,9 @@ export const ApiDocs: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-API-Key': 'nv_live_9f82a17b09c82415d8a9'
+          'X-API-Key': 'YOUR_NORTHVEIL_CLIENT_KEY'
         },
-        body: JSON.stringify({ walletAddress: '0x71c8891575b50d22e032d847847c234a413d4cc8' })
+        body: JSON.stringify({ walletAddress: '0xYOUR_WALLET_ADDRESS' })
       });
       const data = await res.json();
       setTestResult(JSON.stringify(data, null, 2));
@@ -71,8 +71,8 @@ export const ApiDocs: React.FC = () => {
             All REST requests to <code>/api/v1/*</code> endpoints must include a valid Northveil API key passed in the header:
           </p>
           <div className="bg-black border-2 border-white p-4 text-[#ccff00] font-bold space-y-1">
-            <div>X-API-Key: nv_live_9f82a17b09c82415d8a9</div>
-            <div>Authorization: Bearer nv_live_9f82a17b09c82415d8a9</div>
+            <div>X-API-Key: YOUR_NORTHVEIL_CLIENT_KEY</div>
+            <div>Authorization: Bearer YOUR_NORTHVEIL_CLIENT_KEY</div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="bg-black border-2 border-[#ccff00] p-4 space-y-1">

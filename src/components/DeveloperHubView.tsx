@@ -333,7 +333,7 @@ export const DeveloperHubView: React.FC = () => {
         );
         break;
       case 'northveil_list_pending_approvals':
-        setPlaygroundArgs(JSON.stringify({ userId: 'default_user' }, null, 2));
+        setPlaygroundArgs(JSON.stringify({}, null, 2));
         break;
       default:
         setPlaygroundArgs(JSON.stringify({ network: 'sepolia' }, null, 2));

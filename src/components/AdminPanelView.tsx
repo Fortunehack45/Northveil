@@ -170,11 +170,7 @@ export const AdminPanelView: React.FC = () => {
       const saved = localStorage.getItem('northveil_admin_api_keys');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return [
-      { id: '1', name: 'Primary Web App Key', key: 'nv_live_9f82a17b09c82415d8a9', created: '2026-08-01', rateLimit: 'Unlimited' },
-      { id: '2', name: 'Claude Desktop MCP Connector', key: 'nv_live_4b772c1092e411fa34c1', created: '2026-08-05', rateLimit: 'Unlimited' },
-      { id: '3', name: 'Autonomous Agent Engine', key: 'nv_live_8c221a84f33190ab77e2', created: '2026-08-15', rateLimit: 'Unlimited' },
-    ];
+    return [];
   });
 
   const totalUsersCount = subWallets.length;
@@ -187,10 +183,11 @@ export const AdminPanelView: React.FC = () => {
   };
 
   const handleCreateApiKey = () => {
+    const randomSuffix = crypto.randomUUID().replace(/-/g, '').slice(0, 24);
     const newKey = {
       id: Date.now().toString(),
       name: `Developer Key #${apiKeys.length + 1}`,
-      key: `nv_live_${Math.random().toString(36).substring(2, 12)}${Math.random().toString(36).substring(2, 12)}`,
+      key: `nv_live_${randomSuffix}`,
       created: new Date().toISOString().split('T')[0],
       rateLimit: 'Unlimited',
     };

@@ -33,7 +33,7 @@ Claude.ai now supports custom MCP connectors directly in your browser and mobile
      ```
    - **Connector URL (Option B - SSE with Target Wallet)**:
      ```text
-     https://mcp.northveil.xyz/sse?wallet_address=0x56F0Fdbe1B09C0f65DA1cb73ef878C07EC645417
+     https://mcp.northveil.xyz/sse?wallet_address=0xYOUR_WALLET_ADDRESS
      ```
 5. Click **Connect**! Claude will automatically discover all 60 tools, load the official Northveil logo, and enable on-chain intelligence across your chats.
 
@@ -74,7 +74,7 @@ Add Northveil to your configuration file:
       "command": "npx",
       "args": ["-y", "northveil-cli", "mcp"],
       "env": {
-        "NORTHVEIL_WALLET_ADDRESS": "0x56F0Fdbe1B09C0f65DA1cb73ef878C07EC645417",
+        "NORTHVEIL_WALLET_ADDRESS": "0xYOUR_WALLET_ADDRESS",
         "NORTHVEIL_API_URL": "https://mcp.northveil.xyz"
       }
     }
@@ -95,8 +95,8 @@ Add Northveil to your configuration file:
     "northveil": {
       "url": "https://mcp.northveil.xyz/mcp",
       "headers": {
-        "Authorization": "Bearer nv_live_YOUR_API_KEY",
-        "x-wallet-address": "0x56F0Fdbe1B09C0f65DA1cb73ef878C07EC645417"
+        "Authorization": "Bearer YOUR_NORTHVEIL_CLIENT_KEY",
+        "x-wallet-address": "0xYOUR_WALLET_ADDRESS"
       }
     }
   }

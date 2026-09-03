@@ -2611,7 +2611,7 @@
       "command": "npx",
       "args": ["-y", "@northveil/mcp-server"],
       "env": {
-        "NORTHVEIL_WALLET_ADDRESS": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"
+        "NORTHVEIL_WALLET_ADDRESS": "0xYOUR_WALLET_ADDRESS"
       }
     }
   }
@@ -3156,21 +3156,21 @@
     const architectureData = {
       step_dispatch: {
         label: 'claude_desktop.json',
-        config: `{\n  "mcpServers": {\n    "northveil": {\n      "command": "npx",\n      "args": ["-y", "@northveil/mcp-server"],\n      "env": {\n        "NORTHVEIL_WALLET_ADDRESS": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"\n      }\n    }\n  }\n}`,
-        python: `from northveil import NorthveilClient\n\n# Initialize autonomous client runtime\nclient = NorthveilClient(\n    wallet_address="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417",\n    network="sepolia"\n)\n\n# Agent dispatches smart contract deployment via MCP\ntx = client.deploy_contract(\n    name="WATER",\n    symbol="WAR",\n    total_supply=100_000_000,\n    recipient="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"\n)\nprint(f"Contract Dispatched: {tx.contract_address}")`,
-        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({\n  walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',\n  network: 'sepolia'\n});\n\n// Autonomous MCP tool dispatch from LLM agent\nconst result = await vault.tools.deployContract({\n  name: 'WATER',\n  symbol: 'WAR',\n  initialSupply: 100_000_000,\n  decimals: 18\n});\nconsole.log('Contract Dispatched:', result.contractAddress);`
+        config: `{\n  "mcpServers": {\n    "northveil": {\n      "command": "npx",\n      "args": ["-y", "@northveil/mcp-server"],\n      "env": {\n        "NORTHVEIL_WALLET_ADDRESS": "0xYOUR_WALLET_ADDRESS"\n      }\n    }\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\n# Initialize autonomous client runtime\nclient = NorthveilClient(\n    wallet_address="0xYOUR_WALLET_ADDRESS",\n    network="sepolia"\n)\n\n# Agent dispatches smart contract deployment via MCP\ntx = client.deploy_contract(\n    name="WATER",\n    symbol="WAR",\n    total_supply=100_000_000,\n    recipient="0xYOUR_WALLET_ADDRESS"\n)\nprint(f"Contract Dispatched: {tx.contract_address}")`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({\n  walletAddress: '0xYOUR_WALLET_ADDRESS',\n  network: 'sepolia'\n});\n\n// Autonomous MCP tool dispatch from LLM agent\nconst result = await vault.tools.deployContract({\n  name: 'WATER',\n  symbol: 'WAR',\n  initialSupply: 100_000_000,\n  decimals: 18\n});\nconsole.log('Contract Dispatched:', result.contractAddress);`
       },
       step_policy: {
         label: 'policy_guardrails.json',
         config: `{\n  "policyId": "pol_daily_autonomous_v2",\n  "rules": {\n    "maxDailySpendUsd": 50.00,\n    "maxSingleTxUsd": 20.00,\n    "whitelistedNetworks": ["sepolia", "ethereum", "base", "polygon"],\n    "allowedActions": ["DEPLOY_CONTRACT", "SEND_TRANSFER", "EXECUTE_SWAP"],\n    "requirePasskeyAboveUsd": 100.00,\n    "emergencyKillSwitch": false\n  }\n}`,
-        python: `from northveil import NorthveilClient, SpendingPolicy\n\nclient = NorthveilClient(wallet_address="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417")\n\n# Verify transaction intent against autonomous spending rules\npolicy = SpendingPolicy(\n    max_daily_usd=50.00,\n    allowed_networks=["sepolia", "base"],\n    restricted_contracts=["0xDef1C0ded9bec7F1a1670819833240f027b25EfF"]\n)\n\ncheck = client.policies.evaluate(\n    action="SEND_TRANSFER",\n    amount_usd=12.50,\n    network="sepolia"\n)\nassert check.is_allowed is True, "Guardrail velocity limit triggered"`,
-        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ walletAddress: '0x56f0fdbe1b...' });\n\n// Real-time cryptographic policy evaluation\nconst policyGate = await vault.policy.verify({\n  action: 'SEND_TRANSFER',\n  amountUsd: 12.50,\n  token: 'ETH',\n  destination: '0x2de14bb9264acd0346e122c4bb2f0614f79a1670'\n});\n\nif (!policyGate.passed) {\n  throw new Error(\`Policy violation: \${policyGate.rejectionReason}\`);\n}\nconsole.log('Policy Passed. Remaining Daily Quota:', policyGate.dailyRemainingUsd);`
+        python: `from northveil import NorthveilClient, SpendingPolicy\n\nclient = NorthveilClient(wallet_address="0xYOUR_WALLET_ADDRESS")\n\n# Verify transaction intent against autonomous spending rules\npolicy = SpendingPolicy(\n    max_daily_usd=50.00,\n    allowed_networks=["sepolia", "base"],\n    restricted_contracts=["0xDef1C0ded9bec7F1a1670819833240f027b25EfF"]\n)\n\ncheck = client.policies.evaluate(\n    action="SEND_TRANSFER",\n    amount_usd=12.50,\n    network="sepolia"\n)\nassert check.is_allowed is True, "Guardrail velocity limit triggered"`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ walletAddress: '0xYOUR_WALLET_ADDRESS' });\n\n// Real-time cryptographic policy evaluation\nconst policyGate = await vault.policy.verify({\n  action: 'SEND_TRANSFER',\n  amountUsd: 12.50,\n  token: 'ETH',\n  destination: '0x2de14bb9264acd0346e122c4bb2f0614f79a1670'\n});\n\nif (!policyGate.passed) {\n  throw new Error(\`Policy violation: \${policyGate.rejectionReason}\`);\n}\nconsole.log('Policy Passed. Remaining Daily Quota:', policyGate.dailyRemainingUsd);`
       },
       step_passkey: {
         label: 'tee_attestation.json',
         config: `{\n  "attestation": {\n    "enclaveType": "AWS_NITRO_TEE",\n    "pcr0": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",\n    "enclaveSubOrgId": "d982ab71-923f-4e02-b362-e93297a7e112",\n    "authMode": "WEBAUTHN_PASSKEY_BIOMETRIC",\n    "signatureType": "ECDSA_SECP256K1"\n  }\n}`,
-        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(wallet_address="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417")\n\n# Autonomous signing inside AWS Nitro Enclave (Northveil MPC)\nsigned_payload = client.enclave.sign_transaction(\n    tx_params={\n        "to": "0x2de14bb9264acd0346e122c4bb2f0614f79a1670",\n        "value": 5000000000000000, # 0.005 ETH\n        "chainId": 11155111\n    },\n    enclave_proof=True\n)\nprint("TEE Enclave Signature Generated (Zero Key Exposure)")`,
-        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ walletAddress: '0x56f0fdbe1b...' });\n\n// Generate WebAuthn FIDO2 biometric challenge for high-value actions\nconst challenge = await vault.passkey.createChallenge({\n  action: 'DEPLOY_CONTRACT',\n  walletAddress: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417'\n});\n\n// Triggers native Touch ID / Face ID hardware prompt on user device\nconst assertion = await navigator.credentials.get({\n  publicKey: challenge.publicKeyOptions\n});\nconst signedTx = await vault.passkey.submitAssertion(assertion);\nconsole.log('Biometric Passkey Attested:', signedTx.attestationId);`
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(wallet_address="0xYOUR_WALLET_ADDRESS")\n\n# Autonomous signing inside AWS Nitro Enclave (Northveil MPC)\nsigned_payload = client.enclave.sign_transaction(\n    tx_params={\n        "to": "0x2de14bb9264acd0346e122c4bb2f0614f79a1670",\n        "value": 5000000000000000, # 0.005 ETH\n        "chainId": 11155111\n    },\n    enclave_proof=True\n)\nprint("TEE Enclave Signature Generated (Zero Key Exposure)")`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ walletAddress: '0xYOUR_WALLET_ADDRESS' });\n\n// Generate WebAuthn FIDO2 biometric challenge for high-value actions\nconst challenge = await vault.passkey.createChallenge({\n  action: 'DEPLOY_CONTRACT',\n  walletAddress: '0xYOUR_WALLET_ADDRESS'\n});\n\n// Triggers native Touch ID / Face ID hardware prompt on user device\nconst assertion = await navigator.credentials.get({\n  publicKey: challenge.publicKeyOptions\n});\nconst signedTx = await vault.passkey.submitAssertion(assertion);\nconsole.log('Biometric Passkey Attested:', signedTx.attestationId);`
       },
       step_broadcast: {
         label: 'broadcast_receipt.json',
@@ -3210,21 +3210,21 @@
       },
       tool_import_wallet: {
         label: 'import_wallet.json',
-        config: `// Tool Call: import_wallet (Non-Custodial Address Binding)\n{\n  "tool": "import_wallet",\n  "params": {\n    "address": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417",\n    "walletName": "Production Vault"\n  }\n}`,
-        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient()\nvault = client.import_wallet(\n    address="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417",\n    wallet_name="Production Vault"\n)\nprint("Connected Vault:", vault.address)`,
-        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK();\nconst bound = await vault.importWallet({\n  address: '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417',\n  walletName: 'Production Vault'\n});\nconsole.log('Bound Non-Custodial Vault:', bound.address);`
+        config: `// Tool Call: import_wallet (Non-Custodial Address Binding)\n{\n  "tool": "import_wallet",\n  "params": {\n    "address": "0xYOUR_WALLET_ADDRESS",\n    "walletName": "Production Vault"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient()\nvault = client.import_wallet(\n    address="0xYOUR_WALLET_ADDRESS",\n    wallet_name="Production Vault"\n)\nprint("Connected Vault:", vault.address)`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK();\nconst bound = await vault.importWallet({\n  address: '0xYOUR_WALLET_ADDRESS',\n  walletName: 'Production Vault'\n});\nconsole.log('Bound Non-Custodial Vault:', bound.address);`
       },
       tool_get_wallet_info: {
         label: 'get_wallet_info.json',
-        config: `// Tool Call: get_wallet_info\n{\n  "tool": "get_wallet_info",\n  "params": {\n    "address": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"\n  }\n}`,
-        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient()\ninfo = client.get_wallet_info("0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417")\nprint(f"Vault Balances: {info.balances}")\nprint(f"Daily Spend Remaining: \${info.spending_remaining_usd}")`,
-        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK();\nconst info = await vault.getWalletInfo('0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417');\nconsole.log('Balances:', info.balances);\nconsole.log('Daily Limit USD Remaining:', info.dailyLimitRemainingUsd);`
+        config: `// Tool Call: get_wallet_info\n{\n  "tool": "get_wallet_info",\n  "params": {\n    "address": "0xYOUR_WALLET_ADDRESS"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient()\ninfo = client.get_wallet_info("0xYOUR_WALLET_ADDRESS")\nprint(f"Vault Balances: {info.balances}")\nprint(f"Daily Spend Remaining: \${info.spending_remaining_usd}")`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK();\nconst info = await vault.getWalletInfo('0xYOUR_WALLET_ADDRESS');\nconsole.log('Balances:', info.balances);\nconsole.log('Daily Limit USD Remaining:', info.dailyLimitRemainingUsd);`
       },
       tool_activate_kill_switch: {
         label: 'activate_kill_switch.json',
-        config: `// Tool Call: activate_kill_switch\n{\n  "tool": "activate_kill_switch",\n  "params": {\n    "reason": "Emergency Halt Request",\n    "walletAddress": "0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417"\n  }\n}`,
-        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(wallet_address="0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417")\nclient.kill_switch.activate(reason="Security Incident Detected")\nprint("Vault frozen across all chains immediately.")`,
-        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ walletAddress: '0x56f0fdbe1b...' });\nawait vault.emergency.activateKillSwitch({\n  reason: 'Security Incident Detected'\n});\nconsole.log('Vault operations halted immediately.');`
+        config: `// Tool Call: activate_kill_switch\n{\n  "tool": "activate_kill_switch",\n  "params": {\n    "reason": "Emergency Halt Request",\n    "walletAddress": "0xYOUR_WALLET_ADDRESS"\n  }\n}`,
+        python: `from northveil import NorthveilClient\n\nclient = NorthveilClient(wallet_address="0xYOUR_WALLET_ADDRESS")\nclient.kill_switch.activate(reason="Security Incident Detected")\nprint("Vault frozen across all chains immediately.")`,
+        ts: `import { NorthveilSDK } from '@northveil/sdk';\n\nconst vault = new NorthveilSDK({ walletAddress: '0xYOUR_WALLET_ADDRESS' });\nawait vault.emergency.activateKillSwitch({\n  reason: 'Security Incident Detected'\n});\nconsole.log('Vault operations halted immediately.');`
       },
       tool_create_booking_deposit: {
         label: 'create_booking_deposit.json',

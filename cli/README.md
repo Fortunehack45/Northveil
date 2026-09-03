@@ -41,10 +41,10 @@ northveil logout
 ### 2. Multi-Chain Portfolio & Health Auditing
 ```bash
 # Query live multi-chain balances and USD valuations across 37+ networks
-northveil wallet 0x59148d6a9dff263a772b5a84280bc88530f38636
+northveil wallet 0xYOUR_WALLET_ADDRESS
 
 # Perform automated gas sufficiency and asset diversification health checks
-northveil health 0x59148d6a9dff263a772b5a84280bc88530f38636
+northveil health 0xYOUR_WALLET_ADDRESS
 ```
 
 ---
@@ -63,13 +63,13 @@ northveil memecoins --chain all --limit 10
 ### 4. Non-Custodial Transaction Staging & Broadcast
 ```bash
 # Stage an unsigned transaction for local client signing
-northveil tx:prepare --to 0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417 --amount 0.05 --asset ETH --network sepolia
+northveil tx:prepare --to 0xYOUR_WALLET_ADDRESS --amount 0.05 --asset ETH --network sepolia
 
 # Verify recovered signature and broadcast signed raw transaction on-chain
 northveil tx:broadcast --token <APPROVAL_TOKEN> --raw <SIGNED_RAW_HEX>
 
 # Prepare a native or token transfer
-northveil send --to 0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417 --amount 0.05 --token ETH --network base
+northveil send --to 0xYOUR_WALLET_ADDRESS --amount 0.05 --token ETH --network base
 
 # Prepare an optimal DEX swap via 1inch/Uniswap
 northveil swap --from ETH --to USDC --amount 0.1 --network base

@@ -5,54 +5,52 @@
 Install the official Northveil SDK via NPM:
 
 ```bash
-npm install @northveil/sdk
+npm install northveil-sdk
 ```
 
 ## 2. Quickstart Code Examples
 
 ### Initialize the Client
 ```typescript
-import { NorthveilClient } from '@northveil/sdk';
+import { NorthveilClient } from 'northveil-sdk';
 
-const northveil = new NorthveilClient({
-  apiKey: process.env.NORTHVEIL_API_KEY || 'nv_live_your_key',
-  network: 'sepolia',
+const client = new NorthveilClient({
+  apiUrl: process.env.NORTHVEIL_API_URL || 'https://mcp.northveil.xyz',
+  clientKey: process.env.NORTHVEIL_API_KEY || 'YOUR_NORTHVEIL_CLIENT_KEY',
 });
 ```
 
-### Create an Encrypted Custodial Wallet
+### Stage an On-Chain Transfer
 ```typescript
-const wallet = await northveil.createWallet({
-  name: 'Treasury Reserve Vault',
+// Non-custodial workflow:
+// Under Always Ask: Returns APPROVAL_REQUIRED with a secure passkey approval link.
+// Under Autonomous: Verifies grant velocity limits and executes threshold MPC signature directly.
+const transfer = await client.prepareTransfer({
+  to: '0xYOUR_WALLET_ADDRESS',
+  amount: '0.005',
+  chain: 'eip155:8453',
+  asset: 'ETH',
 });
 
-console.log('Address:', wallet.address);
-console.log('Backup Seed Phrase (one-time):', wallet.backupSeedPhrase);
+if (transfer.status === 'APPROVAL_REQUIRED') {
+  console.log('Passkey authorization link:', transfer.approveUrl);
+} else {
+  console.log('Autonomous Tx Hash:', transfer.txHash);
+}
 ```
 
-### Transfer Crypto
+### Deploy Token
 ```typescript
-const tx = await northveil.sendTransfer({
-  token: 'ETH',
-  amount: 0.005,
-  recipientAddress: '0x59148d6a9dff263a772b5a84280bc88530f38636',
-  network: 'sepolia',
-});
-
-console.log('Broadcasted Tx:', tx.txHash);
-console.log('Block Explorer:', tx.explorerUrl);
-```
-
-### Deploy Smart Contract
-```typescript
-const contract = await northveil.deploySmartContract({
-  contractName: 'AlphaToken',
+const deployment = await client.prepareDeployToken({
+  name: 'AlphaToken',
   symbol: 'ALPHA',
-  contractType: 'erc20',
-  totalSupply: 1000000,
-  ownerAllocation: 1000000,
-  network: 'sepolia',
+  totalSupply: '1000000',
+  network: 'base',
+  tokenomics: [
+    { label: 'community', percent: 80 },
+    { label: 'liquidity', percent: 20 },
+  ],
 });
 
-console.log('Contract Address:', contract.contractAddress);
+console.log('Deployment Approval Ticket:', deployment.approvalId);
 ```

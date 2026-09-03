@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { getMcpServerUrl } from '../config/endpointConfig';
 
-const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://ulkbchewsrksgvlbzjzl.supabase.co';
-const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsa2JjaGV3c3Jrc2d2bGJ6anpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NzkzMDIsImV4cCI6MjEwMTI1NTMwMn0.L8d4ZI9f1mJda9mraZRb5O_Tjc9wzSur84pB_Y0vjTA';
+const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient(SUPABASE_URL || 'https://YOUR_PROJECT.supabase.co', SUPABASE_ANON_KEY || 'placeholder-anon-key');
 
 export class SupabaseService {
   /**
@@ -26,7 +26,7 @@ export class SupabaseService {
         address: cleanAddr, 
         name, 
         chain_id: chainId,
-        user_id: existing?.user_id || 'default_user',
+        user_id: existing?.user_id || null,
         wallet_status: existing?.wallet_status || 'active',
         derivation_path: existing?.derivation_path || "m/44'/60'/0'/0/0"
       };
@@ -352,12 +352,15 @@ export class SupabaseService {
    * Create a live pending transaction request for testing approval workflows
    */
   static async createPendingApprovalRequest(walletAddress: string, actionType: string = 'token_transfer', recipientAddress?: string) {
+    if (!recipientAddress) {
+      throw new Error('recipientAddress is required to create a transfer approval request');
+    }
     const cleanAddr = walletAddress.toLowerCase();
-    const targetRecipient = (recipientAddress || '0x59148d6a9dff263a772b5a84280bc88530f38636').toLowerCase();
-    const requestId = `req_${Math.random().toString(36).substring(2, 14)}`;
-    const approvalToken = `tok_${Math.random().toString(36).substring(2, 16)}${Math.random().toString(36).substring(2, 16)}`;
+    const targetRecipient = recipientAddress.toLowerCase();
+    const requestId = `req_${crypto.randomUUID().replace(/-/g, '')}`;
+    const approvalToken = `tok_${crypto.randomUUID().replace(/-/g, '')}`;
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(now.getTime() + 10 * 60 * 1000).toISOString();
 
     // 1. Attempt endpoint staging via MCP Control Plane
     try {

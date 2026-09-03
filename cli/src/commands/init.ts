@@ -4,8 +4,8 @@ import * as path from 'path';
 export function registerInitCommand(program: any) {
   program
     .command('init [projectName]')
-    .description('Scaffold a new Northveil Web3 dApp, AI Agent, or Smart Contract project')
-    .option('-t, --template <template>', 'Template to use: dapp, mcp-agent, smart-contracts', 'dapp')
+    .description('Scaffold a new Northveil Agent Wallet & MCP integration project')
+    .option('-t, --template <template>', 'Template to use: dapp, mcp-agent', 'mcp-agent')
     .action((projectName = 'my-northveil-app', options: any) => {
       const targetDir = path.resolve(process.cwd(), projectName);
       console.log(`\n📦 Scaffolding new Northveil project: ${projectName} (Template: ${options.template})...`);
@@ -20,20 +20,19 @@ export function registerInitCommand(program: any) {
         version: '0.1.0',
         private: true,
         scripts: {
-          dev: options.template === 'dapp' ? 'vite' : 'node index.js',
+          start: 'node index.js',
           build: 'tsc',
         },
         dependencies: {
           'northveil-sdk': '^1.1.0',
-          ethers: '^6.13.1',
         },
       };
       fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify(pkg, null, 2));
 
       // 2. .env.example
       const envExample = `NORTHVEIL_API_URL=https://mcp.northveil.xyz
-NORTHVEIL_API_KEY=nv_live_your_api_key_here
-NORTHVEIL_WALLET_ADDRESS=0xYourWalletAddressHere
+NORTHVEIL_API_KEY=YOUR_NORTHVEIL_CLIENT_KEY
+NORTHVEIL_WALLET_ADDRESS=0xYOUR_WALLET_ADDRESS
 `;
       fs.writeFileSync(path.join(targetDir, '.env.example'), envExample);
 
@@ -41,24 +40,28 @@ NORTHVEIL_WALLET_ADDRESS=0xYourWalletAddressHere
       const starterCode = `import { NorthveilClient } from 'northveil-sdk';
 
 const client = new NorthveilClient({
-  baseUrl: process.env.NORTHVEIL_API_URL || 'https://mcp.northveil.xyz',
-  apiKey: process.env.NORTHVEIL_API_KEY || 'nv_live_default_northveil_key',
+  apiUrl: process.env.NORTHVEIL_API_URL || 'https://mcp.northveil.xyz',
+  clientKey: process.env.NORTHVEIL_API_KEY || 'YOUR_NORTHVEIL_CLIENT_KEY',
 });
 
 async function main() {
   console.log('🚀 Northveil Project Initialized!');
   
-  // Example 1: Search live flights
-  const flights = await client.searchFlights({
-    origin: 'LHR',
-    destination: 'JFK',
-    departureDate: '2026-09-20',
-  });
-  console.log('Found Flights:', flights.offers?.length);
-
-  // Example 2: Check multi-chain portfolio
+  // 1. Check multi-chain portfolio
   const portfolio = await client.getPortfolio();
-  console.log('Total Portfolio Value ($):', portfolio.totalUsdValue);
+  console.log('Portfolio Summary:', portfolio.markdownSummary);
+
+  // 2. Stage non-custodial transfer (Always Ask generates passkey ticket)
+  const transfer = await client.prepareTransfer({
+    to: '0xYOUR_WALLET_ADDRESS',
+    amount: '0.01',
+    chain: 'eip155:8453',
+    asset: 'ETH',
+  });
+  console.log('Transfer Status:', transfer.status);
+  if (transfer.approveUrl) {
+    console.log('Passkey Approval Required:', transfer.approveUrl);
+  }
 }
 
 main().catch(console.error);

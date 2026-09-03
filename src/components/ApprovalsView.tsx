@@ -116,8 +116,8 @@ export const ApprovalsView: React.FC = () => {
             item &&
             !item.id?.startsWith('req-demo-') &&
             !item.id?.startsWith('req-init-') &&
-            item.wallet_address !== '0x56f0fdbe1b09c0f65da1cb73ef878c07ec645417' &&
-            item.wallet_address !== 'digital bind tip drama room burst chief modify promote rib salon armed'
+            typeof item.wallet_address === 'string' &&
+            item.wallet_address.startsWith('0x')
           );
           localStorage.setItem('northveil_approval_history', JSON.stringify(clean));
           setApprovals(clean);

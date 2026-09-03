@@ -23,7 +23,7 @@ Before starting deployment, collect your API credentials:
 
 ### Required Credentials:
 1. **Supabase Database Credentials**:
-   - `SUPABASE_URL`: `https://ulkbchewsrksgvlbzjzl.supabase.co`
+   - `SUPABASE_URL`: `https://YOUR_PROJECT.supabase.co`
    - `SUPABASE_ANON_KEY`: Found in Supabase Dashboard ➔ Project Settings ➔ API.
 2. **Web3 Provider Keys (Optional but Recommended)**:
    - `VITE_MORALIS_API_KEY`: For multi-chain ERC20/NFT indexing (from [moralis.io](https://moralis.io)).
@@ -42,9 +42,9 @@ The Web Wallet frontend, MCP AI server, REST API, and Webhook system are unified
 4. Set **Framework Preset**: `Vite`.
 5. Set **Root Directory**: `./` (Leave as default root).
 6. Expand **Environment Variables** and add:
-   - `SUPABASE_URL` = `https://ulkbchewsrksgvlbzjzl.supabase.co`
+   - `SUPABASE_URL` = `https://YOUR_PROJECT.supabase.co`
    - `SUPABASE_ANON_KEY` = `<YOUR_SUPABASE_ANON_KEY>`
-   - `VITE_SUPABASE_URL` = `https://ulkbchewsrksgvlbzjzl.supabase.co`
+   - `VITE_SUPABASE_URL` = `https://YOUR_PROJECT.supabase.co`
    - `VITE_SUPABASE_ANON_KEY` = `<YOUR_SUPABASE_ANON_KEY>`
    - `VITE_MORALIS_API_KEY` = `<YOUR_MORALIS_KEY>`
    - `VITE_1INCH_API_KEY` = `<YOUR_1INCH_KEY>`
@@ -86,7 +86,7 @@ To completely isolate the MCP server from static web assets and prevent any SPA 
 4. Set **Framework Preset**: `Other`.
 5. Set **Root Directory**: Click **Edit** and select **`mcp-server`**.
 6. Set **Environment Variables**:
-   - `SUPABASE_URL` = `https://ulkbchewsrksgvlbzjzl.supabase.co`
+   - `SUPABASE_URL` = `https://YOUR_PROJECT.supabase.co`
    - `SUPABASE_ANON_KEY` = `<YOUR_SUPABASE_ANON_KEY>`
 7. Click **Deploy**.
 

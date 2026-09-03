@@ -15,7 +15,7 @@ export default function LoginPage() {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'mock_google_client_id';
     const redirectUri = `${window.location.origin}/auth/google/callback`;
     const scope = encodeURIComponent('openid email profile');
-    const state = Math.random().toString(36).slice(2, 12);
+    const state = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
     
     // In demo/offline mode or development, navigate directly to callback with simulated code
     if (!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {

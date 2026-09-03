@@ -11,7 +11,7 @@ export default function ConnectClaudePage() {
 
   const generateNewKey = () => {
     // Generate fresh cryptographically random key
-    const raw = 'nv_live_' + Array.from({ length: 32 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
+    const raw = 'nv_live_' + crypto.randomUUID().replace(/-/g, '');
     setClientKey(raw);
   };
 

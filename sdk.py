@@ -22,14 +22,14 @@ def main():
     print("""
 +---------------------------------------------------------------+
 |                   NORTHVEIL PYTHON HUB                        |
-|         Multi-Chain Web3 & Autonomous Travel Protocol         |
+|         Non-Custodial Agent Wallet & MCP Protocol             |
 +---------------------------------------------------------------+
     """)
 
     # 1. Initialize the Northveil Enterprise Client
     client = Northveil(
-        api_key=os.getenv("NORTHVEIL_API_KEY", "nv_live_9f82a17b09c82415d8a9"),
-        wallet_address=os.getenv("NORTHVEIL_WALLET_ADDRESS", "")
+        api_key=os.getenv("NORTHVEIL_API_KEY", "YOUR_NORTHVEIL_CLIENT_KEY"),
+        wallet_address=os.getenv("NORTHVEIL_WALLET_ADDRESS", "0xYOUR_WALLET_ADDRESS")
     )
 
     print(f"[*] Northveil SDK Version: {northveil.__version__}")
