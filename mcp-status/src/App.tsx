@@ -140,7 +140,7 @@ export const App: React.FC = () => {
           </a>
           <div className="flex items-center gap-3">
             <img
-              src="https://iili.io/CDj46zl.png"
+              src="https://iili.io/CDS9fvn.png"
               alt="Northveil MCP Logo"
               className="h-8 w-auto object-contain"
             />

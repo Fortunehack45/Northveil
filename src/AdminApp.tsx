@@ -41,7 +41,7 @@ export const AdminApp: React.FC = () => {
           {/* Brand Logo & Header */}
           <div className="flex items-center gap-3.5 border-b border-white/[0.08] pb-5">
             <img
-              src="https://iili.io/CDj46zl.png"
+              src="https://iili.io/CDS9fvn.png"
               alt="Northveil Logo"
               className="h-10 w-auto object-contain"
             />
@@ -134,7 +134,7 @@ export const AdminApp: React.FC = () => {
           </a>
           <div className="flex items-center gap-3">
             <img
-              src="https://iili.io/CDj46zl.png"
+              src="https://iili.io/CDS9fvn.png"
               alt="Northveil Logo"
               className="h-8 w-auto object-contain"
             />

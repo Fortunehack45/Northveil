@@ -812,7 +812,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   });
 
   const [gasEstimates, setGasEstimates] = useState<ChainGasEstimate[]>([]);
-  const [systemMetrics] = useState<MicroserviceStatus[]>(MICROSERVICES_STATUS);
+  const [systemMetrics] = useState<MicroserviceStatus[]>([]);
 
   // Auto-initialize vault state on mount
   useEffect(() => {

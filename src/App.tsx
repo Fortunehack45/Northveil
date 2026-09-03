@@ -106,7 +106,7 @@ const MainContent: React.FC = () => {
           {/* Logo Standalone */}
           <div className="flex justify-center">
             <img
-              src="https://iili.io/CDj46zl.png"
+              src="https://iili.io/CDS9fvn.png"
               alt="Northveil Logo"
               className="h-16 w-auto object-contain northveil-logo transition-all"
             />

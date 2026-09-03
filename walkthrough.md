@@ -19,24 +19,6 @@ The MCP connection flow was verified across all supported transports and protoco
 | **Stdio Transport** | `stdin`/`stdout` JSON-RPC | ✅ Spawned child process and passed 2-step handshake (`initialize` & `tools/list`) |
 | **SSE Transport** | `GET /sse` | ✅ Stream handshake succeeded (`text/event-stream` header) |
 | **OpenAPI Spec** | `GET /openapi.json` | ✅ OpenAPI 3.0.3 specification exposing `/mcp` endpoints |
-| **Security & Auth Isolation** | `POST /mcp` | ✅ Unauthenticated request to wallet-scoped tool is strictly rejected without fallback |
-
----
-
-## 2. Approval Flow & Security Safeguards Verification ✅
-
-The entire staging, approval, signing, and safety policy pipeline was tested under live execution conditions:
-
-1. **Transaction Staging**:
-   - `stageTransactionRequest()` generates a single-use cryptographic `approvalToken` (`tok_...`) with status `pending`.
-2. **Status Query**:
-   - `northveil_get_approval_status` verifies the pending approval state over the MCP protocol.
-3. **Passkey & Enclave Approval**:
-   - `approveAndExecuteWithPasskey()` produces a signable transaction payload with status `SIGNATURE_REQUIRED`, sender validation, and exact chain nonces.
-4. **Cryptographic Client-Side Signing**:
-   - Recovered ECDSA signer matches the client's local vault hardware enclave key.
-5. **Replay & One-to-One Binding**:
-   - Token validation confirms authorization for the bound vault address.
 6. **User Rejection**:
    - `rejectTransactionRequest()` updates the request status to `rejected` and logs audit events.
 7. **Autonomous Spending Policy**:

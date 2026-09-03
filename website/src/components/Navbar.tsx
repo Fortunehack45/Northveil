@@ -43,7 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
         >
           <div className="bg-[#ccff00] p-1.5 border-3 border-black shadow-[4px_4px_0px_0px_#00f0ff] group-hover:translate-x-0.5 group-hover:translate-y-0.5 transition-transform">
             <img 
-              src="https://iili.io/CDj46zl.png" 
+              src="https://iili.io/CDS9fvn.png" 
               alt="Northveil Logo" 
               className="w-9 h-9 object-contain bg-black p-0.5 border border-white" 
             />
