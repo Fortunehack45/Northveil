@@ -4,6 +4,7 @@
  */
 
 export interface NorthveilConfig {
+  baseUrl?: string;
   apiUrl?: string;
   clientKey?: string;
   walletAddress?: string;

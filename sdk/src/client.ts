@@ -19,9 +19,13 @@ export class NorthveilClient {
   private walletAddress?: string;
 
   constructor(config: NorthveilConfig = {}) {
-    this.apiUrl = (config.apiUrl || process.env.NORTHVEIL_API_URL || 'https://mcp.northveil.xyz').replace(/\/$/, '');
+    this.apiUrl = (config.baseUrl || config.apiUrl || process.env.NORTHVEIL_API_URL || 'https://mcp.northveil.xyz').replace(/\/$/, '');
     this.clientKey = config.clientKey || process.env.NORTHVEIL_API_KEY || '';
     this.walletAddress = config.walletAddress;
+
+    if (!this.clientKey) {
+      throw new Error('MISSING_CLIENT_KEY: Pass clientKey or set NORTHVEIL_API_KEY');
+    }
   }
 
   /**
@@ -102,13 +106,34 @@ export class NorthveilClient {
    * Queries metadata, active grant policies, and spending limits for the client's wallet
    */
   public async getWalletInfo(): Promise<WalletInfoResult> {
-    return this.callTool<WalletInfoResult>('get_wallet_info', {});
+    return this.callTool<WalletInfoResult>('nv_list_wallets', {});
+  }
+
+  /**
+   * Alias for getWalletInfo
+   */
+  public async listWallets(): Promise<WalletInfoResult> {
+    return this.callTool<WalletInfoResult>('nv_list_wallets', {});
+  }
+
+  /**
+   * Query balances across one chain or all supported chains
+   */
+  public async getBalances(networkOrAddress?: string): Promise<any> {
+    return this.callTool('nv_get_balances', { network: networkOrAddress || 'all' });
+  }
+
+  /**
+   * Check execution status of an approval ticket by ID
+   */
+  public async getApprovalStatus(approvalId: string): Promise<any> {
+    return this.callTool('nv_get_approval_status', { approvalId });
   }
 
   /**
    * Lists active pending approvals awaiting human passkey authorization
    */
   public async listPendingApprovals(): Promise<{ pendingApprovals: PendingApprovalItem[] }> {
-    return this.callTool<{ pendingApprovals: PendingApprovalItem[] }>('list_pending_approvals', {});
+    return this.callTool<{ pendingApprovals: PendingApprovalItem[] }>('nv_list_pending_approvals', {});
   }
 }

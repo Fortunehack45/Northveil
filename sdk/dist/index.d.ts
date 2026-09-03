@@ -1,3 +1,3 @@
 export { NorthveilClient } from './client.js';
-export type { NorthveilConfig, BalanceResult, TokenBalance, NFTItem, SwapParams, DeployContractParams, TransactionResult, TokenPrice, TrendingMemecoin, TokenAuditResult, TradeOrderParams, TradeOrder, WalletHealthResult, SecurityScanResult, SendTransferParams, GasEstimate, VerifyContractParams, ContractVerificationResult, MintTokensParams, MintTokensResult, ReserveTokensParams, ReserveTokensResult, MakeReservationParams, MakeReservationResult, ListReservationsResult, FlightSearchParams, FlightSearchResult, FlightOffer, HotelSearchParams, HotelSearchResult, HotelOffer, EventSearchParams, EventSearchResult, EventOffer, BookingStatusResult, } from './types.js';
+export type { NorthveilConfig, PortfolioBalance, PortfolioResult, PrepareTransferParams, PrepareTransferResult, TransactionStatusResult, WalletInfoResult, PendingApprovalItem, } from './types.js';
 //# sourceMappingURL=index.d.ts.map

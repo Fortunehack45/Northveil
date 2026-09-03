@@ -615,84 +615,54 @@ export const AgentsView: React.FC = () => {
                     <div className="space-y-3">
                       {/* Zero-JSON Claude Guide */}
                       {(connectType === 'claude' || mcpClientTab === 'claude') && (
-                        <div className="p-3.5 bg-black/[0.02] dark:bg-black/40 border border-black/[0.06] dark:border-white/[0.06] rounded-2xl space-y-3">
+                        <div className="p-4 bg-black/[0.02] dark:bg-black/40 border border-black/[0.06] dark:border-white/[0.06] rounded-2xl space-y-3.5">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
-                              <Bot className="w-4 h-4" /> Claude Zero-JSON Direct Connect
+                              <Bot className="w-4 h-4" /> Connect Claude
                             </span>
                             <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 font-semibold">
-                              NO FILE EDITING
+                              ZERO SECRETS
                             </span>
                           </div>
 
-                          {/* Method 1: Claude.ai Web Custom Connector (Web & Mobile) */}
-                          <div className="space-y-1.5">
-                            <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 block">
-                              Method A: Claude.ai Custom Connector (Web / Mobile)
-                            </span>
-                            <ol className="list-decimal list-inside space-y-1 text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed pl-0.5">
-                              <li>Open <strong>Claude.ai</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Connectors</strong> &rarr; <strong>Add custom connector</strong>.</li>
-                              <li>
-                                Set <strong>Name</strong> to <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[10px]">Northveil</code> and <strong>Connector URL</strong> to:
-                                <div className="flex items-center justify-between gap-2 p-1.5 my-1 bg-white dark:bg-[#18181c] rounded-lg border border-black/[0.04] dark:border-white/[0.06]">
-                                  <span className="font-mono text-[10px] text-zinc-800 dark:text-zinc-200 truncate">{baseMcpUrl}/mcp</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyText(`${baseMcpUrl}/mcp`, 'claude-streamable-url')}
-                                    className="p-1 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-zinc-700 dark:text-zinc-300 cursor-pointer shrink-0"
-                                    title="Copy URL"
-                                  >
-                                    {copiedField === 'claude-streamable-url' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                                  </button>
-                                </div>
-                              </li>
-                              <li>Click <strong>Connect</strong>! Claude will instantly load all 60 MCP tools with official logo.</li>
-                            </ol>
-                          </div>
-
-                          {/* Method 2: 1-Click Terminal Command */}
-                          <div className="space-y-1.5 pt-1">
-                            <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 block">
-                              Method B: 1-Click Terminal Command (Claude Code / Desktop)
-                            </span>
-                            <div className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-[#18181c] rounded-xl border border-black/[0.04] dark:border-white/[0.06]">
-                              <code className="font-mono text-[11px] text-zinc-900 dark:text-zinc-200 truncate">
-                                claude mcp add northveil {baseMcpUrl}/mcp
-                              </code>
-                              <button
-                                type="button"
-                                onClick={() => handleCopyText(`claude mcp add northveil ${baseMcpUrl}/mcp`, 'claude-cmd')}
-                                className="px-2 py-1 rounded-lg bg-black/[0.06] dark:bg-white/[0.08] hover:bg-black/[0.12] dark:hover:bg-white/[0.16] text-zinc-900 dark:text-white text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-                              >
-                                {copiedField === 'claude-cmd' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                                {copiedField === 'claude-cmd' ? 'Copied' : 'Copy'}
-                              </button>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 block mb-1">
+                                Connector name
+                              </label>
+                              <div className="flex items-center justify-between gap-2 p-2.5 bg-white dark:bg-[#18181c] rounded-xl border border-black/[0.04] dark:border-white/[0.06]">
+                                <span className="font-mono text-xs font-semibold text-zinc-900 dark:text-white">Northveil</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyText('Northveil', 'claude-name')}
+                                  className="p-1 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                                  title="Copy Name"
+                                >
+                                  {copiedField === 'claude-name' ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
                             </div>
-                          </div>
 
-                          {/* Method 3: Claude Desktop Settings UI */}
-                          <div className="space-y-1.5 pt-1">
-                            <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 block">
-                              Method C: Claude Desktop UI Settings (No config file)
-                            </span>
-                            <ol className="list-decimal list-inside space-y-1 text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed pl-0.5">
-                              <li>Open <strong>Claude Desktop</strong> &rarr; Click <strong>Settings</strong> &rarr; <strong>Connectors / Developer</strong> &rarr; <strong>Add MCP Server</strong>.</li>
-                              <li>
-                                Set <strong>Name</strong>: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[10px]">Northveil</code> and <strong>Server URL</strong> to:
-                                <div className="flex items-center justify-between gap-2 p-1.5 my-1 bg-white dark:bg-[#18181c] rounded-lg border border-black/[0.04] dark:border-white/[0.06]">
-                                  <span className="font-mono text-[10px] text-zinc-800 dark:text-zinc-200 truncate">{generatedSseUrl}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyText(generatedSseUrl, 'claude-url')}
-                                    className="p-1 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-zinc-700 dark:text-zinc-300 cursor-pointer shrink-0"
-                                    title="Copy URL"
-                                  >
-                                    {copiedField === 'claude-url' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                                  </button>
-                                </div>
-                              </li>
-                              <li>Click <strong>Save</strong>! All tools will load immediately.</li>
-                            </ol>
+                            <div>
+                              <label className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 block mb-1">
+                                MCP URL
+                              </label>
+                              <div className="flex items-center justify-between gap-2 p-2.5 bg-white dark:bg-[#18181c] rounded-xl border border-black/[0.04] dark:border-white/[0.06]">
+                                <span className="font-mono text-xs text-zinc-900 dark:text-zinc-200 truncate">https://mcp.northveil.xyz/sse</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyText('https://mcp.northveil.xyz/sse', 'claude-url')}
+                                  className="p-1 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                                  title="Copy URL"
+                                >
+                                  {copiedField === 'claude-url' ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed pt-1">
+                              Add this in Claude.ai &rarr; Connectors. You will sign in with Google and a passkey. You do not paste a secret.
+                            </p>
                           </div>
                         </div>
                       )}

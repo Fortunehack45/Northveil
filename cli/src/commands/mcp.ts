@@ -11,8 +11,8 @@ export function registerMcpCommands(program: any) {
     .option('--http', 'Display streamable HTTP (POST /mcp) connection URL')
     .option('--sse', 'Display Server-Sent Events (GET /sse) connection URL')
     .action(async (options: any) => {
-      // If invoked by Claude Desktop via stdio (non-interactive pipe)
-      if (!process.stdin.isTTY && !options.cursor && !options.claude && !options.windsurf && !options.http && !options.sse) {
+      const hasFlags = options.cursor || options.claude || options.windsurf || options.http || options.sse;
+      if (!hasFlags) {
         const apiUrl = process.env.NORTHVEIL_API_URL || 'https://mcp.northveil.xyz';
         const apiKey = process.env.NORTHVEIL_API_KEY || '';
 

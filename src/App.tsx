@@ -13,6 +13,7 @@ import { OnboardingAuthModal } from './components/OnboardingAuthModal';
 import { AdminPanelView } from './components/AdminPanelView';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { InteractiveTourModal } from './components/InteractiveTourModal';
+import { OAuthConsentModal } from './components/OAuthConsentModal';
 import { Lock, Fingerprint } from 'lucide-react';
 
 const MainContent: React.FC = () => {
@@ -23,6 +24,13 @@ const MainContent: React.FC = () => {
   const [modalAssetId, setModalAssetId] = useState<string | undefined>(undefined);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
   const [isTourOpen, setIsTourOpen] = useState<boolean>(false);
+  const [oauthConsentParams, setOauthConsentParams] = useState<{
+    clientId: string;
+    redirectUri: string;
+    codeChallenge: string;
+    codeChallengeMethod?: string;
+    state?: string;
+  } | null>(null);
   const [unlockPassword, setUnlockPassword] = useState('');
   const [unlockError, setUnlockError] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
@@ -57,6 +65,20 @@ const MainContent: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const action = params.get('action');
+    const clientId = params.get('client_id');
+    const redirectUri = params.get('redirect_uri');
+    const codeChallenge = params.get('code_challenge');
+
+    if (clientId && redirectUri && codeChallenge) {
+      setOauthConsentParams({
+        clientId,
+        redirectUri,
+        codeChallenge,
+        codeChallengeMethod: params.get('code_challenge_method') || 'S256',
+        state: params.get('state') || undefined,
+      });
+    }
+
     if (action === 'transfer' || action === 'send' || action === 'dev') {
       setActiveTab('developerHub');
     } else if (action === 'wallets') {
@@ -238,6 +260,14 @@ const MainContent: React.FC = () => {
         isOpen={isTourOpen}
         onClose={() => setIsTourOpen(false)}
       />
+
+      {/* OAuth 2.0 Consent Modal for Claude */}
+      {oauthConsentParams && (
+        <OAuthConsentModal
+          {...oauthConsentParams}
+          onClose={() => setOauthConsentParams(null)}
+        />
+      )}
     </div>
   );
 };

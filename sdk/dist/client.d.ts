@@ -1,257 +1,53 @@
-import { NorthveilConfig, SwapParams, DeployContractParams, TransactionResult, TokenPrice, TrendingMemecoin, TokenAuditResult, TradeOrderParams, TradeOrder, WalletHealthResult, SecurityScanResult, SendTransferParams, MintTokensParams, MintTokensResult, ReserveTokensParams, ReserveTokensResult, MakeReservationParams, MakeReservationResult, ListReservationsResult, FlightSearchParams, FlightSearchResult, HotelSearchParams, HotelSearchResult, EventSearchParams, EventSearchResult, BookingStatusResult } from './types.js';
+import { NorthveilConfig, PortfolioResult, PrepareTransferParams, PrepareTransferResult, TransactionStatusResult, WalletInfoResult, PendingApprovalItem } from './types.js';
+/**
+ * NorthveilClient
+ * Thin, non-custodial TypeScript client for communicating with Northveil MCP servers.
+ * Never stores or transmits private keys, seeds, or MPC key shares.
+ */
 export declare class NorthveilClient {
-    private baseUrl;
-    private apiKey;
-    private walletAddress;
+    private apiUrl;
+    private clientKey;
+    private walletAddress?;
     constructor(config?: NorthveilConfig);
-    private request;
-    /** Authentication & Identity Scope Service */
-    readonly auth: {
-        /** Get current authenticated developer/user profile, scopes, and allowed wallet addresses */
-        getMe: () => Promise<{
-            authenticated: boolean;
-            keyName: string;
-            walletAddress: string;
-            allowedWallets: string[];
-            permissions: string[];
-            tier: string;
-            userId: string;
-            timestamp: string;
-        }>;
-        /** Dynamically update the active API Key */
-        setApiKey: (key: string) => void;
-        /** Dynamically update the active target wallet */
-        setWalletAddress: (address: string) => void;
-    };
-    private mcpCall;
-    /** Get connected wallet address and details */
-    getWalletInfo(chain?: string): Promise<any>;
-    /** Get full portfolio with balances and USD valuations */
-    getPortfolio(hideZeroBalances?: boolean): Promise<any>;
-    /** Get balance for a specific token */
-    getTokenBalance(symbol: string): Promise<any>;
-    /** Get NFT gallery across 36+ blockchains */
-    getNFTs(chain?: string): Promise<any>;
-    /** Get transaction history */
-    getTransactionHistory(limit?: number, type?: string): Promise<any>;
-    /** Get gas estimates across all chains */
-    getGasEstimate(chain?: string): Promise<any>;
-    /** Execute a token swap via DEX aggregator */
-    swapTokens(params: SwapParams): Promise<TransactionResult>;
-    /** Buy tokens on DEX */
-    buyTokens(token: string, amount: number, fromToken?: string): Promise<TransactionResult>;
-    /** Sell tokens on DEX */
-    sellTokens(token: string, amount: number, toToken?: string): Promise<TransactionResult>;
-    /** Send a crypto transfer */
-    sendTransfer(params: SendTransferParams): Promise<TransactionResult>;
-    /** Get real-time prices for tokens (by symbol or contract address) */
-    getRealtimePrices(symbols?: string[], contractAddresses?: string[], chain?: string): Promise<{
-        prices: TokenPrice[];
-        count: number;
-    }>;
-    /** Discover trending meme coins with safety audit scores */
-    getTrendingMemecoins(chain?: string, limit?: number, minLiquidity?: number): Promise<{
-        tokens: TrendingMemecoin[];
-        count: number;
-    }>;
-    /** Deep security audit of a token contract */
-    auditToken(contractAddress: string, chain?: string): Promise<TokenAuditResult>;
-    /** Set a stop-loss or take-profit order */
-    setTradeOrder(params: TradeOrderParams): Promise<TradeOrder>;
-    /** List active trade orders */
-    getActiveOrders(status?: string): Promise<{
-        orders: TradeOrder[];
-        count: number;
-    }>;
-    /** Cancel a trade order by ID */
-    cancelTradeOrder(orderId: string): Promise<{
-        orderId: string;
-        status: string;
-    }>;
-    /** Comprehensive wallet health check (balances, gas, diversity) */
-    checkWalletHealth(walletAddress?: string): Promise<WalletHealthResult>;
-    /** Deep security scan (phishing, approvals, leaked data) */
-    scanWalletSecurity(walletAddress?: string, deepScan?: boolean): Promise<SecurityScanResult>;
-    /** Deploy a smart contract */
-    deploySmartContract(params: DeployContractParams): Promise<TransactionResult>;
-    /** Audit smart contract source code */
-    auditSmartContract(code: string): Promise<any>;
-    /** Verify and publish smart contract source code on block explorer */
-    verifySmartContract(params: {
-        contractAddress: string;
-        contractName: string;
-        sourceCode?: string;
-        network?: string;
-        compilerVersion?: string;
-    }): Promise<any>;
-    /** Mint new tokens from an ERC-20 contract */
-    mintTokens(params: MintTokensParams): Promise<MintTokensResult>;
-    /** Create a time-locked token reservation */
-    reserveTokens(params: ReserveTokensParams): Promise<ReserveTokensResult>;
-    /** Create a web3 booking reservation & digital ticket pass (flight, movie, hotel, event, dining) */
-    makeReservation(params: MakeReservationParams): Promise<MakeReservationResult>;
-    /** List active web3 reservations, flight boarding passes, and bookings */
-    listReservations(params?: {
-        walletAddress?: string;
-        category?: string;
-    }): Promise<ListReservationsResult>;
-    /** Search live international flights with crypto pricing */
-    searchFlights(params: FlightSearchParams): Promise<FlightSearchResult>;
-    /** Search global hotel accommodations with crypto pricing */
-    searchHotels(params: HotelSearchParams): Promise<HotelSearchResult>;
-    /** Search movies, IMAX screenings, concerts, and VIP events */
-    searchEvents(params?: EventSearchParams): Promise<EventSearchResult>;
-    /** Query booking confirmation status by official airline PNR or Northveil reference */
-    getBookingStatus(bookingReferenceOrPnr: string): Promise<BookingStatusResult>;
-    /** Prepare an unsigned transaction request for local client signing */
-    prepareTransaction(params: {
-        walletAddress?: string;
-        recipient: string;
-        amount: number;
-        asset?: string;
-        network?: string;
-        chainId?: number;
-        calldata?: string;
-        operationType?: 'TRANSFER' | 'SWAP' | 'DEPLOY' | 'CONTRACT_CALL';
-    }): Promise<{
-        success: boolean;
-        requestId: string;
-        approvalToken: string;
-        walletAddress: string;
-        recipient: string;
-        amount: number;
-        asset: string;
-        network: string;
-        chainId: number;
-        nonce: number;
-        unsignedTransaction: any;
-        unsignedSerialized?: string;
-        expiresAt: string;
-    }>;
-    /** Broadcast an already signed raw transaction on-chain */
-    broadcastTransaction(params: {
-        approvalToken?: string;
-        requestId?: string;
-        signedTransaction: string;
-    }): Promise<{
-        success: boolean;
-        status: string;
-        requestId: string;
-        walletAddress: string;
-        recipient: string;
-        amount: number;
-        asset: string;
-        network: string;
-        txHash: string;
-        blockNumber: number;
-        gasUsed: string;
-        explorerUrl: string;
-    }>;
-    /** Register public wallet metadata non-custodially */
-    registerWallet(params: {
-        address: string;
-        walletName?: string;
-        chainId?: string;
-    }): Promise<{
-        success: boolean;
-        wallet: any;
-        address: string;
-        mpcWalletId: string;
-    }>;
-    /** Get full OpenAPI 3.0.3 schema for ChatGPT & REST Action integration */
-    getOpenApiSchema(): Promise<any>;
-    /** List permitted non-custodial wallets */
-    listWallets(): Promise<{
-        wallets: string[];
-        active: string;
-        count: number;
-    }>;
-    /** Get live multi-chain native and token balances */
-    getBalances(network?: string, walletAddress?: string): Promise<any>;
-    /** Simulate transaction execution on a fork */
-    simulateTx(params: {
-        from: string;
-        to: string;
-        value?: string;
-        data?: string;
-        network?: string;
-    }): Promise<any>;
-    /** Estimate live EIP-1559 gas consumption and USD cost */
-    estimateGas(params?: {
-        network?: string;
-        to?: string;
-        value?: string;
-    }): Promise<any>;
-    /** Audit smart contract security and bytecode */
-    auditContract(params: {
-        contractAddress?: string;
-        code?: string;
-        network?: string;
-    }): Promise<any>;
-    /** Non-custodially prepare an unsigned native or token transfer */
-    prepareTransfer(params: {
-        recipient: string;
-        amount: number;
-        asset?: string;
-        network?: string;
-    }): Promise<any>;
-    /** Non-custodially prepare an optimal DEX swap */
-    prepareSwap(params: {
-        fromToken: string;
-        toToken: string;
-        amount: number;
-        slippage?: number;
-        network?: string;
-    }): Promise<any>;
-    /** Request passkey biometric signature for a staged approval */
-    requestSignature(params: {
-        approvalToken: string;
-        userId?: string;
-    }): Promise<any>;
-    /** Request on-chain broadcast of a client-signed raw transaction */
-    requestBroadcast(params: {
-        approvalToken?: string;
-        signedTransaction: string;
-    }): Promise<any>;
-    /** List pending transaction approvals */
-    listPendingApprovals(): Promise<any>;
-    /** Get approval status for an approval token */
-    getApprovalStatus(approvalToken: string): Promise<any>;
-    /** Fetch RFC 9728 OAuth 2.0 Protected Resource Metadata */
-    getOAuthProtectedResourceMetadata(): Promise<any>;
-    /** Fetch RFC 8414 OAuth 2.0 Authorization Server Metadata */
-    getOAuthServerMetadata(): Promise<any>;
-    /** Register an OAuth 2.0 client dynamically (RFC 7591) */
-    registerOAuthClient(params: {
-        client_name?: string;
-        redirect_uris: string[];
-        grant_types?: string[];
-        response_types?: string[];
-        scope?: string;
-    }): Promise<{
-        client_id: string;
-        client_secret?: string;
-        client_name: string;
-        redirect_uris: string[];
-        grant_types: string[];
-        response_types: string[];
-        scope: string;
-    }>;
     /**
-     * Check live server & database connectivity health
+     * Dispatches a JSON-RPC 2.0 tool call to the Northveil MCP endpoint
      */
-    getHealth(): Promise<{
-        status: string;
-        service?: string;
-        supabase?: {
-            connected: boolean;
-            error?: string;
-        };
-        env?: {
-            SUPABASE_URL: boolean;
-            SUPABASE_ANON_KEY: boolean;
-        };
-        timestamp: string;
+    callTool<T = any>(name: string, args?: Record<string, any>): Promise<T>;
+    /**
+     * Retrieves real-time portfolio balance and valuation across supported chains
+     */
+    getPortfolio(walletAddress?: string): Promise<PortfolioResult>;
+    /**
+     * Stages an on-chain transfer.
+     * - Under Always Ask: Returns APPROVAL_REQUIRED with approvalId, payloadHash, and approveUrl for human passkey confirmation.
+     * - Under Autonomous: Evaluates grant limits and executes threshold MPC signing immediately if within bounds.
+     */
+    prepareTransfer(params: PrepareTransferParams): Promise<PrepareTransferResult>;
+    /**
+     * Checks the confirmation receipt of an on-chain transaction hash
+     */
+    getTransactionStatus(txHash: string, chain?: string): Promise<TransactionStatusResult>;
+    /**
+     * Queries metadata, active grant policies, and spending limits for the client's wallet
+     */
+    getWalletInfo(): Promise<WalletInfoResult>;
+    /**
+     * Alias for getWalletInfo
+     */
+    listWallets(): Promise<WalletInfoResult>;
+    /**
+     * Query balances across one chain or all supported chains
+     */
+    getBalances(networkOrAddress?: string): Promise<any>;
+    /**
+     * Check execution status of an approval ticket by ID
+     */
+    getApprovalStatus(approvalId: string): Promise<any>;
+    /**
+     * Lists active pending approvals awaiting human passkey authorization
+     */
+    listPendingApprovals(): Promise<{
+        pendingApprovals: PendingApprovalItem[];
     }>;
 }
 //# sourceMappingURL=client.d.ts.map
