@@ -412,7 +412,38 @@ export const ApprovalsView: React.FC = () => {
       }
 
       const out = await res.json();
-      const txHash = out.txHash;
+      let txHash = out.txHash;
+
+      // If status is pending_user_stamp, execute activity stamp step before confirming
+      if (out.status === 'pending_user_stamp' || !txHash) {
+        setPasskeyNotice('Passkey verified. Submitting Turnkey enclave activity stamp...');
+        const stampRes = await fetch(`${mcpUrl}/wallet/requests/${id}/stamp-complete`, {
+          method: 'POST',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify({
+            activityId: out.activityId,
+            stampedRequest: {
+              activityId: out.activityId,
+              credentialId: authRes.assertion.credentialId,
+              payloadHash: out.payloadHash,
+            },
+          }),
+        });
+
+        if (!stampRes.ok) {
+          const stampErrText = await stampRes.text();
+          throw new Error(`Enclave activity stamp failed: ${stampErrText}`);
+        }
+
+        const stampOut = await stampRes.json();
+        txHash = stampOut.txHash;
+      }
+
+      if (!txHash) {
+        throw new Error('Transaction signing completed but no transaction hash returned from MPC signer.');
+      }
+
       const targetNetwork = currentRecord?.parameters?.network || 'base';
       const explorerUrl = out.explorerUrl || getExplorerLink(targetNetwork, txHash);
 

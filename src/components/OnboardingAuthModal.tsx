@@ -473,21 +473,27 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
 
       // 2. WebAuthn credentials create via @simplewebauthn/browser
       const attResp = await startRegistration({ optionsJSON: options.options || options });
+      if (!attResp?.response?.clientDataJSON) {
+        throw new Error('Passkey create returned an empty credential. Use Chrome/Safari on https://wallet.northveil.xyz.');
+      }
 
       // 3. Finish registration
       const finishRes = await fetch(`${MpcWalletService.getBaseUrl()}/auth/passkey/register/finish`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(token ? { Authorization: `Bearer ${token}`, 'X-Session-Token': token } : {}),
         },
         body: JSON.stringify({
           userId,
           response: attResp,
+          hostname: window.location.hostname,
+          origin: window.location.origin,
         }),
       });
       const finishData = await parseResponse(finishRes);
-      if (!finishRes.ok) throw new Error(finishData.error || 'Passkey registration verification failed');
+      if (!finishRes.ok) throw new Error(finishData.error || finishData.message || 'Passkey registration verification failed');
 
       // 4. Branch based on /wallet/me: if user already has wallets, load them and go to dashboard
       const sessionToken = MpcWalletService.getSessionToken();
