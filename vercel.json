@@ -1,12 +1,15 @@
 {
   "version": 2,
-  "functions": {
-    "api/index.ts": {
-      "maxDuration": 60,
-      "memory": 1024
-    }
-  },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api" }
+    { "source": "/auth/:path*", "destination": "https://mcp.northveil.xyz/auth/:path*" },
+    { "source": "/wallet/:path*", "destination": "https://mcp.northveil.xyz/wallet/:path*" },
+    { "source": "/api/:path*", "destination": "https://mcp.northveil.xyz/api/:path*" },
+    { "source": "/oauth/:path*", "destination": "https://mcp.northveil.xyz/oauth/:path*" },
+    { "source": "/.well-known/:path*", "destination": "https://mcp.northveil.xyz/.well-known/:path*" },
+    { "source": "/mcp", "destination": "https://mcp.northveil.xyz/mcp" },
+    { "source": "/sse", "destination": "https://mcp.northveil.xyz/sse" },
+    { "source": "/messages", "destination": "https://mcp.northveil.xyz/messages" },
+    { "source": "/openapi.json", "destination": "https://mcp.northveil.xyz/openapi.json" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

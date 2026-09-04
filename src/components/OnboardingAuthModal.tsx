@@ -180,6 +180,18 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
     window.location.href = `${mcpBase}/auth/google/start?redirect=${encodeURIComponent(redirectUri)}`;
   };
 
+  const parseResponse = async (res: Response) => {
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      if (!res.ok) {
+        throw new Error(`Server returned status ${res.status}: ${text.slice(0, 100) || res.statusText}`);
+      }
+      throw new Error('Received unexpected non-JSON response from server.');
+    }
+  };
+
   /**
    * Start Email OTP Flow (POST /auth/email/start)
    */
@@ -201,7 +213,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         body: JSON.stringify({ email: cleanEmail }),
       });
 
-      const data = await res.json();
+      const data = await parseResponse(res);
       if (!res.ok) {
         throw new Error(data.error || 'Failed to send verification code.');
       }
@@ -236,7 +248,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         body: JSON.stringify({ email: email.trim().toLowerCase(), code: targetCode }),
       });
 
-      const data = await res.json();
+      const data = await parseResponse(res);
       if (!res.ok) {
         if (data.error === 'OTP_EXPIRED') {
           setEmailError('Your verification code expired (5-minute limit). Please request a new one.');
@@ -293,7 +305,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: userId || undefined, rpID: isLocal ? 'localhost' : undefined }),
       });
-      const options = await beginRes.json();
+      const options = await parseResponse(beginRes);
       if (!beginRes.ok) throw new Error(options.error || 'Failed to start passkey authentication');
 
       // 2. Prompt user WebAuthn assertion
@@ -330,7 +342,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loginPayload),
       });
-      const finishData = await finishRes.json();
+      const finishData = await parseResponse(finishRes);
       if (!finishRes.ok) throw new Error(finishData.error || 'Passkey authentication failed');
 
       // 4. Save elevated session token
@@ -382,7 +394,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         },
         body: JSON.stringify({ userId, rpID: isLocal ? 'localhost' : undefined }),
       });
-      const options = await beginRes.json();
+      const options = await parseResponse(beginRes);
       if (!beginRes.ok) throw new Error(options.error || 'Failed to start passkey registration');
 
       // 2. Navigator credentials create
@@ -421,7 +433,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         },
         body: JSON.stringify(registerPayload),
       });
-      const finishData = await finishRes.json();
+      const finishData = await parseResponse(finishRes);
       if (!finishRes.ok) throw new Error(finishData.error || 'Passkey registration verification failed');
 
       // 4. Advance to wallet setup

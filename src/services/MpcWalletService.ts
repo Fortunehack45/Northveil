@@ -38,6 +38,18 @@ export class MpcWalletService {
     return getMcpServerUrl();
   }
 
+  private static async safeJson<T = any>(res: Response): Promise<T> {
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}: ${text.slice(0, 100) || res.statusText}`);
+      }
+      throw new Error('Received unexpected non-JSON response from server.');
+    }
+  }
+
   public static getSessionToken(): string | null {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem(this.SESSION_KEY);
@@ -85,7 +97,7 @@ export class MpcWalletService {
       }),
     });
 
-    const json = await res.json();
+    const json = await this.safeJson(res);
     if (!res.ok || (!json.wallet && !json.address)) {
       throw new Error(json.error || 'Failed to create MPC Vault');
     }
@@ -135,7 +147,7 @@ export class MpcWalletService {
         body: JSON.stringify(payload),
       });
 
-      const json = await res.json();
+      const json = await this.safeJson(res);
       if (!res.ok || !json.address) {
         throw new Error(json.error || json.message || 'Failed to import vault into Turnkey MPC');
       }
@@ -167,12 +179,12 @@ export class MpcWalletService {
       headers,
     });
 
+    const json = await this.safeJson(res);
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || err.message || 'Failed to fetch user wallet metadata');
+      throw new Error(json.error || json.message || 'Failed to fetch user wallet metadata');
     }
 
-    return await res.json();
+    return json;
   }
 
   /**

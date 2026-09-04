@@ -13,10 +13,10 @@ export const getMcpServerUrl = (): string => {
       return `${protocol}//${hostname}:3001`;
     }
 
-    return window.location.origin;
+    return 'https://mcp.northveil.xyz';
   }
 
-  return 'https://northveil.xyz';
+  return 'https://mcp.northveil.xyz';
 };
 
 export const getMcpHttpUrl = (): string => {
