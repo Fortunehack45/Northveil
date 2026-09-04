@@ -65,6 +65,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
 
   const [processingMsg, setProcessingMsg] = useState('');
   const [googleNotice, setGoogleNotice] = useState<string | null>(null);
+  const [devNotice, setDevNotice] = useState<string | null>(null);
 
   const countdownTimerRef = useRef<any>(null);
   const resendTimerRef = useRef<any>(null);
@@ -218,7 +219,17 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         throw new Error(data.error || 'Failed to send verification code.');
       }
 
-      setCode('');
+      if (data.devCode) {
+        setCode(data.devCode);
+        setDevNotice(
+          data.deliveryNotice
+            ? `${data.deliveryNotice} Your verification code is: ${data.devCode}`
+            : `Your verification code is: ${data.devCode}`
+        );
+      } else {
+        setDevNotice(null);
+        setCode('');
+      }
       setCodeError('');
       setStep('emailCode');
     } catch (err: any) {
@@ -668,6 +679,15 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
           </div>
 
           <div className="space-y-4">
+            {devNotice && (
+              <div className="text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 space-y-1">
+                <div className="font-semibold flex items-center gap-1.5 text-blue-400">
+                  <Sparkles className="w-3.5 h-3.5" /> Verification Code Available
+                </div>
+                <div className="text-[11px] leading-relaxed text-zinc-300">{devNotice}</div>
+              </div>
+            )}
+
             <div className="flex justify-center">
               <input
                 type="text"
