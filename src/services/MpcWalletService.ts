@@ -172,7 +172,10 @@ export class MpcWalletService {
   public static async fetchWalletMe(token?: string) {
     const sessionToken = token || this.getSessionToken();
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (sessionToken) headers['Authorization'] = `Bearer ${sessionToken}`;
+    if (sessionToken) {
+      headers['Authorization'] = `Bearer ${sessionToken}`;
+      headers['X-Session-Token'] = sessionToken;
+    }
 
     const res = await fetch(`${this.getBaseUrl()}/wallet/me`, {
       method: 'GET',

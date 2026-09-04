@@ -163,6 +163,7 @@ interface WalletContextType {
   unlockVault: (password: string) => Promise<boolean>;
   setupVault: (passwordOrSeed: any, passwordArgOrSeed?: any, walletName?: string) => Promise<boolean> | boolean;
   setupMpcVault: (walletName: string, address: string, mpcWalletId: string, userId: string, sessionToken: string) => Promise<boolean>;
+  setupMpcVaultFromServer: (serverWallets: any[], sessionToken?: string) => Promise<boolean>;
   isVaultConfigured: boolean;
   vaultType: 'mpc' | 'imported';
   addCustomToken: (token: CryptoAsset) => void;
@@ -814,24 +815,23 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [gasEstimates, setGasEstimates] = useState<ChainGasEstimate[]>([]);
   const [systemMetrics] = useState<MicroserviceStatus[]>([]);
 
-  // Auto-initialize vault state on mount
+  // Auto-initialize vault state on mount: /wallet/me is canonical source of truth
   useEffect(() => {
-    const hasMpcStorage = !!localStorage.getItem('northveil_v3_mpc_vault');
-    const hasMpcSession = !!MpcWalletService.getSessionToken();
-    const hasLocalVault = VaultService.hasVault();
-
-    if (hasMpcStorage) {
-      setIsVaultConfigured(true);
-      setVaultType('mpc');
-      if (hasMpcSession) {
-        setIsLocked(false);
-      } else {
-        setIsLocked(true);
-      }
-    } else if (hasLocalVault) {
-      setIsVaultConfigured(true);
-      setVaultType('imported');
-      setIsLocked(true);
+    const sessionToken = MpcWalletService.getSessionToken();
+    if (sessionToken) {
+      MpcWalletService.fetchWalletMe(sessionToken)
+        .then((me) => {
+          if (me && me.wallets && me.wallets.length > 0) {
+            setupMpcVaultFromServer(me.wallets, sessionToken);
+          } else {
+            setIsVaultConfigured(false);
+            setIsLocked(false);
+          }
+        })
+        .catch(() => {
+          setIsVaultConfigured(false);
+          setIsLocked(false);
+        });
     } else {
       setIsVaultConfigured(false);
       setIsLocked(false);
@@ -934,6 +934,76 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       return true;
     } catch (e) {
       console.error('MPC Vault setup failed:', e);
+      return false;
+    }
+  };
+
+  const setupMpcVaultFromServer = async (serverWallets: any[], sessionToken?: string): Promise<boolean> => {
+    try {
+      if (!serverWallets || !Array.isArray(serverWallets) || serverWallets.length === 0) {
+        return false;
+      }
+
+      // Sort: primary first, then created_at
+      const sorted = [...serverWallets].sort((a, b) => {
+        if (a.is_primary && !b.is_primary) return -1;
+        if (!a.is_primary && b.is_primary) return 1;
+        return 0;
+      });
+
+      const mappedSubWallets: SubWalletAccount[] = sorted.map((w, idx) => ({
+        id: `acc-${idx}`,
+        name: w.name || (w.is_primary ? 'Primary Vault' : `Vault #${idx + 1}`),
+        accountIndex: idx,
+        address: (w.address || '').toLowerCase(),
+        derivationPath: 'northveil://tee-nitro-enclave',
+        colorTag: idx === 0 ? '#00f0ff' : idx === 1 ? '#ccff00' : '#ff007f',
+        isDefault: Boolean(w.is_primary || idx === 0),
+        createdAt: w.created_at ? w.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+        balanceMultiplier: 1.0,
+      }));
+
+      setSubWallets(mappedSubWallets);
+      setActiveWalletIdState('acc-0');
+      localStorage.setItem('northveil_v3_subwallets', JSON.stringify(mappedSubWallets));
+      localStorage.setItem('northveil_v3_active_subwallet', 'acc-0');
+
+      const primary = sorted[0];
+      const mpcWalletId = primary.mpc_wallet_id || primary.mpcWalletId || '';
+
+      localStorage.setItem(
+        'northveil_v3_mpc_vault',
+        JSON.stringify({
+          version: 3,
+          type: 'mpc_northveil',
+          walletAddress: primary.address.toLowerCase(),
+          mpcWalletId,
+          userId: primary.user_id || MpcWalletService.getUserId(),
+          walletName: primary.name || 'Primary Vault',
+          createdAt: primary.created_at || new Date().toISOString(),
+        })
+      );
+
+      if (sessionToken) {
+        MpcWalletService.saveSession(sessionToken, primary.user_id || MpcWalletService.getUserId(), 'mpc');
+      }
+      setVaultType('mpc');
+
+      // Purge old cached data from previous wallet
+      localStorage.removeItem('northveil_v3_assets');
+      localStorage.removeItem('northveil_v3_transactions');
+      localStorage.removeItem('northveil_v3_staking');
+      setTransactions([]);
+      setStakingPositions([]);
+      setOwnedNFTs([]);
+      setAssets([]);
+
+      setIsVaultConfigured(true);
+      setIsLocked(false);
+
+      return true;
+    } catch (e) {
+      console.error('setupMpcVaultFromServer error:', e);
       return false;
     }
   };
@@ -2364,6 +2434,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         unlockVault,
         setupVault,
         setupMpcVault,
+        setupMpcVaultFromServer,
         isVaultConfigured,
         vaultType,
         addCustomToken: (token: CryptoAsset) => {
