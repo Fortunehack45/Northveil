@@ -137,15 +137,19 @@ export class WebAuthnService {
    * Converts base64url string to Uint8Array
    */
   public static base64URLToBuffer(base64url: string): Uint8Array {
-    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-    const padLen = (4 - (base64.length % 4)) % 4;
-    const padded = base64 + '='.repeat(padLen);
-    const binary = atob(padded);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
+    try {
+      const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+      const padLen = (4 - (base64.length % 4)) % 4;
+      const padded = base64 + '='.repeat(padLen === 4 ? 0 : padLen);
+      const binary = atob(padded);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    } catch {
+      return new TextEncoder().encode(base64url);
     }
-    return bytes;
   }
 
   /**

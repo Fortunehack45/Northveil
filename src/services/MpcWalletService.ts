@@ -63,23 +63,22 @@ export class MpcWalletService {
   }
 
   public static getUserId(): string {
-    if (typeof window === 'undefined') return 'user_default';
-    let id = localStorage.getItem(this.USER_KEY);
-    if (!id) {
-      id = `usr_${Math.random().toString(36).substring(2, 10)}`;
-      localStorage.setItem(this.USER_KEY, id);
-    }
-    return id;
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem(this.USER_KEY) || '';
   }
 
   /**
-   * Provision a Non-Custodial Vault
+   * Provision an MPC Vault via Northveil MCP Gateway
    */
   public static async createMpcVault(walletName: string = 'Primary Vault', userId?: string): Promise<MpcVaultCreationResult> {
     const effectiveUserId = userId || this.getUserId();
-    const res = await fetch(`${this.getBaseUrl()}/api/v1/wallets/create-mpc`, {
+    const token = this.getSessionToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${this.getBaseUrl()}/wallet/create`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         userId: effectiveUserId,
         walletName,
@@ -87,16 +86,17 @@ export class MpcWalletService {
     });
 
     const json = await res.json();
-    if (!res.ok || !json.success) {
-      throw new Error(json.error || 'Failed to create Non-Custodial Vault');
+    if (!res.ok || (!json.wallet && !json.address)) {
+      throw new Error(json.error || 'Failed to create MPC Vault');
     }
 
+    const wallet = json.wallet || json;
     return {
       success: true,
-      address: json.address,
-      mpcWalletId: json.mpcWalletId,
-      mpcProvider: json.mpcProvider || 'non_custodial',
-      userId: effectiveUserId,
+      address: wallet.address,
+      mpcWalletId: wallet.mpc_wallet_id || wallet.mpcWalletId || '',
+      mpcProvider: wallet.mpc_provider || 'turnkey',
+      userId: wallet.user_id || effectiveUserId,
     };
   }
 
@@ -244,13 +244,17 @@ export class MpcWalletService {
     displayName?: string,
     walletAddress?: string
   ) {
-    const res = await fetch(`${this.getBaseUrl()}/api/v1/auth/passkey/register-options`, {
+    const token = this.getSessionToken();
+    const res = await fetch(`${this.getBaseUrl()}/auth/passkey/register/begin`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({
         userId,
         userName: userName || `user_${userId.slice(0, 8)}@northveil.xyz`,
-        userDisplayName: displayName || 'Northveil Vault User',
+        displayName: displayName || 'Northveil Vault User',
         walletAddress: (walletAddress || '').toLowerCase(),
       }),
     });
@@ -271,13 +275,17 @@ export class MpcWalletService {
     walletAddress: string,
     registrationResponse: any
   ): Promise<PasskeyVerificationResult> {
-    const res = await fetch(`${this.getBaseUrl()}/api/v1/auth/passkey/verify-registration`, {
+    const token = this.getSessionToken();
+    const res = await fetch(`${this.getBaseUrl()}/auth/passkey/register/finish`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({
         userId,
         walletAddress: (walletAddress || '').toLowerCase(),
-        registrationResponse,
+        response: registrationResponse,
       }),
     });
 
@@ -297,7 +305,7 @@ export class MpcWalletService {
    * Request WebAuthn Authentication Challenge & Options
    */
   public static async getPasskeyAuthOptions(userId?: string, walletAddress?: string) {
-    const res = await fetch(`${this.getBaseUrl()}/api/v1/auth/passkey/auth-options`, {
+    const res = await fetch(`${this.getBaseUrl()}/auth/passkey/login/begin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -322,13 +330,14 @@ export class MpcWalletService {
     walletAddress: string,
     authenticationResponse: any
   ): Promise<PasskeyVerificationResult> {
-    const res = await fetch(`${this.getBaseUrl()}/api/v1/auth/passkey/verify-authentication`, {
+    const res = await fetch(`${this.getBaseUrl()}/auth/passkey/login/finish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId,
         walletAddress: (walletAddress || '').toLowerCase(),
-        authenticationResponse,
+        credentialId: authenticationResponse.id,
+        response: authenticationResponse,
       }),
     });
 
@@ -338,7 +347,7 @@ export class MpcWalletService {
     }
 
     if (json.sessionToken) {
-      this.saveSession(json.sessionToken, userId, 'mpc');
+      this.saveSession(json.sessionToken, json.user?.id || userId, 'mpc');
     }
 
     return json;
@@ -347,16 +356,26 @@ export class MpcWalletService {
   /**
    * Validate current session status with backend
    */
-  public static async checkSession(): Promise<{ authenticated: boolean; user?: any }> {
+  public static async checkSession(): Promise<{ authenticated: boolean; user?: any; wallet?: any; wallets?: any[]; passkeys?: any[]; agents?: any[] }> {
     const token = this.getSessionToken();
     if (!token) return { authenticated: false };
 
     try {
-      const res = await fetch(`${this.getBaseUrl()}/api/v1/auth/session`, {
+      const res = await fetch(`${this.getBaseUrl()}/wallet/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const json = await res.json();
-      return json;
+      if (res.ok) {
+        const json = await res.json();
+        return {
+          authenticated: true,
+          user: json.user,
+          wallet: json.wallet,
+          wallets: json.wallets,
+          passkeys: json.passkeys,
+          agents: json.agents,
+        };
+      }
+      return { authenticated: false };
     } catch {
       return { authenticated: false };
     }
@@ -376,10 +395,15 @@ export class MpcWalletService {
     const queryStr = cleanParam.startsWith('0x') ? `walletAddress=${cleanParam}` : `userId=${cleanParam || this.getUserId()}`;
 
     const candidateUrls = [
+      `${this.getBaseUrl()}/wallet/approvals/pending?${queryStr}`,
+      `${this.getBaseUrl()}/wallet/approvals/pending`,
+      `${this.getBaseUrl()}/wallet/approvals?status=pending`,
       `${this.getBaseUrl()}/api/v1/dashboard/approvals/pending?${queryStr}`,
       `${this.getBaseUrl()}/api/v1/dashboard/approvals/pending`,
       `${this.getBaseUrl()}/api/v1/approvals/pending?${queryStr}`,
       `${this.getBaseUrl()}/api/v1/approvals/pending`,
+      `/wallet/approvals/pending?${queryStr}`,
+      `/wallet/approvals/pending`,
       `/api/v1/dashboard/approvals/pending?${queryStr}`,
       `/api/v1/dashboard/approvals/pending`,
       `/api/v1/approvals/pending?${queryStr}`,

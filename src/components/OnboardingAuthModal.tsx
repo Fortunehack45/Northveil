@@ -336,7 +336,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
               onClick={handleLoginWithExistingPasskey}
               className="w-full py-3 bg-black/[0.04] dark:bg-white/[0.04] text-zinc-900 dark:text-white font-medium text-xs rounded-full border border-black/[0.08] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.08] cursor-pointer transition-all flex items-center justify-center gap-2"
             >
-              <Fingerprint className="w-3.5 h-3.5" /> Sign In with Biometric Passkey (Returning)
+              <Fingerprint className="w-3.5 h-3.5" /> Sign In with Biometric Passkey
             </button>
             <button
               onClick={() => setStep('createName')}
@@ -344,6 +344,20 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
             >
               <Plus className="w-3.5 h-3.5" /> Create MPC Vault
             </button>
+
+            <details className="pt-2 text-center text-xs">
+              <summary className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer select-none text-[11px]">
+                Advanced / Dev Options
+              </summary>
+              <div className="pt-2">
+                <button
+                  onClick={() => setStep('importWallet')}
+                  className="w-full py-2 bg-black/[0.02] dark:bg-white/[0.02] text-zinc-600 dark:text-zinc-400 font-medium text-[11px] rounded-lg border border-black/[0.06] dark:border-white/[0.06] hover:bg-black/[0.05] dark:hover:bg-white/[0.05] cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Key className="w-3 h-3" /> Connect existing local wallet (Seed / PK)
+                </button>
+              </div>
+            </details>
             {!isFullscreen && onClose && (
               <button
                 onClick={onClose}

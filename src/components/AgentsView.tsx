@@ -20,6 +20,7 @@ import { AgentConnection } from '../types';
 import { CustomSelect } from './CustomSelect';
 import { formatShortAddress, sanitizeToValidAddress } from '../services/addressUtils';
 import { getMcpServerUrl } from '../config/endpointConfig';
+import { MpcWalletService } from '../services/MpcWalletService';
 
 export const AgentsView: React.FC = () => {
   const {
@@ -66,6 +67,37 @@ export const AgentsView: React.FC = () => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldId);
     setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const [issuedClientKey, setIssuedClientKey] = useState<string | null>(null);
+  const [isIssuingKey, setIsIssuingKey] = useState(false);
+
+  const handleIssuePersonalKey = async () => {
+    setIsIssuingKey(true);
+    try {
+      const mcpUrl = (import.meta as any).env?.VITE_NORTHVEIL_API_URL || (import.meta as any).env?.VITE_MCP_URL || 'https://mcp.northveil.xyz';
+      const token = MpcWalletService.getSessionToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${mcpUrl}/wallet/agent-clients`, {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify({ name: 'Personal Script / SDK Key' }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.rawOnce) {
+          setIssuedClientKey(data.rawOnce);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to issue client key:', err);
+    } finally {
+      setIsIssuingKey(false);
+    }
   };
 
   const baseMcpUrl = getMcpServerUrl();
@@ -332,6 +364,139 @@ export const AgentsView: React.FC = () => {
             <span>Custom</span>
           </button>
         </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* PRIMARY CLAUDE MCP CONNECTOR CARD */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <div className="rounded-3xl bg-white dark:bg-[#0f0f12] border border-black/[0.08] dark:border-white/[0.08] p-6 sm:p-7 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-bold text-lg">
+              <Bot className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white">
+                  Claude.ai MCP Connector
+                </h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white font-medium">
+                  SHARED URL
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Connect Claude without pasting secret keys. Passkey signs on demand.
+              </p>
+            </div>
+          </div>
+          <span className="text-[11px] font-mono px-3 py-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 font-semibold self-start sm:self-auto">
+            ZERO SECRETS
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
+              Connector Name
+            </label>
+            <div className="flex items-center justify-between gap-2 p-3 bg-black/[0.02] dark:bg-black/40 rounded-2xl border border-black/[0.06] dark:border-white/[0.06]">
+              <span className="font-mono text-xs font-semibold text-zinc-900 dark:text-white">
+                Northveil
+              </span>
+              <button
+                type="button"
+                onClick={() => handleCopyText('Northveil', 'primary-connector-name')}
+                className="p-1.5 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer flex items-center gap-1 text-xs"
+                title="Copy Name"
+              >
+                {copiedField === 'primary-connector-name' ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-green-500" />
+                    <span className="text-green-500 text-[10px]">Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span className="text-[10px]">Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
+              MCP URL
+            </label>
+            <div className="flex items-center justify-between gap-2 p-3 bg-black/[0.02] dark:bg-black/40 rounded-2xl border border-black/[0.06] dark:border-white/[0.06]">
+              <span className="font-mono text-xs text-zinc-900 dark:text-zinc-200 truncate">
+                https://mcp.northveil.xyz/sse
+              </span>
+              <button
+                type="button"
+                onClick={() => handleCopyText('https://mcp.northveil.xyz/sse', 'primary-connector-url')}
+                className="p-1.5 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer flex items-center gap-1 text-xs"
+                title="Copy URL"
+              >
+                {copiedField === 'primary-connector-url' ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-green-500" />
+                    <span className="text-green-500 text-[10px]">Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span className="text-[10px]">Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed bg-black/[0.02] dark:bg-white/[0.02] p-3 rounded-2xl border border-black/[0.04] dark:border-white/[0.04]">
+          Add this in Claude.ai &rarr; Connectors. You will sign in with Google and a passkey. You do not paste a secret.
+        </p>
+
+        {/* Quiet Advanced / Dev Disclosure */}
+        <details className="text-xs pt-1 border-t border-black/[0.04] dark:border-white/[0.06]">
+          <summary className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer select-none py-2 text-[11px] font-mono">
+            Advanced / Developer Options (CLI / SDK Keys)
+          </summary>
+          <div className="pt-3 space-y-3">
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+              For CLI scripts and headless agent runtimes, issue a personal client key:
+            </p>
+            {!issuedClientKey ? (
+              <button
+                type="button"
+                onClick={handleIssuePersonalKey}
+                disabled={isIssuingKey}
+                className="px-4 py-2 bg-black/[0.04] dark:bg-white/[0.06] text-zinc-900 dark:text-white hover:bg-black/[0.08] dark:hover:bg-white/[0.1] rounded-xl text-xs font-mono font-medium transition-colors cursor-pointer"
+              >
+                {isIssuingKey ? 'Issuing Key...' : 'Issue Personal Client Key (nv_live_...)'}
+              </button>
+            ) : (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between text-xs text-amber-600 dark:text-amber-400 font-semibold">
+                  <span>⚠️ Save your client key now. It will not be shown again.</span>
+                </div>
+                <div className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-[#18181c] rounded-xl border border-amber-500/30">
+                  <code className="font-mono text-xs text-zinc-900 dark:text-white break-all">
+                    {issuedClientKey}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(issuedClientKey, 'primary-issued-key')}
+                    className="p-1.5 rounded-lg bg-black/[0.06] dark:bg-white/[0.08] hover:bg-black/[0.12] text-zinc-900 dark:text-white text-[10px] font-mono shrink-0 cursor-pointer"
+                  >
+                    {copiedField === 'primary-issued-key' ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </details>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
