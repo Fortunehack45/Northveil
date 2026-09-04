@@ -22,13 +22,30 @@ import { WebAuthnService } from '../services/WebAuthnService';
 interface OnboardingAuthModalProps {
   onClose?: () => void;
   isFullscreen?: boolean;
+  initialStep?: 'welcome' | 'unlock_passkey' | 'enroll_passkey' | 'create_or_import' | string;
+}
+
+function mapAuthNextToModalStep(
+  authNext?: string
+): 'welcome' | 'unlockPasskey' | 'enrollPasskey' | 'chooseWallet' {
+  if (authNext === 'unlock_passkey') return 'unlockPasskey';
+  if (authNext === 'enroll_passkey') return 'enrollPasskey';
+  if (authNext === 'create_or_import' || authNext === 'chooseWallet') return 'chooseWallet';
+  return 'welcome';
 }
 
 export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
   onClose,
   isFullscreen = false,
+  initialStep = 'welcome',
 }) => {
-  const { setupMpcVault, setupMpcVaultFromServer } = useWallet();
+  const {
+    setupMpcVault,
+    setupMpcVaultFromServer,
+    setGate,
+    setIsVaultConfigured,
+    setIsLocked,
+  } = useWallet();
 
   const [step, setStep] = useState<
     | 'welcome'
@@ -40,7 +57,17 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
     | 'importWallet'
     | 'createdSuccess'
     | 'processing'
-  >('welcome');
+  >(() => mapAuthNextToModalStep(initialStep));
+
+  // Sync initialStep only if user is still on welcome
+  useEffect(() => {
+    if (initialStep && step === 'welcome') {
+      const mapped = mapAuthNextToModalStep(initialStep);
+      if (mapped !== 'welcome') {
+        setStep(mapped);
+      }
+    }
+  }, [initialStep]);
 
   // Email OTP state
   const [email, setEmail] = useState('');
@@ -97,26 +124,44 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
 
     const incomingToken = params.get('sessionToken');
     if (incomingToken) {
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, '', cleanUrl);
       setStep('processing');
       setProcessingMsg('Securing session with Northveil MPC...');
       MpcWalletService.fetchWalletMe(incomingToken)
         .then(async (me) => {
+          // Clean URL only AFTER fetch finishes to prevent query loss
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, '', cleanUrl);
+
           if (me && me.user) {
             MpcWalletService.saveSession(incomingToken, me.user.id, 'mpc');
-            if (me.next === 'unlock_passkey') {
+            if (me.wallets && me.wallets.length > 0) {
+              await setupMpcVaultFromServer(me.wallets, incomingToken);
+            }
+            const next = me.next || (me.wallets?.length ? 'unlock_passkey' : 'enroll_passkey');
+            if (next === 'unlock_passkey') {
+              if (me.passkeyOk && me.wallets?.length) {
+                setIsVaultConfigured(true);
+                setIsLocked(false);
+                setGate('app');
+                if (onClose) onClose();
+                return;
+              }
               setStep('unlockPasskey');
-            } else if (me.next === 'enroll_passkey') {
+            } else if (next === 'enroll_passkey') {
               setStep('enrollPasskey');
             } else {
               setStep('chooseWallet');
             }
           } else {
+            MpcWalletService.clearSession();
+            setGoogleNotice('Authentication session could not be verified. Please sign in again.');
             setStep('welcome');
           }
         })
-        .catch(() => {
+        .catch((fetchErr: any) => {
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, '', cleanUrl);
+          setGoogleNotice(fetchErr.message || 'Failed to authenticate session.');
           setStep('welcome');
         });
     }
@@ -281,28 +326,38 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         return;
       }
 
-      // Save session
+      // Save session identity (never flip isVaultConfigured or gate here)
       MpcWalletService.saveSession(data.sessionToken, data.user?.id, 'mpc');
 
-      // Fetch /wallet/me - canonical source of truth for user, wallets, and next step
-      const me = await fetch(`${MpcWalletService.getBaseUrl()}/wallet/me`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Session-Token': data.sessionToken,
-          'Authorization': `Bearer ${data.sessionToken}`,
-        },
-      }).then((r) => r.json());
+      // Fetch /wallet/me via canonical MpcWalletService.fetchWalletMe
+      try {
+        const me = await MpcWalletService.fetchWalletMe(data.sessionToken);
+        if (me?.user?.id) {
+          MpcWalletService.saveSession(data.sessionToken, me.user.id, 'mpc');
+        }
+        if (me?.wallets && me.wallets.length > 0) {
+          await setupMpcVaultFromServer(me.wallets, data.sessionToken);
+        }
 
-      if (me?.user?.id) {
-        MpcWalletService.saveSession(data.sessionToken, me.user.id, 'mpc');
-      }
-
-      if (me.next === 'unlock_passkey') {
-        setStep('unlockPasskey');
-      } else if (me.next === 'enroll_passkey') {
-        setStep('enrollPasskey');
-      } else {
-        setStep('chooseWallet');
+        const next = me?.next || (me?.wallets?.length ? 'unlock_passkey' : 'enroll_passkey');
+        if (next === 'unlock_passkey') {
+          if (me.passkeyOk && me.wallets?.length) {
+            setIsVaultConfigured(true);
+            setIsLocked(false);
+            setGate('app');
+            if (onClose) onClose();
+            return;
+          }
+          setStep('unlockPasskey');
+        } else if (next === 'enroll_passkey') {
+          setStep('enrollPasskey');
+        } else {
+          setStep('chooseWallet');
+        }
+      } catch (meErr: any) {
+        // Show error on current step without bouncing to welcome
+        setCodeError(meErr.message || 'Verification succeeded, but failed to load wallet profile.');
+        setStep('emailCode');
       }
     } catch (err: any) {
       setCodeError(err.message || 'Verification failed.');
@@ -372,13 +427,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       MpcWalletService.saveSession(finishData.sessionToken, finishData.user?.id, 'mpc');
 
       // 5. Fetch /wallet/me to load all authentic wallets (primary first)
-      const me = await fetch(`${MpcWalletService.getBaseUrl()}/wallet/me`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Session-Token': finishData.sessionToken,
-          'Authorization': `Bearer ${finishData.sessionToken}`,
-        },
-      }).then((r) => r.json());
+      const me = await MpcWalletService.fetchWalletMe(finishData.sessionToken);
 
       if (!me.wallets || me.wallets.length === 0) {
         setStep('chooseWallet');
@@ -387,9 +436,11 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
 
       await setupMpcVaultFromServer(me.wallets, finishData.sessionToken);
 
-      const primary = me.wallets.find((w: any) => w.is_primary) || me.wallets[0];
-      setCreatedVaultAddress(primary.address);
-      setStep('createdSuccess');
+      // Passkey unlock successful: transition directly to dashboard without lock flash
+      setIsVaultConfigured(true);
+      setIsLocked(false);
+      setGate('app');
+      if (onClose) onClose();
     } catch (err: any) {
       setPasskeyError(err.message || 'Passkey unlock failed.');
       setStep('unlockPasskey');
@@ -462,12 +513,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
 
       // 4. Branch based on /wallet/me: if user already has wallets, load them and go to dashboard
       const sessionToken = MpcWalletService.getSessionToken();
-      const me = await fetch(`${MpcWalletService.getBaseUrl()}/wallet/me`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(sessionToken ? { 'X-Session-Token': sessionToken, 'Authorization': `Bearer ${sessionToken}` } : {}),
-        },
-      }).then((r) => r.json());
+      const me = await MpcWalletService.fetchWalletMe(sessionToken || undefined);
 
       if (me.wallets && me.wallets.length > 0) {
         await setupMpcVaultFromServer(me.wallets, sessionToken || undefined);
@@ -496,13 +542,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       const token = MpcWalletService.getSessionToken() || '';
       await MpcWalletService.createMpcVault(walletNameInput, userId);
 
-      const me = await fetch(`${MpcWalletService.getBaseUrl()}/wallet/me`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Session-Token': token,
-          'Authorization': `Bearer ${token}`,
-        },
-      }).then((r) => r.json());
+      const me = await MpcWalletService.fetchWalletMe(token);
 
       if (me.wallets && me.wallets.length > 0) {
         await setupMpcVaultFromServer(me.wallets, token);
@@ -538,13 +578,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       // Memory wipe of secrets in component state
       setImportText('');
 
-      const me = await fetch(`${MpcWalletService.getBaseUrl()}/wallet/me`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Session-Token': token,
-          'Authorization': `Bearer ${token}`,
-        },
-      }).then((r) => r.json());
+      const me = await MpcWalletService.fetchWalletMe(token);
 
       if (me.wallets && me.wallets.length > 0) {
         await setupMpcVaultFromServer(me.wallets, token);
@@ -1026,6 +1060,9 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
 
           <button
             onClick={() => {
+              setIsVaultConfigured(true);
+              setIsLocked(false);
+              setGate('app');
               if (onClose) onClose();
             }}
             className="w-full py-3.5 bg-black text-white dark:bg-white dark:text-black font-semibold text-xs rounded-full hover:opacity-85 cursor-pointer transition-all shadow-md flex items-center justify-center gap-2"

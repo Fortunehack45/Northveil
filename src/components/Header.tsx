@@ -101,6 +101,8 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onToggleMobileNav }) 
     setTimeout(() => setCopiedAddr(null), 2000);
   };
 
+  if (!activeSubWallet) return null;
+
   return (
     <header className="w-full h-14 sm:h-16 md:h-18 px-3 sm:px-6 md:px-8 bg-white dark:bg-black flex items-center justify-between gap-2 sm:gap-4 md:gap-6 shrink-0 z-30 relative transition-colors">
       {(isWalletMenuOpen || isNotifOpen) && (

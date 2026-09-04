@@ -17,7 +17,7 @@ import { OAuthConsentModal } from './components/OAuthConsentModal';
 import { Lock, Fingerprint } from 'lucide-react';
 
 const MainContent: React.FC = () => {
-  const { isVaultConfigured, isLocked, unlockWalletWithBiometrics, unlockVault, vaultType } = useWallet();
+  const { gate, authNext, isLocked, unlockWalletWithBiometrics, unlockVault, vaultType } = useWallet();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
   const [modalMode, setModalMode] = useState<'send' | 'receive' | null>(null);
@@ -92,9 +92,14 @@ const MainContent: React.FC = () => {
     }
   }, []);
 
-  // If user is logged out or vault not configured, render Fullscreen Auth Page
-  if (!isVaultConfigured) {
-    return <OnboardingAuthModal isFullscreen={true} />;
+  // 1. Boot gate: Render clean blank screen while verifying session + passkey status
+  if (gate === "booting") {
+    return <div className="min-h-screen bg-black" />;
+  }
+
+  // 2. Auth gate: Render OnboardingAuthModal with initialStep from canonical gate engine
+  if (gate === "auth") {
+    return <OnboardingAuthModal isFullscreen={true} initialStep={authNext} />;
   }
 
   // If vault is locked, render Lock & Decrypt screen

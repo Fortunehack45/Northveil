@@ -92,6 +92,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   const formatUsd = (num: number) => formatUsdValue(num);
 
+  if (!activeSubWallet) return null;
+
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* ═══════════════════════════════════════════════════════════════════ */}

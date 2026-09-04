@@ -37,41 +37,16 @@ import { sanitizeToValidAddress, parseEtherSafe } from '../services/addressUtils
 import { ethers } from 'ethers';
 import { Fingerprint, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 
-const DEFAULT_SUB_WALLETS: SubWalletAccount[] = [
-  {
-    id: 'acc-0',
-    name: 'Primary Vault',
-    accountIndex: 0,
-    address: '0x0000000000000000000000000000000000000000',
-    derivationPath: 'northveil://tee-nitro-enclave',
-    colorTag: '#00f0ff',
-    isDefault: true,
-    createdAt: new Date().toISOString().split('T')[0],
-    balanceMultiplier: 1,
-  },
-  {
-    id: 'acc-1',
-    name: 'DeFi Yield & Staking',
-    accountIndex: 1,
-    address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906',
-    derivationPath: "m/44'/60'/0'/0/1",
-    colorTag: '#ccff00',
-    createdAt: '2026-03-14',
-    balanceMultiplier: 1,
-  },
-  {
-    id: 'acc-2',
-    name: 'NFT & High Alpha',
-    accountIndex: 2,
-    address: '0x15d34AA545F19697352d0b0104717BF45E51d582',
-    derivationPath: "m/44'/60'/0'/0/2",
-    colorTag: '#ff007f',
-    createdAt: '2026-05-22',
-    balanceMultiplier: 1,
-  },
-];
+export type Gate = "booting" | "auth" | "app";
+export type AuthNext = "welcome" | "unlock_passkey" | "enroll_passkey" | "create_or_import";
 
 interface WalletContextType {
+  gate: Gate;
+  setGate: (gate: Gate) => void;
+  authNext: AuthNext;
+  setAuthNext: (next: AuthNext) => void;
+  setIsVaultConfigured: (configured: boolean) => void;
+  setIsLocked: (locked: boolean) => void;
   assets: CryptoAsset[];
   transactions: Transaction[];
   stakingPositions: StakingPosition[];
@@ -82,7 +57,7 @@ interface WalletContextType {
   // Multi-Wallet Sub-Account System
   subWallets: SubWalletAccount[];
   activeWalletId: string;
-  activeSubWallet: SubWalletAccount;
+  activeSubWallet: SubWalletAccount | null;
   setActiveWalletId: (id: string) => void;
   createSubWallet: (name: string, colorTag?: string) => SubWalletAccount | null;
   renameSubWallet: (id: string, newName: string) => void;
@@ -229,14 +204,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return MpcWalletService.getVaultType();
   });
 
-  const [isVaultConfigured, setIsVaultConfigured] = useState<boolean>(() => {
-    return (
-      !!localStorage.getItem('northveil_v3_mpc_vault') ||
-      !!localStorage.getItem('northveil_v3_subwallets') ||
-      !!MpcWalletService.getSessionToken()
-    );
-  });
-
+  const [gate, setGate] = useState<Gate>("booting");
+  const [authNext, setAuthNext] = useState<AuthNext>("welcome");
+  const [isVaultConfigured, setIsVaultConfigured] = useState<boolean>(false);
   const [isLocked, setIsLocked] = useState<boolean>(false);
   
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState<boolean>(false);
@@ -245,6 +215,15 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Multi-Wallet Sub-Account State
   const [subWallets, setSubWallets] = useState<SubWalletAccount[]>(() => {
+    const token = MpcWalletService.getSessionToken();
+    if (!token) {
+      try {
+        localStorage.removeItem('northveil_v3_subwallets');
+        localStorage.removeItem('northveil_v3_mpc_vault');
+      } catch {}
+      return [];
+    }
+
     const saved = localStorage.getItem('northveil_v3_subwallets');
     if (saved) {
       try {
@@ -295,6 +274,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   useEffect(() => {
     // Strictly sanitize subWallets before persisting: NEVER write plaintext privateKey to localStorage
+    if (!subWallets || subWallets.length === 0) {
+      localStorage.removeItem('northveil_v3_subwallets');
+      return;
+    }
     const sanitized = subWallets.map(w => {
       const { privateKey, ...safeWallet } = w;
       return safeWallet;
@@ -307,7 +290,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [activeWalletId]);
 
   const activeSubWallet = useMemo(() => {
-    const raw = subWallets.find((w) => w.id === activeWalletId) || subWallets[0] || DEFAULT_SUB_WALLETS[0];
+    const raw = subWallets.find((w) => w.id === activeWalletId) || subWallets[0] || null;
     return raw;
   }, [subWallets, activeWalletId]);
 
@@ -675,27 +658,61 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [gasEstimates, setGasEstimates] = useState<ChainGasEstimate[]>([]);
   const [systemMetrics] = useState<MicroserviceStatus[]>([]);
 
-  // Auto-initialize vault state on mount: /wallet/me is canonical source of truth
+  // Canonical Gate Boot Effect: check session token and passkeyOk before showing welcome, lock, or dashboard
   useEffect(() => {
-    const sessionToken = MpcWalletService.getSessionToken();
-    if (sessionToken) {
-      MpcWalletService.fetchWalletMe(sessionToken)
-        .then((me) => {
-          if (me && me.wallets && me.wallets.length > 0) {
-            setupMpcVaultFromServer(me.wallets, sessionToken);
-          } else {
-            setIsVaultConfigured(false);
-            setIsLocked(false);
-          }
-        })
-        .catch(() => {
+    let cancelled = false;
+    (async () => {
+      const token = MpcWalletService.getSessionToken();
+      if (!token) {
+        // Leftover local vaults are NOT a session
+        if (!cancelled) {
+          try {
+            localStorage.removeItem('northveil_v3_subwallets');
+            localStorage.removeItem('northveil_v3_mpc_vault');
+          } catch {}
           setIsVaultConfigured(false);
+          setGate("auth");
+          setAuthNext("welcome");
+        }
+        return;
+      }
+      try {
+        const me = await MpcWalletService.fetchWalletMe(token);
+        if (cancelled) return;
+        if (!me?.user) {
+          MpcWalletService.clearSession();
+          try {
+            localStorage.removeItem('northveil_v3_subwallets');
+            localStorage.removeItem('northveil_v3_mpc_vault');
+          } catch {}
+          setIsVaultConfigured(false);
+          setGate("auth");
+          setAuthNext("welcome");
+          return;
+        }
+        if (me.wallets?.length) {
+          await setupMpcVaultFromServer(me.wallets, token);
+        }
+        const next = me.next || (me.wallets?.length ? "unlock_passkey" : "enroll_passkey");
+        if (next === "unlock_passkey" && me.wallets?.length && me.passkeyOk) {
+          setIsVaultConfigured(true);
           setIsLocked(false);
-        });
-    } else {
-      setIsVaultConfigured(false);
-      setIsLocked(false);
-    }
+          setGate("app");
+          return;
+        }
+        setIsVaultConfigured(false);
+        setAuthNext(next === "create_or_import" ? "create_or_import" : (next as any));
+        setGate("auth");
+      } catch {
+        if (!cancelled) {
+          setGate("auth");
+          setAuthNext("welcome");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const lockWallet = () => {
@@ -857,9 +874,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setStakingPositions([]);
       setOwnedNFTs([]);
       setAssets([]);
-
-      setIsVaultConfigured(true);
-      setIsLocked(false);
 
       return true;
     } catch (e) {
@@ -1774,9 +1788,13 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     localStorage.removeItem('northveil_imported_pk');
     MpcWalletService.clearSession();
     setSeedPhrase([]);
+    setSubWallets([]);
+    setAssets([]);
+    setTransactions([]);
     setIsVaultConfigured(false);
     setIsLocked(false);
-    window.location.reload();
+    setGate("auth");
+    setAuthNext("welcome");
   };
 
   const toggleFavoriteAsset = (assetId: string) => {
@@ -1788,6 +1806,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   return (
     <WalletContext.Provider
       value={{
+        gate,
+        setGate,
+        authNext,
+        setAuthNext,
+        setIsVaultConfigured,
+        setIsLocked,
         assets,
         transactions,
         stakingPositions,
