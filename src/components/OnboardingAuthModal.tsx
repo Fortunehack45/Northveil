@@ -34,6 +34,14 @@ function mapAuthNextToModalStep(
   return 'welcome';
 }
 
+function explainFetch(err: unknown, url: string): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+    return `Cannot reach ${url}. Check you are on wallet.northveil.xyz, MCP is up, and CORS allows this origin.`;
+  }
+  return msg;
+}
+
 export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
   onClose,
   isFullscreen = false,
@@ -46,6 +54,11 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
     setIsVaultConfigured,
     setIsLocked,
   } = useWallet();
+
+  // Log MCP server base URL once on welcome
+  useEffect(() => {
+    console.info('[nv] mcp', MpcWalletService.getBaseUrl());
+  }, []);
 
   const [step, setStep] = useState<
     | 'welcome'
@@ -161,7 +174,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         .catch((fetchErr: any) => {
           const cleanUrl = window.location.pathname;
           window.history.replaceState({}, '', cleanUrl);
-          setGoogleNotice(fetchErr.message || 'Failed to authenticate session.');
+          setGoogleNotice(explainFetch(fetchErr, `${MpcWalletService.getBaseUrl()}/wallet/me`));
           setStep('welcome');
         });
     }
@@ -278,7 +291,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       setCodeError('');
       setStep('emailCode');
     } catch (err: any) {
-      setEmailError(err.message || 'Failed to send verification code.');
+      setEmailError(explainFetch(err, `${MpcWalletService.getBaseUrl()}/auth/email/start`));
       setStep('emailEnter');
     }
   };
@@ -356,11 +369,11 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         }
       } catch (meErr: any) {
         // Show error on current step without bouncing to welcome
-        setCodeError(meErr.message || 'Verification succeeded, but failed to load wallet profile.');
+        setCodeError(explainFetch(meErr, `${MpcWalletService.getBaseUrl()}/wallet/me`));
         setStep('emailCode');
       }
     } catch (err: any) {
-      setCodeError(err.message || 'Verification failed.');
+      setCodeError(explainFetch(err, `${MpcWalletService.getBaseUrl()}/auth/email/verify`));
       setStep('emailCode');
     }
   };
@@ -442,7 +455,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       setGate('app');
       if (onClose) onClose();
     } catch (err: any) {
-      setPasskeyError(err.message || 'Passkey unlock failed.');
+      setPasskeyError(explainFetch(err, `${MpcWalletService.getBaseUrl()}/auth/passkey/login`));
       setStep('unlockPasskey');
     }
   };
@@ -524,7 +537,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         setStep('chooseWallet');
       }
     } catch (err: any) {
-      setPasskeyError(err.message || 'Passkey enrollment failed.');
+      setPasskeyError(explainFetch(err, `${MpcWalletService.getBaseUrl()}/auth/passkey/register`));
       setStep('enrollPasskey');
     }
   };
@@ -551,7 +564,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       }
       setStep('createdSuccess');
     } catch (err: any) {
-      setPasskeyError(err.message || 'Failed to create MPC wallet');
+      setPasskeyError(explainFetch(err, `${MpcWalletService.getBaseUrl()}/wallet/create`));
       setStep('chooseWallet');
     }
   };
@@ -587,7 +600,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       }
       setStep('createdSuccess');
     } catch (err: any) {
-      setImportError(err.message || 'Import failed.');
+      setImportError(explainFetch(err, `${MpcWalletService.getBaseUrl()}/wallet/import`));
       setStep('importWallet');
     } finally {
       // Guaranteed zeroing of recovery secret in state

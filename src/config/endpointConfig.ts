@@ -1,21 +1,14 @@
 export const getMcpServerUrl = (): string => {
   const env = (import.meta as any).env || {};
   if (env.VITE_MCP_SERVER_URL) {
-    return env.VITE_MCP_SERVER_URL.replace(/\/$/, '');
+    return String(env.VITE_MCP_SERVER_URL).replace(/\/$/, '');
   }
-
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-
-    if (isLocalhost) {
+  if (env.VITE_USE_LOCAL_MCP === '1' && typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return `${protocol}//${hostname}:3001`;
     }
-
-    return 'https://mcp.northveil.xyz';
   }
-
   return 'https://mcp.northveil.xyz';
 };
 
