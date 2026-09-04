@@ -19,7 +19,7 @@ import {
 import { AgentConnection } from '../types';
 import { CustomSelect } from './CustomSelect';
 import { formatShortAddress, sanitizeToValidAddress } from '../services/addressUtils';
-import { getMcpServerUrl } from '../config/endpointConfig';
+import { getMcpServerUrl, getPrimaryMcpUrl, getLegacySseUrl } from '../config/endpointConfig';
 import { MpcWalletService } from '../services/MpcWalletService';
 
 export const AgentsView: React.FC = () => {
@@ -101,8 +101,10 @@ export const AgentsView: React.FC = () => {
   };
 
   const baseMcpUrl = getMcpServerUrl();
+  const primaryMcpUrl = getPrimaryMcpUrl();
   const targetWallet = selectedWalletAddr || activeSubWallet?.address || '0x0000000000000000000000000000000000000000';
-  const generatedSseUrl = `${baseMcpUrl}/sse?wallet_address=${targetWallet}`;
+  const legacySseUrl = getLegacySseUrl(targetWallet);
+  const generatedSseUrl = legacySseUrl;
 
   // Live MCP Health Check
   useEffect(() => {
@@ -126,12 +128,7 @@ export const AgentsView: React.FC = () => {
           {
             mcpServers: {
               northveil: {
-                command: 'npx',
-                args: ['-y', 'northveil-cli', 'mcp'],
-                env: {
-                  NORTHVEIL_API_KEY: 'YOUR_NORTHVEIL_CLIENT_KEY',
-                  NORTHVEIL_API_URL: baseMcpUrl || 'https://mcp.northveil.xyz',
-                },
+                url: primaryMcpUrl,
               },
             },
           },
@@ -143,7 +140,7 @@ export const AgentsView: React.FC = () => {
           {
             mcpServers: {
               northveil: {
-                url: `${baseMcpUrl}/mcp`,
+                url: primaryMcpUrl,
                 headers: {
                   Authorization: 'Bearer nv_live_YOUR_API_KEY',
                   'x-wallet-address': targetWallet,
@@ -157,36 +154,23 @@ export const AgentsView: React.FC = () => {
       case 'chatgpt':
         return JSON.stringify(
           {
-            integration: 'OpenAI ChatGPT Custom Action / GPT Plugin',
-            schema_url: `${baseMcpUrl}/openapi.json`,
-            mcp_stream_url: `${baseMcpUrl}/mcp`,
-            oauth_configuration: {
-              authorization_url: `${baseMcpUrl}/oauth/authorize`,
-              token_url: `${baseMcpUrl}/oauth/token`,
-              client_registration_url: `${baseMcpUrl}/oauth/register`,
-              protected_resource_metadata: `${baseMcpUrl}/.well-known/oauth-protected-resource`,
-              authorization_server_metadata: `${baseMcpUrl}/.well-known/oauth-authorization-server`,
-              scope: 'tools:read tools:execute',
-              client_id: 'chatgpt_agent',
-              client_secret: 'northveil_secret',
-            },
-            alternative_api_key_auth: {
-              type: 'Custom Header',
-              header_name: 'X-API-Key',
-              header_value: 'Your Northveil API Key (from Agents tab)',
-            },
+            name: "Northveil",
+            url: primaryMcpUrl,
+            transport: "mcp",
+            auth: "oauth",
+            instructions: "In ChatGPT: Settings -> Apps -> Developer mode -> Create app. URL: https://mcp.northveil.xyz/mcp with OAuth.",
           },
           null,
           2
         );
       case 'claudecode':
-        return `claude mcp add northveil ${baseMcpUrl}/mcp --header "Authorization: Bearer nv_live_YOUR_API_KEY"`;
+        return `claude mcp add northveil ${primaryMcpUrl}`;
       case 'windsurf':
         return JSON.stringify(
           {
             mcpServers: {
               northveil: {
-                url: `${baseMcpUrl}/mcp`,
+                url: primaryMcpUrl,
                 headers: {
                   Authorization: 'Bearer nv_live_YOUR_API_KEY',
                   'x-wallet-address': targetWallet,
@@ -202,7 +186,7 @@ export const AgentsView: React.FC = () => {
           {
             mcpServers: {
               northveil: {
-                url: generatedSseUrl,
+                url: legacySseUrl,
               },
             },
           },
@@ -217,9 +201,9 @@ export const AgentsView: React.FC = () => {
   const getClientFilePath = (client: 'claude' | 'chatgpt' | 'cursor' | 'windsurf' | 'claudecode' | 'sse') => {
     switch (client) {
       case 'claude':
-        return 'macOS: ~/Library/Application Support/Claude/claude_desktop_config.json | Windows: %APPDATA%\\Claude\\claude_desktop_config.json';
+        return 'Claude.ai -> Connectors (URL: https://mcp.northveil.xyz/mcp) or Claude Desktop config';
       case 'chatgpt':
-        return 'ChatGPT Web UI > Explore GPTs > Create a GPT > Configure > Actions > "Create new action"';
+        return 'ChatGPT -> Settings -> Apps -> Developer mode -> Create (URL: https://mcp.northveil.xyz/mcp)';
       case 'cursor':
         return 'Project Root: .cursor/mcp.json or Settings -> Features -> MCP';
       case 'windsurf':
@@ -227,7 +211,7 @@ export const AgentsView: React.FC = () => {
       case 'claudecode':
         return 'Terminal CLI command';
       case 'sse':
-        return 'Remote SSE Transport Endpoint URL';
+        return 'Legacy SSE Transport Endpoint (only if client cannot use /mcp)';
       default:
         return '';
     }
@@ -289,7 +273,8 @@ export const AgentsView: React.FC = () => {
         'nv_prepare_deploy_token',
         'nv_prepare_contract_call',
       ],
-      sseUrl: generatedSseUrl,
+      mcpUrl: primaryMcpUrl,
+      sseUrl: legacySseUrl,
       recentActionsCount: 0,
     });
 
@@ -430,11 +415,11 @@ export const AgentsView: React.FC = () => {
             </label>
             <div className="flex items-center justify-between gap-2 p-3 bg-black/[0.02] dark:bg-black/40 rounded-2xl border border-black/[0.06] dark:border-white/[0.06]">
               <span className="font-mono text-xs text-zinc-900 dark:text-zinc-200 truncate">
-                https://mcp.northveil.xyz/sse
+                {primaryMcpUrl}
               </span>
               <button
                 type="button"
-                onClick={() => handleCopyText('https://mcp.northveil.xyz/sse', 'primary-connector-url')}
+                onClick={() => handleCopyText(primaryMcpUrl, 'primary-connector-url')}
                 className="p-1.5 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer flex items-center gap-1 text-xs"
                 title="Copy URL"
               >
@@ -451,11 +436,25 @@ export const AgentsView: React.FC = () => {
                 )}
               </button>
             </div>
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 pl-1">
+              Same URL for every user. Sign-in picks your vault.
+            </p>
           </div>
         </div>
 
+        <div className="flex items-center justify-between px-3 py-2 bg-black/[0.02] dark:bg-white/[0.02] rounded-xl border border-black/[0.04] dark:border-white/[0.04] text-[11px] text-zinc-500 dark:text-zinc-400">
+          <span className="font-mono truncate">Legacy SSE: {legacySseUrl}</span>
+          <button
+            type="button"
+            onClick={() => handleCopyText(legacySseUrl, 'legacy-sse-url')}
+            className="hover:text-zinc-900 dark:hover:text-white cursor-pointer flex items-center gap-1 text-[10px] shrink-0 ml-2"
+          >
+            {copiedField === 'legacy-sse-url' ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+
         <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed bg-black/[0.02] dark:bg-white/[0.02] p-3 rounded-2xl border border-black/[0.04] dark:border-white/[0.04]">
-          Add this in Claude.ai &rarr; Connectors. You will sign in with Google and a passkey. You do not paste a secret.
+          Add this in Claude.ai &rarr; Connectors or ChatGPT &rarr; Apps &rarr; Developer mode. You will sign in with Google or email OTP and authorize your vault. You do not paste a secret.
         </p>
 
         {/* Quiet Advanced / Dev Disclosure */}
@@ -813,10 +812,10 @@ export const AgentsView: React.FC = () => {
                                 MCP URL
                               </label>
                               <div className="flex items-center justify-between gap-2 p-2.5 bg-white dark:bg-[#18181c] rounded-xl border border-black/[0.04] dark:border-white/[0.06]">
-                                <span className="font-mono text-xs text-zinc-900 dark:text-zinc-200 truncate">https://mcp.northveil.xyz/sse</span>
+                                <span className="font-mono text-xs text-zinc-900 dark:text-zinc-200 truncate">{primaryMcpUrl}</span>
                                 <button
                                   type="button"
-                                  onClick={() => handleCopyText('https://mcp.northveil.xyz/sse', 'claude-url')}
+                                  onClick={() => handleCopyText(primaryMcpUrl, 'claude-url')}
                                   className="p-1 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-zinc-700 dark:text-zinc-300 cursor-pointer"
                                   title="Copy URL"
                                 >
@@ -826,7 +825,7 @@ export const AgentsView: React.FC = () => {
                             </div>
 
                             <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed pt-1">
-                              Add this in Claude.ai &rarr; Connectors. You will sign in with Google and a passkey. You do not paste a secret.
+                              Add this in Claude.ai &rarr; Connectors. You will sign in with Google or email OTP and authorize your vault. You do not paste a secret.
                             </p>
                           </div>
                         </div>
@@ -837,39 +836,39 @@ export const AgentsView: React.FC = () => {
                         <div className="p-3.5 bg-black/[0.02] dark:bg-black/40 border border-black/[0.06] dark:border-white/[0.06] rounded-2xl space-y-3">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
-                              <Sparkles className="w-4 h-4" /> ChatGPT Custom Action / GPT Plugin
+                              <Sparkles className="w-4 h-4" /> ChatGPT Apps (Developer Mode)
                             </span>
                             <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 font-semibold">
-                              NO FILE EDITING
+                              MCP CONNECTOR
                             </span>
                           </div>
 
                           <div className="space-y-2 text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
                             <div className="p-2 bg-white dark:bg-[#18181c] rounded-xl border border-black/[0.04] dark:border-white/[0.06] space-y-1">
                               <span className="font-semibold text-zinc-900 dark:text-white block text-[10px]">
-                                1. Schema Import URL (Copy & paste into ChatGPT)
+                                Connector URL (Copy & paste into ChatGPT)
                               </span>
                               <div className="flex items-center justify-between gap-2">
                                 <code className="font-mono text-[10px] text-zinc-800 dark:text-zinc-200 truncate">
-                                  {baseMcpUrl}/openapi.json
+                                  {primaryMcpUrl}
                                 </code>
                                 <button
                                   type="button"
-                                  onClick={() => handleCopyText(`${baseMcpUrl}/openapi.json`, 'gpt-schema')}
+                                  onClick={() => handleCopyText(primaryMcpUrl, 'gpt-mcp-url')}
                                   className="px-2 py-0.5 rounded bg-black/[0.06] dark:bg-white/[0.08] text-zinc-900 dark:text-white text-[10px] font-medium cursor-pointer shrink-0"
                                 >
-                                  {copiedField === 'gpt-schema' ? 'Copied' : 'Copy URL'}
+                                  {copiedField === 'gpt-mcp-url' ? 'Copied' : 'Copy URL'}
                                 </button>
                               </div>
                             </div>
 
                             <ol className="list-decimal list-inside space-y-1 pl-0.5">
-                              <li>In ChatGPT, open <strong>Explore GPTs</strong> &rarr; <strong>+ Create</strong> &rarr; <strong>Configure</strong> &rarr; <strong>Actions</strong> &rarr; <strong>Create new action</strong>.</li>
-                              <li>Click <strong>Import from URL</strong>, paste the schema URL copied above and click <strong>Import</strong>.</li>
+                              <li>In ChatGPT, open <strong>Settings</strong> &rarr; <strong>Apps</strong> &rarr; <strong>Developer mode</strong> &rarr; <strong>Create app</strong>.</li>
+                              <li>Set App Name to <strong>Northveil</strong> and Connector URL to <code className="font-mono text-[10px]">{primaryMcpUrl}</code>.</li>
                               <li>
-                                Under <strong>Authentication</strong>, select <strong>OAuth</strong> (Auth URL: <code className="font-mono text-[10px]">{baseMcpUrl}/oauth/authorize</code>, Token URL: <code className="font-mono text-[10px]">{baseMcpUrl}/oauth/token</code>, Scope: <code className="font-mono text-[10px]">tools:read tools:execute</code>) or select <strong>API Key</strong> with Header <code className="font-mono text-[10px]">X-API-Key</code>.
+                                Under <strong>Authentication</strong>, select <strong>OAuth</strong> (callback handles token exchange automatically).
                               </li>
-                              <li>Click <strong>Save</strong>! Your GPT can now perform on-chain operations with hardware MPC security.</li>
+                              <li>Click <strong>Save & Authorize</strong>! Your ChatGPT session can now query balances and stage intents with hardware MPC security.</li>
                             </ol>
                           </div>
                         </div>
@@ -885,7 +884,7 @@ export const AgentsView: React.FC = () => {
                           { id: 'cursor', label: 'Cursor' },
                           { id: 'windsurf', label: 'Windsurf' },
                           { id: 'claudecode', label: 'Claude Code' },
-                          { id: 'sse', label: 'Remote SSE' },
+                          { id: 'sse', label: 'Legacy SSE' },
                         ].map((client) => (
                           <button
                             key={client.id}
@@ -999,6 +998,40 @@ export const AgentsView: React.FC = () => {
               </div>
 
               <div className="p-6 pt-2 overflow-y-auto no-scrollbar space-y-4 flex-1">
+                {/* Agent MCP Connection URL */}
+                <div className="p-4 bg-black/[0.02] dark:bg-black/40 border border-black/[0.04] dark:border-transparent rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-700 dark:text-zinc-300 font-semibold flex items-center gap-1.5">
+                      <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
+                      Primary MCP Connector URL
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-400">Universal Endpoint</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-[#18181c] rounded-xl border border-black/[0.04] dark:border-white/[0.06]">
+                    <span className="font-mono text-xs text-zinc-900 dark:text-zinc-200 truncate">
+                      {selectedAgent.mcpUrl || primaryMcpUrl}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(selectedAgent.mcpUrl || primaryMcpUrl, 'details-mcp-url')}
+                      className="p-1 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                      title="Copy MCP URL"
+                    >
+                      {copiedField === 'details-mcp-url' ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 pt-0.5">
+                    <span className="font-mono text-[10px] truncate">Legacy SSE: {selectedAgent.sseUrl || legacySseUrl}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(selectedAgent.sseUrl || legacySseUrl, 'details-sse-url')}
+                      className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white text-[10px] font-mono cursor-pointer shrink-0 ml-2"
+                    >
+                      {copiedField === 'details-sse-url' ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+
                 {/* Agent API Key in Details */}
                 <div className="p-4 bg-black/[0.02] dark:bg-black/40 border border-black/[0.04] dark:border-transparent rounded-2xl space-y-2">
                   <div className="flex items-center justify-between text-xs">

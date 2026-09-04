@@ -17,14 +17,27 @@ Northveil is a strictly non-custodial control plane and Model Context Protocol (
 
 ## 🔌 Official MCP Gateway Endpoints
 
-| Protocol / Client | Connection URL / Command | Transport |
-| :--- | :--- | :--- |
-| **Claude Desktop & CLI** | `claude mcp add northveil https://mcp.northveil.xyz/mcp` | Streamable HTTP |
-| **Remote SSE Gateway** | `https://mcp.northveil.xyz/sse` | Server-Sent Events |
-| **OpenAPI 3.0 Specification** | `https://mcp.northveil.xyz/openapi.json` | OpenAPI / OAuth 2.0 |
-| **Local Stdio Transport** | `npx -y northveil-cli mcp` | stdio (JSON-RPC 2.0) |
+| Client | Role | URL / Command | Transport & Auth |
+| :--- | :--- | :--- | :--- |
+| **Claude.ai / Claude Desktop** | **Primary Connector** | `https://mcp.northveil.xyz/mcp` | Streamable HTTP • OAuth 2.0 (RFC 8414) |
+| **ChatGPT Apps (Developer mode)** | **Primary Connector** | `https://mcp.northveil.xyz/mcp` | Streamable HTTP • OAuth 2.0 (RFC 8414) |
+| **Cursor / Windsurf / Claude Code** | **Primary Remote** | `https://mcp.northveil.xyz/mcp` | Streamable HTTP • Bearer Token |
+| **Legacy SSE Clients** | Optional Compatibility | `https://mcp.northveil.xyz/sse` | Server-Sent Events (SSE) |
+| **Local Stdio Transport** | CLI Bridge | `npx -y northveil-cli mcp` | stdio (JSON-RPC 2.0) |
+
+> **Single Universal URL**: `https://mcp.northveil.xyz/mcp` is the universal endpoint for every user. User authentication (OAuth 2.0 / Bearer token) binds directly to the user's primary vault. No `?wallet_address=` query parameter is needed in the URL.
 
 ---
+
+## 🛡️ Interactive In-Chat UI (MCP Apps)
+Northveil serves interactive cards conforming to the MCP Apps specification (`text/html;profile=mcp-app`):
+- `ui://northveil/send` — In-chat transfer approval card
+- `ui://northveil/swap` — In-chat token swap staging card
+- `ui://northveil/deploy` — In-chat smart contract deployment & execution card
+- `ui://northveil/status` — Live spend request polling & transaction confirmation card
+- `ui://northveil/read` — Vault balances and multi-chain portfolio rollups
+
+Tool responses return `_meta.ui.resourceUri` so supporting clients render cards directly in the conversation. pure-text clients cleanly fallback to standard markdown text.
 
 ## 🏛️ Ecosystem Monorepo Architecture
 

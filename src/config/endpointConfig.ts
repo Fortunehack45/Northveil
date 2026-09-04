@@ -1,3 +1,5 @@
+export const MCP_PUBLIC_ORIGIN = 'https://mcp.northveil.xyz';
+
 export const getMcpServerUrl = (): string => {
   const env = (import.meta as any).env || {};
   if (env.VITE_MCP_SERVER_URL) {
@@ -12,15 +14,21 @@ export const getMcpServerUrl = (): string => {
   return 'https://mcp.northveil.xyz';
 };
 
+export function getPrimaryMcpUrl(): string {
+  return `${getMcpServerUrl()}/mcp`;
+}
+
+export function getLegacySseUrl(walletAddress?: string): string {
+  const base = `${getMcpServerUrl()}/sse`;
+  return walletAddress ? `${base}?wallet_address=${walletAddress}` : base;
+}
+
 export const getMcpHttpUrl = (): string => {
-  const baseUrl = getMcpServerUrl();
-  return `${baseUrl}/mcp`;
+  return getPrimaryMcpUrl();
 };
 
 export const getMcpSseUrl = (walletAddress?: string): string => {
-  const baseUrl = getMcpServerUrl();
-  const walletParam = walletAddress ? `?wallet_address=${walletAddress}` : '';
-  return `${baseUrl}/sse${walletParam}`;
+  return getLegacySseUrl(walletAddress);
 };
 
 export const getMcpMessagesUrl = (sessionId: string): string => {

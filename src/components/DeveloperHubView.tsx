@@ -27,7 +27,7 @@ import { SwapService } from '../services/SwapService';
 import { SupabaseService } from '../services/SupabaseService';
 import { MpcWalletService } from '../services/MpcWalletService';
 import { ethers } from 'ethers';
-import { getMcpServerUrl } from '../config/endpointConfig';
+import { getMcpServerUrl, getPrimaryMcpUrl, getLegacySseUrl } from '../config/endpointConfig';
 import { formatShortAddress } from '../services/addressUtils';
 
 export const DeveloperHubView: React.FC = () => {
@@ -83,11 +83,10 @@ export const DeveloperHubView: React.FC = () => {
         return JSON.stringify(
           {
             connector_name: 'Northveil',
-            recommended_transport: 'Streamable HTTP',
-            streamable_http_url: `${baseMcpUrl}/mcp`,
-            alternative_sse_url: `${baseMcpUrl}/sse?wallet_address=${currentAddress}`,
+            primary_url: getPrimaryMcpUrl(),
+            legacy_sse_url: getLegacySseUrl(),
             icon_logo_url: 'https://iili.io/CDS9fvn.png',
-            status: 'Ready (60 Tools Active)',
+            status: 'Ready (Threshold MPC & Non-Custodial Intelligence)',
           },
           null,
           2
@@ -97,12 +96,7 @@ export const DeveloperHubView: React.FC = () => {
           {
             mcpServers: {
               northveil: {
-                command: 'npx',
-                args: ['-y', 'northveil-cli', 'mcp'],
-                env: {
-                  NORTHVEIL_API_KEY: 'YOUR_NORTHVEIL_CLIENT_KEY',
-                  NORTHVEIL_API_URL: baseMcpUrl || 'https://mcp.northveil.xyz',
-                },
+                url: getPrimaryMcpUrl(),
               },
             },
           },
@@ -114,11 +108,7 @@ export const DeveloperHubView: React.FC = () => {
           {
             mcpServers: {
               northveil: {
-                url: `${baseMcpUrl}/mcp`,
-                headers: {
-                  Authorization: 'Bearer nv_live_YOUR_API_KEY',
-                  'x-wallet-address': currentAddress,
-                },
+                url: getPrimaryMcpUrl(),
               },
             },
           },
@@ -128,40 +118,23 @@ export const DeveloperHubView: React.FC = () => {
       case 'chatgpt':
         return JSON.stringify(
           {
-            integration: 'OpenAI ChatGPT Custom Action / GPT Plugin',
-            schema_url: `${baseMcpUrl}/openapi.json`,
-            mcp_stream_url: `${baseMcpUrl}/mcp`,
-            oauth_configuration: {
-              authorization_url: `${baseMcpUrl}/oauth/authorize`,
-              token_url: `${baseMcpUrl}/oauth/token`,
-              client_registration_url: `${baseMcpUrl}/oauth/register`,
-              protected_resource_metadata: `${baseMcpUrl}/.well-known/oauth-protected-resource`,
-              authorization_server_metadata: `${baseMcpUrl}/.well-known/oauth-authorization-server`,
-              scope: 'tools:read tools:execute',
-              client_id: 'chatgpt_agent',
-              client_secret: 'northveil_secret',
-            },
-            alternative_api_key_auth: {
-              type: 'Custom Header',
-              header_name: 'X-API-Key',
-              header_value: 'Your Northveil API Key (from Agents tab)',
-            },
+            integration: 'ChatGPT Apps (Developer mode)',
+            server_url: getPrimaryMcpUrl(),
+            authentication: 'OAuth 2.0 (RFC 8414 PKCE)',
+            token_url: `${getMcpServerUrl()}/oauth/token`,
+            authorization_url: `${getMcpServerUrl()}/oauth/authorize`,
           },
           null,
           2
         );
       case 'claudecode':
-        return `claude mcp add northveil ${baseMcpUrl}/mcp --header "Authorization: Bearer nv_live_YOUR_API_KEY"`;
+        return `claude mcp add northveil ${getPrimaryMcpUrl()}`;
       case 'windsurf':
         return JSON.stringify(
           {
             mcpServers: {
               northveil: {
-                url: `${baseMcpUrl}/mcp`,
-                headers: {
-                  Authorization: 'Bearer nv_live_YOUR_API_KEY',
-                  'x-wallet-address': currentAddress,
-                },
+                url: getPrimaryMcpUrl(),
               },
             },
           },
@@ -169,13 +142,13 @@ export const DeveloperHubView: React.FC = () => {
           2
         );
       case 'http':
-        return `curl -X POST ${baseMcpUrl}/mcp \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer nv_live_YOUR_API_KEY" \\\n  -H "x-wallet-address: ${currentAddress}" \\\n  -d '{\n    "jsonrpc": "2.0",\n    "id": 1,\n    "method": "tools/call",\n    "params": {\n      "name": "northveil_get_balances",\n      "arguments": { "network": "base" }\n    }\n  }'`;
+        return `curl -X POST ${getPrimaryMcpUrl()} \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer nv_oauth_YOUR_TOKEN" \\\n  -d '{\n    "jsonrpc": "2.0",\n    "id": 1,\n    "method": "tools/call",\n    "params": {\n      "name": "nv_get_balances",\n      "arguments": { "network": "base" }\n    }\n  }'`;
       case 'sse':
         return JSON.stringify(
           {
             mcpServers: {
               northveil: {
-                url: `${baseMcpUrl}/sse?wallet_address=${currentAddress}`,
+                url: getLegacySseUrl(),
               },
             },
           },
@@ -192,11 +165,11 @@ export const DeveloperHubView: React.FC = () => {
       case 'claudeweb':
         return 'Claude.ai & Claude Mobile -> Settings -> Connectors -> Add custom connector';
       case 'claude':
-        return 'macOS: ~/Library/Application Support/Claude/claude_desktop_config.json | Windows: %APPDATA%\\Claude\\claude_desktop_config.json | Linux: ~/.config/Claude/claude_desktop_config.json';
+        return 'Claude Desktop -> Settings -> Connectors / Developer (or claude_desktop_config.json)';
       case 'cursor':
         return 'Project Root: .cursor/mcp.json (or Cursor Settings > Features > MCP Servers)';
       case 'chatgpt':
-        return 'ChatGPT UI > Explore GPTs > Create a GPT > Configure > Actions > "Create new action"';
+        return 'ChatGPT -> Apps -> Developer mode -> Add Northveil MCP URL';
       case 'claudecode':
         return 'Terminal CLI command line execution';
       case 'windsurf':
@@ -204,7 +177,7 @@ export const DeveloperHubView: React.FC = () => {
       case 'http':
         return 'Direct Streamable HTTP JSON-RPC 2.0 (POST /mcp)';
       case 'sse':
-        return 'Remote Streamable SSE Endpoint URL (GET /sse)';
+        return 'Legacy SSE Endpoint URL (https://mcp.northveil.xyz/sse)';
       default:
         return '';
     }
@@ -844,11 +817,11 @@ export const DeveloperHubView: React.FC = () => {
                   { id: 'claudeweb', label: 'Claude.ai Web' },
                   { id: 'claude', label: 'Claude Desktop' },
                   { id: 'cursor', label: 'Cursor IDE' },
-                  { id: 'chatgpt', label: 'ChatGPT Actions' },
+                  { id: 'chatgpt', label: 'ChatGPT Apps' },
                   { id: 'claudecode', label: 'Claude Code' },
                   { id: 'windsurf', label: 'Windsurf' },
                   { id: 'http', label: 'POST /mcp (HTTP)' },
-                  { id: 'sse', label: 'Remote SSE' },
+                  { id: 'sse', label: 'Legacy SSE' },
                 ].map((client) => (
                   <button
                     key={client.id}
@@ -904,28 +877,28 @@ export const DeveloperHubView: React.FC = () => {
                   <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed">
                     <li>Open <strong>Claude.ai</strong> (or Claude Mobile App) &rarr; Go to <strong>Settings</strong> &rarr; <strong>Connectors</strong> &rarr; Click <strong>Add custom connector</strong>.</li>
                     <li>Enter <strong>Name</strong>: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">Northveil</code>.</li>
-                    <li>Enter <strong>URL</strong>: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{baseMcpUrl}/mcp</code> (Streamable HTTP, recommended) or <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{baseMcpUrl}/sse?wallet_address={currentAddress}</code>.</li>
-                    <li>Click <strong>Add / Connect</strong>. Claude will immediately discover all 57 Northveil on-chain intelligence &amp; MPC tools.</li>
+                    <li>Enter <strong>URL</strong>: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{getPrimaryMcpUrl()}</code> (Primary Universal Endpoint) or <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{getLegacySseUrl()}</code> (Legacy SSE fallback).</li>
+                    <li>Click <strong>Add / Connect</strong>. Claude will immediately discover all Northveil on-chain intelligence &amp; MPC tools.</li>
                   </ol>
                 )}
                 {selectedMcpClient === 'claude' && (
                   <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed">
-                    <li><strong>Zero-JSON Method (Fastest)</strong>: Run <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude mcp add northveil {baseMcpUrl}/mcp</code> in your terminal — no config file editing needed!</li>
-                    <li><strong>Claude Settings UI</strong>: Open Claude Desktop &rarr; <strong>Settings</strong> &rarr; <strong>Connectors / Developer</strong> &rarr; Click <strong>Add MCP Server</strong> &rarr; Enter URL <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{baseMcpUrl}/mcp</code>.</li>
+                    <li><strong>Zero-JSON Method (Fastest)</strong>: Run <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude mcp add northveil {getPrimaryMcpUrl()}</code> in your terminal — no config file editing needed!</li>
+                    <li><strong>Claude Settings UI</strong>: Open Claude Desktop &rarr; <strong>Settings</strong> &rarr; <strong>Connectors / Developer</strong> &rarr; Click <strong>Add MCP Server</strong> &rarr; Enter URL <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{getPrimaryMcpUrl()}</code>.</li>
                     <li><strong>Config File (Optional)</strong>: Or paste the snippet above into <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude_desktop_config.json</code>.</li>
                   </ol>
                 )}
                 {selectedMcpClient === 'chatgpt' && (
                   <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed">
-                    <li>In ChatGPT, go to <strong>Explore GPTs</strong> &rarr; <strong>Create a GPT</strong> &rarr; <strong>Configure</strong> &rarr; <strong>Actions</strong> &rarr; <strong>Create new action</strong>.</li>
-                    <li>Click <strong>Import from URL</strong>, paste <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{baseMcpUrl}/openapi.json</code> and click <strong>Import</strong>.</li>
-                    <li>Under Authentication, select <strong>OAuth</strong> (Auth URL: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{baseMcpUrl}/oauth/authorize</code>, Token URL: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{baseMcpUrl}/oauth/token</code>, Scope: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">tools:read tools:execute</code>) or select <strong>API Key</strong> (Custom Header: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">X-API-Key</code>).</li>
-                    <li>Save your GPT! ChatGPT can now execute non-custodial swaps, check balances, and submit verified transactions.</li>
+                    <li>In ChatGPT, navigate to <strong>Settings</strong> &rarr; <strong>Apps</strong> &rarr; <strong>Developer mode</strong>.</li>
+                    <li>Click <strong>Add Northveil MCP</strong> &rarr; Enter Server URL: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{getPrimaryMcpUrl()}</code>.</li>
+                    <li>Under Authentication, select <strong>OAuth</strong> (Auth URL: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{getMcpServerUrl()}/oauth/authorize</code>, Token URL: <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{getMcpServerUrl()}/oauth/token</code>).</li>
+                    <li>Save! ChatGPT can now execute non-custodial swaps, check balances, and submit verified transactions.</li>
                   </ol>
                 )}
                 {selectedMcpClient === 'claudecode' && (
                   <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed">
-                    <li>Run <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude mcp add northveil npx -y northveil-cli mcp</code> in your terminal.</li>
+                    <li>Run <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude mcp add northveil {getPrimaryMcpUrl()}</code> in your terminal.</li>
                     <li>Launch Claude Code with <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">claude</code>.</li>
                     <li>Claude will automatically detect and invoke Northveil tools for on-chain intelligence.</li>
                   </ol>
@@ -939,8 +912,8 @@ export const DeveloperHubView: React.FC = () => {
                 )}
                 {selectedMcpClient === 'sse' && (
                   <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed">
-                    <li>Point your SSE-compatible LLM agent or framework (LangChain, LlamaIndex, AutoGPT) to the endpoint URL.</li>
-                    <li>Establish the real-time event stream via HTTP GET /sse and send requests via POST /message.</li>
+                    <li>Legacy fallback for clients that only speak Server-Sent Events (SSE).</li>
+                    <li>Connect to the stream at <code className="px-1 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.08] font-mono text-[11px]">{getLegacySseUrl()}</code>.</li>
                   </ol>
                 )}
               </div>

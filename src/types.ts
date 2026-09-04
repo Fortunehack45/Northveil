@@ -202,6 +202,7 @@ export interface AgentConnection {
   permissions: string[];
   recentActionsCount?: number;
   sseUrl?: string;
+  mcpUrl?: string;
 }
 
 export interface McpApprovalRecord {
