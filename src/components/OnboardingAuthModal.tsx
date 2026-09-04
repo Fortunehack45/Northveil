@@ -18,6 +18,7 @@ import {
 import { useWallet } from '../context/WalletContext';
 import { MpcWalletService } from '../services/MpcWalletService';
 import { WebAuthnService } from '../services/WebAuthnService';
+import { fetchLiveMe } from '../services/LivePortfolio';
 import { ethers } from 'ethers';
 
 interface OnboardingAuthModalProps {
@@ -69,6 +70,35 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       );
       const cleanUrl = window.location.pathname;
       window.history.replaceState({}, '', cleanUrl);
+    }
+
+    const incomingToken = params.get('sessionToken');
+    if (incomingToken) {
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, '', cleanUrl);
+      setStep('processing');
+      setProcessingMsg('Securing session with Northveil MPC...');
+      fetchLiveMe(incomingToken)
+        .then(async (me) => {
+          if (me && me.wallet && me.wallet.address) {
+            await setupMpcVault(
+              me.wallet.name || 'Primary Vault',
+              me.wallet.address,
+              me.wallet.mpc_wallet_id || '',
+              me.user?.id || '',
+              incomingToken
+            );
+            if (onClose) onClose();
+          } else if (me && me.user) {
+            MpcWalletService.saveSession(incomingToken, me.user.id, 'mpc');
+            setStep('createName');
+          } else {
+            setStep('welcome');
+          }
+        })
+        .catch(() => {
+          setStep('welcome');
+        });
     }
   }, []);
 
