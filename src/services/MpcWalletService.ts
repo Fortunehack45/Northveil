@@ -81,7 +81,7 @@ export class MpcWalletService {
       headers,
       body: JSON.stringify({
         userId: effectiveUserId,
-        walletName,
+        name: walletName,
       }),
     });
 
@@ -91,79 +91,88 @@ export class MpcWalletService {
     }
 
     const wallet = json.wallet || json;
+    const addr = wallet.address || json.address;
     return {
       success: true,
-      address: wallet.address,
-      mpcWalletId: wallet.mpc_wallet_id || wallet.mpcWalletId || '',
+      address: addr,
+      mpcWalletId: wallet.mpc_wallet_id || wallet.mpcWalletId || json.mpcWalletId || '',
       mpcProvider: wallet.mpc_provider || 'turnkey',
       userId: wallet.user_id || effectiveUserId,
     };
   }
 
   /**
-   * Import wallet public metadata into Northveil (Derives address locally; secrets never sent to server)
+   * Import wallet non-custodially into Northveil Turnkey MPC Enclave
+   * Secrets are transmitted over TLS directly to MCP -> Turnkey and never stored locally
    */
   public static async importMpcVault(
-    importType: 'privateKey' | 'seed' | 'publicAddress',
-    secretOrAddress: string,
+    importType: 'privateKey' | 'seed',
+    secret: string,
     walletName: string = 'Imported Vault',
     userId?: string
   ): Promise<MpcVaultCreationResult> {
     const effectiveUserId = userId || this.getUserId();
-    const cleanSecret = secretOrAddress.trim();
-    let publicAddress = '';
+    const token = this.getSessionToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const cleanSecret = secret.trim();
+    const payload: Record<string, any> = {
+      name: walletName,
+      userId: effectiveUserId,
+    };
 
     if (importType === 'seed') {
-      const words = cleanSecret.split(/\s+/).map((w) => w.trim().toLowerCase()).filter(Boolean);
-      if (words.length >= 12) {
-        const derived = WalletService.deriveEVMAddress(words, 0);
-        publicAddress = derived.address.toLowerCase();
-      } else {
-        publicAddress = sanitizeToValidAddress(cleanSecret, 0);
-      }
-    } else if (importType === 'privateKey') {
-      const cleanKey = cleanSecret.startsWith('0x') ? cleanSecret : `0x${cleanSecret}`;
-      try {
-        const wallet = new ethers.Wallet(cleanKey);
-        publicAddress = wallet.address.toLowerCase();
-      } catch {
-        publicAddress = sanitizeToValidAddress(cleanSecret, 0);
-      }
+      payload.mnemonic = cleanSecret;
     } else {
-      publicAddress = sanitizeToValidAddress(cleanSecret, 0);
+      payload.privateKey = cleanSecret.startsWith('0x') ? cleanSecret : `0x${cleanSecret}`;
     }
 
     try {
-      const res = await fetch(`${this.getBaseUrl()}/api/v1/wallets/register`, {
+      const res = await fetch(`${this.getBaseUrl()}/wallet/import`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          address: publicAddress,
-          walletName,
-          userId: effectiveUserId,
-        }),
+        headers,
+        body: JSON.stringify(payload),
       });
 
       const json = await res.json();
-      if (res.ok && json.success) {
-        return {
-          success: true,
-          address: publicAddress,
-          mpcWalletId: json.mpcWalletId || `wlt_${Date.now()}_${publicAddress.slice(2, 8)}`,
-          mpcProvider: json.mpcProvider || 'non_custodial',
-          userId: effectiveUserId,
-        };
+      if (!res.ok || !json.address) {
+        throw new Error(json.error || json.message || 'Failed to import vault into Turnkey MPC');
       }
-    } catch {}
 
-    // Local non-custodial fallback: register locally without blocking user
-    return {
-      success: true,
-      address: publicAddress,
-      mpcWalletId: `wlt_local_${Date.now()}_${publicAddress.slice(2, 8)}`,
-      mpcProvider: 'non_custodial',
-      userId: effectiveUserId,
-    };
+      return {
+        success: true,
+        address: json.address,
+        mpcWalletId: json.mpcWalletId || json.wallet?.mpc_wallet_id || '',
+        mpcProvider: 'turnkey',
+        userId: effectiveUserId,
+      };
+    } finally {
+      // Memory wipe of secrets
+      payload.mnemonic = undefined;
+      payload.privateKey = undefined;
+    }
+  }
+
+  /**
+   * Fetch authenticated user, active wallet, passkeys, and next onboarding step
+   */
+  public static async fetchWalletMe(token?: string) {
+    const sessionToken = token || this.getSessionToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (sessionToken) headers['Authorization'] = `Bearer ${sessionToken}`;
+
+    const res = await fetch(`${this.getBaseUrl()}/wallet/me`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || 'Failed to fetch user wallet metadata');
+    }
+
+    return await res.json();
   }
 
   /**
