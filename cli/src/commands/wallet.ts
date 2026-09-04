@@ -1,4 +1,4 @@
-import { postApi, getConfig } from '../utils';
+import { postApi, getConfig, mcpJsonRpc } from '../utils';
 
 export function registerWalletCommands(program: any) {
   program
@@ -51,62 +51,48 @@ export function registerWalletCommands(program: any) {
     });
 
   program
-    .command('tx:prepare')
-    .description('Non-custodially stage an unsigned transaction for local client signing')
-    .requiredOption('--to <address>', 'Recipient address')
-    .requiredOption('--amount <amount>', 'Amount to transfer')
-    .option('--asset <symbol>', 'Token asset symbol (ETH, USDC)', 'ETH')
-    .option('--network <network>', 'Network (base, sepolia, ethereum)', 'base')
-    .action(async (options: any) => {
-      const cfg = getConfig();
-      console.log(`\n⚙️ Staging non-custodial transaction for ${cfg.walletAddress || 'active wallet'}...`);
+    .command('tools')
+    .description('List available MCP AI tools from the Northveil Control Plane')
+    .action(async () => {
+      console.log('\n🛠️  Fetching available MCP tools from Northveil...');
       try {
-        const data = await postApi('/api/v1/transactions/prepare', {
-          walletAddress: cfg.walletAddress,
-          recipient: options.to,
-          amount: parseFloat(options.amount),
-          asset: options.asset,
-          network: options.network,
-        });
-
-        console.log('✅ Transaction Staged Successfully!');
+        const result = await mcpJsonRpc('tools/list');
+        const tools = result?.tools || [];
+        console.log(`\nFound ${tools.length} available tools:`);
         console.log('-------------------------------------------------------------');
-        console.log(`Request ID:      ${data.requestId}`);
-        console.log(`Approval Token:  ${data.approvalToken}`);
-        console.log(`Nonce:           ${data.nonce}`);
-        console.log(`Chain ID:        ${data.chainId}`);
-        console.log(`Expires At:      ${data.expiresAt}`);
-        console.log('\nUnsigned Payload (Sign locally via client):');
-        console.log(JSON.stringify(data.unsignedTransaction, null, 2));
+        for (const t of tools) {
+          console.log(`• ${t.name.padEnd(26)} : ${t.description?.slice(0, 70)}...`);
+        }
         console.log('-------------------------------------------------------------');
+        console.log('Usage: northveil call <tool_name> \'{"key":"value"}\'\n');
       } catch (err: any) {
-        console.error('\n❌ Stage Transaction Error:', err.message);
+        console.error('\n❌ Failed to list tools:', err.message);
       }
     });
 
   program
-    .command('tx:broadcast')
-    .description('Verify recovered signature and broadcast signed raw transaction on-chain')
-    .requiredOption('--token <approvalToken>', 'Approval token from tx:prepare')
-    .requiredOption('--raw <signedHex>', 'Client-signed raw transaction hex string (0x...)')
-    .action(async (options: any) => {
-      console.log(`\n🚀 Broadcasting client-signed transaction on-chain...`);
+    .command('call <tool> [jsonArgs]')
+    .description('Execute an MCP tool via JSON-RPC 2.0 with authenticated agent credentials')
+    .action(async (tool: string, jsonArgs?: string) => {
+      let argsObj: any = {};
+      if (jsonArgs) {
+        try {
+          argsObj = JSON.parse(jsonArgs);
+        } catch (e: any) {
+          console.error('\n❌ Invalid JSON arguments:', e.message);
+          return;
+        }
+      }
+      console.log(`\n⚡ Invoking MCP tool "${tool}"...`);
       try {
-        const data = await postApi('/api/v1/transactions/broadcast', {
-          approvalToken: options.token,
-          signedTransaction: options.raw,
+        const result = await mcpJsonRpc('tools/call', {
+          name: tool,
+          arguments: argsObj,
         });
-
-        console.log('✅ Transaction Broadcasted Successfully!');
-        console.log('-------------------------------------------------------------');
-        console.log(`Status:       ${data.status}`);
-        console.log(`Tx Hash:      ${data.txHash}`);
-        console.log(`Block Number: ${data.blockNumber}`);
-        console.log(`Gas Used:     ${data.gasUsed}`);
-        console.log(`Explorer:     ${data.explorerUrl}`);
-        console.log('-------------------------------------------------------------');
+        console.log('✅ Result:');
+        console.log(JSON.stringify(result, null, 2));
       } catch (err: any) {
-        console.error('\n❌ Broadcast Error:', err.message);
+        console.error(`\n❌ Failed to execute tool "${tool}":`, err.message);
       }
     });
 

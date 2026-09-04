@@ -31,6 +31,7 @@ export const WalletsView: React.FC = () => {
     importSubWallet,
     renameSubWallet,
     deleteSubWallet,
+    setupMpcVaultFromServer,
     restoreWalletFromSeed,
     restoreWalletFromPrivateKey,
     getDecryptedPrivateKey,
@@ -155,55 +156,42 @@ export const WalletsView: React.FC = () => {
     setShowCreateModal(false);
   };
 
-  const handleImportWallet = (e: React.FormEvent) => {
+  const handleImportWallet = async (e: React.FormEvent) => {
     e.preventDefault();
     setImportError('');
     const raw = importSecret.trim();
     if (!raw) {
-      setImportError('Please enter a valid seed phrase or private key.');
+      setImportError('Please enter a valid recovery phrase or private key.');
       return;
     }
 
     try {
       const chosenName = importName.trim() || `Imported Wallet #${subWallets.length + 1}`;
-      const userId = MpcWalletService.getUserId();
-
       const words = raw.split(/\s+/).map((w) => w.trim().toLowerCase()).filter(Boolean);
+
       if (words.length >= 12) {
-        // Seed phrase
-        MpcWalletService.importMpcVault('seed', words.join(' '), chosenName, userId).catch((e) => {
-          console.warn('[Northveil Enclave Import Notice]:', e.message);
-        });
-        const newWallet = importSubWallet('seed', words.join(' '), chosenName);
-        if (newWallet) {
-          setShowImportModal(false);
-          setImportSecret('');
-          setImportName('');
-        } else {
-          setImportError('Failed to import seed phrase. Please check word count and order.');
-        }
+        await MpcWalletService.importMpcVault('seed', words.join(' '), chosenName);
       } else {
-        // Private key
         const clean = raw.replace(/\s+/g, '');
         const pKey = clean.startsWith('0x') ? clean : `0x${clean}`;
-        if (pKey.length !== 66 || !ethers.isHexString(pKey, 32)) {
-          setImportError('Invalid format: Must be a 12-24 word seed phrase or a 64-character private key.');
-          return;
-        }
-        MpcWalletService.importMpcVault('privateKey', pKey, chosenName, userId).catch((e) => {
-          console.warn('[Northveil Enclave Import Notice]:', e.message);
-        });
-        const newWallet = importSubWallet('privateKey', pKey, chosenName);
-        if (newWallet) {
-          setShowImportModal(false);
-          setImportSecret('');
-          setImportName('');
-        } else {
-          setImportError('Invalid private key format.');
+        await MpcWalletService.importMpcVault('privateKey', pKey, chosenName);
+      }
+
+      setImportSecret('');
+      setImportName('');
+      setShowImportModal(false);
+
+      const token = MpcWalletService.getSessionToken();
+      if (token) {
+        const me = await MpcWalletService.fetchWalletMe(token);
+        if (me?.wallets) {
+          await setupMpcVaultFromServer(me.wallets, token);
         }
       }
     } catch (err: any) {
       setImportError(err?.message || 'Import error occurred.');
+    } finally {
+      setImportSecret('');
     }
   };
 

@@ -6,7 +6,6 @@
 
 import { getMcpServerUrl } from '../config/endpointConfig';
 import { ethers } from 'ethers';
-import { WalletService } from './WalletService';
 import { sanitizeToValidAddress } from './addressUtils';
 
 export interface MpcVaultCreationResult {
@@ -114,55 +113,117 @@ export class MpcWalletService {
   }
 
   /**
-   * Import wallet non-custodially into Northveil Turnkey MPC Enclave
-   * Secrets are transmitted over TLS directly to MCP -> Turnkey and never stored locally
+   * Request an enclave import bundle from Turnkey via MCP
+   */
+  public static async importBegin(token?: string): Promise<{
+    importBundle: string;
+    organizationId: string;
+    turnkeyUserId: string;
+  }> {
+    const sessionToken = token || this.getSessionToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (sessionToken) {
+      headers['Authorization'] = `Bearer ${sessionToken}`;
+      headers['X-Session-Token'] = sessionToken;
+    }
+
+    const res = await fetch(`${this.getBaseUrl()}/wallet/import/begin`, {
+      method: 'POST',
+      headers,
+    });
+
+    const json = await this.safeJson(res);
+    if (!res.ok || !json.importBundle) {
+      throw new Error(json.error || json.message || 'Failed to initialize enclave wallet import');
+    }
+
+    return {
+      importBundle: json.importBundle,
+      organizationId: json.organizationId,
+      turnkeyUserId: json.turnkeyUserId || json.userId,
+    };
+  }
+
+  /**
+   * Submit client-encrypted bundle to Turnkey via MCP (Server never sees raw mnemonic or privateKey)
+   */
+  public static async importFinish(
+    name: string,
+    encryptedBundle: string,
+    token?: string
+  ): Promise<MpcVaultCreationResult> {
+    const sessionToken = token || this.getSessionToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (sessionToken) {
+      headers['Authorization'] = `Bearer ${sessionToken}`;
+      headers['X-Session-Token'] = sessionToken;
+    }
+
+    const res = await fetch(`${this.getBaseUrl()}/wallet/import/finish`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ name, encryptedBundle }),
+    });
+
+    const json = await this.safeJson(res);
+    if (!res.ok || (!json.address && !json.wallet?.address)) {
+      throw new Error(json.error || json.message || 'Failed to complete enclave wallet import');
+    }
+
+    const addr = json.address || json.wallet?.address;
+    const mpcWalletId = json.mpcWalletId || json.wallet?.mpc_wallet_id || '';
+    const userId = json.wallet?.user_id || this.getUserId();
+
+    return {
+      success: true,
+      address: addr,
+      mpcWalletId,
+      mpcProvider: 'turnkey',
+      userId,
+    };
+  }
+
+  /**
+   * Import wallet non-custodially into Northveil Turnkey MPC Enclave.
+   * Material is encrypted in the browser directly to Turnkey's TEK public key.
+   * Neither plaintext mnemonic nor hex private key ever touches server memory.
    */
   public static async importMpcVault(
     importType: 'privateKey' | 'seed',
     secret: string,
     walletName: string = 'Imported Vault',
-    userId?: string
+    _userId?: string
   ): Promise<MpcVaultCreationResult> {
-    const effectiveUserId = userId || this.getUserId();
     const token = this.getSessionToken();
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const cleanSecret = secret.trim();
-    const payload: Record<string, any> = {
-      name: walletName,
-      userId: effectiveUserId,
-    };
-
-    if (importType === 'seed') {
-      payload.mnemonic = cleanSecret;
-    } else {
-      payload.privateKey = cleanSecret.startsWith('0x') ? cleanSecret : `0x${cleanSecret}`;
-    }
+    let cleanSecret = secret.trim();
 
     try {
-      const res = await fetch(`${this.getBaseUrl()}/wallet/import`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      });
+      const begin = await this.importBegin(token || undefined);
+      const { encryptWalletToBundle, encryptPrivateKeyToBundle } = await import('@turnkey/crypto');
 
-      const json = await this.safeJson(res);
-      if (!res.ok || !json.address) {
-        throw new Error(json.error || json.message || 'Failed to import vault into Turnkey MPC');
+      let encryptedBundle: string;
+      if (importType === 'seed') {
+        encryptedBundle = await encryptWalletToBundle({
+          mnemonic: cleanSecret,
+          importBundle: begin.importBundle,
+          userId: begin.turnkeyUserId,
+          organizationId: begin.organizationId,
+        });
+      } else {
+        const hexKey = cleanSecret.startsWith('0x') ? cleanSecret : `0x${cleanSecret}`;
+        encryptedBundle = await encryptPrivateKeyToBundle({
+          privateKey: hexKey,
+          keyFormat: 'HEXADECIMAL',
+          importBundle: begin.importBundle,
+          userId: begin.turnkeyUserId,
+          organizationId: begin.organizationId,
+        });
       }
 
-      return {
-        success: true,
-        address: json.address,
-        mpcWalletId: json.mpcWalletId || json.wallet?.mpc_wallet_id || '',
-        mpcProvider: 'turnkey',
-        userId: effectiveUserId,
-      };
+      return await this.importFinish(walletName, encryptedBundle, token || undefined);
     } finally {
-      // Memory wipe of secrets
-      payload.mnemonic = undefined;
-      payload.privateKey = undefined;
+      // Immediate memory wipe
+      cleanSecret = '';
     }
   }
 

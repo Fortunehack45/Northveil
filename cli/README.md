@@ -60,18 +60,21 @@ northveil memecoins --chain all --limit 10
 
 ---
 
-### 4. Non-Custodial Transaction Staging & Broadcast
+### 4. Non-Custodial MCP AI Tools & Intent Execution
 ```bash
-# Stage an unsigned transaction for local client signing
-northveil tx:prepare --to 0xYOUR_WALLET_ADDRESS --amount 0.05 --asset ETH --network sepolia
+# List all available MCP tools
+northveil tools
 
-# Verify recovered signature and broadcast signed raw transaction on-chain
-northveil tx:broadcast --token <APPROVAL_TOKEN> --raw <SIGNED_RAW_HEX>
+# Execute an MCP tool via JSON-RPC 2.0
+northveil call prepare_transfer '{"to":"0xRecipient","amount":"0.05","chain":"base"}'
+
+# Inspect transaction / request status
+northveil call get_transaction_status '{"requestId":"<REQUEST_ID>"}'
 
 # Prepare a native or token transfer
 northveil send --to 0xYOUR_WALLET_ADDRESS --amount 0.05 --token ETH --network base
 
-# Prepare an optimal DEX swap via 1inch/Uniswap
+# Prepare an optimal DEX swap
 northveil swap --from ETH --to USDC --amount 0.1 --network base
 ```
 

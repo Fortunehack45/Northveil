@@ -8,6 +8,8 @@ export interface NorthveilConfig {
   apiUrl?: string;
   clientKey?: string;
   walletAddress?: string;
+  privateKey?: never;
+  mnemonic?: never;
 }
 
 export interface PortfolioBalance {

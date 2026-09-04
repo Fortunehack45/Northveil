@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { Component, useState, useEffect, useRef } from 'react';
 import { WalletProvider, useWallet } from './context/WalletContext';
 import { Header } from './components/Header';
 import { Navigation, TabType } from './components/Navigation';
@@ -281,9 +281,13 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = { hasError: false, error: null };
+  public props: ErrorBoundaryProps;
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
+    this.props = props;
     this.state = { hasError: false, error: null };
   }
 
@@ -291,7 +295,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: any) {
     console.error('Uncaught Northveil App Error:', error, errorInfo);
   }
 
@@ -307,7 +311,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
             </div>
             <button
               onClick={() => {
-                this.setState({ hasError: false, error: null });
+                this.state = { hasError: false, error: null };
                 window.location.reload();
               }}
               className="w-full py-3 bg-white text-black font-semibold text-xs rounded-full hover:bg-zinc-200 cursor-pointer"

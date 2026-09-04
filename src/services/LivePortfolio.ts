@@ -21,7 +21,7 @@ export interface LivePortfolioResponse {
   totalUsdValue: number;
 }
 
-const MCP_URL = import.meta.env.VITE_NORTHVEIL_API_URL || import.meta.env.VITE_MCP_URL || 'https://mcp.northveil.xyz';
+const MCP_URL = (import.meta as any).env?.VITE_NORTHVEIL_API_URL || (import.meta as any).env?.VITE_MCP_URL || 'https://mcp.northveil.xyz';
 
 export async function fetchLivePortfolio(sessionToken?: string): Promise<LivePortfolioResponse> {
   const headers: Record<string, string> = {

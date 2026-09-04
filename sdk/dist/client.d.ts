@@ -10,6 +10,14 @@ export declare class NorthveilClient {
     private walletAddress?;
     constructor(config?: NorthveilConfig);
     /**
+     * Invokes an arbitrary MCP tool by name
+     */
+    call<T = any>(tool: string, args?: Record<string, any>): Promise<T>;
+    /**
+     * Inspects a request lifecycle record by its requestId
+     */
+    getRequest(requestId: string): Promise<any>;
+    /**
      * Dispatches a JSON-RPC 2.0 tool call to the Northveil MCP endpoint
      */
     callTool<T = any>(name: string, args?: Record<string, any>): Promise<T>;

@@ -19,6 +19,9 @@ export class NorthveilClient {
   private walletAddress?: string;
 
   constructor(config: NorthveilConfig = {}) {
+    if ((config as any).privateKey || (config as any).mnemonic) {
+      throw new Error('NON_CUSTODIAL_VIOLATION: Northveil SDK strictly forbids privateKey or mnemonic. Authentication is strictly via clientKey (agent key) or OAuth.');
+    }
     this.apiUrl = (config.baseUrl || config.apiUrl || process.env.NORTHVEIL_API_URL || 'https://mcp.northveil.xyz').replace(/\/$/, '');
     this.clientKey = config.clientKey || process.env.NORTHVEIL_API_KEY || '';
     this.walletAddress = config.walletAddress;
@@ -26,6 +29,32 @@ export class NorthveilClient {
     if (!this.clientKey) {
       throw new Error('MISSING_CLIENT_KEY: Pass clientKey or set NORTHVEIL_API_KEY');
     }
+  }
+
+  /**
+   * Invokes an arbitrary MCP tool by name
+   */
+  public async call<T = any>(tool: string, args: Record<string, any> = {}): Promise<T> {
+    return this.callTool<T>(tool, args);
+  }
+
+  /**
+   * Inspects a request lifecycle record by its requestId
+   */
+  public async getRequest(requestId: string): Promise<any> {
+    const res = await fetch(`${this.apiUrl}/wallet/requests/${encodeURIComponent(requestId)}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': this.clientKey,
+        'Authorization': `Bearer ${this.clientKey}`,
+      },
+    });
+    if (!res.ok) {
+      const err = await res.text().catch(() => '');
+      throw new Error(`Failed to load request (${res.status}): ${err}`);
+    }
+    return await res.json();
   }
 
   /**

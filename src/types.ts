@@ -144,7 +144,6 @@ export interface SubWalletAccount {
   accountIndex: number;
   address: string;
   derivationPath: string;
-  privateKey?: string;
   solanaAddress?: string;
   solanaDerivationPath?: string;
   bitcoinAddress?: string;
@@ -208,6 +207,7 @@ export interface AgentConnection {
 export interface McpApprovalRecord {
   id: string;
   tool_name: string;
+  operation?: string;
   status: 'CONFIRMED' | 'PENDING' | 'REJECTED' | 'FAILED' | 'EXPIRED';
   parameters: any;
   response?: any;

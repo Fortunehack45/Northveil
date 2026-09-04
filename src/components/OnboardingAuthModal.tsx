@@ -531,10 +531,9 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
     setProcessingMsg('Submitting key material non-custodially to Turnkey MPC enclave...');
 
     try {
-      const userId = MpcWalletService.getUserId();
       const chosenName = importWalletName.trim() || 'Imported Vault';
       const token = MpcWalletService.getSessionToken() || '';
-      await MpcWalletService.importMpcVault(importType, clean, chosenName, userId);
+      await MpcWalletService.importMpcVault(importType, clean, chosenName);
 
       // Memory wipe of secrets in component state
       setImportText('');
@@ -556,6 +555,9 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
     } catch (err: any) {
       setImportError(err.message || 'Import failed.');
       setStep('importWallet');
+    } finally {
+      // Guaranteed zeroing of recovery secret in state
+      setImportText('');
     }
   };
 

@@ -803,7 +803,7 @@ export const DeveloperHubView: React.FC = () => {
                   <span>1.</span> Read-Only Autonomy
                 </span>
                 <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                  Agents freely query balances, quotes, token safety, flight status, and market data without requiring approval.
+                  Agents freely query balances, quotes, token safety, gas estimates, and market data without requiring approval.
                 </p>
               </div>
 
@@ -977,8 +977,8 @@ export const DeveloperHubView: React.FC = () => {
                     prompt: 'Deploy an ERC20 token named QuantumToken with symbol QTM and total supply 1,000,000 on Sepolia.',
                   },
                   {
-                    title: 'Airline PNR & Ticket Verification',
-                    prompt: 'Verify flight status and booking reservation for official IATA PNR code 7X9K2B.',
+                    title: 'Cross-Chain Transfer Intent',
+                    prompt: 'Stage an autonomous transfer of 0.05 ETH to 0x742d35Cc6634C0532925a3b844Bc454e4438f44e on Ethereum Mainnet.',
                   },
                 ].map((item, idx) => (
                   <div

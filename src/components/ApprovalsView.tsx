@@ -81,6 +81,7 @@ export const ApprovalsView: React.FC = () => {
               request_id: data.requestId,
               approval_token: data.requestId,
               wallet_address: data.walletAddress || activeSubWallet?.address || '',
+              tool_name: data.tool || 'transfer',
               operation: data.tool || 'transfer',
               status: data.status === 'success' ? 'CONFIRMED' : data.status === 'denied' ? 'REJECTED' : 'PENDING',
               created_at: data.createdAt || new Date().toISOString(),

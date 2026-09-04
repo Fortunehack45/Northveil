@@ -119,9 +119,13 @@ export function registerTradeCommands(program: any) {
         console.log(`Network:         ${data.network} (Chain ID: ${data.chainId})`);
         console.log(`Status:          ${data.status}`);
         console.log(`Expires At:      ${data.expiresAt}`);
-        console.log('-------------------------------------------------------------');
-        console.log('👉 To sign and broadcast, use:');
-        console.log(`   northveil tx:broadcast --token ${data.approvalToken} --raw <signedHex>\n`);
+        if (data.approveUrl) {
+          console.log(`👉 Passkey approval required at: ${data.approveUrl}\n`);
+        } else if (data.status === 'executed' || data.txHash) {
+          console.log(`✅ Executed on-chain! Tx Hash: ${data.txHash}\n`);
+        } else {
+          console.log(`👉 Inspect status with: northveil call get_transaction_status '{"requestId":"${data.requestId}"}'\n`);
+        }
       } catch (err: any) {
         console.error('\n❌ Send Transfer Error:', err.message);
       }

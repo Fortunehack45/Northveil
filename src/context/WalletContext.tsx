@@ -202,33 +202,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [seedPhrase, setSeedPhrase] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem('northveil_seed_phrase') || localStorage.getItem('northveil_seed');
-      if (raw) {
-        const words = raw.trim().split(/\s+/).filter(Boolean);
-        if (words.length >= 12 || (words.length === 1 && words[0].startsWith('0x'))) return words;
-      }
-      const directPk = localStorage.getItem('northveil_vault_pk') || localStorage.getItem('northveil_imported_pk') || localStorage.getItem('northveil_active_pk');
-      if (directPk && directPk.trim()) {
-        return [directPk.trim()];
-      }
-    } catch {}
-    return [];
-  });
+  const [seedPhrase, setSeedPhrase] = useState<string[]>([]);
 
+  const latestAssets = React.useRef<CryptoAsset[]>(assets);
   useEffect(() => {
-    if (seedPhrase && seedPhrase.length > 0) {
-      if (seedPhrase.length >= 12) {
-        localStorage.setItem('northveil_seed_phrase', seedPhrase.join(' '));
-        localStorage.setItem('northveil_seed', seedPhrase.join(' '));
-      } else if (seedPhrase.length === 1 && seedPhrase[0]) {
-        localStorage.setItem('northveil_vault_pk', seedPhrase[0]);
-        localStorage.setItem('northveil_imported_pk', seedPhrase[0]);
-        localStorage.setItem('northveil_active_pk', seedPhrase[0]);
-      }
-    }
-  }, [seedPhrase]);
+    latestAssets.current = assets;
+  }, [assets]);
 
   const [activeChain, setActiveChain] = useState<NetworkId>('ethereum');
   const [customNetworks, setCustomNetworks] = useState<ChainInfo[]>(() => {
@@ -253,14 +232,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [isVaultConfigured, setIsVaultConfigured] = useState<boolean>(() => {
     return (
       !!localStorage.getItem('northveil_v3_mpc_vault') ||
-      !!localStorage.getItem('northveil_v3_encrypted_vault') ||
-      !!localStorage.getItem('northveil_seed_phrase') ||
-      !!localStorage.getItem('northveil_seed') ||
-      !!localStorage.getItem('northveil_vault_pk') ||
-      !!localStorage.getItem('northveil_imported_pk') ||
-      !!localStorage.getItem('northveil_active_pk') ||
       !!localStorage.getItem('northveil_v3_subwallets') ||
-      VaultService.hasVault()
+      !!MpcWalletService.getSessionToken()
     );
   });
 
@@ -335,38 +308,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const activeSubWallet = useMemo(() => {
     const raw = subWallets.find((w) => w.id === activeWalletId) || subWallets[0] || DEFAULT_SUB_WALLETS[0];
-    if (!raw) return raw;
-    let pk = raw.privateKey;
-    if (!pk) {
-      if (seedPhrase && seedPhrase.length > 0) {
-        if (seedPhrase.length === 1 && seedPhrase[0]) {
-          pk = seedPhrase[0];
-        } else if (seedPhrase.length >= 12) {
-          try {
-            pk = WalletService.deriveEVMAddress(seedPhrase, raw.accountIndex || 0).privateKey;
-          } catch {}
-        }
-      }
-    }
-    if (!pk && typeof window !== 'undefined') {
-      try {
-        const directPk = localStorage.getItem('northveil_vault_pk') || localStorage.getItem('northveil_imported_pk') || localStorage.getItem('northveil_active_pk');
-        if (directPk && directPk.trim()) pk = directPk.trim();
-        if (!pk) {
-          const rawStoredSeed = localStorage.getItem('northveil_seed_phrase') || localStorage.getItem('northveil_seed');
-          if (rawStoredSeed) {
-            const words = rawStoredSeed.trim().split(/\s+/).filter(Boolean);
-            if (words.length >= 12) {
-              pk = WalletService.deriveEVMAddress(words, raw.accountIndex || 0).privateKey;
-            } else if (words.length === 1 && words[0]) {
-              pk = words[0];
-            }
-          }
-        }
-      } catch {}
-    }
-    return { ...raw, privateKey: pk };
-  }, [subWallets, activeWalletId, seedPhrase]);
+    return raw;
+  }, [subWallets, activeWalletId]);
 
   // Auto-sync active wallet address metadata to Supabase Cloud DB
   useEffect(() => {
@@ -450,49 +393,37 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const createSubWallet = (name: string, colorTag: string = '#ffffff'): SubWalletAccount | null => {
-    let activeSeed = seedPhrase;
-    if (!activeSeed || activeSeed.length === 0) {
-      // If seed phrase not in session, generate a distinct discrete keypair for the sub-account
-      const randomWallet = ethers.Wallet.createRandom();
-      activeSeed = [randomWallet.privateKey];
-    }
     const nextIndex = subWallets.length;
-    
-    // Derive real EVM Address and Private Key
-    const { address, privateKey, path } = WalletService.deriveEVMAddress(activeSeed, nextIndex);
-
-    let solanaAddress = '';
-    let solanaPath = '';
-    if (activeSeed.length >= 12) {
-      try {
-        const solana = WalletService.deriveSolanaAddress(activeSeed, nextIndex);
-        solanaAddress = solana.address;
-        solanaPath = solana.path;
-      } catch {}
-    }
+    const finalName = name.trim() || `Vault Account #${nextIndex + 1}`;
 
     const newWallet: SubWalletAccount = {
       id: `acc-${Date.now()}`,
-      name: name.trim() || `Vault Account #${nextIndex + 1}`,
+      name: finalName,
       accountIndex: nextIndex,
-      address,
-      derivationPath: path,
-      privateKey,
-      solanaAddress,
-      solanaDerivationPath: solanaPath,
+      address: sanitizeToValidAddress('', nextIndex),
+      derivationPath: 'northveil://tee-nitro-enclave',
       colorTag: colorTag || '#ffffff',
       createdAt: new Date().toISOString().split('T')[0],
       balanceMultiplier: 1.0,
     };
 
-    SupabaseService.syncWallet(
-      address.toLowerCase(),
-      newWallet.name,
-      activeChain
-    );
-
     setSubWallets((prev) => [...prev, newWallet]);
     setActiveWalletIdState(newWallet.id);
+
+    // Asynchronously provision through Turnkey MPC
+    MpcWalletService.createMpcVault(finalName).then((res) => {
+      if (res && res.address) {
+        const sessionToken = MpcWalletService.getSessionToken();
+        MpcWalletService.fetchWalletMe(sessionToken || undefined).then((me) => {
+          if (me && me.wallets) {
+            setupMpcVaultFromServer(me.wallets, sessionToken || undefined);
+          }
+        }).catch(() => {});
+      }
+    }).catch((err) => {
+      console.warn('[Northveil] MPC subwallet creation notice:', err.message);
+    });
+
     return newWallet;
   };
 
@@ -501,79 +432,39 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     secret: string,
     name?: string
   ): SubWalletAccount | null => {
-    try {
-      const cleanSecret = secret.trim();
-      const nextIndex = subWallets.length;
-      let newWallet: SubWalletAccount;
+    const nextIndex = subWallets.length;
+    const finalName = name?.trim() || `Imported Account #${nextIndex + 1}`;
 
-      if (type === 'seed') {
-        const words = cleanSecret.split(/\s+/).map((w) => w.trim().toLowerCase()).filter(Boolean);
-        if (words.length < 12) return null;
-        const { address, privateKey, path } = WalletService.deriveEVMAddress(words, 0);
-        let solanaAddress = '';
-        let solanaPath = '';
-        try {
-          const solana = WalletService.deriveSolanaAddress(words, 0);
-          solanaAddress = solana.address;
-          solanaPath = solana.path;
-        } catch {}
+    const newWallet: SubWalletAccount = {
+      id: `acc-${Date.now()}`,
+      name: finalName,
+      accountIndex: nextIndex,
+      address: sanitizeToValidAddress('', nextIndex),
+      derivationPath: 'northveil://tee-nitro-enclave',
+      colorTag: '#ffffff',
+      isDefault: false,
+      createdAt: new Date().toISOString().split('T')[0],
+      balanceMultiplier: 1.0,
+    };
 
-        let bitcoinAddress = '';
-        let bitcoinPath = '';
-        try {
-          const btc = WalletService.deriveBitcoinAddress(words, 0);
-          bitcoinAddress = btc.address;
-          bitcoinPath = btc.path;
-        } catch {}
+    setSubWallets((prev) => [...prev, newWallet]);
+    setActiveWalletIdState(newWallet.id);
 
-        newWallet = {
-          id: `acc-${Date.now()}`,
-          name: name?.trim() || `Imported Account #${nextIndex + 1}`,
-          accountIndex: nextIndex,
-          address: sanitizeToValidAddress(address, nextIndex),
-          derivationPath: path,
-          privateKey,
-          solanaAddress,
-          solanaDerivationPath: solanaPath,
-          bitcoinAddress,
-          bitcoinDerivationPath: bitcoinPath,
-          colorTag: '#ffffff',
-          isDefault: false,
-          createdAt: new Date().toISOString().split('T')[0],
-          balanceMultiplier: 1.0,
-        };
-      } else {
-        const formattedKey = cleanSecret.startsWith('0x') ? cleanSecret : `0x${cleanSecret}`;
-        const ethersWallet = new ethers.Wallet(formattedKey);
-        const address = ethersWallet.address.toLowerCase();
-
-        newWallet = {
-          id: `acc-${Date.now()}`,
-          name: name?.trim() || `Imported Account #${nextIndex + 1}`,
-          accountIndex: nextIndex,
-          address: sanitizeToValidAddress(address, nextIndex),
-          derivationPath: 'imported_private_key',
-          privateKey: formattedKey,
-          colorTag: '#ffffff',
-          isDefault: false,
-          createdAt: new Date().toISOString().split('T')[0],
-          balanceMultiplier: 1.0,
-        };
+    // Non-custodial in-browser Turnkey import
+    MpcWalletService.importMpcVault(type, secret, finalName).then((res) => {
+      if (res && res.address) {
+        const sessionToken = MpcWalletService.getSessionToken();
+        MpcWalletService.fetchWalletMe(sessionToken || undefined).then((me) => {
+          if (me && me.wallets) {
+            setupMpcVaultFromServer(me.wallets, sessionToken || undefined);
+          }
+        }).catch(() => {});
       }
+    }).catch((err) => {
+      console.warn('[Northveil] MPC enclave import notice:', err.message);
+    });
 
-      const updated = [...subWallets, newWallet];
-      setSubWallets(updated);
-      setActiveWalletIdState(newWallet.id);
-      localStorage.setItem('northveil_v3_subwallets', JSON.stringify(updated));
-      localStorage.setItem('northveil_v3_active_subwallet', newWallet.id);
-
-      SupabaseService.syncWallet(newWallet.address, newWallet.name, activeChain);
-      setTimeout(() => refreshBalances(), 100);
-      return newWallet;
-    } catch (e) {
-      console.error('importSubWallet error:', e);
-      return null;
-    }
+    return newWallet;
   };
 
   const renameSubWallet = (id: string, newName: string) => {
@@ -591,39 +482,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const getDecryptedPrivateKey = async (walletId: string, password?: string): Promise<string | null> => {
-    const targetWallet = subWallets.find(w => w.id === walletId);
-    if (!targetWallet) return null;
-    if (targetWallet.derivationPath?.includes('turnkey') || targetWallet.derivationPath?.includes('northveil')) return null;
-
-    // 1. If seed phrase is already decrypted in session, derive directly
-    if (seedPhrase && seedPhrase.length >= 12) {
-      try {
-        const derived = WalletService.deriveEVMAddress(seedPhrase, targetWallet.accountIndex || 0);
-        if (derived.privateKey) return derived.privateKey;
-      } catch (e) {}
-    }
-
-    // 2. If password provided, attempt vault decryption
-    if (password) {
-      const decryptedSeed = await VaultService.decrypt(password);
-      if (decryptedSeed && decryptedSeed.length >= 12) {
-        setSeedPhrase(decryptedSeed);
-        try {
-          const derived = WalletService.deriveEVMAddress(decryptedSeed, targetWallet.accountIndex || 0);
-          if (derived.privateKey) return derived.privateKey;
-        } catch (e) {}
-      }
-    }
-
-    // 3. Fallback to direct derivation path if available
-    try {
-      const dummySeed = seedPhrase.length >= 12 ? seedPhrase : ['test', 'vault', 'wallet', 'crypto', 'asset', 'secure', 'node', 'chain', 'block', 'token', 'key', 'seed'];
-      const fallback = WalletService.deriveEVMAddress(dummySeed, targetWallet.accountIndex || 0);
-      return fallback.privateKey || null;
-    } catch {
-      return null;
-    }
+  const getDecryptedPrivateKey = async (_walletId: string, _password?: string): Promise<string | null> => {
+    return null;
   };
 
   // Connected AI Agents State (Real Database & On-Chain Connections Only)
@@ -1008,120 +868,13 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const unlockVault = async (password: string): Promise<boolean> => {
-    const decryptedSeed = await VaultService.decrypt(password);
-    if (decryptedSeed && (decryptedSeed.length >= 12 || decryptedSeed.length === 1)) {
-      setSeedPhrase(decryptedSeed);
-      setIsLocked(false);
-      return true;
-    }
+  const unlockVault = async (_password: string): Promise<boolean> => {
     return false;
   };
 
-  const setupVault = async (
-    passwordOrSeed: any,
-    passwordArgOrSeed?: any,
-    walletName?: string
-  ): Promise<boolean> => {
-    let finalSeed: string[] = [];
-    let finalPassword = '';
-
-    if (Array.isArray(passwordOrSeed)) {
-      finalSeed = passwordOrSeed;
-      finalPassword = typeof passwordArgOrSeed === 'string' ? passwordArgOrSeed : '';
-    } else if (typeof passwordOrSeed === 'string') {
-      finalPassword = passwordOrSeed;
-      if (Array.isArray(passwordArgOrSeed) && passwordArgOrSeed.length > 0) {
-        finalSeed = passwordArgOrSeed;
-      } else if (seedPhrase && seedPhrase.length >= 12) {
-        finalSeed = seedPhrase;
-      } else {
-        finalSeed = WalletService.generateSeedPhrase();
-      }
-    }
-
-    if (finalPassword.length < 4) return false;
-    try {
-      if (!finalSeed || (finalSeed.length !== 1 && finalSeed.length < 12)) {
-        finalSeed = WalletService.generateSeedPhrase();
-      }
-      await VaultService.encryptAndSave(finalSeed, finalPassword);
-      setSeedPhrase(finalSeed);
-
-      // Derive fresh primary wallet from the newly created seed
-      const { address, privateKey, path } = WalletService.deriveEVMAddress(finalSeed, 0);
-      let solanaAddress = '';
-      let solanaPath = '';
-      if (finalSeed.length >= 12) {
-        try {
-          const solana = WalletService.deriveSolanaAddress(finalSeed, 0);
-          solanaAddress = solana.address;
-          solanaPath = solana.path;
-        } catch {}
-      }
-
-      let bitcoinAddress = '';
-      let bitcoinPath = '';
-      if (finalSeed.length >= 12) {
-        try {
-          const btc = WalletService.deriveBitcoinAddress(finalSeed, 0);
-          bitcoinAddress = btc.address;
-          bitcoinPath = btc.path;
-        } catch {}
-      }
-
-      const chosenName = walletName?.trim() || 'Primary Vault';
-      const cleanAddress = sanitizeToValidAddress(address, 0);
-
-      const newPrimaryWallet: SubWalletAccount = {
-        id: 'acc-0',
-        name: chosenName,
-        accountIndex: 0,
-        address: cleanAddress,
-        derivationPath: path,
-        privateKey,
-        solanaAddress,
-        solanaDerivationPath: solanaPath,
-        bitcoinAddress,
-        bitcoinDerivationPath: bitcoinPath,
-        colorTag: '#ffffff',
-        isDefault: true,
-        createdAt: new Date().toISOString().split('T')[0],
-        balanceMultiplier: 1.0,
-      };
-
-      // Reset subWallets to the brand new wallet account
-      setSubWallets([newPrimaryWallet]);
-      setActiveWalletIdState('acc-0');
-      localStorage.setItem('northveil_v3_subwallets', JSON.stringify([newPrimaryWallet]));
-      localStorage.setItem('northveil_v3_active_subwallet', 'acc-0');
-
-      // Purge old cached data from previous wallet
-      localStorage.removeItem('northveil_v3_assets');
-      localStorage.removeItem('northveil_v3_transactions');
-      localStorage.removeItem('northveil_v3_staking');
-      setTransactions([]);
-      setStakingPositions([]);
-      setOwnedNFTs([]);
-      setAssets([]);
-
-      setIsVaultConfigured(true);
-      setIsLocked(false);
-      setVaultType('imported');
-
-      // Auto-sync address to Supabase
-      SupabaseService.syncWallet(
-        cleanAddress,
-        chosenName,
-        'ethereum'
-      );
-
-      setTimeout(() => refreshBalances(), 100);
-      return true;
-    } catch (e) {
-      console.error('Vault setup failed:', e);
-      return false;
-    }
+  const setupVault = async (): Promise<boolean> => {
+    console.warn('[Northveil] setupVault is deprecated. All vaults are provisioned via Turnkey MPC.');
+    return false;
   };
 
   // Save to local storage
@@ -1579,68 +1332,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       throw new Error('Wallet or target asset not initialized.');
     }
 
-    // 1. Resolve local signing wallet if available (seed phrase or imported private key)
-    let localWallet: ethers.Wallet | null = null;
-    let localPrivateKey: string | undefined = activeSubWallet.privateKey;
-
-    if (!localPrivateKey && activeSubWallet.id) {
-      localPrivateKey = (await getDecryptedPrivateKey(activeSubWallet.id)) || undefined;
-    }
-    if (!localPrivateKey && seedPhrase && seedPhrase.length > 0) {
-      if (seedPhrase.length === 1) {
-        localPrivateKey = seedPhrase[0];
-      } else if (seedPhrase.length >= 12) {
-        const derived = WalletService.deriveEVMAddress(seedPhrase, activeSubWallet.accountIndex);
-        localPrivateKey = derived.privateKey;
-      }
-    }
-
-    if (localPrivateKey) {
-      const cleanPk = localPrivateKey.startsWith('0x') ? localPrivateKey : `0x${localPrivateKey}`;
-      const provider = ProviderService.getEVMProvider(sourceAsset.network);
-      localWallet = new ethers.Wallet(cleanPk, provider);
-    }
-
-    if (localWallet) {
-      try {
-        const txHash = await SwapService.executeSwap({
-          fromAsset: sourceAsset,
-          toAsset: targetAsset,
-          amount: fromAmount,
-          slippage: userSettings.slippageTolerance,
-          walletAddress: activeSubWallet.address,
-          evmWallet: localWallet,
-          quoteData
-        });
-
-        const newTx: Transaction = {
-          id: `tx-${Date.now()}`,
-          hash: txHash,
-          type: isBridge ? 'bridge' : 'swap',
-          network: toNetwork || sourceAsset.network,
-          fromAsset: sourceAsset.symbol,
-          fromAmount,
-          toAsset: targetAsset.symbol,
-          toAmount,
-          senderAddress: activeSubWallet.address,
-          recipientAddress: activeSubWallet.address,
-          gasFeeUsd,
-          timestamp: new Date().toISOString(),
-          status: 'completed',
-          costBasisUsd: Number((fromAmount * sourceAsset.priceUsd).toFixed(2)),
-          realizedGainUsd: Number((toAmount * targetAsset.priceUsd - fromAmount * sourceAsset.priceUsd - gasFeeUsd).toFixed(2)),
-        };
-
-        setTransactions((prev) => [newTx, ...prev.filter(t => t.id !== newTx.id)]);
-        refreshBalances();
-        return txHash;
-      } catch (e: any) {
-        alert('On-Chain Swap Failed: ' + (e.reason || e.message || e));
-        throw e;
-      }
-    }
-
-    // 2. Non-Custodial MPC Hardware Enclave Vault Swap
+    // Non-Custodial MPC Hardware Enclave Vault Swap
     try {
       const prep = await MpcWalletService.prepareTransaction({
         walletAddress: activeSubWallet.address,
@@ -1719,162 +1411,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       throw new Error('Target asset or wallet unavailable.');
     }
 
-    // 1. Resolve local signing wallet if available
-    let localWallet: ethers.Wallet | null = null;
-    let localPrivateKey: string | undefined = activeSubWallet.privateKey;
-
-    if (!localPrivateKey && activeSubWallet.id) {
-      localPrivateKey = (await getDecryptedPrivateKey(activeSubWallet.id)) || undefined;
-    }
-    if (!localPrivateKey && seedPhrase && seedPhrase.length > 0) {
-      if (seedPhrase.length === 1) {
-        localPrivateKey = seedPhrase[0];
-      } else if (seedPhrase.length >= 12) {
-        const derived = WalletService.deriveEVMAddress(seedPhrase, activeSubWallet.accountIndex);
-        localPrivateKey = derived.privateKey;
-      }
-    }
-
-    if (localPrivateKey) {
-      const cleanPk = localPrivateKey.startsWith('0x') ? localPrivateKey : `0x${localPrivateKey}`;
-      const provider = ProviderService.getEVMProvider(targetAsset.network);
-      localWallet = new ethers.Wallet(cleanPk, provider);
-    }
-
-    // Solana Native Handling
-    if (targetAsset.network === 'solana' || targetAsset.network === 'solana_devnet') {
-      if (seedPhrase && seedPhrase.length >= 12) {
-        try {
-          const { Keypair, Connection, PublicKey, SystemProgram, Transaction: SolTx, sendAndConfirmTransaction, LAMPORTS_PER_SOL } = await import('@solana/web3.js');
-          const rpcUrl = targetAsset.network === 'solana_devnet' ? 'https://api.devnet.solana.com' : 'https://api.mainnet-beta.solana.com';
-          const connection = new Connection(rpcUrl, 'confirmed');
-          const solData = WalletService.deriveSolanaAddress(seedPhrase, activeSubWallet.accountIndex);
-          
-          let fromKeypair: any;
-          if (solData.privateKey) {
-            const bs58 = (await import('bs58')).default;
-            fromKeypair = Keypair.fromSecretKey(bs58.decode(solData.privateKey));
-          }
-
-          if (!fromKeypair) {
-            throw new Error('Unable to derive Solana signing key.');
-          }
-
-          const toPubkey = new PublicKey(recipientAddress);
-          const lamports = Math.round(amount * LAMPORTS_PER_SOL);
-          const solTx = new SolTx().add(
-            SystemProgram.transfer({
-              fromPubkey: fromKeypair.publicKey,
-              toPubkey,
-              lamports,
-            })
-          );
-          const signature = await sendAndConfirmTransaction(connection, solTx, [fromKeypair]);
-
-          const newTx: Transaction = {
-            id: `tx-${Date.now()}`,
-            hash: signature,
-            type: 'send',
-            network: targetAsset.network,
-            fromAsset: targetAsset.symbol,
-            fromAmount: amount,
-            senderAddress: solData.address,
-            recipientAddress,
-            gasFeeUsd: 0.005,
-            timestamp: new Date().toISOString(),
-            status: 'completed',
-          };
-
-          setTransactions((prev) => [newTx, ...prev.filter((t) => t.id !== newTx.id)]);
-          SupabaseService.recordTransaction({
-            wallet_address: solData.address,
-            tx_hash: signature,
-            type: 'send',
-            token_symbol: targetAsset.symbol,
-            amount,
-            recipient: recipientAddress,
-            status: 'completed',
-            chain_id: targetAsset.network,
-            gas_fee_usd: 0.005,
-          });
-          refreshBalances();
-          return signature;
-        } catch (e: any) {
-          alert('Solana Transfer Failed: ' + (e.reason || e.message || e));
-          throw e;
-        }
-      }
-    }
-
-    // EVM Local Signing Handling
-    if (localWallet) {
-      try {
-        const provider = ProviderService.getEVMProvider(targetAsset.network);
-        const connectedWallet = localWallet.connect(provider);
-
-        let txResponse;
-        if (!targetAsset.contractAddress || targetAsset.contractAddress === '0x0000000000000000000000000000000000000000' || targetAsset.contractAddress === '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c') {
-          const tx = {
-            to: recipientAddress,
-            value: parseEtherSafe(amount)
-          };
-          const gasLimit = await connectedWallet.estimateGas(tx).catch(() => 21000n);
-          txResponse = await connectedWallet.sendTransaction({ ...tx, gasLimit });
-        } else {
-          const ERC20_ABI = ['function transfer(address to, uint256 value) returns (bool)'];
-          const contract = new ethers.Contract(targetAsset.contractAddress, ERC20_ABI, connectedWallet);
-          const decimals = targetAsset.decimals || 18;
-          const fixedStr = Number(amount).toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: decimals });
-          let parsedAmount = 0n;
-          try {
-            parsedAmount = ethers.parseUnits(fixedStr, decimals);
-          } catch {
-            parsedAmount = parseEtherSafe(amount);
-          }
-          const gasLimit = await contract.transfer.estimateGas(recipientAddress, parsedAmount).catch(() => 65000n);
-          txResponse = await contract.transfer(recipientAddress, parsedAmount, { gasLimit });
-        }
-
-        const newTx: Transaction = {
-          id: `tx-${Date.now()}`,
-          hash: txResponse.hash,
-          type: 'send',
-          network: targetAsset.network,
-          fromAsset: targetAsset.symbol,
-          fromAmount: amount,
-          senderAddress: activeSubWallet.address,
-          recipientAddress,
-          gasFeeUsd,
-          timestamp: new Date().toISOString(),
-          status: 'pending',
-        };
-
-        setTransactions((prev) => [newTx, ...prev.filter(t => t.id !== newTx.id)]);
-        SupabaseService.recordTransaction({
-          wallet_address: activeSubWallet.address,
-          tx_hash: txResponse.hash,
-          type: 'send',
-          token_symbol: targetAsset.symbol,
-          amount,
-          recipient: recipientAddress,
-          status: 'pending',
-          chain_id: targetAsset.network,
-          gas_fee_usd: gasFeeUsd,
-        });
-
-        txResponse.wait().then(() => {
-          setTransactions((prev) => prev.map(t => t.id === newTx.id ? { ...t, status: 'completed' } : t));
-          refreshBalances();
-        });
-
-        return txResponse.hash;
-      } catch (e: any) {
-        alert('On-Chain Transaction Failed: ' + (e.reason || e.message || e));
-        throw e;
-      }
-    }
-
-    // 2. Non-Custodial Northveil MPC Hardware Enclave Vault Signing with Biometric Passkey
+    // Non-Custodial Northveil MPC Hardware Enclave Vault Signing with Biometric Passkey
     try {
       const prep = await MpcWalletService.prepareTransaction({
         walletAddress: activeSubWallet.address,
@@ -2206,148 +1743,20 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     document.body.removeChild(link);
   };
 
-  // Restore Wallet From Seed
-  const restoreWalletFromSeed = (words: string[], name: string = 'Primary Vault'): boolean => {
-    try {
-      const cleanWords = words.map((w) => w.trim().toLowerCase()).filter(Boolean);
-      if (cleanWords.length < 12) return false;
-
-      // Validate or attempt derivation
-      const { address, privateKey, path } = WalletService.deriveEVMAddress(cleanWords, 0);
-      let solanaAddress = '';
-      let solanaPath = '';
-      try {
-        const solana = WalletService.deriveSolanaAddress(cleanWords, 0);
-        solanaAddress = solana.address;
-        solanaPath = solana.path;
-      } catch {}
-
-      let bitcoinAddress = '';
-      let bitcoinPath = '';
-      try {
-        const btc = WalletService.deriveBitcoinAddress(cleanWords, 0);
-        bitcoinAddress = btc.address;
-        bitcoinPath = btc.path;
-      } catch {}
-
-      setSeedPhrase(cleanWords);
-      localStorage.setItem('northveil_seed_phrase', cleanWords.join(' '));
-      localStorage.setItem('northveil_seed', cleanWords.join(' '));
-
-      const chosenName = name?.trim() || 'Primary Vault';
-      const cleanAddress = sanitizeToValidAddress(address, 0);
-
-      const mainWallet: SubWalletAccount = {
-        id: 'acc-0',
-        name: chosenName,
-        accountIndex: 0,
-        address: cleanAddress,
-        derivationPath: path,
-        privateKey,
-        solanaAddress,
-        solanaDerivationPath: solanaPath,
-        bitcoinAddress,
-        bitcoinDerivationPath: bitcoinPath,
-        colorTag: '#ffffff',
-        isDefault: true,
-        createdAt: new Date().toISOString().split('T')[0],
-        balanceMultiplier: 1.0,
-      };
-
-      setSubWallets([mainWallet]);
-      setActiveWalletIdState('acc-0');
-
-      localStorage.setItem('northveil_v3_subwallets', JSON.stringify([mainWallet]));
-      localStorage.setItem('northveil_v3_active_subwallet', 'acc-0');
-
-      setIsVaultConfigured(true);
-      setIsLocked(false);
-      setVaultType('imported');
-
-      // Auto-sync address to Supabase
-      SupabaseService.syncWallet(
-        cleanAddress,
-        chosenName,
-        'ethereum'
-      );
-
-      setAssets([]);
-      setTransactions([]);
-      setStakingPositions([]);
-      setOwnedNFTs([]);
-      setHistoricalPerformance([]);
-
-      setTimeout(() => refreshBalances(), 100);
-      return true;
-    } catch (e) {
-      console.error('restoreWalletFromSeed error:', e);
-      return false;
-    }
+  // Restore Wallet From Seed (Deprecated)
+  const restoreWalletFromSeed = (_words: string[], _name: string = 'Primary Vault'): boolean => {
+    console.warn('[Northveil] restoreWalletFromSeed is deprecated. Use enclave device import.');
+    return false;
   };
 
-  // Restore Wallet From Private Key
+  // Restore Wallet From Private Key (Deprecated)
   const restoreWalletFromPrivateKey = (
-    privateKeyInput: string,
-    name: string = 'Primary Vault',
-    chain: string = 'ethereum'
+    _privateKeyInput: string,
+    _name: string = 'Primary Vault',
+    _chain: string = 'ethereum'
   ): boolean => {
-    try {
-      const cleanKey = privateKeyInput.trim();
-      if (!cleanKey) return false;
-      const formattedKey = cleanKey.startsWith('0x') ? cleanKey : `0x${cleanKey}`;
-      const wallet = new ethers.Wallet(formattedKey);
-      const address = wallet.address.toLowerCase();
-
-      setSeedPhrase([formattedKey]);
-      localStorage.setItem('northveil_vault_pk', formattedKey);
-      localStorage.setItem('northveil_imported_pk', formattedKey);
-      localStorage.setItem('northveil_active_pk', formattedKey);
-
-      const chosenName = name?.trim() || 'Primary Vault';
-      const cleanAddress = sanitizeToValidAddress(address, 0);
-
-      const mainWallet: SubWalletAccount = {
-        id: 'acc-0',
-        name: chosenName,
-        accountIndex: 0,
-        address: cleanAddress,
-        derivationPath: 'imported_private_key',
-        privateKey: formattedKey,
-        colorTag: '#ffffff',
-        isDefault: true,
-        createdAt: new Date().toISOString().split('T')[0],
-        balanceMultiplier: 1.0,
-      };
-
-      setSubWallets([mainWallet]);
-      setActiveWalletIdState('acc-0');
-
-      localStorage.setItem('northveil_v3_subwallets', JSON.stringify([mainWallet]));
-      localStorage.setItem('northveil_v3_active_subwallet', 'acc-0');
-
-      // Auto-sync address to Supabase for MCP tools
-      SupabaseService.syncWallet(
-        cleanAddress,
-        chosenName,
-        chain
-      );
-
-      setIsVaultConfigured(true);
-      setIsLocked(false);
-      setVaultType('imported');
-
-      setAssets([]);
-      setTransactions([]);
-      setStakingPositions([]);
-      setOwnedNFTs([]);
-      setHistoricalPerformance([]);
-
-      setTimeout(() => refreshBalances(), 100);
-      return true;
-    } catch (e) {
-      console.error('restoreWalletFromPrivateKey error:', e);
-      return false;
-    }
+    console.warn('[Northveil] restoreWalletFromPrivateKey is deprecated. Use enclave device import.');
+    return false;
   };
 
   const logOut = () => {
@@ -2358,6 +1767,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     localStorage.removeItem('northveil_v3_assets');
     localStorage.removeItem('northveil_v3_transactions');
     localStorage.removeItem('northveil_v3_staking');
+    localStorage.removeItem('northveil_vault_pk');
+    localStorage.removeItem('northveil_seed_phrase');
+    localStorage.removeItem('northveil_seed');
+    localStorage.removeItem('northveil_active_pk');
+    localStorage.removeItem('northveil_imported_pk');
     MpcWalletService.clearSession();
     setSeedPhrase([]);
     setIsVaultConfigured(false);

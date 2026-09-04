@@ -1,44 +1,43 @@
 import fetch from 'node-fetch';
 import { getCliConfig, saveCliConfig, clearCliConfig } from '../config';
-import { printBanner, API_BASE_CANDIDATES } from '../utils';
+import { printBanner } from '../utils';
 
 export async function loginCommand(options: { key?: string; url?: string }) {
 
   const apiKey = options.key || process.env.NORTHVEIL_API_KEY;
   if (!apiKey) {
-    console.error('❌ Error: API Key is required.');
-    console.log('👉 Usage: northveil login --key <your_nv_live_key>\n');
+    console.error('❌ Error: Agent Client Key is required.');
+    console.log('👉 To obtain an agent client key:');
+    console.log('   1. Open https://wallet.northveil.xyz in your browser');
+    console.log('   2. Sign in with Google or Passkey');
+    console.log('   3. Navigate to Agent Clients / Developer Keys');
+    console.log('   4. Click "Create Agent Key" to issue a client key');
+    console.log('   5. Run: northveil login --key <your_nv_live_key>\n');
     process.exit(1);
   }
 
-  const customUrl = options.url || process.env.NORTHVEIL_API_URL;
-  const urlsToTry = customUrl ? [customUrl, ...API_BASE_CANDIDATES] : API_BASE_CANDIDATES;
+  const activeUrl = options.url || process.env.NORTHVEIL_API_URL || 'https://mcp.northveil.xyz';
 
-  console.log('🔑 Authenticating with Northveil Protocol...');
+  console.log('🔑 Authenticating with Northveil Protocol at ' + activeUrl + '...');
 
   let authData: any = null;
-  let activeUrl = '';
 
-  for (const baseUrl of urlsToTry) {
-    try {
-      const res = await fetch(`${baseUrl}/api/v1/auth/me`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'X-API-Key': apiKey,
-          'Bypass-Tunnel-Reminder': 'true',
-        },
-      });
+  try {
+    const res = await fetch(`${activeUrl}/api/v1/auth/me`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'X-API-Key': apiKey,
+        'Bypass-Tunnel-Reminder': 'true',
+      },
+    });
 
-      if (res.ok) {
-        authData = await res.json();
-        activeUrl = baseUrl;
-        break;
-      }
-    } catch (e) {
-      // Try next endpoint
+    if (res.ok) {
+      authData = await res.json();
     }
+  } catch (e: any) {
+    console.error('❌ Network Error:', e.message);
   }
 
   if (!authData || !authData.authenticated) {
@@ -75,7 +74,7 @@ export async function whoamiCommand() {
     return;
   }
 
-  const targetUrl = config.apiUrl || process.env.NORTHVEIL_API_URL || API_BASE_CANDIDATES[0];
+  const targetUrl = config.apiUrl || process.env.NORTHVEIL_API_URL || 'https://mcp.northveil.xyz';
 
   try {
     const res = await fetch(`${targetUrl}/api/v1/auth/me`, {
