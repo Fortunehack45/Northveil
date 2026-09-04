@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowRight,
   ArrowLeft,
@@ -13,6 +13,7 @@ import {
   Sparkles,
   Key,
   Plus,
+  AlertCircle,
 } from 'lucide-react';
 import { useWallet } from '../context/WalletContext';
 import { MpcWalletService } from '../services/MpcWalletService';
@@ -57,6 +58,19 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
   const [importPasswordError, setImportPasswordError] = useState('');
 
   const [processingMsg, setProcessingMsg] = useState('');
+  const [googleNotice, setGoogleNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get('error');
+    if (err === 'GOOGLE_CLIENT_ID_NOT_CONFIGURED') {
+      setGoogleNotice(
+        'Google OAuth credentials need to be configured in Vercel. You can create your non-custodial hardware MPC vault directly with your biometric passkey below!'
+      );
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+  }, []);
 
   const handleCopyAddress = () => {
     if (createdVaultAddress) {
@@ -262,6 +276,18 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
               Hardware Enclave Multi-Chain Vault with Biometric Passkeys & AI MCP Tools.
             </p>
           </div>
+
+          {googleNotice && (
+            <div className="p-3.5 bg-amber-500/10 border border-amber-500/25 rounded-2xl text-left space-y-1.5 animate-in fade-in">
+              <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 text-xs font-semibold">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>Google OAuth Setup Notice</span>
+              </div>
+              <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                {googleNotice}
+              </p>
+            </div>
+          )}
 
           <div className="space-y-3 pt-2">
             <button
