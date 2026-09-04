@@ -57,14 +57,49 @@ export const ApprovalsView: React.FC = () => {
     return [];
   });
   const [isCreatingTest, setIsCreatingTest] = useState(false);
-  // Deep link: /?action=approvals&id=UUID loads that id
+  // Deep link: /?action=approvals&id=UUID or /approve/:requestId loads that id
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const deepId = params.get('id');
+    let deepId: string | null = null;
+    const pathname = window.location.pathname;
+    if (pathname.startsWith('/approve/')) {
+      deepId = pathname.replace('/approve/', '').split('/')[0].split('?')[0];
+    }
+    if (!deepId) {
+      const params = new URLSearchParams(window.location.search);
+      deepId = params.get('id') || params.get('requestId');
+    }
     if (deepId) {
       setSearchQuery(deepId);
+      // Directly fetch request details from MCP server
+      const mcpUrl = (import.meta as any).env?.VITE_NORTHVEIL_API_URL || (import.meta as any).env?.VITE_MCP_URL || 'https://mcp.northveil.xyz';
+      fetch(`${mcpUrl}/wallet/requests/${deepId}`, { credentials: 'include' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data && data.requestId) {
+            const stagedRecord: McpApprovalRecord = {
+              id: data.requestId,
+              request_id: data.requestId,
+              approval_token: data.requestId,
+              wallet_address: data.walletAddress || activeSubWallet?.address || '',
+              operation: data.tool || 'transfer',
+              status: data.status === 'success' ? 'CONFIRMED' : data.status === 'denied' ? 'REJECTED' : 'PENDING',
+              created_at: data.createdAt || new Date().toISOString(),
+              parameters: {
+                to: data.to,
+                amount: data.amount,
+                network: data.chain,
+                payloadHash: data.payloadHash,
+              },
+            };
+            setApprovals((prev) => {
+              if (prev.some((p) => p.id === data.requestId)) return prev;
+              return [stagedRecord, ...prev];
+            });
+          }
+        })
+        .catch(() => {});
     }
-  }, []);
+  }, [activeSubWallet?.address]);
 
   // Keep a fresh ref to avoid stale closures in polling intervals
   const approvalsRef = useRef<McpApprovalRecord[]>(approvals);

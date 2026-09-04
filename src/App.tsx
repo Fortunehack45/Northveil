@@ -85,7 +85,7 @@ const MainContent: React.FC = () => {
       setActiveTab('wallets');
     } else if (action === 'agents') {
       setActiveTab('agents');
-    } else if (action === 'approvals') {
+    } else if (action === 'approvals' || window.location.pathname.startsWith('/approve/')) {
       setActiveTab('approvals');
     } else if (action === 'profile') {
       setActiveTab('profile');
