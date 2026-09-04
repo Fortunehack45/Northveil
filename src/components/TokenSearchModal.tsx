@@ -16,6 +16,7 @@ interface TokenSearchModalProps {
   onSelectToken: (token: CryptoAsset) => void;
   selectedAssetId?: string;
   title?: string;
+  writeOnly?: boolean;
 }
 
 export const TokenSearchModal: React.FC<TokenSearchModalProps> = ({
@@ -24,6 +25,7 @@ export const TokenSearchModal: React.FC<TokenSearchModalProps> = ({
   onSelectToken,
   selectedAssetId,
   title = 'Select Token',
+  writeOnly = false,
 }) => {
   const { assets } = useWallet();
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,6 +48,9 @@ export const TokenSearchModal: React.FC<TokenSearchModalProps> = ({
     const baseList = [...withBalance, ...coreZero];
 
     return baseList.filter((asset) => {
+      // Filter out non-write assets if writeOnly is active
+      if (writeOnly && (asset.network === 'bitcoin' || asset.id === 'btc-native')) return false;
+
       // Category filter
       if (activeCategory === 'holdings' && asset.balance <= 0) return false;
       if (activeCategory === 'meme' && !asset.name.toLowerCase().includes('pepe') && !asset.name.toLowerCase().includes('doge') && !asset.name.toLowerCase().includes('bonk')) return false;

@@ -5,6 +5,17 @@
  */
 
 import { MpcWalletService } from './MpcWalletService';
+import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
+
+export function explainWebAuthn(err: unknown): string {
+  const e = err as DOMException;
+  if (e?.name === 'NotAllowedError') {
+    return 'Passkey blocked or timed out. Use https://wallet.northveil.xyz in Chrome or Safari (not an in-app browser). Enable Windows Hello / Touch ID / Face ID, or use a security key. Tap Enroll once and finish the system prompt within two minutes.';
+  }
+  if (e?.name === 'InvalidStateError') return 'This device already has a Northveil passkey. Use Unlock.';
+  if (e?.name === 'NotSupportedError') return 'This browser cannot create passkeys.';
+  return (e as any)?.message || 'Passkey failed';
+}
 
 export interface RegisteredPasskey {
   credentialId: string;
@@ -36,17 +47,9 @@ export class WebAuthnService {
    */
   public static getRpId(): string {
     if (typeof window === 'undefined') return 'northveil.xyz';
-    const hostname = window.location.hostname;
-    if (!hostname || hostname === 'localhost' || hostname === '127.0.0.1') {
-      return hostname || 'localhost';
-    }
-    if (hostname.endsWith('.vercel.app')) {
-      return hostname;
-    }
-    if (hostname.endsWith('northveil.xyz')) {
-      return 'northveil.xyz';
-    }
-    return hostname;
+    const h = window.location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1') return h;
+    return 'northveil.xyz';
   }
 
   /**
@@ -170,81 +173,31 @@ export class WebAuthnService {
 
     try {
       const effectiveUserId = userId || MpcWalletService.getUserId();
-      let creationOptions: PublicKeyCredentialCreationOptions;
 
+      // 1. Obtain cryptographic challenge from server for this specific wallet
+      const serverOpts = await MpcWalletService.getPasskeyRegistrationOptions(
+        effectiveUserId,
+        `user_${normAddr.slice(0, 8)}@northveil.xyz`,
+        displayName || `Vault ${normAddr.slice(0, 6)}...${normAddr.slice(-4)}`,
+        normAddr
+      );
+
+      const optionsJSON = (serverOpts as any).options || serverOpts;
+      let attResp: any;
       try {
-        // 1. Obtain cryptographic challenge from server for this specific wallet
-        const serverOpts = await MpcWalletService.getPasskeyRegistrationOptions(
-          effectiveUserId,
-          `user_${normAddr.slice(0, 8)}@northveil.xyz`,
-          displayName || `Vault ${normAddr.slice(0, 6)}...${normAddr.slice(-4)}`,
-          normAddr
-        );
-
-        creationOptions = {
-          ...serverOpts,
-          challenge: this.base64URLToBuffer(serverOpts.challenge) as unknown as BufferSource,
-          user: {
-            ...serverOpts.user,
-            id: this.base64URLToBuffer(serverOpts.user.id) as unknown as BufferSource,
-          },
-          excludeCredentials: serverOpts.excludeCredentials?.map((c: any) => ({
-            ...c,
-            id: this.base64URLToBuffer(c.id) as unknown as BufferSource,
-          })),
-        };
-      } catch (e: any) {
-        // Fallback to client-generated options if backend unreachable in offline mode
-        const challenge = new Uint8Array(32);
-        window.crypto.getRandomValues(challenge);
-        const userIdBytes = new TextEncoder().encode(effectiveUserId.slice(0, 32));
-        creationOptions = {
-          challenge,
-          rp: { name: 'Northveil Autonomous Vault', id: this.getRpId() },
-          user: {
-            id: userIdBytes,
-            name: `user_${normAddr.slice(0, 8)}`,
-            displayName: displayName || 'Northveil Vault User',
-          },
-          pubKeyCredParams: [
-            { alg: -7, type: 'public-key' },
-            { alg: -257, type: 'public-key' },
-          ],
-          authenticatorSelection: {
-            authenticatorAttachment: 'platform',
-            userVerification: 'preferred',
-            residentKey: 'preferred',
-          },
-          timeout: 60000,
-          attestation: 'none',
-        };
+        attResp = await startRegistration({ optionsJSON });
+      } catch (err) {
+        return { success: false, error: explainWebAuthn(err) };
       }
-
-      // 2. Prompt user device for Biometric / Security Key
-      const credential = (await navigator.credentials.create({
-        publicKey: creationOptions,
-      })) as PublicKeyCredential | null;
-
-      if (!credential) {
-        return { success: false, error: 'Passkey registration cancelled or returned no credential.' };
-      }
-
-      const rawIdBase64 = this.bufferToBase64URL(credential.rawId);
-      const response = credential.response as AuthenticatorAttestationResponse;
 
       const registrationResponsePayload = {
-        id: credential.id,
-        rawId: rawIdBase64,
-        type: credential.type,
-        response: {
-          clientDataJSON: this.bufferToBase64URL(response.clientDataJSON),
-          attestationObject: this.bufferToBase64URL(response.attestationObject),
-          transports: (response as any).getTransports ? (response as any).getTransports() : ['internal', 'hybrid'],
-          publicKeyAlgorithm: (response as any).getPublicKeyAlgorithm ? (response as any).getPublicKeyAlgorithm() : -7,
-        },
+        id: attResp.id,
+        rawId: attResp.rawId,
+        type: attResp.type,
+        response: attResp.response,
       };
 
-      // 3. Verify with server and receive signed session token
+      // 2. Verify with server and receive signed session token
       let sessionToken: string | undefined;
       try {
         const verifyRes = await MpcWalletService.verifyPasskeyRegistration(
@@ -258,14 +211,14 @@ export class WebAuthnService {
       }
 
       const registered: RegisteredPasskey = {
-        credentialId: credential.id,
-        rawIdBase64,
+        credentialId: attResp.id,
+        rawIdBase64: attResp.rawId,
         createdAt: new Date().toISOString(),
         deviceName: 'Biometric Touch ID / Face ID',
         walletAddress: normAddr,
       };
 
-      // 4. Save strictly to the per-wallet map (1-to-1 binding)
+      // 3. Save strictly to the per-wallet map (1-to-1 binding)
       const map = this.listRegisteredPasskeys();
       map[normAddr] = registered;
       localStorage.setItem(this.MAP_STORAGE_KEY, JSON.stringify(map));
@@ -273,10 +226,7 @@ export class WebAuthnService {
 
       return { success: true, passkey: registered, sessionToken };
     } catch (err: any) {
-      if (err.name === 'NotAllowedError') {
-        return { success: false, error: 'Passkey prompt was cancelled by the user.' };
-      }
-      return { success: false, error: err.message || 'Passkey registration failed.' };
+      return { success: false, error: explainWebAuthn(err) };
     }
   }
 
@@ -306,102 +256,27 @@ export class WebAuthnService {
 
     try {
       const effectiveUserId = userId || MpcWalletService.getUserId();
-      let requestOptions: PublicKeyCredentialRequestOptions;
+      const serverOpts = await MpcWalletService.getPasskeyAuthOptions(effectiveUserId, normAddr);
+      const optionsJSON = (serverOpts as any).options || serverOpts;
 
+      let authResp: any;
       try {
-        const serverOpts = await MpcWalletService.getPasskeyAuthOptions(effectiveUserId, normAddr);
-        requestOptions = {
-          ...serverOpts,
-          challenge: this.base64URLToBuffer(serverOpts.challenge) as unknown as BufferSource,
-          allowCredentials: serverOpts.allowCredentials?.map((c: any) => ({
-            ...c,
-            id: this.base64URLToBuffer(c.id) as unknown as BufferSource,
-          })),
-        };
-      } catch {
-        let challenge: Uint8Array;
-        if (customChallenge && customChallenge.length >= 16) {
-          challenge = new TextEncoder().encode(customChallenge);
-        } else {
-          challenge = new Uint8Array(32);
-          window.crypto.getRandomValues(challenge);
-        }
-
-        const registered = this.getRegisteredPasskey(normAddr);
-        requestOptions = {
-          challenge: challenge as unknown as BufferSource,
-          rpId: this.getRpId(),
-          userVerification: 'preferred',
-          timeout: 60000,
-        };
-
-        if (registered?.rawIdBase64) {
-          try {
-            requestOptions.allowCredentials = [
-              {
-                id: this.base64URLToBuffer(registered.rawIdBase64) as unknown as BufferSource,
-                type: 'public-key',
-                transports: ['internal', 'hybrid'],
-              },
-            ];
-          } catch {}
-        }
-      }
-
-      const assertion = (await navigator.credentials.get({
-        publicKey: requestOptions,
-      })) as PublicKeyCredential | null;
-
-      if (!assertion) {
-        return { success: false, error: 'Biometric authorization returned no response.' };
-      }
-
-      const response = assertion.response as AuthenticatorAssertionResponse;
-      const clientDataJSON = this.bufferToBase64URL(response.clientDataJSON);
-      const authenticatorData = this.bufferToBase64URL(response.authenticatorData);
-      const signature = this.bufferToBase64URL(response.signature);
-      const userHandle = response.userHandle ? this.bufferToBase64URL(response.userHandle) : undefined;
-
-      const assertionPayload = {
-        credentialId: assertion.id,
-        clientDataJSON,
-        authenticatorData,
-        signature,
-      };
-
-      // Verify on backend
-      let sessionToken: string | undefined;
-      try {
-        const verifyRes = await MpcWalletService.verifyPasskeyAuthentication(
-          effectiveUserId,
-          normAddr || '',
-          {
-            id: assertion.id,
-            rawId: this.bufferToBase64URL(assertion.rawId),
-            type: assertion.type,
-            response: {
-              clientDataJSON,
-              authenticatorData,
-              signature,
-              userHandle,
-            },
-          }
-        );
-        sessionToken = verifyRes.sessionToken;
-      } catch (err: any) {
-        console.warn('Server authentication verification note:', err.message);
+        authResp = await startAuthentication({ optionsJSON });
+      } catch (err) {
+        return { success: false, error: explainWebAuthn(err) };
       }
 
       return {
         success: true,
-        sessionToken,
-        assertion: assertionPayload,
+        assertion: {
+          credentialId: authResp.id,
+          clientDataJSON: authResp.response.clientDataJSON,
+          authenticatorData: authResp.response.authenticatorData,
+          signature: authResp.response.signature,
+        },
       };
     } catch (err: any) {
-      if (err.name === 'NotAllowedError') {
-        return { success: false, error: 'Biometric authorization was cancelled.' };
-      }
-      return { success: false, error: err.message || 'WebAuthn biometric authentication error.' };
+      return { success: false, error: explainWebAuthn(err) };
     }
   }
 }

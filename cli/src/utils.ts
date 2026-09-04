@@ -23,8 +23,16 @@ export function printBanner() {
 ╚═══════════════════════════════════════════════════════════════╝`);
 }
 
-export async function mcpJsonRpc(method: string, params: any = {}): Promise<any> {
+export function requireApiKey(): CliConfig {
   const cfg = getConfig();
+  if (!cfg.apiKey) {
+    throw new Error('Authentication required: No API key configured. Run `northveil login` or set NORTHVEIL_API_KEY.');
+  }
+  return cfg;
+}
+
+export async function mcpJsonRpc(method: string, params: any = {}): Promise<any> {
+  const cfg = requireApiKey();
   const res = await fetch(`${cfg.baseUrl}/mcp`, {
     method: 'POST',
     headers: {

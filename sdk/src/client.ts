@@ -98,6 +98,10 @@ export class NorthveilClient {
       throw new Error(`MCP Tool Error (${json.error.code}): ${json.error.message}`);
     }
 
+    if (json.result?.structuredContent) {
+      return json.result.structuredContent as T;
+    }
+
     const contentText = json.result?.content?.[0]?.text;
     if (!contentText) return json.result as T;
 
@@ -112,7 +116,7 @@ export class NorthveilClient {
    * Retrieves real-time portfolio balance and valuation across supported chains
    */
   public async getPortfolio(walletAddress?: string): Promise<PortfolioResult> {
-    return this.callTool<PortfolioResult>('get_portfolio', walletAddress ? { walletAddress } : {});
+    return this.callTool<PortfolioResult>('nv_get_portfolio', walletAddress ? { walletAddress } : {});
   }
 
   /**
@@ -121,14 +125,14 @@ export class NorthveilClient {
    * - Under Autonomous: Evaluates grant limits and executes threshold MPC signing immediately if within bounds.
    */
   public async prepareTransfer(params: PrepareTransferParams): Promise<PrepareTransferResult> {
-    return this.callTool<PrepareTransferResult>('prepare_transfer', params);
+    return this.callTool<PrepareTransferResult>('nv_prepare_transfer', params);
   }
 
   /**
    * Checks the confirmation receipt of an on-chain transaction hash
    */
   public async getTransactionStatus(txHash: string, chain?: string): Promise<TransactionStatusResult> {
-    return this.callTool<TransactionStatusResult>('get_transaction_status', { txHash, chain });
+    return this.callTool<TransactionStatusResult>('nv_get_tx', { txHash, chain });
   }
 
   /**

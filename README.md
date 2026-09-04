@@ -60,7 +60,7 @@ Northveil/
 1. **Zero Server-Side Private Key Storage**: No private keys, seed phrases, or MPC secret shares exist on the server, in memory as long-lived secrets, in Postgres, in environment variables, or in git.
 2. **WebAuthn Biometric Passkey Gating**: Operations under *Always Ask* mode generate single-use approval tickets with 10-minute TTL. The challenge commits cryptographically to `sha256(canonicalUnsignedTx)`.
 3. **Autonomous Agent Spending Scopes**: Users grant AI agents scoped operational budgets with maximum per-transaction caps, rolling 24-hour daily limits, and recipient allowlists. Non-zero calldata is forbidden in autonomous mode.
-4. **Isolated Threshold MPC**: Signing occurs inside hardware-isolated enclaves (Turnkey TEE partitions) upon validation of policy and cryptographic passkey assertion evidence.
+4. **Isolated Threshold MPC**: Signing occurs inside hardware-isolated enclaves (Turnkey TEE partitions) upon validation of policy and cryptographic passkey assertion evidence. Operator root keys are denied transaction signing privileges once the Turnkey Console deny-policy is applied (see [SECURITY.md](file:///c:/Users/USER%20PC/Desktop/Northveil/SECURITY.md)).
 
 ---
 

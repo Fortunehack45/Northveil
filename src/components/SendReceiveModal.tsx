@@ -18,9 +18,16 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
 }) => {
   const { assets, sendCrypto, triggerBiometricAuth, hardwareWallet, activeSubWallet } = useWallet();
 
-  const [selectedAssetId, setSelectedAssetId] = useState<string>(
-    initialAssetId || assets[0]?.id || 'eth-main'
-  );
+  const [selectedAssetId, setSelectedAssetId] = useState<string>(() => {
+    if (mode === 'send') {
+      const candidate = assets.find((a) => a.id === initialAssetId);
+      if (candidate && (candidate.network === 'bitcoin' || candidate.id === 'btc-native')) {
+        const evm = assets.find((a) => a.network === 'base' || a.network === 'ethereum');
+        return evm?.id || 'eth-main';
+      }
+    }
+    return initialAssetId || assets[0]?.id || 'eth-main';
+  });
   const [recipientAddress, setRecipientAddress] = useState<string>('');
   const [amount, setAmount] = useState<string>('0.05');
   const [copied, setCopied] = useState<boolean>(false);
@@ -123,7 +130,8 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
           setSelectedAssetId(t.id);
           setIsTokenSearchOpen(false);
         }}
-        title="Select Token"
+        writeOnly={mode === 'send'}
+        title={mode === 'send' ? 'Select Asset to Send' : 'Select Token'}
       />
 
       <div className="bg-white dark:bg-[#121215] border border-black/[0.08] dark:border-white/[0.08] rounded-3xl max-w-md w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
@@ -225,10 +233,16 @@ export const SendReceiveModal: React.FC<SendReceiveModalProps> = ({
               </div>
             </div>
 
+            {asset.network === 'bitcoin' && (
+              <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-left leading-relaxed">
+                Bitcoin is view-only (read-only balance tracking). Outbound MPC transfers are currently enabled on Base, Ethereum, and Sepolia.
+              </div>
+            )}
+
             {/* Send Button */}
             <button
               onClick={handleConfirmSend}
-              disabled={isSending || !recipientAddress || numAmount <= 0}
+              disabled={isSending || !recipientAddress || numAmount <= 0 || asset.network === 'bitcoin'}
               className="w-full py-3 bg-black text-white dark:bg-white dark:text-black font-semibold rounded-full text-xs hover:opacity-85 active:scale-[0.98] cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
             >
               {isSending ? 'Signing & Broadcasting...' : `Confirm & Send ${asset.symbol}`}

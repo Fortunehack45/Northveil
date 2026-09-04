@@ -72,6 +72,8 @@ class Northveil:
             raise NorthveilException(f"MCP Error ({err.get('code')}): {err.get('message')}")
 
         result = data.get("result", {})
+        if "structuredContent" in result:
+            return result["structuredContent"]
         content = result.get("content", [])
         if content and isinstance(content, list) and len(content) > 0:
             text = content[0].get("text", "")
@@ -138,7 +140,7 @@ class Northveil:
         """Retrieve multi-chain balances and USD valuation."""
         target = wallet_address or self.wallet_address
         args = {"walletAddress": target} if target else {}
-        return self.call("get_portfolio", args)
+        return self.call("nv_get_portfolio", args)
 
     def prepare_transfer(self, to: str, amount: str, chain: str = "eip155:8453", asset: str = "ETH", **kwargs) -> dict:
         """
@@ -153,13 +155,14 @@ class Northveil:
             "asset": asset,
             **kwargs
         }
-        return self.call("prepare_transfer", args)
+        return self.call("nv_prepare_transfer", args)
 
     def get_transaction_status(self, tx_hash: str, chain: str = None) -> dict:
         """Check confirmation status of a transaction on-chain."""
         args = {"txHash": tx_hash}
         if chain:
             args["chain"] = chain
-        return self.call("get_transaction_status", args)
+        return self.call("nv_get_tx", args)
 
 NorthveilClient = Northveil
+

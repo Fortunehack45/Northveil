@@ -53,8 +53,8 @@ export function registerMcpCommands(program: any) {
       // Interactive terminal mode: Print configuration snippets
       const cfg = getConfig();
       console.log(`\n🤖 NORTHVEIL MODEL CONTEXT PROTOCOL (MCP) CONFIG`);
-      console.log(`HTTP Endpoint: ${cfg.baseUrl}/mcp`);
-      console.log(`SSE Endpoint:  ${cfg.baseUrl}/sse\n`);
+      console.log(`Primary Endpoint: ${cfg.baseUrl}/mcp (Streamable HTTP JSON-RPC 2.0)`);
+      console.log(`Legacy SSE Alias: ${cfg.baseUrl}/sse\n`);
 
       if (options.cursor) {
         const cursor = {
@@ -88,8 +88,9 @@ export function registerMcpCommands(program: any) {
         console.log(`Streamable HTTP MCP JSON-RPC 2.0 URL:`);
         console.log(`curl -X POST ${cfg.baseUrl}/mcp -H "X-API-Key: ${cfg.apiKey}" -H "Content-Type: application/json"`);
       } else if (options.sse) {
-        console.log(`Server-Sent Events (SSE) Stream URL:`);
-        console.log(`${cfg.baseUrl}/sse?apiKey=${cfg.apiKey}`);
+        console.log(`Server-Sent Events (SSE) Stream URL (Legacy Alias):`);
+        console.log(`${cfg.baseUrl}/sse`);
+        console.log(`Note: Authenticate via 'Authorization: Bearer <API_KEY>' or 'X-API-Key: <API_KEY>' header.`);
       } else {
         const claude = {
           mcpServers: {

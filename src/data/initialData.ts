@@ -462,7 +462,7 @@ export const SUPPORTED_CHAINS: ChainInfo[] = [
 
 export const DICTIONARY: Record<LanguageCode, Record<string, string>> = {
   en: {
-    appTitle: 'Apex DEX & Multi-Chain Wallet',
+    appTitle: 'Northveil Non-Custodial Agent Wallet',
     portfolio: 'Portfolio',
     dexBridge: 'DEX & Bridge',
     gasEstimator: 'Gas Estimator',
@@ -495,7 +495,7 @@ export const DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     theme: 'Theme',
   },
   es: {
-    appTitle: 'Billetera Apex DEX Multicadena',
+    appTitle: 'Billetera Northveil No Custodial',
     portfolio: 'Portafolio',
     dexBridge: 'DEX y Puente',
     gasEstimator: 'Estimador de Gas',
@@ -528,7 +528,7 @@ export const DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     theme: 'Tema',
   },
   de: {
-    appTitle: 'Apex DEX & Multi-Chain Wallet',
+    appTitle: 'Northveil Non-Custodial Agent Wallet',
     portfolio: 'Portfolio',
     dexBridge: 'DEX & Bridge',
     gasEstimator: 'Gas-Schätzung',
@@ -561,7 +561,7 @@ export const DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     theme: 'Design',
   },
   ja: {
-    appTitle: 'Apex DEX & マルチチェーンウォレット',
+    appTitle: 'Northveil ノンカストディアル・ウォレット',
     portfolio: 'ポートフォリオ',
     dexBridge: 'DEX & ブリッジ',
     gasEstimator: 'ガス代見積もり',
@@ -594,7 +594,7 @@ export const DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     theme: 'テーマ',
   },
   zh: {
-    appTitle: 'Apex DEX 与多链去中心化钱包',
+    appTitle: 'Northveil 非托管智能代理钱包',
     portfolio: '资产组合',
     dexBridge: 'DEX 闪兑与跨链桥',
     gasEstimator: 'Gas 费实时估算',
@@ -627,7 +627,7 @@ export const DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     theme: '主题',
   },
   fr: {
-    appTitle: 'Portefeuille Apex DEX & Multi-Chaînes',
+    appTitle: 'Portefeuille Northveil Non-Custodial',
     portfolio: 'Portefeuille',
     dexBridge: 'DEX & Pont Multi-Chaînes',
     gasEstimator: 'Estimateur de Gas',

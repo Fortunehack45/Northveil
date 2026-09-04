@@ -17,7 +17,8 @@ import {
 } from 'lucide-react';
 import { useWallet } from '../context/WalletContext';
 import { MpcWalletService } from '../services/MpcWalletService';
-import { WebAuthnService } from '../services/WebAuthnService';
+import { WebAuthnService, explainWebAuthn } from '../services/WebAuthnService';
+import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 
 interface OnboardingAuthModalProps {
   onClose?: () => void;
@@ -109,6 +110,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
 
   const countdownTimerRef = useRef<any>(null);
   const resendTimerRef = useRef<any>(null);
+  const enrollingRef = useRef(false);
 
   // Check if device supports platform biometric passkey
   useEffect(() => {
@@ -382,6 +384,8 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
    * Unlock with Passkey (Returning user flow)
    */
   const handleUnlockPasskey = async () => {
+    if (enrollingRef.current) return;
+    enrollingRef.current = true;
     setPasskeyError('');
     setStep('processing');
     setProcessingMsg('Authenticating with hardware biometric passkey...');
@@ -399,39 +403,17 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       const options = await parseResponse(beginRes);
       if (!beginRes.ok) throw new Error(options.error || 'Failed to start passkey authentication');
 
-      // 2. Prompt user WebAuthn assertion
-      const cred = (await navigator.credentials.get({
-        publicKey: {
-          ...options,
-          challenge: WebAuthnService.base64URLToBuffer(options.challenge) as unknown as BufferSource,
-          allowCredentials: options.allowCredentials?.map((c: any) => ({
-            ...c,
-            id: WebAuthnService.base64URLToBuffer(c.id) as unknown as BufferSource,
-          })),
-        },
-      })) as PublicKeyCredential | null;
-
-      if (!cred) throw new Error('Passkey authentication cancelled or returned no credential');
-
-      const getResp = cred.response as AuthenticatorAssertionResponse;
-      const loginPayload = {
-        credentialId: cred.id,
-        response: {
-          id: cred.id,
-          rawId: WebAuthnService.bufferToBase64URL(cred.rawId),
-          type: cred.type,
-          clientDataJSON: WebAuthnService.bufferToBase64URL(getResp.clientDataJSON),
-          authenticatorData: WebAuthnService.bufferToBase64URL(getResp.authenticatorData),
-          signature: WebAuthnService.bufferToBase64URL(getResp.signature),
-          userHandle: getResp.userHandle ? WebAuthnService.bufferToBase64URL(getResp.userHandle) : undefined,
-        },
-      };
+      // 2. Prompt user WebAuthn assertion via @simplewebauthn/browser
+      const authResp = await startAuthentication({ optionsJSON: options.options || options });
 
       // 3. Complete passkey login on server (returns elevated passkeyOk: true session token)
       const finishRes = await fetch(`${MpcWalletService.getBaseUrl()}/auth/passkey/login/finish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(loginPayload),
+        body: JSON.stringify({
+          credentialId: authResp.id,
+          response: authResp,
+        }),
       });
       const finishData = await parseResponse(finishRes);
       if (!finishRes.ok) throw new Error(finishData.error || 'Passkey authentication failed');
@@ -455,8 +437,10 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       setGate('app');
       if (onClose) onClose();
     } catch (err: any) {
-      setPasskeyError(explainFetch(err, `${MpcWalletService.getBaseUrl()}/auth/passkey/login`));
+      setPasskeyError(explainWebAuthn(err) || explainFetch(err, `${MpcWalletService.getBaseUrl()}/auth/passkey/login`));
       setStep('unlockPasskey');
+    } finally {
+      enrollingRef.current = false;
     }
   };
 
@@ -464,6 +448,8 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
    * Enroll Biometric Passkey (Mandatory WebAuthn registration)
    */
   const handleEnrollPasskey = async () => {
+    if (enrollingRef.current) return;
+    enrollingRef.current = true;
     setPasskeyError('');
     setStep('processing');
     setProcessingMsg('Prompting biometric passkey enrollment (Touch ID / Face ID / Windows Hello)...');
@@ -485,32 +471,8 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       const options = await parseResponse(beginRes);
       if (!beginRes.ok) throw new Error(options.error || 'Failed to start passkey registration');
 
-      // 2. Navigator credentials create
-      const cred = (await navigator.credentials.create({
-        publicKey: {
-          ...options,
-          challenge: WebAuthnService.base64URLToBuffer(options.challenge) as unknown as BufferSource,
-          user: {
-            ...options.user,
-            id: WebAuthnService.base64URLToBuffer(options.user.id) as unknown as BufferSource,
-          },
-        },
-      })) as PublicKeyCredential | null;
-
-      if (!cred) throw new Error('Passkey creation cancelled or returned no credential');
-
-      const regResp = cred.response as AuthenticatorAttestationResponse;
-      const registerPayload = {
-        userId,
-        response: {
-          id: cred.id,
-          rawId: WebAuthnService.bufferToBase64URL(cred.rawId),
-          type: cred.type,
-          clientDataJSON: WebAuthnService.bufferToBase64URL(regResp.clientDataJSON),
-          attestationObject: WebAuthnService.bufferToBase64URL(regResp.attestationObject),
-          transports: (regResp as any).getTransports ? (regResp as any).getTransports() : ['internal', 'hybrid'],
-        },
-      };
+      // 2. WebAuthn credentials create via @simplewebauthn/browser
+      const attResp = await startRegistration({ optionsJSON: options.options || options });
 
       // 3. Finish registration
       const finishRes = await fetch(`${MpcWalletService.getBaseUrl()}/auth/passkey/register/finish`, {
@@ -519,7 +481,10 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(registerPayload),
+        body: JSON.stringify({
+          userId,
+          response: attResp,
+        }),
       });
       const finishData = await parseResponse(finishRes);
       if (!finishRes.ok) throw new Error(finishData.error || 'Passkey registration verification failed');
@@ -537,8 +502,10 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         setStep('chooseWallet');
       }
     } catch (err: any) {
-      setPasskeyError(explainFetch(err, `${MpcWalletService.getBaseUrl()}/auth/passkey/register`));
+      setPasskeyError(explainWebAuthn(err) || explainFetch(err, `${MpcWalletService.getBaseUrl()}/auth/passkey/register`));
       setStep('enrollPasskey');
+    } finally {
+      enrollingRef.current = false;
     }
   };
 
@@ -885,6 +852,16 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
               {passkeyError}
             </div>
           )}
+
+          <div className="bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.06] rounded-xl p-3 text-[11px] text-zinc-500 dark:text-zinc-400 space-y-1.5 leading-relaxed text-left">
+            <div className="font-semibold text-zinc-700 dark:text-zinc-300">Tips for passkey registration:</div>
+            <ul className="list-disc list-inside space-y-0.5">
+              <li>Open this page at <span className="font-mono text-zinc-700 dark:text-zinc-300">https://wallet.northveil.xyz</span></li>
+              <li>Use Chrome or Safari (not an in-app browser)</li>
+              <li>Supports Windows Hello, Touch ID, Face ID, or a hardware security key</li>
+              <li>Tap Enroll once and finish the system prompt within two minutes</li>
+            </ul>
+          </div>
 
           <button
             onClick={handleEnrollPasskey}

@@ -1744,14 +1744,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const csvContent =
       'data:text/csv;charset=utf-8,' +
-      [`# APEX DEX WALLET TAX REPORT (${year}) - METHOD: ${method}`, `# Net Taxable Income: $${summary.netTaxableIncomeUsd}`]
+      [`# NORTHVEIL WALLET TAX REPORT (${year}) - METHOD: ${method}`, `# Net Taxable Income: $${summary.netTaxableIncomeUsd}`]
         .concat([headers.join(','), ...rows.map((r) => r.join(','))])
         .join('\n');
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Apex_Tax_Report_${year}_${method}.csv`);
+    link.setAttribute('download', `Northveil_Tax_Report_${year}_${method}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
