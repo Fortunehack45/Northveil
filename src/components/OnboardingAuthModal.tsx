@@ -435,6 +435,18 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       setIsVaultConfigured(true);
       setIsLocked(false);
       setGate('app');
+
+      // If this login was part of an OAuth popup flow (e.g. from Claude), resume authorization
+      const urlParams = new URLSearchParams(window.location.search);
+      const nextUrl = urlParams.get('next');
+      if (nextUrl) {
+        if (nextUrl.startsWith('/oauth/authorize') || nextUrl.startsWith('https://mcp.northveil.xyz/oauth/authorize')) {
+          const target = nextUrl.startsWith('http') ? nextUrl : `https://mcp.northveil.xyz${nextUrl}`;
+          window.location.href = target;
+          return;
+        }
+      }
+
       if (onClose) onClose();
     } catch (err: any) {
       setPasskeyError(explainWebAuthn(err) || explainFetch(err, `${MpcWalletService.getBaseUrl()}/auth/passkey/login`));

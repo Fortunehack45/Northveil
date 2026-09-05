@@ -57,7 +57,10 @@ export const OAuthConsentModal: React.FC<OAuthConsentModalProps> = ({
 
       const token = localStorage.getItem('nv_session_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+        headers['X-Session-Token'] = token;
+      }
 
       const res = await fetch(`${mcpUrl}/oauth/consent`, {
         method: 'POST',
