@@ -392,6 +392,7 @@ export class MpcWalletService {
   public static async getPasskeyAuthOptions(userId?: string, walletAddress?: string) {
     const res = await fetch(`${this.getBaseUrl()}/auth/passkey/login/begin`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId,
@@ -404,7 +405,7 @@ export class MpcWalletService {
     if (!res.ok || !opts) {
       throw new Error(json.error || json.message || 'Failed to generate WebAuthn authentication options');
     }
-    return opts;
+    return { ...opts, challengeToken: json.challengeToken };
   }
 
   /**
@@ -413,15 +414,19 @@ export class MpcWalletService {
   public static async verifyPasskeyAuthentication(
     userId: string,
     walletAddress: string,
-    authenticationResponse: any
+    authenticationResponse: any,
+    challengeToken?: string
   ): Promise<PasskeyVerificationResult> {
     const res = await fetch(`${this.getBaseUrl()}/auth/passkey/login/finish`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId,
         walletAddress: (walletAddress || '').toLowerCase(),
         credentialId: authenticationResponse.id,
+        challenge: authenticationResponse.challenge,
+        challengeToken,
         response: authenticationResponse,
       }),
     });

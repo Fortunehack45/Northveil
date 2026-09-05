@@ -397,6 +397,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       // 1. Begin passkey login options
       const beginRes = await fetch(`${MpcWalletService.getBaseUrl()}/auth/passkey/login/begin`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: userId || undefined, rpID: isLocal ? 'localhost' : undefined }),
       });
@@ -406,12 +407,18 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       // 2. Prompt user WebAuthn assertion via @simplewebauthn/browser
       const authResp = await startAuthentication({ optionsJSON: options.options || options });
 
+      const issuedChallenge = (options.options || options)?.challenge || options?.challenge;
+      const challengeToken = options.challengeToken;
+
       // 3. Complete passkey login on server (returns elevated passkeyOk: true session token)
       const finishRes = await fetch(`${MpcWalletService.getBaseUrl()}/auth/passkey/login/finish`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           credentialId: authResp.id,
+          challenge: issuedChallenge,
+          challengeToken,
           response: authResp,
         }),
       });
@@ -474,6 +481,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       // 1. Begin registration
       const beginRes = await fetch(`${MpcWalletService.getBaseUrl()}/auth/passkey/register/begin`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -489,6 +497,9 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         throw new Error('Passkey create returned an empty credential. Use Chrome/Safari on https://wallet.northveil.xyz.');
       }
 
+      const issuedChallenge = (options.options || options)?.challenge || options?.challenge;
+      const challengeToken = options.challengeToken;
+
       // 3. Finish registration
       const finishRes = await fetch(`${MpcWalletService.getBaseUrl()}/auth/passkey/register/finish`, {
         method: 'POST',
@@ -499,6 +510,8 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         },
         body: JSON.stringify({
           userId,
+          challenge: issuedChallenge,
+          challengeToken,
           response: attResp,
           hostname: window.location.hostname,
           origin: window.location.origin,
