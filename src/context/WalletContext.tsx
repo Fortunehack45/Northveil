@@ -698,7 +698,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           setGate("app");
           return;
         }
-        if (next === "unlock_passkey" && me.wallets?.length) {
+        if (me.wallets?.length) {
+          // If wallets exist, never show create_or_import — prompt passkey unlock
           setIsVaultConfigured(false);
           setIsLocked(true);
           setAuthNext("unlock_passkey");
@@ -708,6 +709,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setIsVaultConfigured(false);
         setAuthNext(next === "create_or_import" ? "create_or_import" : (next as any));
         setGate("auth");
+
       } catch {
         if (!cancelled) {
           setGate("auth");

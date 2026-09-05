@@ -40,6 +40,12 @@ function explainFetch(err: unknown, url: string): string {
   if (/failed to fetch|networkerror|load failed/i.test(msg)) {
     return `Cannot reach ${url}. Check you are on wallet.northveil.xyz, MCP is up, and CORS allows this origin.`;
   }
+  if (/invalid api key/i.test(msg) || /auth_db_misconfigured/i.test(msg) || /supabase_admin_key_invalid/i.test(msg)) {
+    return 'Northveil auth database is misconfigured. Try again in a minute.';
+  }
+  if (/resend/i.test(msg)) {
+    return 'Could not send email. Try Google, or retry.';
+  }
   return msg;
 }
 
@@ -129,10 +135,18 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const err = params.get('error');
-    if (err === 'GOOGLE_CLIENT_ID_NOT_CONFIGURED') {
-      setGoogleNotice(
-        'Google OAuth credentials need to be configured in Vercel. You can continue with email or your biometric passkey below!'
-      );
+    if (err) {
+      if (err === 'GOOGLE_CLIENT_ID_NOT_CONFIGURED') {
+        setGoogleNotice(
+          'Google OAuth credentials need to be configured in Vercel. You can continue with email or your biometric passkey below!'
+        );
+      } else if (err === 'AUTH_DB_MISCONFIGURED' || /invalid api key/i.test(err) || /supabase_admin_key_invalid/i.test(err)) {
+        setGoogleNotice('Northveil auth database is misconfigured. Try again in a minute.');
+      } else if (/resend/i.test(err)) {
+        setGoogleNotice('Could not send email. Try Google, or retry.');
+      } else {
+        setGoogleNotice(err);
+      }
       const cleanUrl = window.location.pathname;
       window.history.replaceState({}, '', cleanUrl);
     }
@@ -151,9 +165,16 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
             MpcWalletService.saveSession(incomingToken, me.user.id, 'mpc');
             if (me.wallets && me.wallets.length > 0) {
               await setupMpcVaultFromServer(me.wallets, incomingToken);
+              if (me.passkeyOk) {
+                setIsVaultConfigured(true);
+                setIsLocked(false);
+                setGate('app');
+                if (onClose) onClose();
+                return;
+              }
             }
             const next = me.next || (me.wallets?.length ? 'unlock_passkey' : 'enroll_passkey');
-            if (next === 'unlock_passkey') {
+            if (next === 'unlock_passkey' || (me.wallets && me.wallets.length > 0)) {
               if (me.passkeyOk && me.wallets?.length) {
                 setIsVaultConfigured(true);
                 setIsLocked(false);
@@ -181,6 +202,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         });
     }
   }, []);
+
 
   // Countdown timer effect for emailCode step
   useEffect(() => {
