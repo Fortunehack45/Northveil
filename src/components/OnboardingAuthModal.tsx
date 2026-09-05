@@ -429,14 +429,28 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       MpcWalletService.saveSession(finishData.sessionToken, finishData.user?.id, 'mpc');
 
       // 5. Fetch /wallet/me to load all authentic wallets (primary first)
-      const me = await MpcWalletService.fetchWalletMe(finishData.sessionToken);
+      let me: any = null;
+      try {
+        me = await MpcWalletService.fetchWalletMe(finishData.sessionToken);
+      } catch (e) {
+        console.warn('[OnboardingAuthModal] fetchWalletMe notice:', e);
+      }
 
-      if (!me.wallets || me.wallets.length === 0) {
+      let effectiveWallets = (me?.wallets && Array.isArray(me.wallets) && me.wallets.length > 0) ? me.wallets : [];
+      if (effectiveWallets.length === 0) {
+        if (finishData.wallets && Array.isArray(finishData.wallets) && finishData.wallets.length > 0) {
+          effectiveWallets = finishData.wallets;
+        } else if (finishData.wallet) {
+          effectiveWallets = [finishData.wallet];
+        }
+      }
+
+      if (effectiveWallets.length === 0) {
         setStep('chooseWallet');
         return;
       }
 
-      await setupMpcVaultFromServer(me.wallets, finishData.sessionToken);
+      await setupMpcVaultFromServer(effectiveWallets, finishData.sessionToken);
 
       // Passkey unlock successful: transition directly to dashboard without lock flash
       setIsVaultConfigured(true);

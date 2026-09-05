@@ -691,11 +691,18 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         if (me.wallets?.length) {
           await setupMpcVaultFromServer(me.wallets, token);
         }
-        const next = me.next || (me.wallets?.length ? "unlock_passkey" : "enroll_passkey");
-        if (next === "unlock_passkey" && me.wallets?.length && me.passkeyOk) {
+        const next = me.next || (me.wallets?.length ? (me.passkeyOk ? "dashboard" : "unlock_passkey") : "enroll_passkey");
+        if (me.wallets?.length && (me.passkeyOk || next === "dashboard")) {
           setIsVaultConfigured(true);
           setIsLocked(false);
           setGate("app");
+          return;
+        }
+        if (next === "unlock_passkey" && me.wallets?.length) {
+          setIsVaultConfigured(false);
+          setIsLocked(true);
+          setAuthNext("unlock_passkey");
+          setGate("auth");
           return;
         }
         setIsVaultConfigured(false);
@@ -735,7 +742,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         if (res.sessionToken) {
           MpcWalletService.saveSession(res.sessionToken, targetUserId, 'mpc');
         }
+        setIsVaultConfigured(true);
         setIsLocked(false);
+        setGate('app');
         return true;
       }
       return false;
