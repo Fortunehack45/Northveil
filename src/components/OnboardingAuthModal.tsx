@@ -142,14 +142,17 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         );
       } else if (err === 'AUTH_DB_MISCONFIGURED' || /invalid api key/i.test(err) || /supabase_admin_key_invalid/i.test(err)) {
         setGoogleNotice('Northveil auth database is misconfigured. Try again in a minute.');
+      } else if (err === 'AUTH_FAILED') {
+        setGoogleNotice('Google authentication could not be completed. You can sign in with your email or biometric passkey below.');
       } else if (/resend/i.test(err)) {
         setGoogleNotice('Could not send email. Try Google, or retry.');
       } else {
-        setGoogleNotice(err);
+        setGoogleNotice('Authentication failed. Please try again or sign in with your email below.');
       }
       const cleanUrl = window.location.pathname;
       window.history.replaceState({}, '', cleanUrl);
     }
+
 
     const incomingToken = params.get('sessionToken');
     if (incomingToken) {
