@@ -448,10 +448,16 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         }),
       });
       const finishData = await parseResponse(finishRes);
-      if (!finishRes.ok) throw new Error(finishData.error || 'Passkey authentication failed');
+      if (!finishRes.ok) {
+        if (finishData.error === 'PASSKEY_NOT_FOUND' || finishRes.status === 404) {
+          throw new Error('PASSKEY_NOT_FOUND');
+        }
+        throw new Error(finishData.error || finishData.message || 'Passkey authentication failed');
+      }
 
       // 4. Save elevated session token
       MpcWalletService.saveSession(finishData.sessionToken, finishData.user?.id, 'mpc');
+
 
       // 5. Fetch /wallet/me to load all authentic wallets (primary first)
       let me: any = null;
@@ -559,18 +565,27 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       const finishData = await parseResponse(finishRes);
       if (!finishRes.ok) throw new Error(finishData.error || finishData.message || 'Passkey registration verification failed');
 
+      if (finishData.sessionToken) {
+        MpcWalletService.saveSession(finishData.sessionToken, finishData.user?.id || userId, 'mpc');
+      }
+
       // 4. Branch based on /wallet/me: if user already has wallets, load them and go to dashboard
-      const sessionToken = MpcWalletService.getSessionToken();
+      const sessionToken = MpcWalletService.getSessionToken() || finishData.sessionToken;
       const me = await MpcWalletService.fetchWalletMe(sessionToken || undefined);
 
       if (me.wallets && me.wallets.length > 0) {
         await setupMpcVaultFromServer(me.wallets, sessionToken || undefined);
         const primary = me.wallets.find((w: any) => w.is_primary) || me.wallets[0];
         setCreatedVaultAddress(primary.address);
-        setStep('createdSuccess');
+        setIsVaultConfigured(true);
+        setIsLocked(false);
+        setGate('app');
+        if (onClose) onClose();
+        return;
       } else {
         setStep('chooseWallet');
       }
+
     } catch (err: any) {
       setPasskeyError(explainWebAuthn(err) || explainFetch(err, `${MpcWalletService.getBaseUrl()}/auth/passkey/register`));
       setStep('enrollPasskey');
@@ -883,8 +898,21 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
           </div>
 
           {passkeyError && (
-            <div className="text-xs text-red-500 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
-              {passkeyError}
+            <div className="text-xs text-red-500 bg-red-500/10 border border-red-500/20 rounded-xl p-3 space-y-2.5 text-left">
+              <p className="font-medium">
+                {passkeyError.includes('PASSKEY_NOT_FOUND')
+                  ? 'No matching passkey was found on this device for your account.'
+                  : passkeyError}
+              </p>
+              <button
+                onClick={() => {
+                  setPasskeyError('');
+                  setStep('enrollPasskey');
+                }}
+                className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5"
+              >
+                <Fingerprint className="w-3.5 h-3.5" /> Set Up Passkey on this Device
+              </button>
             </div>
           )}
 
@@ -894,8 +922,21 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
           >
             <Fingerprint className="w-4 h-4" /> Unlock Vault with Passkey
           </button>
+
+          <div className="text-center pt-1">
+            <button
+              onClick={() => {
+                setPasskeyError('');
+                setStep('enrollPasskey');
+              }}
+              className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 cursor-pointer transition-all inline-flex items-center gap-1"
+            >
+              Using a new device? <span className="underline font-medium text-black dark:text-white">Enroll passkey on this device</span>
+            </button>
+          </div>
         </div>
       )}
+
 
       {/* ─── STEP: ENROLL PASSKEY (NEW ACCOUNT) ────────────────────── */}
       {step === 'enrollPasskey' && (
