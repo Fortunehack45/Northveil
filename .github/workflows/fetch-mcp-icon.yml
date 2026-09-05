@@ -1,0 +1,63 @@
+name: Fetch MCP icon asset
+
+# Temporary utility workflow: pulls the official Northveil MCP icon asset
+# from its canonical URL and commits a self-hosted copy into the repo so the
+# MCP server can serve it from its own origin (reliable icon rendering for
+# MCP clients that refuse cross-origin / hotlink-protected images).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-icon:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Download official MCP icon
+        run: |
+          set -euo pipefail
+          mkdir -p mcp-server/public public
+          curl -fsSL --retry 3 \
+            -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" \
+            -o /tmp/northveil-icon.png \
+            "https://iili.io/CDS9fvn.png"
+          ls -l /tmp/northveil-icon.png
+          MAGIC=$(head -c 8 /tmp/northveil-icon.png | xxd -p)
+          echo "magic=$MAGIC"
+          case "$MAGIC" in
+            89504e470d0a1a0a*) echo "valid PNG";;
+            ffd8ff*) echo "valid JPEG"; mv /tmp/northveil-icon.png /tmp/northveil-icon.img;;
+            *) echo "unexpected file signature - aborting"; head -c 200 /tmp/northveil-icon.png; exit 1;;
+          esac
+
+      - name: Install brand assets
+        run: |
+          set -euo pipefail
+          if [ -f /tmp/northveil-icon.img ]; then
+            EXT=jpg
+          else
+            EXT=png
+          fi
+          cp /tmp/northveil-icon.img /tmp/northveil-icon.$EXT 2>/dev/null || true
+          cp /tmp/northveil-icon.$EXT mcp-server/public/icon.$EXT
+          cp /tmp/northveil-icon.$EXT public/mcp-icon.$EXT
+          ls -l mcp-server/public public/mcp-icon.$EXT
+
+      - name: Commit and push
+        run: |
+          set -euo pipefail
+          git config user.name "arena-ai-coding-agent[bot]"
+          git config user.email "198508977+arena-ai-coding-agent[bot]@users.noreply.github.com"
+          git add -A mcp-server/public public/mcp-icon.*
+          if git diff --cached --quiet; then
+            echo "no changes to commit"
+          else
+            git commit -m "chore(branding): self-host official Northveil MCP icon asset"
+            git push origin "HEAD:${{ github.ref_name }}"
+          fi
