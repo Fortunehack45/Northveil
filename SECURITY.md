@@ -63,8 +63,12 @@ Northveil is an AI-agent non-custodial wallet and MCP server control plane. Secu
    - The browser performs client-side HPKE encryption (`encryptWalletToBundle` / `encryptPrivateKeyToBundle`) using `@turnkey/crypto`.
    - The server only receives an `encryptedBundle` via `POST /wallet/import/finish` and forwards it directly to the Turnkey enclave.
    - Direct plaintext submission to `POST /wallet/import` is rejected with `400 RAW_MATERIAL_FORBIDDEN`.
+5. **No Server-Side Signing**:
+   - hosted signAndBroadcast has no signTransaction call
+   - Server-side signing using organization root credentials is permanently forbidden on hosted environments. Signing requires user-stamped activities.
 
 ---
+
 
 ## Turnkey Enclave Policy Specification
 

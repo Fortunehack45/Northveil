@@ -696,8 +696,21 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           setIsVaultConfigured(true);
           setIsLocked(false);
           setGate("app");
+          const nextUrl = new URLSearchParams(window.location.search).get('next');
+          if (
+            nextUrl &&
+            (nextUrl.startsWith('/oauth/authorize') ||
+              nextUrl.startsWith('https://mcp.northveil.xyz/oauth/authorize'))
+          ) {
+            const target = nextUrl.startsWith('http')
+              ? nextUrl
+              : `https://mcp.northveil.xyz${nextUrl}`;
+            window.location.href = target;
+            return;
+          }
           return;
         }
+
         if (me.wallets?.length) {
           // If wallets exist, never show create_or_import — prompt passkey unlock
           setIsVaultConfigured(false);
@@ -747,7 +760,20 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setIsVaultConfigured(true);
         setIsLocked(false);
         setGate('app');
+        const nextUrl = new URLSearchParams(window.location.search).get('next');
+        if (
+          nextUrl &&
+          (nextUrl.startsWith('/oauth/authorize') ||
+            nextUrl.startsWith('https://mcp.northveil.xyz/oauth/authorize'))
+        ) {
+          const target = nextUrl.startsWith('http')
+            ? nextUrl
+            : `https://mcp.northveil.xyz${nextUrl}`;
+          window.location.href = target;
+          return true;
+        }
         return true;
+
       }
       return false;
     } catch (err) {

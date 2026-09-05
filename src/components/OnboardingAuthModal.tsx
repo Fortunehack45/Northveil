@@ -118,6 +118,23 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
   const resendTimerRef = useRef<any>(null);
   const enrollingRef = useRef(false);
 
+  // Resume Claude OAuth helper
+  const resumeNextOAuth = (explicitNext?: string | null): boolean => {
+    const nextUrl = explicitNext || new URLSearchParams(window.location.search).get('next');
+    if (
+      nextUrl &&
+      (nextUrl.startsWith('/oauth/authorize') ||
+        nextUrl.startsWith('https://mcp.northveil.xyz/oauth/authorize'))
+    ) {
+      const target = nextUrl.startsWith('http')
+        ? nextUrl
+        : `https://mcp.northveil.xyz${nextUrl}`;
+      window.location.href = target;
+      return true;
+    }
+    return false;
+  };
+
   // Check if device supports platform biometric passkey
   useEffect(() => {
     if (WebAuthnService.isSupported()) {
@@ -135,6 +152,8 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const err = params.get('error');
+    const nextParam = params.get('next');
+
     if (err) {
       if (err === 'GOOGLE_CLIENT_ID_NOT_CONFIGURED') {
         setGoogleNotice(
@@ -142,6 +161,10 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
         );
       } else if (err === 'AUTH_DB_MISCONFIGURED' || /invalid api key/i.test(err) || /supabase_admin_key_invalid/i.test(err)) {
         setGoogleNotice('Northveil auth database is misconfigured. Try again in a minute.');
+      } else if (err === 'GOOGLE_AUTH_FAILED') {
+        setGoogleNotice('Google authentication failed. Please try signing in again, or continue with email below.');
+      } else if (err === 'SESSION_FAILED') {
+        setGoogleNotice('Session could not be established. Please try signing in again.');
       } else if (err === 'AUTH_FAILED') {
         setGoogleNotice('Google authentication could not be completed. You can sign in with your email or biometric passkey below.');
       } else if (/resend/i.test(err)) {
@@ -149,10 +172,11 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       } else {
         setGoogleNotice('Authentication failed. Please try again or sign in with your email below.');
       }
-      const cleanUrl = window.location.pathname;
+      const cleanUrl = nextParam
+        ? `${window.location.pathname}?next=${encodeURIComponent(nextParam)}`
+        : window.location.pathname;
       window.history.replaceState({}, '', cleanUrl);
     }
-
 
     const incomingToken = params.get('sessionToken');
     if (incomingToken) {
@@ -160,10 +184,6 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
       setProcessingMsg('Securing session with Northveil MPC...');
       MpcWalletService.fetchWalletMe(incomingToken)
         .then(async (me) => {
-          // Clean URL only AFTER fetch finishes to prevent query loss
-          const cleanUrl = window.location.pathname;
-          window.history.replaceState({}, '', cleanUrl);
-
           if (me && me.user) {
             MpcWalletService.saveSession(incomingToken, me.user.id, 'mpc');
             if (me.wallets && me.wallets.length > 0) {
@@ -172,6 +192,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
                 setIsVaultConfigured(true);
                 setIsLocked(false);
                 setGate('app');
+                if (resumeNextOAuth(nextParam)) return;
                 if (onClose) onClose();
                 return;
               }
@@ -182,6 +203,7 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
                 setIsVaultConfigured(true);
                 setIsLocked(false);
                 setGate('app');
+                if (resumeNextOAuth(nextParam)) return;
                 if (onClose) onClose();
                 return;
               }
@@ -198,13 +220,12 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
           }
         })
         .catch((fetchErr: any) => {
-          const cleanUrl = window.location.pathname;
-          window.history.replaceState({}, '', cleanUrl);
           setGoogleNotice(explainFetch(fetchErr, `${MpcWalletService.getBaseUrl()}/wallet/me`));
           setStep('welcome');
         });
     }
   }, []);
+
 
 
   // Countdown timer effect for emailCode step
@@ -260,11 +281,11 @@ export const OnboardingAuthModal: React.FC<OnboardingAuthModalProps> = ({
   };
 
   const handleContinueWithGoogle = () => {
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const redirectUri = window.location.origin + window.location.pathname;
+    const redirectUri = window.location.href;
     const mcpBase = MpcWalletService.getBaseUrl();
     window.location.href = `${mcpBase}/auth/google/start?redirect=${encodeURIComponent(redirectUri)}`;
   };
+
 
   const parseResponse = async (res: Response) => {
     const text = await res.text();
