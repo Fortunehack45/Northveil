@@ -24,12 +24,10 @@ import {
   DICTIONARY,
 } from '../data/initialData';
 import { fetchLivePortfolio, fetchLiveHistory, fetchLiveMe } from '../services/LivePortfolio';
-import { WalletService } from '../services/WalletService';
 import { TokenService } from '../services/TokenService';
 import { ProviderService } from '../services/ProviderService';
 import { SwapService } from '../services/SwapService';
 import { IndexerService } from '../services/IndexerService';
-import { VaultService } from '../services/VaultService';
 import { SupabaseService } from '../services/SupabaseService';
 import { WebAuthnService } from '../services/WebAuthnService';
 import { MpcWalletService } from '../services/MpcWalletService';
@@ -996,9 +994,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const refreshBalances = async () => {
     if (!activeSubWallet || !activeSubWallet.address) return;
     try {
-      const currentSeed = (seedPhrase && seedPhrase.length > 0) ? seedPhrase : null;
-      const solanaAddress = currentSeed ? WalletService.deriveSolanaAddress(currentSeed, activeSubWallet.accountIndex).address : activeSubWallet.address;
-      const bitcoinAddress = currentSeed ? WalletService.deriveBitcoinAddress(currentSeed, activeSubWallet.accountIndex).address : activeSubWallet.address;
+      const solanaAddress = activeSubWallet.address;
+      const bitcoinAddress = activeSubWallet.address;
       
       // Deep clone current assets to prevent mutating the state directly
       let baseAssets: CryptoAsset[] = JSON.parse(JSON.stringify(latestAssets.current));

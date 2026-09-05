@@ -22,7 +22,6 @@ import { SupabaseService, supabase } from '../services/SupabaseService';
 import { MpcWalletService } from '../services/MpcWalletService';
 import { WebAuthnService } from '../services/WebAuthnService';
 import { ProviderService } from '../services/ProviderService';
-import { WalletService } from '../services/WalletService';
 import { formatShortAddress, parseEtherSafe } from '../services/addressUtils';
 import { ethers } from 'ethers';
 

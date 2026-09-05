@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Fingerprint, CheckCircle2, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
 
+import { startRegistration } from '@simplewebauthn/browser';
+
 export default function PasskeyOnboardingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -16,39 +18,41 @@ export default function PasskeyOnboardingPage() {
 
     try {
       if (!window.PublicKeyCredential) {
-        throw new Error('WebAuthn is not supported in this environment.');
+        throw new Error('WebAuthn biometrics are not supported on this device.');
       }
 
-      // Generate challenge and register credential on platform authenticator (Touch ID, Windows Hello, Face ID)
-      const challenge = new Uint8Array(32);
-      window.crypto.getRandomValues(challenge);
-
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          challenge,
-          rp: {
-            name: 'Northveil Vault',
-            id: window.location.hostname,
-          },
-          user: {
-            id: new Uint8Array([1, 2, 3, 4]),
-            name: 'user@northveil.xyz',
-            displayName: 'Northveil User',
-          },
-          pubKeyCredParams: [
-            { alg: -7, type: 'public-key' },  // ES256
-            { alg: -257, type: 'public-key' }, // RS256
-          ],
-          authenticatorSelection: {
-            userVerification: 'required',
-            residentKey: 'preferred',
-          },
-          timeout: 60000,
-        },
+      const mcpBase = process.env.NEXT_PUBLIC_MCP_URL || 'https://mcp.northveil.xyz';
+      const beginRes = await fetch(`${mcpBase}/auth/passkey/register/begin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          hostname: window.location.hostname,
+        }),
       });
 
-      if (!credential) {
-        throw new Error('Registration was cancelled or failed.');
+      if (!beginRes.ok) {
+        throw new Error('Failed to initiate passkey registration.');
+      }
+
+      const opts = await beginRes.json();
+      const optionsJSON = opts.options || opts;
+      const regResp = await startRegistration({ optionsJSON });
+
+      const finishRes = await fetch(`${mcpBase}/auth/passkey/register/finish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          challenge: opts.challenge || optionsJSON.challenge,
+          challengeToken: opts.challengeToken,
+          response: regResp,
+        }),
+      });
+
+      const finishData = await finishRes.json();
+      if (!finishRes.ok || (!finishData.verified && !finishData.success)) {
+        throw new Error(finishData.error || finishData.message || 'Passkey registration rejected.');
       }
 
       setEnrolled(true);
@@ -56,12 +60,7 @@ export default function PasskeyOnboardingPage() {
         router.push('/onboarding/wallet');
       }, 1200);
     } catch (err: any) {
-      // In dev/unsupported webviews, allow simulated progression
-      console.warn('Passkey registration fallback:', err);
-      setEnrolled(true);
-      setTimeout(() => {
-        router.push('/onboarding/wallet');
-      }, 1000);
+      setError(err?.message || 'Passkey enrollment failed. Please try again.');
     } finally {
       setLoading(false);
     }

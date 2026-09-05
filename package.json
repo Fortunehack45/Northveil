@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit && node scripts/check-no-custodial-keys.js",
+    "lint:custody": "node scripts/check-no-custodial-keys.js",
     "test:mpc": "npx tsx scratch/test_real_non_custodial_mpc.ts"
   },
   "dependencies": {

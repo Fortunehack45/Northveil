@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldCheck, Fingerprint, Lock, ArrowRight, CheckCircle2 } from 'lucide-react';
 
+import { startAuthentication } from '@simplewebauthn/browser';
+
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -33,7 +35,35 @@ export default function LoginPage() {
       if (!window.PublicKeyCredential) {
         throw new Error('WebAuthn passkeys are not supported on this browser or device.');
       }
-      // Demo passkey login verification
+      const mcpBase = process.env.NEXT_PUBLIC_MCP_URL || 'https://mcp.northveil.xyz';
+      const beginRes = await fetch(`${mcpBase}/auth/passkey/login/begin`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (!beginRes.ok) {
+        throw new Error('Failed to begin passkey authentication.');
+      }
+      const opts = await beginRes.json();
+      const optionsJSON = opts.options || opts;
+      const authResp = await startAuthentication({ optionsJSON });
+
+      const finishRes = await fetch(`${mcpBase}/auth/passkey/login/finish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          credentialId: authResp.id,
+          challenge: opts.challenge || optionsJSON.challenge,
+          challengeToken: opts.challengeToken,
+          response: authResp,
+        }),
+      });
+
+      const finishData = await finishRes.json();
+      if (!finishRes.ok || (!finishData.verified && !finishData.success)) {
+        throw new Error(finishData.error || finishData.message || 'Passkey verification rejected');
+      }
+
       router.push('/home');
     } catch (err: any) {
       setError(err.message || 'Passkey authentication failed');

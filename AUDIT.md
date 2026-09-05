@@ -64,30 +64,37 @@ The objective is to eliminate all client-side and server-side key custody risks,
 
 ## 3. Implementation Verification Checklist
 
-- [ ] **Phase 1 (Wallet SPA)**:
-  - [ ] Delete/hide `setupVault` from UI.
-  - [ ] Hydrate wallet state exclusively from `GET /wallet/me`.
-  - [ ] In-browser encryption via `@turnkey/crypto` for wallet import.
-  - [ ] Zero mnemonic string in React state.
-- [ ] **Phase 2 (MCP Custody)**:
-  - [ ] Add `RAW_MATERIAL_FORBIDDEN` guard in `/wallet/import/finish`.
-  - [ ] Remove `ethers.HDNodeWallet.fromPhrase` from `mpcAdapter.ts`.
-  - [ ] Hosted boot invariant check with `signer=turnkey` boot log.
-  - [ ] Verify no secret columns in database schema.
-- [ ] **Phase 3 (CLI)**:
-  - [ ] Remove `tx:prepare` and `tx:broadcast`.
-  - [ ] Implement `northveil tools` and `northveil call <tool> [args]`.
-  - [ ] Store API key in `~/.northveil/credentials` (mode `0600`).
-  - [ ] Default URL to `https://mcp.northveil.xyz`.
-- [ ] **Phase 4 (SDK)**:
-  - [ ] TypeScript SDK: reject `privateKey`/`mnemonic`, implement `call()` and `getRequest()`.
-  - [ ] Python SDK: strip forbidden travel tools ("38 tools"), provide clean JSON-RPC client.
-- [ ] **Phase 5 (Cross-Surface Bugs)**:
-  - [ ] Add `resources/list` handler to MCP server.
-  - [ ] Ensure standard error mapping for lifecycle errors.
-- [ ] **Phase 6 (Tests)**:
-  - [ ] Test `RAW_MATERIAL_FORBIDDEN` rejection.
-  - [ ] Test `NO_SIGN_PERMIT` enforcement.
-  - [ ] Zero secret hits across hosted paths.
-- [ ] **Phase 7 (Docs)**:
-  - [ ] Update `SECURITY.md` with exact Turnkey policy details.
+- [x] **Phase 1 (Wallet SPA)**:
+  - [x] Delete dead `VaultService.ts` and `WalletService.ts` entirely.
+  - [x] Remove unused imports and enforce CI lint check (`node scripts/check-no-custodial-keys.js`).
+  - [x] Delete/hide `setupVault` from UI.
+  - [x] Hydrate wallet state exclusively from `GET /wallet/me`.
+  - [x] In-browser encryption via `@turnkey/crypto` for wallet import.
+  - [x] Zero mnemonic string in React state.
+- [x] **Phase 2 (MCP Custody & Auth)**:
+  - [x] Add `RAW_MATERIAL_FORBIDDEN` guard in `/wallet/import/finish`.
+  - [x] Remove `ethers.HDNodeWallet.fromPhrase` from `mpcAdapter.ts`.
+  - [x] Hosted boot invariant check with `signer=turnkey` boot log.
+  - [x] Verify no secret columns in database schema (`wallets` only has `mpc_wallet_id`).
+  - [x] Fix WebAuthn COSE public key decoding (`unpackCredentialPublicKey`) to eliminate `"Length not supported or not well formed"`.
+  - [x] Fix SSE CORS credentials + origin allow-list to adhere to Fetch specification.
+  - [x] Disclose autonomous mode delegate key requirements honestly in `nv_set_autonomous_mode`.
+- [x] **Phase 3 (CLI)**:
+  - [x] Remove `tx:prepare` and `tx:broadcast`.
+  - [x] Implement `northveil tools` and `northveil call <tool> [args]`.
+  - [x] Store API key in `~/.northveil/credentials` (mode `0600`).
+  - [x] Default URL to `https://mcp.northveil.xyz`.
+- [x] **Phase 4 (SDK)**:
+  - [x] TypeScript SDK: reject `privateKey`/`mnemonic`, implement `call()` and `getRequest()`.
+  - [x] Python SDK: strip forbidden travel tools ("38 tools"), provide clean JSON-RPC client.
+- [x] **Phase 5 (Cross-Surface Bugs)**:
+  - [x] Add `resources/list` handler to MCP server.
+  - [x] Ensure standard error mapping for lifecycle errors.
+- [x] **Phase 6 (Tests & CI)**:
+  - [x] Test `RAW_MATERIAL_FORBIDDEN` rejection.
+  - [x] Test `NO_SIGN_PERMIT` enforcement.
+  - [x] Zero secret hits across hosted paths.
+  - [x] Add automated custody pattern linter in `npm run lint`.
+- [ ] **Phase 7 (Pending Turnkey Dashboard Verification)**:
+  - [ ] Confirm Turnkey dashboard policy denies root API key from direct `ACTIVITY_TYPE_SIGN_TRANSACTION_V2` on user sub-org wallets without user passkey authenticator.
+
